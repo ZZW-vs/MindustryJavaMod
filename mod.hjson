@@ -1,14 +1,14 @@
 #the mod name as displayed in-game
-displayName: "Java Mod Template"
+displayName: "测试模组"
 
 #the internal name of your mod
-name: "example-java-mod"
+name: "这是一个测试模组"
 
 #your name
-author: "You"
+author: "ZZW"
 
 #the fully qualified main class of the mod
-main: "example.ExampleJavaMod"
+main: "ZZW.ExampleJavaMod"
 
 #the mod description as seen in the mod dialog
 description: "A Mindustry Java mod template."
