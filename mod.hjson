@@ -5,10 +5,10 @@ displayName: "测试模组"
 name: "这是一个测试模组"
 
 #your name
-author: "ZZW"
+author: "zzw"
 
 #the fully qualified main class of the mod
-main: "ZZW.ExampleJavaMod"
+main: "zzw.TestMod"
 
 #the mod description as seen in the mod dialog
 description: "A Mindustry Java mod template."
@@ -17,7 +17,7 @@ description: "A Mindustry Java mod template."
 version: 1.0
 
 #the minimum game build required to run this mod
-minGameVersion: 146
+minGameVersion: 145
 
 #this is a java mod
 java: true
