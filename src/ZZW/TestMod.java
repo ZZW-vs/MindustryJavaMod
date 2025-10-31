@@ -1,4 +1,4 @@
-package Text;
+package ZZW;
 
 import arc.Events;
 import arc.util.Time;
@@ -6,12 +6,12 @@ import mindustry.game.EventType;
 import mindustry.mod.Mod;
 import mindustry.ui.dialogs.BaseDialog;
 
-public class TextMod extends Mod {
-    public TextMod() {
-        Events.on(EventType.ClientLoadEvent.class, e -> {
+public class TestMod extends Mod{
+    public TestMod() {
+        Events.on(EventType.ClientLoadEvent.class, e ->{
             Time.run(10f, () -> {
-                BaseDialog  dialog = new BaseDialog("Welcome to use my mod!");
-                dialog.cont.add("I am ZZW, Thank you for using my mod!");
+                BaseDialog dialog = new BaseDialog("Welcome to use my mod!");
+                dialog.cont.add("I am ZZW, Thank you for playing my mod");
                 Time.run(100f, dialog::addCloseButton);
                 dialog.show();
             });
