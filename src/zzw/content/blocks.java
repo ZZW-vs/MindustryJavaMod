@@ -8,31 +8,31 @@ import mindustry.world.Block;
 import mindustry.world.blocks.production.GenericCrafter;
 
 public class blocks {
-    public static Block Furnace, Processing_Factory;
+    public static Block  Plate_Maker, Large_Plate_Maker;
     public static void load(){
-        Furnace = new GenericCrafter("furnace"){{
-            requirements(Category.crafting, ItemStack.with(Items.copper, 100, Items.lead, 80, items.Iron, 30));
+        Plate_Maker = new GenericCrafter("plate_maker"){{
+            requirements(Category.crafting, ItemStack.with(Items.copper, 90, Items.lead, 70, items.Iron, 35));
 
             alwaysUnlocked = true;
             craftEffect = Fx.pulverizeMedium;
-            outputItem = new ItemStack(items.Iron_Plate, 1);
+            outputItem = new ItemStack(items.Iron_Sheet, 1);
             consumeItem(items.Iron, 1);
 
             size = 2;
             hasItems = true;
-            craftTime = 90;
+            craftTime = 80f;
         }};
 
-        Processing_Factory = new GenericCrafter("processing_factory"){{
-            requirements(Category.crafting, ItemStack.with(items.Iron, 100, Items.lead, 80, items.Iron_Plate, 30));
+        Large_Plate_Maker = new GenericCrafter("large_plate_maker"){{
+            requirements(Category.crafting, ItemStack.with(items.Iron, 130, Items.lead, 100, items.Iron, 40, items.Iron_Sheet, 25));
             alwaysUnlocked = true;
             craftEffect = Fx.pulverizeMedium;
-            outputItem = new ItemStack(items.Iron_Plate, 1);
-            consumeItem(items.Iron, 1);
+            outputItem = new ItemStack(items.Iron_Sheet, 3);
+            consumeItem(items.Iron, 2);
 
-            size = 2;
+            size = 3;
             hasItems = true;
-            craftTime = 90;
+            craftTime = 60f;
         }};
 
     }
