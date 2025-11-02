@@ -7,6 +7,7 @@ import mindustry.mod.Mod;
 import mindustry.ui.dialogs.BaseDialog;
 
 import zzw.content.items;
+import zzw.content.blocks;
 
 public class TestMod extends Mod{
     public TestMod(){
@@ -23,5 +24,6 @@ public class TestMod extends Mod{
     @Override
     public void loadContent(){
         items.load();
+        blocks.load();
     }
 }

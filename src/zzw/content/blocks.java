@@ -12,10 +12,11 @@ public class blocks {
     public static void load(){
         Furnace = new GenericCrafter("furnace"){{
             requirements(Category.crafting, ItemStack.with(Items.copper, 100, Items.lead, 80, items.Iron, 30));
+
             alwaysUnlocked = true;
             craftEffect = Fx.pulverizeMedium;
             outputItem = new ItemStack(items.Iron_Plate, 1);
-            consumeItem(zzw.content.items.Iron, 1);
+            consumeItem(items.Iron, 1);
 
             size = 2;
             hasItems = true;
