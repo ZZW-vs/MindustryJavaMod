@@ -15,24 +15,24 @@ public class blocks {
 
             alwaysUnlocked = true;
             craftEffect = Fx.pulverizeMedium;
-            outputItem = new ItemStack(items.Iron_Sheet, 1);
-            consumeItem(items.Iron, 1);
+            outputItem = new ItemStack(items.Iron_Sheet, 2);
+            consumeItem(items.Iron, 2);
 
             size = 2;
             hasItems = true;
-            craftTime = 80f;
+            craftTime = 65f;
         }};
 
         Large_Plate_Maker = new GenericCrafter("large_plate_maker"){{
             requirements(Category.crafting, ItemStack.with(items.Iron, 130, Items.lead, 100, items.Iron, 40, items.Iron_Sheet, 25));
             alwaysUnlocked = true;
             craftEffect = Fx.pulverizeMedium;
-            outputItem = new ItemStack(items.Iron_Sheet, 3);
-            consumeItem(items.Iron, 2);
+            outputItem = new ItemStack(items.Iron_Sheet, 4);
+            consumeItem(items.Iron, 3);
 
             size = 3;
             hasItems = true;
-            craftTime = 60f;
+            craftTime = 55f;
         }};
 
     }
