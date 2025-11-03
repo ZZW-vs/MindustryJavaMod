@@ -17,10 +17,7 @@ public class blocks {
             craftEffect = Fx.pulverizeMedium;
 
             outputItem = new ItemStack(items.Iron_Sheet, 2);
-            consumeItem(items.Iron, 2);
-
-            outputItem = new ItemStack(items.Gold_Sheet, 2);
-            consumeItem(items.Gold, 2);
+            consumeItem(items.Iron, 2 );
 
             size = 2;
             hasItems = true;
