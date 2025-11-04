@@ -12,7 +12,8 @@ import static mindustry.type.ItemStack.with;
 
 
 public class blocks {
-    public static Block Plate_Maker_Iron, Large_Plate_Maker_Iron, Plate_Maker_Gold, Large_Plate_Maker_Gold, Conveyor;
+    public static Block Plate_Maker_Iron, Large_Plate_Maker_Iron, Plate_Maker_Gold,
+            Large_Plate_Maker_Gold, PPC_Conveyor;
     public static void load(){
         Plate_Maker_Iron = new GenericCrafter("plate_maker_iron"){{
             requirements(Category.crafting, ItemStack.with(Items.copper, 90, Items.lead, 70, items.Iron, 35));
@@ -29,7 +30,8 @@ public class blocks {
         }};
 
         Large_Plate_Maker_Iron = new GenericCrafter("large_plate_maker_iron"){{
-            requirements(Category.crafting, ItemStack.with(items.Iron, 130, Items.lead, 100, items.Iron, 40, items.Iron_Sheet, 25));
+            requirements(Category.crafting, ItemStack.with(items.Iron, 130, Items.lead, 100, items.Iron, 40,
+                    items.Iron_Sheet, 25));
             alwaysUnlocked = true;
             craftEffect = Fx.pulverizeMedium;
 
@@ -59,7 +61,8 @@ public class blocks {
         }};
 
         Large_Plate_Maker_Gold = new GenericCrafter("large_plate_maker_gold"){{
-            requirements(Category.crafting, ItemStack.with(items.Iron, 140, Items.lead, 110, items.Gold, 40, items.Gold_Sheet, 25));
+            requirements(Category.crafting, ItemStack.with(items.Iron, 140, Items.lead, 110, items.Gold, 40,
+                    items.Gold_Sheet, 25));
             alwaysUnlocked = true;
             craftEffect = Fx.pulverizeMedium;
 
@@ -74,7 +77,7 @@ public class blocks {
             craftTime = 70f;
         }};
 
-        Conveyor = new Conveyor("ppc"){{
+        PPC_Conveyor = new Conveyor("ppc") {{
             requirements(Category.distribution, with(items.Iron, 1));
             health = 55;
             speed = 0.5f;
@@ -82,6 +85,5 @@ public class blocks {
             buildCostMultiplier = 2f;
             researchCost = with(items.Iron, 5);
         }};
-
     }
 }
