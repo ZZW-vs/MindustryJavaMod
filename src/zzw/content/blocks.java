@@ -36,6 +36,9 @@ public class blocks {
             outputItem = new ItemStack(items.Iron_Sheet, 4);
             consumeItem(items.Iron, 3);
 
+            hasPower = true;
+            consumePower(1f);
+
             size = 3;
             hasItems = true;
             craftTime = 60f;
@@ -49,7 +52,6 @@ public class blocks {
             outputItem = new ItemStack(items.Gold_Sheet, 2);
             consumeItem(items.Gold, 2);
 
-            hasPower = true;
 
             size = 2;
             hasItems = true;
@@ -64,12 +66,15 @@ public class blocks {
             outputItem = new ItemStack(items.Gold_Sheet, 4);
             consumeItem(items.Gold, 3);
 
+            hasPower = true;
+            consumePower(1f);
+
             size = 3;
             hasItems = true;
             craftTime = 70f;
         }};
 
-        Conveyor = new Conveyor("conveyor_zzw"){{
+        Conveyor = new Conveyor("ppc"){{
             requirements(Category.distribution, with(items.Iron, 1));
             health = 55;
             speed = 0.5f;
