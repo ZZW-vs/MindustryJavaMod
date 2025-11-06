@@ -49,6 +49,7 @@ public class Planets {
             size = 2;
             hasItems = true;
             craftTime = 75f;
+        }};
 
         Large_Plate_Maker_Iron = new GenericCrafter("large_plate_maker_iron"){{
             requirements(Category.crafting, ItemStack.with(items.Iron, 120, Items.lead, 100, items.Iron, 40,
@@ -82,9 +83,7 @@ public class Planets {
             hasItems = true;
             craftTime = 65f;
         }};
-
-        }};
-        Large_Plate_Maker_Copper = new GenericCrafter("plate_maker_copper"){{
+        Large_Plate_Maker_Copper = new GenericCrafter("large_plate_maker_copper"){{
             requirements(Category.crafting, ItemStack.with(Items.copper, 180, Items.lead, 100,
                     items.Copper_Sheet, 50));
             alwaysUnlocked = true;
