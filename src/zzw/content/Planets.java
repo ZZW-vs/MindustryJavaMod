@@ -61,11 +61,11 @@ public class Planets {
             consumeItem(items.Iron, 3);
 
             hasPower = true;
-            consumePower(2f);
+            consumePower(0.125f);
 
             size = 3;
             hasItems = true;
-            craftTime = 65f;
+            craftTime = 60f;
         }};
         Large_Plate_Maker_Gold = new GenericCrafter("large_plate_maker_gold"){{
             requirements(Category.crafting, ItemStack.with(items.Iron, 120, Items.lead, 100, items.Gold, 40,
@@ -77,11 +77,11 @@ public class Planets {
             consumeItem(items.Gold, 3);
 
             hasPower = true;
-            consumePower(2f);
+            consumePower(0.125f);
 
             size = 3;
             hasItems = true;
-            craftTime = 65f;
+            craftTime = 60f;
         }};
         Large_Plate_Maker_Copper = new GenericCrafter("large_plate_maker_copper"){{
             requirements(Category.crafting, ItemStack.with(Items.copper, 180, Items.lead, 100,
@@ -93,11 +93,11 @@ public class Planets {
             consumeItem(Items.copper, 3);
 
             hasPower = true;
-            consumePower(2f);
+            consumePower(0.125f);
 
             size = 3;
             hasItems = true;
-            craftTime = 65f;
+            craftTime = 60f;
         }};
     }
 }
