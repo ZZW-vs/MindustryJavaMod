@@ -6,8 +6,9 @@ import mindustry.game.EventType;
 import mindustry.mod.Mod;
 import mindustry.ui.dialogs.BaseDialog;
 
+import zzw.content.Blocks;
 import zzw.content.items;
-import zzw.content.blocks;
+import zzw.content.Planets;
 
 public class TestMod extends Mod{
     public TestMod(){
@@ -24,6 +25,7 @@ public class TestMod extends Mod{
     @Override
     public void loadContent(){
         items.load();
-        blocks.load();
+        Planets.load();
+        Blocks.load();
     }
 }

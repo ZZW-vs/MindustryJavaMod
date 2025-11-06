@@ -4,7 +4,7 @@ import arc.graphics.Color;
 import mindustry.type.Item;
 
 public class items {
-    public static Item Iron, Iron_Sheet, Gold, Gold_Sheet;
+    public static Item Iron, Iron_Sheet, Gold, Gold_Sheet, Copper_Sheet;
     public static void load(){
         Iron = new Item("iron", Color.valueOf("cfcfcf")){{
             hardness = 1;
@@ -22,6 +22,11 @@ public class items {
             alwaysUnlocked = false;
         }};
         Gold_Sheet = new Item("gold_sheet", Color.valueOf("f2df82")){{
+            hardness = 1;
+            cost = 0.5f;
+            alwaysUnlocked = false;
+        }};
+        Copper_Sheet = new Item("copper_sheet", Color.valueOf("c4a638")){{
             hardness = 1;
             cost = 0.5f;
             alwaysUnlocked = false;
