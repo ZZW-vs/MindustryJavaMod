@@ -1,5 +1,6 @@
 package zzw.content;
 
+import arc.struct.Seq;
 import mindustry.content.Fx;
 import mindustry.content.Items;
 import mindustry.type.Category;
@@ -10,7 +11,7 @@ import mindustry.world.blocks.production.GenericCrafter;
 
 public class Planets {
     public static Block Plate_Maker_Iron, Large_Plate_Maker_Iron, Plate_Maker_Gold,
-            Large_Plate_Maker_Gold, Large_Plate_Maker_Copper, Plate_Maker_Copper;
+            Large_Plate_Maker_Gold, Large_Plate_Maker_Copper, Plate_Maker_Copper, Plate_Maker;
     public static void load(){
         Plate_Maker_Iron = new GenericCrafter("plate_maker_iron"){{
             requirements(Category.crafting, ItemStack.with(Items.copper, 90, Items.lead, 70, items.Iron, 30));
@@ -98,6 +99,18 @@ public class Planets {
             size = 3;
             hasItems = true;
             craftTime = 60f;
+        }};
+        Plate_Maker = new GenericCrafter("plate_maker"){{
+            requirements(Category.crafting, ItemStack.with(Items.copper, 180, Items.lead, 100,
+                    items.Copper_Sheet, 50));
+            alwaysUnlocked = true;
+            Seq.with(
+                    consumeItem(Items.copper, 3), outputItem = new ItemStack(items.Copper_Sheet, 4),
+                    consumeItem(Items.copper, 3), outputItem = new ItemStack(items.Copper_Sheet, 4)
+            );
+            size = 2;
+            hasItems = true;
+            craftTime = 10f;
         }};
     }
 }
