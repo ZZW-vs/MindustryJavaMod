@@ -5,10 +5,12 @@ import mindustry.type.Category;
 import mindustry.type.ItemStack;
 import mindustry.world.Block;
 import mindustry.world.blocks.defense.Wall;
+import mindustry.world.blocks.distribution.Conveyor;
 
 public class Blocks {
-    public static Block Copper_Wall, Large_Copper_Wall, Iron_Wall, Large_Iron_Wall, Text;
+    public static Block Copper_Wall, Large_Copper_Wall, Iron_Wall, Large_Iron_Wall, PPC_Conveyor;
     public static void load(){
+        //TODO 墙
         Copper_Wall = new Wall("copper_wall"){{
             requirements(Category.defense, ItemStack.with(items.Copper_Sheet, 6, Items.copper, 1));
             size = 1;
@@ -28,6 +30,15 @@ public class Blocks {
             requirements(Category.defense, ItemStack.with(items.Iron_Sheet, 16, items.Iron, 6));
             size = 2;
             health = 1600;
+        }};
+
+        //TODO传送带
+        PPC_Conveyor = new Conveyor("ppc") {{
+            requirements(Category.distribution, ItemStack.with(Items.lead, 1));
+            health = 55;
+            speed = 0.05f;
+            displayedSpeed = 0.3f;
+            buildCostMultiplier = 2f;
         }};
     }
 }

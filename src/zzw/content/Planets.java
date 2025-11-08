@@ -6,13 +6,13 @@ import mindustry.type.Category;
 import mindustry.type.ItemStack;
 import mindustry.world.Block;
 import mindustry.world.blocks.production.GenericCrafter;
-import mindustry.world.blocks.distribution.Conveyor;
 
 
 public class Planets {
     public static Block Plate_Maker_Iron, Large_Plate_Maker_Iron, Plate_Maker_Gold,
-            Large_Plate_Maker_Gold, Large_Plate_Maker_Copper, Plate_Maker_Copper, PPC_Conveyor;
+            Large_Plate_Maker_Gold, Large_Plate_Maker_Copper, Plate_Maker_Copper;
     public static void load(){
+        //TODO 普通工厂
         Plate_Maker_Iron = new GenericCrafter("plate_maker_iron"){{
             requirements(Category.crafting, ItemStack.with(Items.copper, 90, Items.lead, 70, items.Iron, 30));
 
@@ -52,6 +52,7 @@ public class Planets {
             craftTime = 75f;
         }};
 
+        //TODO 大型工厂
         Large_Plate_Maker_Iron = new GenericCrafter("large_plate_maker_iron"){{
             requirements(Category.crafting, ItemStack.with(items.Iron, 120, Items.lead, 100, items.Iron, 40,
                     items.Iron_Sheet, 23));
@@ -99,13 +100,6 @@ public class Planets {
             size = 3;
             hasItems = true;
             craftTime = 60f;
-        }};
-        PPC_Conveyor = new Conveyor("ppc") {{
-            requirements(Category.distribution, ItemStack.with(Items.lead, 1));
-            health = 55;
-            speed = 0.03f;
-            displayedSpeed = 0.3f;
-            buildCostMultiplier = 2f;
         }};
     }
 }
