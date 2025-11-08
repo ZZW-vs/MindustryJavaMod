@@ -103,8 +103,8 @@ public class Planets {
         PPC_Conveyor = new Conveyor("ppc") {{
             requirements(Category.distribution, ItemStack.with(Items.lead, 1));
             health = 55;
-            speed = 0.5f;
-            displayedSpeed = 0.5f;
+            speed = 0.03f;
+            displayedSpeed = 0.3f;
             buildCostMultiplier = 2f;
         }};
     }
