@@ -6,6 +6,7 @@ import mindustry.type.Category;
 import mindustry.type.ItemStack;
 import mindustry.world.Block;
 import mindustry.world.blocks.production.GenericCrafter;
+import mindustry.world.blocks.distribution.Conveyor;
 
 
 public class Planets {
@@ -99,14 +100,12 @@ public class Planets {
             hasItems = true;
             craftTime = 60f;
         }};
+        PPC_Conveyor = new Conveyor("ppc") {{
+            requirements(Category.distribution, ItemStack.with(Items.lead, 1));
+            health = 55;
+            speed = 0.5f;
+            displayedSpeed = 4.2f;
+            buildCostMultiplier = 2f;
+        }};
     }
 }
-//        PPC_Conveyor = new Conveyor("ppc") {{
-//            requirements(Category.crafting, ItemStack.with(items.Iron, 1));
-//            frames = 5;
-//            transitionFrames = 1;
-//            health = 55;
-//            speed = 0.5f;
-//            displayedSpeed = 4.2f;
-//            buildCostMultiplier = 2f;
-//        }};
