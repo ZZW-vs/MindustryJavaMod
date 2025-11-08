@@ -1,4 +1,4 @@
-package zzw.structure;
+package zzw.content.structure;
 
 import arc.Events;
 import arc.util.Log;
@@ -8,6 +8,7 @@ import mindustry.game.EventType;
 import mindustry.gen.Call;
 import mindustry.gen.Sounds;
 import mindustry.type.UnitType;
+import mindustry.game.Team;
 import mindustry.world.Tile;
 import mindustry.world.blocks.environment.Floor;
 import mindustry.world.blocks.environment.OreBlock;
@@ -163,13 +164,13 @@ public class StructureDetector {
                     if (Vars.netServer != null) {
                         // 确保玩家存在
                         if (Vars.player != null) {
-                            Vars.netServer.unitSpawner.spawn(unitType, Vars.player.team(), centerX * 8, centerY * 8);
+                            unitType.spawn(Vars.player.team(), centerX * 8, centerY * 8);
                         } else {
                             // 如果玩家不存在，使用默认队伍
-                            Vars.netServer.unitSpawner.spawn(unitType, mindustry.content.Team.sharded, centerX * 8, centerY * 8);
+                            unitType.spawn(Team.sharded, centerX * 8, centerY * 8);
                         }
                     }
-                    Call.soundAt(Sounds.spawn, centerX * 8, centerY * 8, 1, 1);
+                    Call.soundAt(Sounds.respawning, centerX * 8, centerY * 8, 1, 1);
                 }
                 break;
 

@@ -9,8 +9,8 @@ import mindustry.ui.dialogs.BaseDialog;
 import zzw.content.Blocks;
 import zzw.content.items;
 import zzw.content.Planets;
-import zzw.structure.StructureConfig;
-import zzw.structure.StructureDetector;
+import zzw.content.structure.StructureConfig;
+import zzw.content.structure.StructureDetector;
 
 public class TestMod extends Mod{
     public TestMod(){

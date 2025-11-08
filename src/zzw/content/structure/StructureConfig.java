@@ -1,6 +1,7 @@
-package zzw.structure;
+package zzw.content.structure;
 
 import arc.util.Log;
+import mindustry.content.UnitTypes;
 import mindustry.type.UnitType;
 import zzw.content.Blocks;
 
@@ -8,7 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class StructureConfig {
-    static void registerDefaultStructures() {
+    public static void registerDefaultStructures() {
         // 注册铜墙十字结构 - 检测到时生成爆炸效果 registerCopperCross();
 
         // 注册铁墙T形结构 - 检测到时显示消息 registerIronT();
@@ -19,6 +20,17 @@ public class StructureConfig {
         registerMixedStructure();
 
         Log.info("Default structures registered successfully");
+    }
+
+    private static void registerMixedStructure() {
+        StructureDetector.StructurePattern pattern = new StructureDetector.StructurePattern(
+                "mixed_structure", "spawn_unit", UnitTypes.beta);
+        pattern.addBlock("iron_wall",0,0); // 中心
+        pattern.addBlock("copper_wall", -1, -1); // 左下
+        pattern.addBlock("copper_wall",1, -1); // 右下
+        pattern.addBlock("iron_wall", -1,1); // 左上
+        pattern.addBlock("iron_wall",1,1); // 右上
+        StructureDetector.registerStructurePattern(pattern);
     }
 
     private static void registerCopperCross() {
@@ -55,9 +67,5 @@ public class StructureConfig {
         StructureDetector.registerStructurePattern(pattern);
     }
 
-    private static void registerMixedStructure() {
-        StructureDetector.StructurePattern pattern = new StructureDetector.StructurePattern(
-                "mixed_structure", "spawn_unit", mindustry.content.UnitTypes.duo);
-        pattern.addBlock("iron_wall",0,0); // 中心 pattern.addBlock("copper_wall", -1, -1); // 左下 pattern.addBlock("copper_wall",1, -1); // 右下 pattern.addBlock("iron_wall", -1,1); // 左上 pattern.addBlock("iron_wall",1,1); // 右上 StructureDetector.registerStructurePattern(pattern);
-    }
+
 }
