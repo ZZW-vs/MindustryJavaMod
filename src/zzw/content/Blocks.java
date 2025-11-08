@@ -6,6 +6,7 @@ import mindustry.type.ItemStack;
 import mindustry.world.Block;
 import mindustry.world.blocks.defense.Wall;
 import mindustry.world.blocks.distribution.Conveyor;
+import static zzw.content.items.*;
 
 public class Blocks {
     public static Block Copper_Wall, Large_Copper_Wall, Iron_Wall, Large_Iron_Wall, PPC_Conveyor;

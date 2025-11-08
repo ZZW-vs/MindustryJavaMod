@@ -9,9 +9,17 @@ import mindustry.ui.dialogs.BaseDialog;
 import zzw.content.Blocks;
 import zzw.content.items;
 import zzw.content.Planets;
+import zzw.structure.StructureConfig;
+import zzw.structure.StructureDetector;
 
 public class TestMod extends Mod{
     public TestMod(){
+        // 初始化结构检测系统
+        StructureDetector.initialize();
+
+        // 注册默认结构
+        StructureConfig.registerDefaultStructures();
+
         Events.on(EventType.ClientLoadEvent.class, e -> {
             Time.run(10f, () -> {
                 BaseDialog dialog = new BaseDialog("Welcome to use my mod!");
