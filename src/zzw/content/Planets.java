@@ -100,11 +100,11 @@ public class Planets {
             hasItems = true;
             craftTime = 60f;
         }};
-        PPC_Conveyor = new Conveyor("铜铅带") {{
+        PPC_Conveyor = new Conveyor("ppc") {{
             requirements(Category.distribution, ItemStack.with(Items.lead, 1));
             health = 55;
             speed = 0.5f;
-            displayedSpeed = 4.2f;
+            displayedSpeed = 0.5f;
             buildCostMultiplier = 2f;
         }};
     }
