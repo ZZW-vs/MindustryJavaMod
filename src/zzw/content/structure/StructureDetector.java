@@ -131,16 +131,16 @@ public class StructureDetector {
 
         switch (blockType) {
             case "copper_wall":
-                return tile.block() == Blocks.Copper_Wall;
+                return tile.block() != null && tile.block().name.equals("copper_wall");
             case "iron_wall":
-                return tile.block() == Blocks.Iron_Wall;
+                return tile.block() != null && tile.block().name.equals("iron_wall");
             case "large_copper_wall":
                 // 对于大型方块，需要检查是否是大型方块的一部分
-                return tile.block() == Blocks.Large_Copper_Wall; 
+                return tile.block() != null && tile.block().name.equals("large_copper_wall"); 
 
             case "large_iron_wall":
                 // 对于大型方块，需要检查是否是大型方块的一部分
-                return tile.block() == Blocks.Large_Iron_Wall; 
+                return tile.block() != null && tile.block().name.equals("large_iron_wall"); 
 
             case "any_block":
                 return tile.block() != null;
@@ -214,16 +214,16 @@ public class StructureDetector {
                                     if (tile != null && tile.block() != null) {
                                         switch (replacementType) {
                                             case "copper_wall":
-                                                tile.setBlock(Blocks.Copper_Wall);
+                                                tile.setBlock(Vars.content.block("copper_wall"));
                                                 break;
                                             case "iron_wall":
-                                                tile.setBlock(Blocks.Iron_Wall);
+                                                tile.setBlock(Vars.content.block("iron_wall"));
                                                 break;
                                             case "large_copper_wall":
-                                                tile.setBlock(Blocks.Large_Copper_Wall);
+                                                tile.setBlock(Vars.content.block("large_copper_wall"));
                                                 break;
                                             case "large_iron_wall":
-                                                tile.setBlock(Blocks.Large_Iron_Wall);
+                                                tile.setBlock(Vars.content.block("large_iron_wall"));
                                                 break;
                                         }
                                     }
@@ -233,16 +233,16 @@ public class StructureDetector {
                                     if (tile != null) {
                                         switch (replacementType) {
                                             case "copper_wall":
-                                                tile.setBlock(Blocks.Copper_Wall);
+                                                tile.setBlock(Vars.content.block("copper_wall"));
                                                 break;
                                             case "iron_wall":
-                                                tile.setBlock(Blocks.Iron_Wall);
+                                                tile.setBlock(Vars.content.block("iron_wall"));
                                                 break;
                                             case "large_copper_wall":
-                                                tile.setBlock(Blocks.Large_Copper_Wall);
+                                                tile.setBlock(Vars.content.block("large_copper_wall"));
                                                 break;
                                             case "large_iron_wall":
-                                                tile.setBlock(Blocks.Large_Iron_Wall);
+                                                tile.setBlock(Vars.content.block("large_iron_wall"));
                                                 break;
                                         }
                                     }

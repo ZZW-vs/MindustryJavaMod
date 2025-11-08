@@ -10,11 +10,14 @@ import java.util.Map;
 
 public class StructureConfig {
     public static void registerDefaultStructures() {
-        // 注册铜墙十字结构 - 检测到时生成爆炸效果 registerCopperCross();
+        // 注册铜墙十字结构 - 检测到时生成爆炸效果
+        registerCopperCross();
 
-        // 注册铁墙T形结构 - 检测到时显示消息 registerIronT();
+        // 注册铁墙T形结构 - 检测到时显示消息
+        registerIronT();
 
-        // 注册大型铜墙方块结构 - 检测到时替换为铁墙 registerCopperSquare();
+        // 注册大型铜墙方块结构 - 检测到时替换为铁墙
+        registerCopperSquare();
 
         // 注册混合墙结构 - 检测到时生成单位（如果可用）
         registerMixedStructure();
