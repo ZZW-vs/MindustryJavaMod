@@ -51,8 +51,8 @@ public class TestMod extends Mod{
      * 显示欢迎对话框
      */
     private void showWelcomeDialog() {
-        BaseDialog dialog = new BaseDialog("欢迎使用我的模组！");
-        dialog.cont.add("我是ZZW，感谢您游玩我的模组");
+        BaseDialog dialog = new BaseDialog("欢迎来玩我的模组！");
+        dialog.cont.add("我是b站up“郑zip”，感谢您游玩我的模组");
         
         // 延迟添加关闭按钮，让玩家有时间阅读消息
         Time.run(CLOSE_BUTTON_DELAY, dialog::addCloseButton);

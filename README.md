@@ -1,39 +1,75 @@
-# Mindustry Java Mod Template
-A Java Mindustry mod template that works on Android and PC. The Kotlin version of this mod can be seen [here](https://github.com/Anuken/MindustryKotlinModTemplate).
+# Create Mod
 
-## Building for Desktop Testing
+一个为Mindustry添加了基础金属加工系统的Java模组，灵感来源于Minecraft的Create模组。
 
-1. Install JDK **17**.
-2. Run `gradlew jar` [1].
-3. Your mod jar will be in the `build/libs` directory. **Only use this version for testing on desktop. It will not work with Android.**
-To build an Android-compatible version, you need the Android SDK. You can either let Github Actions handle this, or set it up yourself. See steps below.
+## 功能特性
 
-## Building through Github Actions
+### 新增物品
+- **铁锭** - 基础金属原料，用于制作铁板
+- **金锭** - 珍贵的金属原料，用于制作金板
+- **铁板** - 通过铁锭压制而成的金属板材，用于建造各种设备
+- **金板** - 通过金锭压制而成的珍贵金属板材，用于制造高级设备
+- **铜板** - 通过原生铜压制而成的金属板材，用于制造各种设备
 
-This repository is set up with Github Actions CI to automatically build the mod for you every commit. This requires a Github repository, for obvious reasons.
-To get a jar file that works for every platform, do the following:
-1. Make a Github repository with your mod name, and upload the contents of this repo to it. Perform any modifications necessary, then commit and push. 
-2. Check the "Actions" tab on your repository page. Select the most recent commit in the list. If it completed successfully, there should be a download link under the "Artifacts" section. 
-3. Click the download link (should be the name of your repo). This will download a **zipped jar** - **not** the jar file itself [2]! Unzip this file and import the jar contained within in Mindustry. This version should work both on Android and Desktop.
+### 新增方块
 
-## Building Locally
+#### 生产设备
+- **铁板制造机** - 将铁锭加工成铁板的基础工业设备
+  - 每次消耗2个铁锭，生产2个铁板
+- **金板制造机** - 将金锭加工成金板的精密工业设备
+  - 每次消耗2个金锭，生产2个金板
+- **铜板制造机** - 将原生铜加工成铜板的基础工业设备
+  - 每次消耗2个原生铜，生产2个铜板
 
-Building locally takes more time to set up, but shouldn't be a problem if you've done Android development before.
-1. Download the Android SDK, unzip it and set the `ANDROID_HOME` environment variable to its location.
-2. Make sure you have API level 30 installed, as well as any recent version of build tools (e.g. 30.0.1)
-3. Add a build-tools folder to your PATH. For zzw, if you have `30.0.1` installed, that would be `$ANDROID_HOME/build-tools/30.0.1`.
-4. Run `gradlew deploy`. If you did everything correctlly, this will create a jar file in the `build/libs` directory that can be run on both Android and desktop. 
+#### 高级生产设备
+- **大型铁板制造机** - 高效率的铁板生产设备，需要电力支持
+  - 每次消耗3个铁锭，生产4个铁板，需要电力
+- **大型金板制造机** - 高效率的金板生产设备，需要电力支持
+  - 每次消耗3个金锭，生产4个金板，需要电力
+- **大型铜板制造机** - 高效率的铜板生产设备，需要电力支持
+  - 每次消耗3个原生铜，生产4个铜板，需要电力
 
-## Adding Dependencies
+#### 防御方块
+- **铜块** - 由铜板和原生铜制作的防御块
+  - 基础防御设施，可以合成大型铜块
+- **铁块** - 由铁板和原生铜制作的防御块
+  - 基础防御设施，可以合成大型铁块
+- **大型铜块** - 由大量铜板和原生铜制作的大型防御块
+  - 高耐久防御设施，由四个小铜块自动合成
+- **大型铁块** - 由大量铁板和铁锭制作的大型防御块
+  - 高耐久防御设施，由四个小铁块自动合成
 
-Please note that all dependencies on Mindustry, Arc or its submodules **must be declared as compileOnly in Gradle**. Never use `implementation` for core Mindustry or Arc dependencies. 
+#### 物流设备
+- **传送带** - 用于输送物品的机械设备
+  - 双厨狂喜
 
-- `implementation` **places the entire dependency in the jar**, which is, in most mod dependencies, very undesirable. You do not want the entirety of the Mindustry API included with your mod.
-- `compileOnly` means that the dependency is only around at compile time, and not included in the jar.
+## 安装说明
 
-Only use `implementation` if you want to package another Java library *with your mod*, and that library is not present in Mindustry already.
+1. 下载最新版本的模组文件
+2. 将模组文件放入Mindustry的mods文件夹
+3. 启动游戏，在模组列表中启用模组
+4. 重新启动游戏以应用更改
 
---- 
+## 兼容性
 
-*[1]* *On Linux/Mac it's `./gradlew`, but if you're using Linux I assume you know how to run executables properly anyway.*  
-*[2]: Yes, I know this is stupid. It's a Github UI limitation - while the jar itself is uploaded unzipped, there is currently no way to download it as a single file.*
+- 最低游戏版本：145
+
+## 开发信息
+
+- 模组作者：b站up “郑zip”
+- 主类：zzw.TestMod
+
+## 许可证
+
+本模组遵循MIT许可证。
+
+## 贡献
+
+欢迎提交问题报告和功能请求！如果您想贡献代码，请先创建一个分支并提交Pull Request。
+
+## 更新日志
+
+### v1.1
+- 初始版本发布
+- 添加基础金属加工系统
+- 添加各种生产设备和防御方块

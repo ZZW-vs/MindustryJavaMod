@@ -82,9 +82,8 @@ public class Z_Blocks {
         PPC_Conveyor = new Conveyor("ppc") {{
             requirements(Category.distribution, ItemStack.with(Items.lead, 1));
             health = 55;
-            speed = 0.06f;
-            displayedSpeed = 0.03f;
-            buildCostMultiplier = 2f;
+            speed = 0.03f;
+            displayedSpeed = 0.06f;
         }};
     }
     
