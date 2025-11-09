@@ -8,31 +8,32 @@ import mindustry.world.Block;
 import mindustry.world.blocks.defense.Wall;
 import mindustry.world.blocks.distribution.Conveyor;
 import arc.Events;
+import zzw.content.Z_Items;
 
 import static zzw.content.blocks.BlockMerger.checkAndReplace;
 
-public class blocks {
+public class Z_Blocks {
     public static Block Copper_Block, Large_Copper_Block, Iron_Block, Large_Iron_Block, PPC_Conveyor;
 
     public static void load(){
         //TODO 墙
-        Copper_Block = new Wall("copper_wall"){{
-            requirements(Category.defense, ItemStack.with(zzw.content.items.Copper_Sheet, 6, Items.copper, 1));
+        Copper_Block = new Wall("copper_block"){{
+            requirements(Category.defense, ItemStack.with(Z_Items.Copper_Sheet, 4, Items.copper, 3));
             size = 1;
             health = 380;
         }};
-        Large_Copper_Block =  new Wall("large_copper_wall"){{
-            requirements(Category.defense, ItemStack.with(zzw.content.items.Copper_Sheet, 16, Items.copper, 6));
+        Large_Copper_Block =  new Wall("large_copper_block"){{
+            requirements(Category.defense, ItemStack.with(Z_Items.Copper_Sheet, 16, Items.copper, 12));
             size = 2;
             health = 1520;
         }};
-        Iron_Block = new Wall("iron_wall"){{
-            requirements(Category.defense, ItemStack.with(zzw.content.items.Iron_Sheet, 6, Items.copper, 1));
+        Iron_Block = new Wall("iron_block"){{
+            requirements(Category.defense, ItemStack.with(Z_Items.Iron_Sheet, 4, Items.copper, 3));
             size = 1;
             health = 400;
         }};
-        Large_Iron_Block = new Wall("large_iron_wall"){{
-            requirements(Category.defense, ItemStack.with(zzw.content.items.Iron_Sheet, 16, zzw.content.items.Iron, 6));
+        Large_Iron_Block = new Wall("large_iron_block"){{
+            requirements(Category.defense, ItemStack.with(Z_Items.Iron_Sheet, 16, Z_Items.Iron, 12));
             size = 2;
             health = 1600;
         }};
@@ -42,7 +43,7 @@ public class blocks {
             requirements(Category.distribution, ItemStack.with(Items.lead, 1));
             health = 55;
             speed = 0.06f;
-            displayedSpeed = 0.06f;
+            displayedSpeed = 0.03f;
             buildCostMultiplier = 2f;
         }};
 

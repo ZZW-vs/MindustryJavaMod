@@ -6,9 +6,9 @@ import mindustry.game.EventType;
 import mindustry.mod.Mod;
 import mindustry.ui.dialogs.BaseDialog;
 
-import zzw.content.blocks.blocks;
-import zzw.content.items;
-import zzw.content.factory;
+import zzw.content.blocks.Z_Blocks;
+import zzw.content.Z_Items;
+import zzw.content.Z_Factory;
 
 public class TestMod extends Mod{
     public TestMod(){
@@ -24,8 +24,8 @@ public class TestMod extends Mod{
 
     @Override
     public void loadContent(){
-        items.load();
-        factory.load();
-        blocks.load();
+        Z_Items.load();
+        Z_Factory.load();
+        Z_Blocks.load();
     }
 }
