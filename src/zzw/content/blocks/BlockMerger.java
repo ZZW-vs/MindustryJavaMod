@@ -6,7 +6,6 @@ import mindustry.world.Tile;
 import mindustry.world.Block;
 import mindustry.game.Team;
 import mindustry.content.Fx;
-import mindustry.entities.Effect;
 
 public class BlockMerger {
     // 添加一个延迟标记，防止立即重复合并
@@ -116,7 +115,7 @@ public class BlockMerger {
                         Tile other = Vars.world.tile(startX + dx, startY + dy);
                         if(other != null && pattern[dx][dy]) {
                             // 给已有方块添加微光效果，提示玩家差一个就能合并
-                            Fx.spark.at(other.drawx(), other.drawy());
+                            Fx.pulverize.at(other.drawx(), other.drawy());
                         }
                     }
                 }
