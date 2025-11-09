@@ -85,7 +85,7 @@ public class Z_Blocks {
             requirements(Category.distribution, ItemStack.with(Items.lead, 1));
             health = 50;
             speed = 0.05f;
-            displayedSpeed = 5f;
+            displayedSpeed = 7f;
         }};
         Better_PPC_Conveyor = new  StackConveyor("b_ppc") {{
             requirements(Category.distribution, ItemStack.with(Items.lead, 3, Z_Items.Iron_Sheet, 2));
