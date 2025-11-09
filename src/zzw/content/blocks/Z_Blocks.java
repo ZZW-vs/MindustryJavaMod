@@ -8,6 +8,7 @@ import mindustry.world.Block;
 import mindustry.world.blocks.defense.Wall;
 import mindustry.world.blocks.distribution.Conveyor;
 import arc.Events;
+import mindustry.world.blocks.distribution.StackConveyor;
 import zzw.content.Z_Items;
 
 import static zzw.content.blocks.BlockMerger.checkAndReplace;
@@ -26,8 +27,9 @@ public class Z_Blocks {
     public static Block Large_Iron_Block;    // 大铁块（2x2）
     
     // 传送带
-    public static Block PPC_Conveyor;        // 特殊传送带
-    
+    public static Block PPC_Conveyor;        // 传送带
+    public static Block Better_PPC_Conveyor;        // 传送带
+
     /**
      * 加载所有自定义方块
      */
@@ -79,14 +81,20 @@ public class Z_Blocks {
      * 创建传送带
      */
     private static void createConveyor() {
-        PPC_Conveyor = new Conveyor("ppc") {{
+        PPC_Conveyor = new  Conveyor("ppc") {{
             requirements(Category.distribution, ItemStack.with(Items.lead, 1));
-            health = 55;
-            speed = 0.03f;
-            displayedSpeed = 0.06f;
+            health = 50;
+            speed = 0.05f;
+            displayedSpeed = 5f;
+        }};
+        Better_PPC_Conveyor = new  StackConveyor("b_ppc") {{
+            requirements(Category.distribution, ItemStack.with(Items.lead, 3, Z_Items.Iron_Sheet, 2));
+            health = 70;
+            speed = 0.045f;
+            itemCapacity = 16;
         }};
     }
-    
+
     /**
      * 注册事件监听器，处理方块合并逻辑
      */
