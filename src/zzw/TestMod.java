@@ -6,11 +6,9 @@ import mindustry.game.EventType;
 import mindustry.mod.Mod;
 import mindustry.ui.dialogs.BaseDialog;
 
-import zzw.content.Blocks;
+import zzw.content.blocks.blocks;
 import zzw.content.items;
-import zzw.content.Planets;
-import zzw.content.structure.StructureConfig;
-import zzw.content.structure.StructureDetector;
+import zzw.content.factory;
 
 public class TestMod extends Mod{
     public TestMod(){
@@ -27,13 +25,7 @@ public class TestMod extends Mod{
     @Override
     public void loadContent(){
         items.load();
-        Planets.load();
-        Blocks.load();
-        
-        // 初始化结构检测系统
-        StructureDetector.initialize();
-
-        // 注册默认结构
-        StructureConfig.registerDefaultStructures();
+        factory.load();
+        blocks.load();
     }
 }

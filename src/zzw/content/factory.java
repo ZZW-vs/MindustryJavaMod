@@ -8,7 +8,7 @@ import mindustry.world.Block;
 import mindustry.world.blocks.production.GenericCrafter;
 
 
-public class Planets {
+public class factory {
     public static Block Plate_Maker_Iron, Large_Plate_Maker_Iron, Plate_Maker_Gold,
             Large_Plate_Maker_Gold, Large_Plate_Maker_Copper, Plate_Maker_Copper;
     public static void load(){
