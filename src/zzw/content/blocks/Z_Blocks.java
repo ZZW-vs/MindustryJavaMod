@@ -19,16 +19,20 @@ import static zzw.content.blocks.BlockMerger.checkAndReplace;
  */
 public class Z_Blocks {
     // 铜方块
-    public static Block Copper_Block;        // 小铜块（1x1）
-    public static Block Large_Copper_Block;  // 大铜块（2x2）
+    public static Block Copper_Block;         // 小铜块（1x1）
+    public static Block Large_Copper_Block;   // 大铜块（2x2）
     
     // 铁方块
-    public static Block Iron_Block;          // 小铁块（1x1）
-    public static Block Large_Iron_Block;    // 大铁块（2x2）
+    public static Block Iron_Block;           // 小铁块（1x1）
+    public static Block Large_Iron_Block;     // 大铁块（2x2）
     
     // 传送带
-    public static Block PPC_Conveyor;        // 传送带
-    public static Block Better_PPC_Conveyor;        // 传送带
+    public static Block PPC_Conveyor;         // 传送带
+    public static Block Better_PPC_Conveyor;  // 高级传送带
+
+    // 其他方块
+    public static Block Pumpkin;              // 南瓜
+    public static Block Carved_Pumpkin;       // 雕刻南瓜
 
     /**
      * 加载所有自定义方块
@@ -39,6 +43,9 @@ public class Z_Blocks {
         
         // 创建传送带
         createConveyor();
+
+        // 其他方块
+        otherBlocks();
         
         // 注册事件监听器
         registerEventListeners();
@@ -95,6 +102,21 @@ public class Z_Blocks {
         }};
     }
 
+    /**
+     * 其他方块
+     */
+    private static void otherBlocks() {
+        Pumpkin = new Block("pumpkin"){{
+            requirements(Category.defense, ItemStack.with(Z_Items.Copper_Sheet, 4, Items.copper, 3));
+            size = 1;
+            health = 380;
+        }};
+        Carved_Pumpkin = new Block("carved_pumpkin"){{
+            requirements(Category.defense, ItemStack.with(Z_Items.Copper_Sheet, 4, Items.copper, 3));
+            size = 1;
+            health = 350;
+        }};
+    };
     /**
      * 注册事件监听器，处理方块合并逻辑
      */

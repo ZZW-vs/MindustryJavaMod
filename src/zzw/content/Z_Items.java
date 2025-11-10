@@ -16,9 +16,12 @@ public class Z_Items {
     public static Item Iron_Sheet; // 铁板
     public static Item Gold_Sheet; // 金板
     public static Item Copper_Sheet; // 铜板
-    
-    // 特殊物品
-    public static Item Text_An; // 篝火火焰（特殊纹理物品）
+
+    // 其他物品
+    public static Item Pumpkin_Seeds; // 南瓜种子
+
+    // 测试物品
+    public static Item Text_An; // 篝火火焰（动态贴图测试物品）
     
     /**
      * 加载所有自定义物品
@@ -32,8 +35,11 @@ public class Z_Items {
         Iron_Sheet = createBasicItem("iron_sheet", "cfcfcf");
         Gold_Sheet = createBasicItem("gold_sheet", "f2df82");
         Copper_Sheet = createBasicItem("copper_sheet", "c4a638");
-        
-        // 特殊物品
+
+        // 其他物品
+        Pumpkin_Seeds = createBasicItem("pumpkin_seeds", "ffcc00");
+
+        // 测试物品
         Text_An = new Item("campfire_fire", Color.valueOf("cfcfcf")){{
             frames = 5;
             transitionFrames = 1;
