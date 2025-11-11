@@ -9,6 +9,7 @@ import mindustry.world.blocks.defense.Wall;
 import mindustry.world.blocks.distribution.Conveyor;
 import arc.Events;
 import mindustry.world.blocks.distribution.StackConveyor;
+import mindustry.world.meta.BuildVisibility;
 import zzw.content.Z_Items;
 
 import static zzw.content.blocks.BlockMerger.checkAndReplace;
@@ -110,13 +111,16 @@ public class Z_Blocks {
             requirements(Category.defense, ItemStack.with(Z_Items.Copper_Sheet, 4, Items.copper, 3));
             size = 1;
             health = 380;
+            buildVisibility = BuildVisibility.hidden;
         }};
         Carved_Pumpkin = new Block("carved_pumpkin"){{
             requirements(Category.defense, ItemStack.with(Z_Items.Copper_Sheet, 4, Items.copper, 3));
             size = 1;
             health = 350;
+            buildVisibility = BuildVisibility.hidden;
         }};
-    };
+    }
+
     /**
      * 注册事件监听器，处理方块合并逻辑
      */
