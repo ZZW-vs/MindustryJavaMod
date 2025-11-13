@@ -9,6 +9,7 @@ import mindustry.ui.dialogs.BaseDialog;
 import zzw.content.blocks.Z_Blocks;
 import zzw.content.Z_Items;
 import zzw.content.Z_Factory;
+import zzw.content.Z_Mechanics;
 
 /**
  * 主模组类
@@ -42,6 +43,9 @@ public class TestMod extends Mod{
         
         // 加载自定义工厂（需要物品）
         Z_Factory.load();
+
+        // 加载机械系统（需要物品和工厂）
+        Z_Mechanics.load();
         
         // 加载自定义方块（可能需要物品和工厂）
         Z_Blocks.load();
