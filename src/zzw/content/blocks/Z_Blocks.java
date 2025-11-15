@@ -117,7 +117,7 @@ public class Z_Blocks {
             requirements(Category.defense, ItemStack.with(Z_Items.Copper_Sheet, 4, Items.copper, 3));
             size = 1;
             health = 350;
-            buildVisibility = BuildVisibility.hidden;
+            buildVisibility = BuildVisibility.sandboxOnly;
         }};
     }
 

@@ -384,9 +384,42 @@ public class Z_Mechanics {
                 // 更新自身值
                 rotationSpeed = networkSpeed;
                 stress = networkStress;
+
+                // 检查是否有应力和转速的方块连接，更新主节点状态
+                checkAndUpdateMasterNode();
             } else {
                 // 未分配网络的传动箱，尝试加入网络或成为新网络的主节点
                 findOrCreateNetwork();
+            }
+        }
+
+        /**
+         * 检查是否有应力和转速的方块连接，并更新主节点状态
+         */
+        private void checkAndUpdateMasterNode() {
+            boolean hasPowerSource = false;
+
+            // 检查四个方向的邻居
+            for (int i = 0; i < 4; i++) {
+                Building other = nearby(i);
+                if (other instanceof MechanicalComponentBuild component) {
+                    // 如果邻居是动力源或者有转速和应力，则标记为有动力源
+                    if (component.isSource || (component.rotationSpeed > SPEED_THRESHOLD && component.stress > 0)) {
+                        hasPowerSource = true;
+                        break;
+                    }
+                }
+            }
+
+            // 如果有动力源连接且当前不是主节点，则设为主节点
+            if (hasPowerSource && !isNetworkMaster) {
+                isNetworkMaster = true;
+                needsNetworkUpdate = true; // 标记需要更新网络值
+            }
+            // 如果没有动力源连接且当前是主节点，则取消主节点状态
+            else if (!hasPowerSource && isNetworkMaster) {
+                isNetworkMaster = false;
+                needsNetworkUpdate = true; // 标记需要更新网络值
             }
         }
 
@@ -431,10 +464,26 @@ public class Z_Mechanics {
             visitedSet.clear();
             float maxSpeed = 0f;
             float totalStress = 0f;
+            boolean hasMaster = false; // 检查网络中是否有主节点
 
             // 收集网络中的所有传动箱
             java.util.List<TransmissionBoxBuild> networkBoxes = new java.util.ArrayList<>();
             collectNetworkBoxes(this, networkBoxes);
+
+            // 检查网络中是否有主节点
+            for (TransmissionBoxBuild box : networkBoxes) {
+                if (box.isNetworkMaster) {
+                    hasMaster = true;
+                    break;
+                }
+            }
+
+            // 如果没有主节点，清零转速和应力
+            if (!hasMaster) {
+                networkSpeed = 0f;
+                networkStress = 0f;
+                return;
+            }
 
             // 计算网络值
             for (TransmissionBoxBuild box : networkBoxes) {
@@ -444,8 +493,8 @@ public class Z_Mechanics {
 
                 for (int i = 0; i < 4; i++) {
                     Building other = box.nearby(i);
-                    if (other instanceof MechanicalComponentBuild component && !(other instanceof TransmissionBoxBuild)) {
-                        // 只考虑非传动箱的机械组件作为输入
+                    if (other instanceof MechanicalComponentBuild component) {
+                        // 考虑所有机械组件作为输入，包括传动箱
                         if (component.rotationSpeed > SPEED_THRESHOLD) {
                             localMaxSpeed = Math.max(localMaxSpeed, component.rotationSpeed);
                             localTotalStress += component.stress;
@@ -504,13 +553,11 @@ public class Z_Mechanics {
             visitedSet.add(posId);
 
             // 更新当前传动箱的值
-            if (current != this) {
-                current.networkSpeed = this.networkSpeed;
-                current.networkStress = this.networkStress;
-                current.rotationSpeed = this.networkSpeed;
-                current.stress = this.networkStress;
-                current.needsNetworkUpdate = false; // 避免重复更新
-            }
+            current.networkSpeed = this.networkSpeed;
+            current.networkStress = this.networkStress;
+            current.rotationSpeed = this.networkSpeed;
+            current.stress = this.networkStress;
+            current.needsNetworkUpdate = false; // 避免重复更新
 
             // 检查所有邻居
             for (int i = 0; i < 4; i++) {
@@ -534,6 +581,7 @@ public class Z_Mechanics {
                     // 加入现有网络
                     networkId = neighbor.networkId;
                     isNetworkMaster = false;
+                    needsNetworkUpdate = true; // 标记自己需要更新网络值
                     neighbor.validateNetwork(); // 通知验证网络
                     neighbor.needsNetworkUpdate = true; // 标记需要更新网络值
                     return;
@@ -651,7 +699,7 @@ public class Z_Mechanics {
         
         @Override
         public void display(Table table) {
-            super.display(table);
+            // 不调用 super.display(table) 以避免重复显示应力和转速
 
             // 创建可更新的应力显示标签
             var stressLabel = table.add("[accent]应力: [white]" + (int)stress + " us").width(160).get();
@@ -741,9 +789,19 @@ public class Z_Mechanics {
 
         @Override
         public void buildConfiguration(Table table) {
-            table.slider(-MAX_SPEED, MAX_SPEED, 1f, targetSpeed, this::configure).row();
+            // 滑块范围调整为0到256，步长为1，长度适中
+            table.slider(0, 256, 1f, targetSpeed, this::configure).width(200f).row();
             
 
+        }
+
+        /**
+         * 配置滑块值，自动吸附到32的倍速
+         */
+        public void configure(float value) {
+            // 自动吸附到32的倍速
+            float snappedValue = Math.round(value / 32f) * 32f;
+            setTargetSpeed(snappedValue);
         }
 
         @Override
@@ -753,7 +811,7 @@ public class Z_Mechanics {
         
         @Override
         public void display(Table table) {
-            super.display(table);
+            // 不调用 super.display(table) 以避免重复显示应力和转速
 
             // 创建可更新的应力显示标签，确保与转速对齐
             var stressLabel = table.add("[accent]应力: [white]∞ us").width(160).get();
