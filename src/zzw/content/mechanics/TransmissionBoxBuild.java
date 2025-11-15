@@ -162,8 +162,15 @@ public class TransmissionBoxBuild extends MechanicalComponentBuild {
                 if (other instanceof MechanicalComponentBuild component) {
                     // 考虑所有机械组件作为输入，包括传动箱
                     if (component.rotationSpeed > SPEED_THRESHOLD) {
-                        localMaxSpeed = Math.max(localMaxSpeed, component.rotationSpeed);
-                        localTotalStress += component.stress;
+                        // 如果是传动箱且在同一网络中，使用其网络值而不是自身值
+                        if (component instanceof TransmissionBoxBuild transmission && transmission.networkId == networkId) {
+                            localMaxSpeed = Math.max(localMaxSpeed, transmission.networkSpeed);
+                            localTotalStress += transmission.networkStress;
+                        } else {
+                            // 对于其他机械组件，使用其自身的值
+                            localMaxSpeed = Math.max(localMaxSpeed, component.rotationSpeed);
+                            localTotalStress += component.stress;
+                        }
                     }
                 }
             }

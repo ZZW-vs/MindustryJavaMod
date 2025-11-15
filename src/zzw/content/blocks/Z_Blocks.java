@@ -108,17 +108,29 @@ public class Z_Blocks {
      */
     private static void otherBlocks() {
         Pumpkin = new Block("pumpkin"){{
-            requirements(Category.defense, ItemStack.with(Z_Items.Copper_Sheet, 4, Items.copper, 3));
+            requirements(Category.crafting, ItemStack.with(Z_Items.Copper_Sheet, 4, Items.copper, 3));
             size = 1;
             health = 380;
             buildVisibility = BuildVisibility.shown;
+            destructible = true;
+            allowDiagonal = true;
+            solid = true;
+            canOverdrive = false;
+            instantDeconstruct = true;
         }};
+
         Carved_Pumpkin = new Block("carved_pumpkin"){{
-            requirements(Category.defense, ItemStack.with(Z_Items.Copper_Sheet, 4, Items.copper, 3));
+            requirements(Category.crafting, ItemStack.with(Z_Items.Copper_Sheet, 4, Items.copper, 3));
             size = 1;
             health = 350;
             buildVisibility = BuildVisibility.shown;
+            destructible = true;
+            allowDiagonal = true;
+            solid = true;
+            canOverdrive = false;
+            instantDeconstruct = true;
         }};
+
     }
 
     /**
