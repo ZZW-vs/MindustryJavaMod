@@ -111,13 +111,13 @@ public class Z_Blocks {
             requirements(Category.defense, ItemStack.with(Z_Items.Copper_Sheet, 4, Items.copper, 3));
             size = 1;
             health = 380;
-            buildVisibility = BuildVisibility.sandboxOnly;
+            buildVisibility = BuildVisibility.shown;
         }};
         Carved_Pumpkin = new Block("carved_pumpkin"){{
             requirements(Category.defense, ItemStack.with(Z_Items.Copper_Sheet, 4, Items.copper, 3));
             size = 1;
             health = 350;
-            buildVisibility = BuildVisibility.sandboxOnly;
+            buildVisibility = BuildVisibility.shown;
         }};
     }
 

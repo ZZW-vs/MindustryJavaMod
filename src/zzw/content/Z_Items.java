@@ -8,17 +8,22 @@ import mindustry.type.Item;
  * 包含模组中添加的所有物品定义
  */
 public class Z_Items {
-    // 金属原料
+    // 基础矿物
     public static Item Iron; // 铁
     public static Item Gold; // 金
-    
-    // 金属板材
+    public static Item Andesite_Alloy; // 安山合金
+    public static Item Brass; // 黄铜
+    public static Item Zinc; // 锌
+
+    // 板材
     public static Item Iron_Sheet; // 铁板
     public static Item Gold_Sheet; // 金板
     public static Item Copper_Sheet; // 铜板
+    public static Item Brass_Sheet; // 黄铜板
 
     // 其他物品
     public static Item Pumpkin_Seeds; // 南瓜种子
+    public static Item Pulp; // 纸浆
 
     // 测试物品
     public static Item Text_An; // 篝火火焰（动态贴图测试物品）
@@ -27,17 +32,22 @@ public class Z_Items {
      * 加载所有自定义物品
      */
     public static void load(){
-        // 基础金属
+        // 基础矿物
         Iron = createBasicItem("iron", "cfcfcf");
         Gold = createBasicItem("gold", "f2df82");
+        Andesite_Alloy = createBasicItem("andesite_alloy", "cfcfcf");
+        Brass = createBasicItem("brass", "f2df82");
+        Zinc = createBasicItem("zinc", "f2df82");
         
-        // 金属板材
+        // 板材
         Iron_Sheet = createBasicItem("iron_sheet", "cfcfcf");
         Gold_Sheet = createBasicItem("gold_sheet", "f2df82");
         Copper_Sheet = createBasicItem("copper_sheet", "c4a638");
+        Brass_Sheet = createBasicItem("brass_sheet", "f2df82");
 
         // 其他物品
         Pumpkin_Seeds = createBasicItem("pumpkin_seeds", "ffcc00");
+        Pulp = createBasicItem("pulp", "cfcfcf");
 
         // 测试物品
         Text_An = new Item("campfire_fire", Color.valueOf("cfcfcf")){{
