@@ -7,7 +7,7 @@ import arc.util.Timer;
 import mindustry.gen.Building;
 
 /**
- * 机械组件基类 - 优化版
+ * 机械组件基类
  * 使用缓存和批量处理提高性能
  */
 public class MechanicalComponentBuild extends Building {

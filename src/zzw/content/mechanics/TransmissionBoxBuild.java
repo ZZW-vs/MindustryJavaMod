@@ -1,8 +1,5 @@
 package zzw.content.mechanics;
 
-import arc.Core;
-import arc.graphics.Color;
-import arc.graphics.g2d.Draw;
 import arc.scene.ui.layout.Table;
 import arc.util.Time;
 import arc.util.Timer;
@@ -97,17 +94,6 @@ public class TransmissionBoxBuild extends MechanicalComponentBuild {
         }
     }
 
-    @Override
-    public void draw() {
-        super.draw();
-
-        // 基本绘制，无动画效果
-        if (rotationSpeed > SPEED_THRESHOLD) {
-            Draw.color(Color.white);
-            Draw.rect(Core.atlas.find("zzw-transmission-rotating"), x, y, rotation);
-            Draw.reset();
-        }
-    }
 
     @Override
     public void display(Table table) {

@@ -5,7 +5,7 @@ import arc.util.Time;
 import arc.util.Timer;
 
 /**
- * 应力源实现 - 优化版
+ * 应力源实现
  * 功能特性：
  * 1. 可配置的转速，支持正反转
  * 2. 平滑的转速变化，避免突变
@@ -14,7 +14,7 @@ import arc.util.Timer;
 public class StressSourceBuild extends MechanicalComponentBuild {
     private float targetSpeed = 0f;          // 目标转速
     // 使用静态常量ACCELERATION替代实例变量，节省内存
-    private static final float ACCELERATION = 0.5f;
+    private static final float ACCELERATION = 1.5f;
     private float drillSpeedMultiplier = 1.0f; // 钻速倍率，随时间增长
     private static final float DRILL_SPEED_GROWTH_RATE = 0.001f; // 钻速增长率
 
