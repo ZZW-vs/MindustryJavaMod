@@ -1,9 +1,10 @@
-
 package zzw.content;
 
 import arc.math.Mathf;
 import arc.scene.ui.layout.Table;
+import arc.struct.IntSet;
 import arc.util.Time;
+import arc.util.Timer;
 import mindustry.content.Items;
 import mindustry.gen.Building;
 import mindustry.type.Category;
@@ -12,24 +13,33 @@ import mindustry.world.Block;
 import mindustry.world.meta.BuildVisibility;
 
 /**
- * 机械系统类
- * 包含模组中添加的所有机械方块定义
+ * 机械系统类 - 优化版
+ * 提供高效的机械传动系统实现
+ * 
+ * 优化点：
+ * 1. 使用IntSet缓存已访问的方块，避免重复计算
+ * 2. 优化邻居检测逻辑，减少内存分配
+ * 3. 添加机械效率计算，使系统更真实
+ * 4. 改进UI更新机制，减少不必要的渲染
  */
 public class Z_Mechanics {
-    /** 应力源 - 沙盒模式专用 */
-    public static Block stressSource;
+    // 机械方块定义
+    public static Block stressSource;      // 应力源
+    public static Block mechanicalShaft;   // 传动箱
 
-    /** 传动箱 */
-    public static Block mechanicalShaft;
+    // 常量定义
+    private static final float MAX_SPEED = 256f;
+    private static final float SPEED_THRESHOLD = 0.01f;
+    private static final float DEFAULT_ACCELERATION = 0.5f;
+    private static final float EFFICIENCY_LOSS_PER_BLOCK = 0.05f; // 每个传动箱的效率损失
+    private static final int MAX_SEARCH_DEPTH = 15; // 最大搜索深度
+    private static final float UI_UPDATE_INTERVAL = 1/30f; // UI更新间隔（30fps）
 
     /**
      * 加载所有自定义机械
      */
     public static void load() {
-        // 创建动力源
         createPowerSources();
-
-        // 创建传输组件
         createTransmission();
     }
 
@@ -37,7 +47,6 @@ public class Z_Mechanics {
      * 创建动力源
      */
     private static void createPowerSources() {
-        // 应力源 - 沙盒模式专用，可调节转速
         stressSource = new Block("stress_source") {{
             requirements(Category.crafting, ItemStack.with(Items.lead, 100, Items.copper, 80));
             size = 1;
@@ -45,10 +54,10 @@ public class Z_Mechanics {
             solid = true;
             update = true;
             configurable = true;
-            buildVisibility = BuildVisibility.sandboxOnly; // 仅限沙盒模式
+            buildVisibility = BuildVisibility.sandboxOnly;
 
-            // 配置选项
-            config(Float.class, (StressSourceBuild build, Float value) -> build.targetSpeed = Mathf.clamp(value, -256f, 256f));
+            config(Float.class, (StressSourceBuild build, Float value) ->
+                build.setTargetSpeed(Mathf.clamp(value, -MAX_SPEED, MAX_SPEED)));
         }};
 
         stressSource.buildType = StressSourceBuild::new;
@@ -58,7 +67,6 @@ public class Z_Mechanics {
      * 创建传输组件
      */
     private static void createTransmission() {
-        // 传动箱
         mechanicalShaft = new Block("transmission_box") {{
             requirements(Category.crafting, ItemStack.with(Items.lead, 10, Z_Items.Iron, 5));
             size = 1;
@@ -71,62 +79,212 @@ public class Z_Mechanics {
     }
 
     /**
-     * 机械组件基类 - 处理旋转速度和传输
+     * 机械组件基类 - 优化版
+     * 使用缓存和批量处理提高性能
      */
     public static class MechanicalComponentBuild extends Building {
-        /** 旋转速度 */
+        // 机械属性
         public float rotationSpeed = 0f;
-        /** 旋转角度 */
-        public float rotation = 0f;
-        /** 应力值 */
         public float stress = 0f;
-        /** 是否为动力源 */
         public boolean isSource = false;
-        /** 是否为负载端 */
         public boolean isSink = false;
 
-        // 缓存相邻组件，避免每帧重复计算
-        private final MechanicalComponentBuild[] cachedNeighbors = new MechanicalComponentBuild[4];
+        // 性能优化：缓存相关
+        private final MechanicalComponentBuild[] neighbors = new MechanicalComponentBuild[4];
         private int lastCacheFrame = -1;
+        protected boolean needsUpdate = true; // 改为protected以便子类访问
+
+        // 路径查找优化
+        private static final IntSet visitedSet = new IntSet();
+        private int lastPathCheckFrame = -1;
+        private Boolean hasPathToSourceCache = null;
 
         @Override
         public void update() {
-            // 如果不是动力源，尝试从相邻方块获取旋转速度和应力
+            // 使用needsUpdate标志避免不必要的计算
+            if (!needsUpdate && !isSource) return;
+
             if (!isSource) {
-                float maxInputSpeed = 0f;
-                float maxInputStress = 0f;
+                updateFromNeighbors();
+            }
 
-                // 缓存相邻组件以提高性能
-                if (lastCacheFrame != (int)Time.time) {
-                    lastCacheFrame = (int)Time.time;
-                    for (int i = 0; i < 4; i++) {
-                        Building other = nearby(i);
-                        cachedNeighbors[i] = (other instanceof MechanicalComponentBuild) ? 
-                            (MechanicalComponentBuild) other : null;
-                    }
-                }
+            if (isSink && rotationSpeed > 0) {
+                handleMechanicalOperation();
+            }
 
-                // 检查四个方向的相邻方块
+            needsUpdate = false;
+        }
+
+        /**
+         * 从相邻组件更新动力状态
+         * 优化了邻居检测逻辑和动力传递效率
+         */
+        private void updateFromNeighbors() {
+            float maxInputSpeed = 0f;
+            float maxInputStress = 0f;
+            boolean hasValidSource = false;
+            int distanceFromSource = Integer.MAX_VALUE; // 记录到动力源的距离
+
+            // 仅在必要时更新邻居缓存
+            int currentFrame = (int)Time.time;
+            if (lastCacheFrame != currentFrame) {
+                lastCacheFrame = currentFrame;
                 for (int i = 0; i < 4; i++) {
-                    MechanicalComponentBuild component = cachedNeighbors[i];
-                    if (component != null) {
-                        // 只从动力源或已连接的组件获取动力
-                        if (component.isSource || component.rotationSpeed > 0) {
-                            // 移除面对面连接限制，允许所有相邻组件接收动力
-                            maxInputSpeed = Math.max(maxInputSpeed, component.rotationSpeed);
-                            maxInputStress = Math.max(maxInputStress, component.stress);
+                    Building other = nearby(i);
+                    neighbors[i] = (other instanceof MechanicalComponentBuild) ?
+                        (MechanicalComponentBuild) other : null;
+                }
+            }
+
+            // 检查邻居组件
+            for (MechanicalComponentBuild component : neighbors) {
+                if (component != null) {
+                    if (component.isSource) {
+                        // 直接从动力源获取动力
+                        maxInputSpeed = Math.max(maxInputSpeed, component.rotationSpeed);
+                        maxInputStress = Math.max(maxInputStress, component.stress);
+                        hasValidSource = true;
+                        distanceFromSource = Math.min(distanceFromSource, 1);
+                    } else if (component.rotationSpeed > SPEED_THRESHOLD) {
+                        // 检查是否有通往动力源的路径
+                        boolean pathValid = hasValidPathToSource(component);
+                        if (pathValid) {
+                            // 计算基于距离的效率损失
+                            float distance = getDistanceToSource(component);
+                            float efficiency = Math.max(0.1f, 1.0f - (distance * EFFICIENCY_LOSS_PER_BLOCK));
+
+                            // 应用效率损失
+                            float effectiveSpeed = component.rotationSpeed * efficiency;
+                            float effectiveStress = component.stress * efficiency;
+
+                            maxInputSpeed = Math.max(maxInputSpeed, effectiveSpeed);
+                            maxInputStress = Math.max(maxInputStress, effectiveStress);
+                            hasValidSource = true;
+                            distanceFromSource = Math.min(distanceFromSource, (int)distance + 1);
                         }
                     }
                 }
-
-                // 更新旋转速度和应力
-                rotationSpeed = maxInputSpeed;
-                stress = maxInputStress;
             }
 
-            // 如果是应用机械，处理生产逻辑
-            if (isSink && rotationSpeed > 0) {
-                handleMechanicalOperation();
+            // 更新旋转速度和应力
+            float oldSpeed = rotationSpeed;
+            float oldStress = stress;
+
+            if (hasValidSource) {
+                // 应用基于距离的效率损失
+                float efficiency = Math.max(0.1f, 1.0f - (distanceFromSource * EFFICIENCY_LOSS_PER_BLOCK));
+                rotationSpeed = maxInputSpeed * efficiency;
+                stress = maxInputStress * efficiency;
+            } else {
+                // 如果没有有效动力源，清除旋转速度和应力
+                rotationSpeed = 0f;
+                stress = 0f;
+            }
+
+            // 仅在值变化时更新
+            if (Math.abs(oldSpeed - rotationSpeed) > SPEED_THRESHOLD || Math.abs(oldStress - stress) > SPEED_THRESHOLD) {
+                notifyNeighborsNeedUpdate();
+            }
+        }
+
+        /**
+         * 检查是否有通往动力源的有效路径
+         * 使用优化的深度优先搜索算法和缓存
+         */
+        private boolean hasValidPathToSource(MechanicalComponentBuild start) {
+            if (start.isSource) return true;
+
+            // 使用缓存避免重复计算
+            int currentFrame = (int)Time.time;
+            if (lastPathCheckFrame == currentFrame && hasPathToSourceCache != null) {
+                return hasPathToSourceCache;
+            }
+
+            lastPathCheckFrame = currentFrame;
+
+            // 清空访问记录
+            visitedSet.clear();
+
+            // 执行搜索
+            hasPathToSourceCache = hasValidPathToSourceRecursive(start, 0);
+            return hasPathToSourceCache;
+        }
+
+        /**
+         * 获取到动力源的距离
+         */
+        private float getDistanceToSource(MechanicalComponentBuild start) {
+            if (start.isSource) return 0;
+
+            // 清空访问记录
+            visitedSet.clear();
+
+            // 执行搜索并返回距离
+            return getDistanceToSourceRecursive(start, 0);
+        }
+
+        private boolean hasValidPathToSourceRecursive(MechanicalComponentBuild current, int depth) {
+            // 检查深度限制
+            if (depth > MAX_SEARCH_DEPTH) return false;
+
+            // 如果是动力源，返回true
+            if (current.isSource) return true;
+
+            // 使用位置ID标记已访问的方块
+            int posId = current.pos();
+            if (visitedSet.contains(posId)) return false;
+            visitedSet.add(posId);
+
+            // 检查所有邻居
+            for (int i = 0; i < 4; i++) {
+                Building other = current.nearby(i);
+                if (other instanceof MechanicalComponentBuild component) {
+                    // 递归检查
+                    if (hasValidPathToSourceRecursive(component, depth + 1)) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private float getDistanceToSourceRecursive(MechanicalComponentBuild current, int depth) {
+            // 检查深度限制
+            if (depth > MAX_SEARCH_DEPTH) return Float.MAX_VALUE;
+
+            // 如果是动力源，返回距离
+            if (current.isSource) return depth;
+
+            // 使用位置ID标记已访问的方块
+            int posId = current.pos();
+            if (visitedSet.contains(posId)) return Float.MAX_VALUE;
+            visitedSet.add(posId);
+
+            float minDistance = Float.MAX_VALUE;
+
+            // 检查所有邻居
+            for (int i = 0; i < 4; i++) {
+                Building other = current.nearby(i);
+                if (other instanceof MechanicalComponentBuild component) {
+                    // 递归检查
+                    float distance = getDistanceToSourceRecursive(component, depth + 1);
+                    minDistance = Math.min(minDistance, distance);
+                }
+            }
+
+            return minDistance;
+        }
+
+        /**
+         * 通知邻居需要更新
+         * 减少不必要的更新传播
+         */
+        private void notifyNeighborsNeedUpdate() {
+            for (MechanicalComponentBuild component : neighbors) {
+                if (component != null) {
+                    component.needsUpdate = true;
+                }
             }
         }
 
@@ -140,39 +298,267 @@ public class Z_Mechanics {
         public void display(Table table) {
             super.display(table);
 
-            // 添加应力和转速信息显示
+            // 创建可更新的应力显示标签
+            var stressLabel = table.add("[accent]应力: [white]" + (int)stress + " us").get();
             table.row();
-            table.add("[accent]应力: [white]" + (int)stress + " us");
-            table.row();
-            table.add("[accent]转速: [white]" + (int)rotationSpeed + " bpm");
+
+            // 创建可更新的转速显示标签
+            var speedLabel = table.add("[accent]转速: [white]" + (int)rotationSpeed + " bpm").get();
+
+            // 添加更新任务，每帧更新显示值
+            Time.runTask(0f, () -> {
+                // 使用定时器持续更新UI显示
+                Timer.schedule(() -> {
+                    if (this.isAdded() && stressLabel != null && speedLabel != null) {
+                        stressLabel.setText("[accent]应力: [white]" + (int)stress + " us");
+                        speedLabel.setText("[accent]转速: [white]" + (int)rotationSpeed + " bpm");
+                    }
+                }, 0, UI_UPDATE_INTERVAL); // 使用优化的更新间隔
+            });
+        }
+
+        protected void handleMechanicalOperation() {
+            // 由子类实现
         }
 
         /**
-         * 处理机械操作，由子类实现
+         * 当方块被破坏时通知邻居更新
          */
-        protected void handleMechanicalOperation() {
-            // 基础实现为空，由子类重写
+        @Override
+        public void onRemoved() {
+            super.onRemoved();
+            notifyNeighborsNeedUpdate();
+        }
+
+        /**
+         * 当方块被放置时通知邻居更新
+         */
+        @Override
+        public void onProximityAdded() {
+            super.onProximityAdded();
+            notifyNeighborsNeedUpdate();
         }
     }
 
     /**
-     * 传动箱实现 - 只传输应力和转速，不旋转
+     * 传动箱实现 - 网络版
+     * 连接的传动箱视为一个整体，共享相同的转速和应力
      */
     public static class TransmissionBoxBuild extends MechanicalComponentBuild {
-        // 传动箱继承基类的draw方法，不显示旋转动画
+        // 网络相关属性
+        private int networkId = -1; // 所属网络ID，-1表示未分配网络
+        private boolean isNetworkMaster = false; // 是否为网络主节点（负责计算）
+        private static int nextNetworkId = 0; // 下一个可用的网络ID
+        private static final IntSet visitedSet = new IntSet(); // 用于网络搜索的访问记录
+
+        @Override
+        public void update() {
+            // 如果是网络主节点，则执行更新
+            if (isNetworkMaster) {
+                // 确保网络完整性
+                validateNetwork();
+
+                // 执行基类更新逻辑
+                super.update();
+
+                // 将更新后的值传播到网络中的所有传动箱
+                propagateNetworkValues();
+            } else if (networkId == -1) {
+                // 未分配网络的传动箱，尝试加入网络或成为新网络的主节点
+                findOrCreateNetwork();
+            }
+        }
+
+        /**
+         * 验证网络完整性，确保所有传动箱都在同一网络中
+         */
+        private void validateNetwork() {
+            if (!isNetworkMaster) return;
+
+            visitedSet.clear();
+            validateNetworkRecursive(this);
+        }
+
+        /**
+         * 递归验证网络
+         */
+        private void validateNetworkRecursive(TransmissionBoxBuild current) {
+            int posId = current.pos();
+            if (visitedSet.contains(posId)) return;
+            visitedSet.add(posId);
+
+            // 检查所有邻居
+            for (int i = 0; i < 4; i++) {
+                Building other = current.nearby(i);
+                if (other instanceof TransmissionBoxBuild neighbor) {
+                    // 如果邻居有不同网络ID，将其合并到当前网络
+                    if (neighbor.networkId != networkId) {
+                        mergeNetworks(this, neighbor);
+                    }
+                    validateNetworkRecursive(neighbor);
+                }
+            }
+        }
+
+        /**
+         * 将网络值传播到所有传动箱
+         */
+        private void propagateNetworkValues() {
+            if (!isNetworkMaster) return;
+
+            visitedSet.clear();
+            propagateValuesRecursive(this);
+        }
+
+        /**
+         * 递归传播网络值
+         */
+        private void propagateValuesRecursive(TransmissionBoxBuild current) {
+            int posId = current.pos();
+            if (visitedSet.contains(posId)) return;
+            visitedSet.add(posId);
+
+            // 更新当前传动箱的值
+            if (current != this) {
+                current.rotationSpeed = this.rotationSpeed;
+                current.stress = this.stress;
+                current.needsUpdate = false; // 避免重复更新
+            }
+
+            // 检查所有邻居
+            for (int i = 0; i < 4; i++) {
+                Building other = current.nearby(i);
+                if (other instanceof TransmissionBoxBuild neighbor && neighbor.networkId == networkId) {
+                    propagateValuesRecursive(neighbor);
+                }
+            }
+        }
+
+        /**
+         * 查找或创建网络
+         */
+        private void findOrCreateNetwork() {
+            visitedSet.clear();
+
+            // 检查是否有相邻的传动箱网络
+            for (int i = 0; i < 4; i++) {
+                Building other = nearby(i);
+                if (other instanceof TransmissionBoxBuild neighbor && neighbor.networkId != -1) {
+                    // 加入现有网络
+                    networkId = neighbor.networkId;
+                    isNetworkMaster = false;
+                    neighbor.validateNetwork(); // 通知主节点验证网络
+                    return;
+                }
+            }
+
+            // 没有找到现有网络，创建新网络
+            networkId = nextNetworkId++;
+            isNetworkMaster = true;
+        }
+
+        /**
+         * 合并两个网络
+         */
+        private static void mergeNetworks(TransmissionBoxBuild master, TransmissionBoxBuild other) {
+            int oldNetworkId = other.networkId;
+
+            // 将other的网络合并到master的网络
+            visitedSet.clear();
+            mergeNetworksRecursive(master, other, oldNetworkId);
+        }
+
+        /**
+         * 递归合并网络
+         */
+        private static void mergeNetworksRecursive(TransmissionBoxBuild master, TransmissionBoxBuild current, int oldNetworkId) {
+            int posId = current.pos();
+            if (visitedSet.contains(posId)) return;
+            visitedSet.add(posId);
+
+            // 更新网络ID和主节点状态
+            current.networkId = master.networkId;
+            current.isNetworkMaster = false;
+
+            // 递归处理邻居
+            for (int i = 0; i < 4; i++) {
+                Building other = current.nearby(i);
+                if (other instanceof TransmissionBoxBuild neighbor && neighbor.networkId == oldNetworkId) {
+                    mergeNetworksRecursive(master, neighbor, oldNetworkId);
+                }
+            }
+        }
+
+        @Override
+        public void onRemoved() {
+            super.onRemoved();
+
+            // 如果是网络主节点，需要选择新的主节点
+            if (isNetworkMaster && networkId != -1) {
+                findNewNetworkMaster();
+            }
+        }
+
+        /**
+         * 寻找新的网络主节点
+         */
+        private void findNewNetworkMaster() {
+            visitedSet.clear();
+            TransmissionBoxBuild newMaster = findNewMasterRecursive(this);
+
+            if (newMaster != null) {
+                newMaster.isNetworkMaster = true;
+                newMaster.needsUpdate = true;
+            }
+        }
+
+        /**
+         * 递归寻找新的网络主节点
+         */
+        private TransmissionBoxBuild findNewMasterRecursive(TransmissionBoxBuild current) {
+            int posId = current.pos();
+            if (visitedSet.contains(posId)) return null;
+            visitedSet.add(posId);
+
+            // 检查所有邻居
+            for (int i = 0; i < 4; i++) {
+                Building other = current.nearby(i);
+                if (other instanceof TransmissionBoxBuild neighbor && neighbor.networkId == networkId) {
+                    TransmissionBoxBuild result = findNewMasterRecursive(neighbor);
+                    if (result != null) return result;
+                }
+            }
+
+            // 如果没有找到其他候选者，返回自己
+            return current;
+        }
+
+        @Override
+        public void draw() {
+            super.draw();
+
+            // 如果是网络主节点，可以添加特殊视觉效果
+            if (isNetworkMaster) {
+                // TODO: 这里可以添加主节点的特殊视觉效果
+                drawNetworkMasterEffect();
+            }
+        }
+
+        /**
+         * 绘制网络主节点的特殊效果
+         */
+        private void drawNetworkMasterEffect() {
+            // 预留方法，用于绘制网络主节点的特殊视觉效果
+        }
     }
 
     /**
-     * 应力源实现 - 沙盒模式专用
+     * 应力源实现 - 优化版
      */
     public static class StressSourceBuild extends MechanicalComponentBuild {
-        /** 目标转速 */
-        public float targetSpeed = 0f;
-        /** 加速度 */
-        public float acceleration = 0.5f;
-
-        // 优化：添加速度变化阈值，避免微小变化时的频繁计算
-        private static final float SPEED_THRESHOLD = 0.01f;
+        private float targetSpeed = 0f;
+        // 使用静态常量ACCELERATION替代实例变量
+        private static final float ACCELERATION = DEFAULT_ACCELERATION;
 
         @Override
         public void update() {
@@ -182,19 +568,36 @@ public class Z_Mechanics {
             isSource = true;
 
             // 平滑调整到目标速度
+            adjustSpeed();
+        }
+
+        /**
+         * 平滑调整速度
+         */
+        private void adjustSpeed() {
             float speedDifference = targetSpeed - rotationSpeed;
             if (Math.abs(speedDifference) > SPEED_THRESHOLD) {
-                // 使用线性插值使速度变化更平滑
-                rotationSpeed += speedDifference * acceleration * Time.delta / 60f;
-            } else {
-                // 当接近目标速度时，直接设为目标值
+                rotationSpeed += speedDifference * ACCELERATION * Time.delta / 60f;
+                needsUpdate = true; // 速度变化时通知邻居更新
+            } else if (rotationSpeed != targetSpeed) {
                 rotationSpeed = targetSpeed;
+                needsUpdate = true;
+            }
+        }
+
+        /**
+         * 设置目标速度
+         */
+        public void setTargetSpeed(float speed) {
+            if (targetSpeed != speed) {
+                targetSpeed = speed;
+                needsUpdate = true;
             }
         }
 
         @Override
         public void buildConfiguration(Table table) {
-            table.slider(-256f, 256f, 1f, targetSpeed, this::configure).row();
+            table.slider(-MAX_SPEED, MAX_SPEED, 1f, targetSpeed, this::configure).row();
         }
 
         @Override
@@ -203,4 +606,3 @@ public class Z_Mechanics {
         }
     }
 }
-
