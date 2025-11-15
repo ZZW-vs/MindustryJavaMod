@@ -1,15 +1,12 @@
 package zzw.content.mechanics;
 
+import arc.Core;
+import arc.graphics.Color;
+import arc.graphics.g2d.Draw;
 import arc.scene.ui.layout.Table;
 import arc.util.Time;
 import arc.util.Timer;
 import mindustry.gen.Building;
-import mindustry.graphics.Drawf;
-import arc.graphics.g2d.Draw;
-import arc.math.Mathf;
-import arc.graphics.Color;
-import arc.Core;
-import mindustry.Vars;
 
 /**
  * 简化版传动箱实现
@@ -22,12 +19,11 @@ import mindustry.Vars;
 public class TransmissionBoxBuild extends MechanicalComponentBuild {
     // 常量定义
     private static final float SPEED_THRESHOLD = 0.01f;    // 转速阈值
-    private static final float EFFICIENCY = 0.95f;          // 传动效率
+
     private static final float UI_UPDATE_INTERVAL = 1/30f;   // UI更新间隔（30fps）
 
     // 视觉效果参数
     private float rotation = 0f;                           // 旋转角度
-    private float pulseScale = 1f;                          // 脉冲缩放效果
 
     @Override
     public void update() {
@@ -36,9 +32,6 @@ public class TransmissionBoxBuild extends MechanicalComponentBuild {
         // 更新旋转角度
         if (rotationSpeed > SPEED_THRESHOLD) {
             rotation += rotationSpeed * Time.delta;
-            pulseScale = 1f + Mathf.sin(Time.time * 0.05f) * 0.1f;
-        } else {
-            pulseScale = Mathf.lerpDelta(pulseScale, 1f, 0.1f);
         }
 
         // 更新应力传递
@@ -73,8 +66,8 @@ public class TransmissionBoxBuild extends MechanicalComponentBuild {
                 float oldSpeed = rotationSpeed;
                 float oldStress = stress;
 
-                rotationSpeed = maxInputSpeed * EFFICIENCY;
-                stress = maxInputStress * EFFICIENCY;
+                rotationSpeed = maxInputSpeed;
+                stress = maxInputStress;
 
                 // 如果值发生变化，通知邻居更新
                 if (Math.abs(oldSpeed - rotationSpeed) > SPEED_THRESHOLD || 
@@ -108,24 +101,10 @@ public class TransmissionBoxBuild extends MechanicalComponentBuild {
     public void draw() {
         super.draw();
 
-        // 绘制旋转效果
+        // 基本绘制，无动画效果
         if (rotationSpeed > SPEED_THRESHOLD) {
             Draw.color(Color.white);
-            Draw.alpha(Mathf.absin(Time.time, 3f, 0.3f));
             Draw.rect(Core.atlas.find("zzw-transmission-rotating"), x, y, rotation);
-            Draw.reset();
-
-            // 绘制应力流动效果
-            if (stress > 0) {
-                Drawf.light(x, y, 30f, Color.orange, 0.5f + Mathf.absin(Time.time, 2f, 0.3f) * 0.5f);
-            }
-        }
-
-        // 绘制脉冲效果
-        if (pulseScale > 1f) {
-            Draw.color(Color.white);
-            Draw.alpha(0.3f * (pulseScale - 1f) * 10f);
-            Draw.rect(block.region, x, y, block.size * Vars.tilesize * pulseScale);
             Draw.reset();
         }
     }
@@ -140,9 +119,7 @@ public class TransmissionBoxBuild extends MechanicalComponentBuild {
         var speedLabel = table.add("[accent]转速: [white]" + (int)rotationSpeed + " rpm").width(160).get();
         table.row();
 
-        // 显示传动效率
-        table.add("[accent]传动效率: [white]" + (int)(EFFICIENCY * 100) + "%").width(160);
-        table.row();
+
 
         // 添加更新任务，每帧更新显示值
         Time.runTask(0f, () -> {

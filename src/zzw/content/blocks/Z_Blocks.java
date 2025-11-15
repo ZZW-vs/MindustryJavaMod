@@ -60,7 +60,6 @@ public class Z_Blocks {
         Copper_Block = new Wall("copper_block"){{
             requirements(Category.defense, ItemStack.with(Z_Items.Copper_Sheet, 4, Items.copper, 3));
             size = 1;
-            buildTime = 150f;
             health = 380;
         }};
         
@@ -68,7 +67,6 @@ public class Z_Blocks {
         Large_Copper_Block = new Wall("large_copper_block"){{
             requirements(Category.defense, ItemStack.with(Z_Items.Copper_Sheet, 16, Items.copper, 12));
             size = 2;
-            buildTime = 300f;
             health = 1520;
         }};
         
@@ -76,7 +74,6 @@ public class Z_Blocks {
         Iron_Block = new Wall("iron_block"){{
             requirements(Category.defense, ItemStack.with(Z_Items.Iron_Sheet, 4, Items.copper, 3));
             size = 1;
-            buildTime = 150f;
             health = 400;
         }};
         
@@ -84,7 +81,6 @@ public class Z_Blocks {
         Large_Iron_Block = new Wall("large_iron_block"){{
             requirements(Category.defense, ItemStack.with(Z_Items.Iron_Sheet, 16, Z_Items.Iron, 12));
             size = 2;
-            buildTime = 300f;
             health = 1600;
         }};
     }
