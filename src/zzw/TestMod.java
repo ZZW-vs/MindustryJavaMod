@@ -11,31 +11,18 @@ import zzw.content.Z_Items;
 import zzw.content.Z_Factory;
 import zzw.content.mechanics.Z_Mechanics;
 
-/**
- * 主模组类
- * 处理模组的初始化和内容加载
- */
+
 public class TestMod extends Mod{
-    // 欢迎对话框显示延迟（秒）
     private static final float WELCOME_DIALOG_DELAY = 10f;
-    // 关闭按钮显示延迟（秒）
     private static final float CLOSE_BUTTON_DELAY = 100f;
     
-    /**
-     * 构造函数，设置事件监听器
-     */
     public TestMod(){
-        // 监听客户端加载完成事件
         Events.on(EventType.ClientLoadEvent.class, e -> {
-            // 延迟显示欢迎对话框
             Time.run(WELCOME_DIALOG_DELAY, this::showWelcomeDialog);
         });
     }
 
-    /**
-     * 加载模组内容
-     * 按照依赖关系顺序加载：先物品，再工厂，最后方块
-     */
+
     @Override
     public void loadContent(){
         // 加载自定义物品（基础资源）
