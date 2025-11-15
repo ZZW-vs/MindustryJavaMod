@@ -6,10 +6,10 @@ import mindustry.game.EventType;
 import mindustry.mod.Mod;
 import mindustry.ui.dialogs.BaseDialog;
 
-import zzw.content.Z_Mechanics;
 import zzw.content.blocks.Z_Blocks;
 import zzw.content.Z_Items;
 import zzw.content.Z_Factory;
+import zzw.content.mechanics.Z_Mechanics;
 
 /**
  * 主模组类
