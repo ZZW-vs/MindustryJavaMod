@@ -17,8 +17,6 @@ public class TransmissionBoxBuild extends MechanicalComponentBuild {
     // 常量定义
     private static final float SPEED_THRESHOLD = 0.01f;    // 转速阈值
 
-    private static final float UI_UPDATE_INTERVAL = 1/30f;   // UI更新间隔（30fps）
-
     // 视觉效果参数
     private float rotation = 0f;                           // 旋转角度
 
@@ -41,43 +39,57 @@ public class TransmissionBoxBuild extends MechanicalComponentBuild {
     private void updateStressTransmission() {
         // 如果不是动力源，从邻居获取动力
         if (!isSource) {
-            float maxInputSpeed = 0f;
-            float maxInputStress = 0f;
+            float sourceSpeed = 0f;
+            float sourceStress = 0f;
             boolean hasValidSource = false;
+            boolean hasSource = false; // 检测是否有动力源邻居
 
             // 检查所有邻居
             for (int i = 0; i < 4; i++) {
                 Building other = nearby(i);
                 if (other instanceof MechanicalComponentBuild component) {
-                    // 如果邻居是动力源或有转速和应力
-                    if (component.isSource || (component.rotationSpeed > SPEED_THRESHOLD && component.stress > 0)) {
-                        maxInputSpeed = Math.max(maxInputSpeed, component.rotationSpeed);
-                        maxInputStress = Math.max(maxInputStress, component.stress);
+                    // 如果邻居是动力源
+                    if (component.isSource) {
+                        // 直接使用动力源的值，而不是取最大值
+                        sourceSpeed = component.rotationSpeed;
+                        sourceStress = component.stress;
                         hasValidSource = true;
+                        hasSource = true;
+                    }
+                    // 或者邻居有转速和应力
+                    else if (component.rotationSpeed > SPEED_THRESHOLD && component.stress > 0) {
+                        // 如果没有动力源，使用非动力源邻居的值
+                        if (!hasSource) {
+                            sourceSpeed = Math.max(sourceSpeed, component.rotationSpeed);
+                            sourceStress = Math.max(sourceStress, component.stress);
+                            hasValidSource = true;
+                        }
                     }
                 }
             }
 
             // 更新自身值，应用传动效率
+            float oldSpeed = rotationSpeed;
+            float oldStress = stress;
+
             if (hasValidSource) {
-                float oldSpeed = rotationSpeed;
-                float oldStress = stress;
-
-                rotationSpeed = maxInputSpeed;
-                stress = maxInputStress;
-
-                // 如果值发生变化，通知邻居更新
-                if (Math.abs(oldSpeed - rotationSpeed) > SPEED_THRESHOLD || 
-                    Math.abs(oldStress - stress) > SPEED_THRESHOLD) {
-                    notifyNeighborsNeedUpdate();
-                }
+                rotationSpeed = sourceSpeed;
+                stress = sourceStress;
             } else {
                 // 如果没有有效动力源，清除旋转速度和应力
-                if (rotationSpeed > 0 || stress > 0) {
-                    rotationSpeed = 0f;
-                    stress = 0f;
-                    notifyNeighborsNeedUpdate();
-                }
+                rotationSpeed = 0f;
+                stress = 0f;
+            }
+
+            // 如果值发生变化，通知邻居更新
+            if (Math.abs(oldSpeed - rotationSpeed) > SPEED_THRESHOLD ||
+                Math.abs(oldStress - stress) > SPEED_THRESHOLD) {
+                notifyNeighborsNeedUpdate();
+            }
+
+            // 如果有动力源邻居，但自身没有更新，强制更新
+            if (hasSource && Math.abs(oldSpeed - rotationSpeed) <= SPEED_THRESHOLD) {
+                needsUpdate = true;
             }
         }
     }
@@ -97,6 +109,8 @@ public class TransmissionBoxBuild extends MechanicalComponentBuild {
 
     @Override
     public void display(Table table) {
+        super.display(table);
+
         // 创建可更新的应力显示标签
         var stressLabel = table.add("[accent]应力: [white]" + (int)stress + " us").width(160).get();
         table.row();
@@ -104,8 +118,6 @@ public class TransmissionBoxBuild extends MechanicalComponentBuild {
         // 创建可更新的转速显示标签
         var speedLabel = table.add("[accent]转速: [white]" + (int)rotationSpeed + " rpm").width(160).get();
         table.row();
-
-
 
         // 添加更新任务，每帧更新显示值
         Time.runTask(0f, () -> {
@@ -115,19 +127,7 @@ public class TransmissionBoxBuild extends MechanicalComponentBuild {
                     stressLabel.setText("[accent]应力: [white]" + (int)stress + " us");
                     speedLabel.setText("[accent]转速: [white]" + (int)rotationSpeed + " rpm");
                 }
-            }, 0, UI_UPDATE_INTERVAL); // 使用优化的更新间隔
+            }, 0, 1/30f); // 使用30fps的更新间隔
         });
-    }
-
-    @Override
-    public void onRemoved() {
-        super.onRemoved();
-        notifyNeighborsNeedUpdate();
-    }
-
-    @Override
-    public void onProximityAdded() {
-        super.onProximityAdded();
-        notifyNeighborsNeedUpdate();
     }
 }

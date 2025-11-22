@@ -22,6 +22,7 @@ public class Z_Mechanics {
     // 机械方块定义
     public static Block stressSource;      // 应力源
     public static Block mechanicalShaft;   // 传动箱
+    public static Block cogwheel;          // 齿轮
 
     /**
      * 加载所有自定义机械
@@ -29,6 +30,7 @@ public class Z_Mechanics {
     public static void load() {
         createPowerSources();
         createTransmission();
+        createCogwheels();
     }
 
     /**
@@ -64,5 +66,20 @@ public class Z_Mechanics {
         }};
 
         mechanicalShaft.buildType = TransmissionBoxBuild::new;
+    }
+
+    /**
+     * 创建传输组件 - 齿轮
+     */
+    private static void createCogwheels() {
+        cogwheel = new Block("cogwheel") {{
+            requirements(Category.crafting, ItemStack.with(Items.copper, 15, Z_Items.Iron, 10));
+            size = 1;
+            health = 120;
+            solid = true;
+            update = true;
+        }};
+
+        cogwheel.buildType = CogwheelBuild::new;
     }
 }

@@ -20,7 +20,6 @@ public class StressSourceBuild extends MechanicalComponentBuild {
 
     // 常量定义
     private static final float SPEED_THRESHOLD = 0.01f;              // 转速阈值
-    private static final float UI_UPDATE_INTERVAL = 1/30f;            // UI更新间隔（30fps）
 
     @Override
     public void update() {
@@ -106,7 +105,7 @@ public class StressSourceBuild extends MechanicalComponentBuild {
                     stressLabel.setText("[accent]应力: [white]∞ us");
                     speedLabel.setText("[accent]转速: [white]" + (int)rotationSpeed + " rpm");
                 }
-            }, 0, UI_UPDATE_INTERVAL); // 使用优化的更新间隔
+            }, 0, 1/30f); // 使用30fps的更新间隔
         });
     }
 }
