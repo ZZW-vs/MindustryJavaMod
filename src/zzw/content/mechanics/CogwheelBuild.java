@@ -6,10 +6,11 @@ import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
 import arc.graphics.g2d.TextureRegion;
+import arc.scene.ui.Label;
 import arc.scene.ui.layout.Table;
 import arc.util.Time;
+import arc.util.Timer;
 import mindustry.gen.Building;
-import mindustry.ui.Bar;
 
 /**
  * 齿轮方块实现
@@ -215,18 +216,59 @@ public class CogwheelBuild extends MechanicalComponentBuild {
 
     @Override
     public void display(Table table) {
-        table.row();
+        // 使用新的UI组件创建美观的信息面板
+        Table panel = MechanicalUI.createInfoPanel("齿轮状态");
 
-        // 转速显示条
-        table.add(new Bar(() -> "转速: " + String.format("%.2f", rotationSpeed), 
-                         () -> Color.lightGray, 
-                         () -> rotationSpeed / 10f)).width(200f).padBottom(4);
+        // 添加旋转指示器
+        MechanicalUI.RotationIndicator rotationIndicator = new MechanicalUI.RotationIndicator(
+            30f, MechanicalUI.SPEED_COLOR, "转速"
+        );
+        rotationIndicator.setSpeed(rotationSpeed);
+        panel.add(rotationIndicator).pad(10).row();
 
-        table.row();
+        // 添加应力圆形指示器
+        MechanicalUI.CircularIndicator stressIndicator = new MechanicalUI.CircularIndicator(
+            25f, MechanicalUI.STRESS_COLOR, "应力", "us"
+        );
+        stressIndicator.setValue(Math.min(stress / 10f, 1.0f));
+        panel.add(stressIndicator).pad(10).row();
 
-        // 应力显示条
-        table.add(new Bar(() -> "应力: " + String.format("%.2f", stress), 
-                         () -> STRESS_COLOR, 
-                         () -> stress)).width(200f);
+        // 添加效率指示器
+        MechanicalUI.CircularIndicator efficiencyIndicator = new MechanicalUI.CircularIndicator(
+            25f, MechanicalUI.EFFICIENCY_COLOR, "效率", "%"
+        );
+        // 计算效率：基于应力与最大应力的比例
+        float efficiency = stress > 0 ? Math.max(0.1f, 1.0f - (stress / 10f)) : 0;
+        efficiencyIndicator.setValue(efficiency);
+        panel.add(efficiencyIndicator).pad(10).row();
+
+        // 添加齿轮比信息
+        panel.add(MechanicalUI.createTooltipLabel(
+            String.format("齿轮比: %.1f:1", GEAR_RATIO),
+            "齿轮比决定了转速和应力的转换效率"
+        )).center().pad(5).row();
+
+        // 添加状态信息
+        String statusText = isSource ? "动力源" : 
+                          (rotationSpeed > 0.01f ? "运行中" : "静止");
+        Color statusColor = isSource ? MechanicalUI.EFFICIENCY_COLOR : 
+                           (rotationSpeed > 0.01f ? MechanicalUI.SPEED_COLOR : MechanicalUI.NORMAL_COLOR);
+
+        Label statusLabel = new Label("[[" + statusColor + "]]" + statusText + "[]");
+        statusLabel.setFontScale(1.1f);
+        panel.add(statusLabel).center().pad(5).row();
+
+        // 添加到主表格
+        table.add(panel);
+
+        // 设置定时更新
+        Time.runTask(0f, () -> Timer.schedule(() -> {
+            if (this.isAdded()) {
+                rotationIndicator.setSpeed(rotationSpeed);
+                stressIndicator.setValue(Math.min(stress / 10f, 1.0f));
+                float currentEfficiency = stress > 0 ? Math.max(0.1f, 1.0f - (stress / 10f)) : 0;
+                efficiencyIndicator.setValue(currentEfficiency);
+            }
+        }, 0, MechanicalUI.UPDATE_INTERVAL));
     }
 }
