@@ -1,11 +1,15 @@
 package zzw.content.mechanics;
 
 import arc.Core;
+import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
+import arc.graphics.g2d.Fill;
+import arc.graphics.g2d.Lines;
 import arc.graphics.g2d.TextureRegion;
 import arc.scene.ui.layout.Table;
 import arc.util.Time;
 import mindustry.gen.Building;
+import mindustry.ui.Bar;
 
 /**
  * 齿轮方块实现
@@ -23,12 +27,18 @@ public class CogwheelBuild extends MechanicalComponentBuild {
     // 常量定义
     private static final float SPEED_THRESHOLD = 0.01f;    // 转速阈值
     private static final float GEAR_RATIO = 1.0f;          // 齿轮比，决定转速变化
+    private static final float STRESS_THRESHOLD = 0.5f;    // 高应力阈值
+    private static final Color STRESS_COLOR = new Color(1f, 0.7f, 0.4f, 1f); // 高应力颜色
 
     @Override
     public void created() {
         super.created();
-        // 加载齿轮纹理
-        gearRegion = block.uiIcon;
+        // 加载齿轮纹理 - 使用方块区域而不是UI图标
+        gearRegion = Core.atlas.find("zzw-cogwheel");
+        // 如果找不到专用齿轮纹理，则使用方块区域
+        if (gearRegion == null || !gearRegion.found()) {
+            gearRegion = block.region;
+        }
         // 尝试加载顶部装饰纹理
         topRegion = Core.atlas.find("zzw-cogwheel-top");
     }
@@ -132,30 +142,66 @@ public class CogwheelBuild extends MechanicalComponentBuild {
     public void draw() {
         // 整个方块旋转 - 转速越大，旋转越快
         if (rotationSpeed > SPEED_THRESHOLD) {
-            // 应用旋转
-            Draw.rect(block.region, x, y, rotation);
-
-            // 绘制齿轮纹理
+            // 绘制齿轮纹理（已经包含了基础方块）
             if (gearRegion != null) {
                 Draw.rect(gearRegion, x, y, rotation);
+            } else {
+                // 如果没有齿轮纹理，使用方块区域
+                Draw.rect(block.region, x, y, rotation);
             }
 
             // 绘制顶部装饰
             if (topRegion != null) {
                 Draw.rect(topRegion, x, y, rotation);
             }
+
+            // 绘制应力指示器 - 高应力时显示
+            if (stress > STRESS_THRESHOLD) {
+                Draw.color(STRESS_COLOR);
+                Lines.stroke(2f * stress);
+                // 根据转速调整线条长度
+                float lineLen = 8f + rotationSpeed * 3f;
+
+                // 绘制4个方向的应力指示线
+                for (int i = 0; i < 4; i++) {
+                    float angle = rotation + i * 90f;
+                    Lines.lineAngle(x, y, angle, lineLen);
+                }
+
+                // 绘制中心点
+                Fill.circle(x, y, 3f + stress * 2f);
+                Draw.color();
+            }
         } else {
             // 静止状态，不旋转
-            Draw.rect(block.region, x, y);
-
-            // 绘制齿轮纹理
+            // 绘制齿轮纹理（已经包含了基础方块）
             if (gearRegion != null) {
                 Draw.rect(gearRegion, x, y);
+            } else {
+                // 如果没有齿轮纹理，使用方块区域
+                Draw.rect(block.region, x, y);
             }
 
             // 绘制顶部装饰
             if (topRegion != null) {
                 Draw.rect(topRegion, x, y);
+            }
+
+            // 静止状态下如果有应力，显示静态应力指示器
+            if (stress > STRESS_THRESHOLD) {
+                Draw.color(STRESS_COLOR);
+                Lines.stroke(1.5f * stress);
+                float lineLen = 8f;
+
+                // 绘制4个方向的静态应力指示线
+                for (int i = 0; i < 4; i++) {
+                    float angle = i * 90f;
+                    Lines.lineAngle(x, y, angle, lineLen);
+                }
+
+                // 绘制中心点
+                Fill.circle(x, y, 3f + stress * 2f);
+                Draw.color();
             }
         }
 
@@ -169,7 +215,18 @@ public class CogwheelBuild extends MechanicalComponentBuild {
 
     @Override
     public void display(Table table) {
-        // 不调用 super.display(table) 以避免重复显示
-        // UI显示已移除
+        table.row();
+
+        // 转速显示条
+        table.add(new Bar(() -> "转速: " + String.format("%.2f", rotationSpeed), 
+                         () -> Color.lightGray, 
+                         () -> rotationSpeed / 10f)).width(200f).padBottom(4);
+
+        table.row();
+
+        // 应力显示条
+        table.add(new Bar(() -> "应力: " + String.format("%.2f", stress), 
+                         () -> STRESS_COLOR, 
+                         () -> stress)).width(200f);
     }
 }
