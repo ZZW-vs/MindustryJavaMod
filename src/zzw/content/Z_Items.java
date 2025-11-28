@@ -9,6 +9,7 @@ public class Z_Items {
     public static Item Andesite_Alloy;
     public static Item Brass;
     public static Item Zinc;
+    public static Item Copper;
 
     public static Item Iron_Sheet;
     public static Item Gold_Sheet;
