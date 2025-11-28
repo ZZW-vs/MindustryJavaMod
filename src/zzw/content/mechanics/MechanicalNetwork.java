@@ -99,7 +99,7 @@ public class MechanicalNetwork {
         }
 
         // 检查是否过载
-        boolean isOverloaded = totalStressDemand > (primarySource != null ? primarySource.maxStress : 0f);
+        boolean isOverloaded = totalStressDemand > (primarySource != null ? primarySource.stressImpact : 0f);
 
         // 更新所有组件
         for (MechanicalComponentBuild component : components) {
@@ -118,10 +118,10 @@ public class MechanicalNetwork {
             if (isOverloaded) {
                 // 过载时降低转速
                 component.rotationSpeed = maxSpeed * efficiency * 0.5f;
-                component.stress = component.maxStress * STRESS_OVERLOAD_THRESHOLD;
+                component.stress = component.stressImpact * STRESS_OVERLOAD_THRESHOLD;
             } else {
                 // 正常情况
-                component.rotationSpeed = maxSpeed * component.speedRatio * efficiency;
+                component.rotationSpeed = maxSpeed * efficiency;
                 component.stress = component.stressImpact;
             }
         }
