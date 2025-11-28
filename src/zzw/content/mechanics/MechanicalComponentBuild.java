@@ -2,48 +2,119 @@ package zzw.content.mechanics;
 
 import arc.scene.ui.layout.Table;
 import arc.struct.IntSet;
+import arc.struct.Seq;
 import arc.util.Time;
 import mindustry.gen.Building;
 
 /**
- * 机械组件基类
- * 使用缓存和批量处理提高性能
+ * 机械组件基类 - 机械动力风格
+ * 实现类似我的世界机械动力的应力和转速传输机制
+ * 特性：
+ * 1. 应力网络计算：计算整个机械网络的总应力和转速
+ * 2. 动力源优先级：多个动力源时使用最高转速
+ * 3. 应力过载保护：当应力超过组件承受能力时停止工作
+ * 4. 转速转换：不同组件可以转换转速和应力比例
  */
 public class MechanicalComponentBuild extends Building {
     // 机械属性
-    public float rotationSpeed, stress;
-    public boolean isSource, isSink;
+    public float rotationSpeed = 0f;  // 当前转速 (RPM)
+    public float stress = 0f;         // 当前应力 (单位应力)
+    public boolean isSource = false;   // 是否为动力源
+    public boolean isSink = false;     // 是否为终端用户
+    
+    // 组件特性
+    public float maxStress = 8f;       // 最大承受应力
+    public float stressImpact = 1f;    // 应力影响系数
+    public float speedRatio = 1f;      // 转速比例
 
-    // 性能优化：缓存相关
+    // 网络计算相关
+    private int lastUpdateFrame = -1;
+    private static final IntSet visitedSet = new IntSet();
+    private static final Seq<MechanicalComponentBuild> networkComponents = new Seq<>();
+    
+    // 缓存相关
     private final MechanicalComponentBuild[] neighbors = new MechanicalComponentBuild[4];
     private int lastCacheFrame = -1;
     protected boolean needsUpdate = true;
-
+    
     // 路径查找优化
-    private static final IntSet visitedSet = new IntSet();
     private int lastPathCheckFrame = -1;
     private Boolean hasPathToSourceCache;
-
+    
     // 常量定义
-    private static final float SPEED_THRESHOLD = 0.01f;
-    private static final float EFFICIENCY_LOSS_PER_BLOCK = 0.05f;
-    private static final int MAX_SEARCH_DEPTH = 15;
-    private static final float UI_UPDATE_INTERVAL = 1/30f;
+    protected static final float SPEED_THRESHOLD = 0.01f;
+    private static final float STRESS_OVERLOAD_THRESHOLD = 0.95f; // 应力过载阈值
+    private static final float STRESS_OVERLOAD_DAMAGE = 0.2f;     // 过载伤害系数
+    private static final int MAX_NETWORK_SIZE = 100;              // 最大网络大小
+    private static final float EFFICIENCY_LOSS_PER_BLOCK = 0.05f;  // 每格效率损失
+    private static final int MAX_SEARCH_DEPTH = 15;               // 最大搜索深度
 
     @Override
     public void update() {
-        if (!needsUpdate && !isSource) return;
-
-        if (!isSource) updateFromNeighbors();
-        if (isSink && rotationSpeed > 0) handleMechanicalOperation();
-
-        needsUpdate = false;
+        // 每隔一段时间更新网络
+        int currentFrame = (int)Time.time;
+        if (currentFrame - lastUpdateFrame > 10) {
+            lastUpdateFrame = currentFrame;
+            updateNetwork();
+        }
+        
+        // 应力过载检测
+        if (stress > maxStress * STRESS_OVERLOAD_THRESHOLD) {
+            handleOverload();
+        }
+        
+        // 如果是终端用户且有动力，执行操作
+        if (isSink && rotationSpeed > SPEED_THRESHOLD) {
+            handleMechanicalOperation();
+        }
     }
 
     /**
-     * 从相邻组件更新动力状态
+     * 更新整个机械网络
      */
-    private void updateFromNeighbors() {
+    private void updateNetwork() {
+        // 重置网络
+        networkComponents.clear();
+        visitedSet.clear();
+        
+        // 收集所有网络组件
+        collectNetworkComponents(this);
+        
+        // 计算网络状态
+        if (!networkComponents.isEmpty()) {
+            calculateNetworkState();
+        }
+    }
+    
+    /**
+     * 递归收集网络中的所有组件
+     */
+    private void collectNetworkComponents(MechanicalComponentBuild component) {
+        if (component == null) return;
+        
+        int posId = component.pos();
+        if (visitedSet.contains(posId)) return;
+        visitedSet.add(posId);
+        
+        // 添加到网络
+        networkComponents.add(component);
+        
+        // 防止网络过大
+        if (networkComponents.size >= MAX_NETWORK_SIZE) return;
+        
+        // 递归处理邻居
+        for (int i = 0; i < 4; i++) {
+            Building other = component.nearby(i);
+            if (other instanceof MechanicalComponentBuild mechComponent) {
+                collectNetworkComponents(mechComponent);
+            }
+        }
+    }
+    
+    /**
+     * 计算网络状态
+     */
+    private void calculateNetworkState() {
         float sourceSpeed = 0f, sourceStress = 0f;
         boolean hasValidSource = false;
         boolean hasSource = false;
@@ -167,7 +238,7 @@ public class MechanicalComponentBuild extends Building {
     /**
      * 通知邻居需要更新
      */
-    private void notifyNeighborsNeedUpdate() {
+    protected void notifyNeighborsNeedUpdate() {
         for (MechanicalComponentBuild component : neighbors) {
             if (component != null) component.needsUpdate = true;
         }
@@ -184,6 +255,19 @@ public class MechanicalComponentBuild extends Building {
         // 转速和应力的显示由子类实现
     }
 
+    /**
+     * 处理应力过载
+     */
+    private void handleOverload() {
+        // 降低转速
+        rotationSpeed *= 0.9f;
+        
+        // 对建筑造成伤害
+        damage(maxHealth * STRESS_OVERLOAD_DAMAGE * Time.delta);
+        
+        // 视觉效果和音效由子类实现
+    }
+    
     protected void handleMechanicalOperation() {
         // 由子类实现
     }

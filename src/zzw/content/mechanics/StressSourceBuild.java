@@ -18,8 +18,7 @@ public class StressSourceBuild extends MechanicalComponentBuild {
     private float drillSpeedMultiplier = 1.0f; // 钻速倍率，随时间增长
     private static final float DRILL_SPEED_GROWTH_RATE = 0.001f; // 钻速增长率
 
-    // 常量定义
-    private static final float SPEED_THRESHOLD = 0.01f;              // 转速阈值
+    // 使用父类中的SPEED_THRESHOLD常量
 
     @Override
     public void update() {
@@ -42,13 +41,13 @@ public class StressSourceBuild extends MechanicalComponentBuild {
     }
 
     /**
-     * 平滑调整速度
+     * 平滑调整速度 - 优化版本
      */
     private void adjustSpeed() {
         float speedDifference = targetSpeed - rotationSpeed;
         if (Math.abs(speedDifference) > SPEED_THRESHOLD) {
             rotationSpeed += speedDifference * ACCELERATION * Time.delta / 60f;
-            needsUpdate = true; // 速度变化时通知邻居更新
+            needsUpdate = true;
         } else if (rotationSpeed != targetSpeed) {
             rotationSpeed = targetSpeed;
             needsUpdate = true;
@@ -87,9 +86,7 @@ public class StressSourceBuild extends MechanicalComponentBuild {
 
     @Override
     public void display(Table table) {
-        // 不调用 super.display(table) 以避免重复显示应力和转速
-
-        // 创建可更新的应力显示标签，确保与转速对齐
+        // 创建可更新的应力显示标签
         var stressLabel = table.add("[accent]应力: [white]∞ us").width(160).get();
         table.row();
 
@@ -99,13 +96,12 @@ public class StressSourceBuild extends MechanicalComponentBuild {
 
         // 添加更新任务，每帧更新显示值
         Time.runTask(0f, () -> {
-            // 使用定时器持续更新UI显示
             Timer.schedule(() -> {
                 if (this.isAdded() && stressLabel != null && speedLabel != null) {
                     stressLabel.setText("[accent]应力: [white]∞ us");
                     speedLabel.setText("[accent]转速: [white]" + (int)rotationSpeed + " rpm");
                 }
-            }, 0, 1/30f); // 使用30fps的更新间隔
+            }, 0, 1/30f);
         });
     }
 }

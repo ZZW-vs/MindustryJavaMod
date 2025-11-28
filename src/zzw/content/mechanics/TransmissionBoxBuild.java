@@ -34,76 +34,64 @@ public class TransmissionBoxBuild extends MechanicalComponentBuild {
     }
 
     /**
-     * 更新应力传递
+     * 更新应力传递 - 优化版本
      */
     private void updateStressTransmission() {
-        // 如果不是动力源，从邻居获取动力
-        if (!isSource) {
-            float sourceSpeed = 0f;
-            float sourceStress = 0f;
-            boolean hasValidSource = false;
-            boolean hasSource = false; // 检测是否有动力源邻居
-
-            // 检查所有邻居
-            for (int i = 0; i < 4; i++) {
-                Building other = nearby(i);
-                if (other instanceof MechanicalComponentBuild component) {
-                    // 如果邻居是动力源
-                    if (component.isSource) {
-                        // 直接使用动力源的值，而不是取最大值
-                        sourceSpeed = component.rotationSpeed;
-                        sourceStress = component.stress;
-                        hasValidSource = true;
-                        hasSource = true;
-                    }
-                    // 或者邻居有转速和应力
-                    else if (component.rotationSpeed > SPEED_THRESHOLD && component.stress > 0) {
-                        // 如果没有动力源，使用非动力源邻居的值
-                        if (!hasSource) {
-                            sourceSpeed = Math.max(sourceSpeed, component.rotationSpeed);
-                            sourceStress = Math.max(sourceStress, component.stress);
-                            hasValidSource = true;
-                        }
-                    }
+        // 如果是动力源，直接返回
+        if (isSource) return;
+        
+        // 使用父类的更新逻辑
+        float oldSpeed = rotationSpeed;
+        float oldStress = stress;
+        
+        // 检查邻居并获取动力
+        float sourceSpeed = 0f;
+        float sourceStress = 0f;
+        boolean hasValidSource = false;
+        boolean hasSource = false;
+        
+        for (int i = 0; i < 4; i++) {
+            Building other = nearby(i);
+            if (other instanceof MechanicalComponentBuild component) {
+                if (component.isSource) {
+                    sourceSpeed = component.rotationSpeed;
+                    sourceStress = component.stress;
+                    hasValidSource = true;
+                    hasSource = true;
+                } else if (component.rotationSpeed > SPEED_THRESHOLD && component.stress > 0 && !hasSource) {
+                    sourceSpeed = Math.max(sourceSpeed, component.rotationSpeed);
+                    sourceStress = Math.max(sourceStress, component.stress);
+                    hasValidSource = true;
                 }
             }
-
-            // 更新自身值，应用传动效率
-            float oldSpeed = rotationSpeed;
-            float oldStress = stress;
-
-            if (hasValidSource) {
-                rotationSpeed = sourceSpeed;
-                stress = sourceStress;
-            } else {
-                // 如果没有有效动力源，清除旋转速度和应力
-                rotationSpeed = 0f;
-                stress = 0f;
-            }
-
-            // 如果值发生变化，通知邻居更新
-            if (Math.abs(oldSpeed - rotationSpeed) > SPEED_THRESHOLD ||
-                Math.abs(oldStress - stress) > SPEED_THRESHOLD) {
-                notifyNeighborsNeedUpdate();
-            }
-
-            // 如果有动力源邻居，但自身没有更新，强制更新
-            if (hasSource && Math.abs(oldSpeed - rotationSpeed) <= SPEED_THRESHOLD) {
-                needsUpdate = true;
-            }
+        }
+        
+        // 更新自身值
+        if (hasValidSource) {
+            rotationSpeed = sourceSpeed;
+            stress = sourceStress;
+        } else {
+            rotationSpeed = 0f;
+            stress = 0f;
+        }
+        
+        // 检查值变化并通知邻居
+        if (Math.abs(oldSpeed - rotationSpeed) > SPEED_THRESHOLD ||
+            Math.abs(oldStress - stress) > SPEED_THRESHOLD) {
+            notifyNeighborsNeedUpdate();
+        }
+        
+        // 如果有动力源邻居，但自身没有更新，强制更新
+        if (hasSource && Math.abs(oldSpeed - rotationSpeed) <= SPEED_THRESHOLD) {
+            needsUpdate = true;
         }
     }
 
     /**
-     * 通知邻居需要更新
+     * 通知邻居需要更新 - 使用父类方法
      */
-    private void notifyNeighborsNeedUpdate() {
-        for (int i = 0; i < 4; i++) {
-            Building other = nearby(i);
-            if (other instanceof MechanicalComponentBuild component) {
-                component.needsUpdate = true;
-            }
-        }
+    protected void notifyNeighborsNeedUpdate() {
+        super.notifyNeighborsNeedUpdate();
     }
 
 

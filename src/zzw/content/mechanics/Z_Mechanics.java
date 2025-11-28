@@ -47,7 +47,7 @@ public class Z_Mechanics {
             buildVisibility = BuildVisibility.sandboxOnly;
 
             config(Float.class, (StressSourceBuild build, Float value) ->
-                build.setTargetSpeed(Mathf.clamp(value, -256f, 256f)));
+                build.setTargetSpeed(Mathf.clamp(value, 0f, 256f)));
         }};
 
         stressSource.buildType = StressSourceBuild::new;
@@ -72,7 +72,7 @@ public class Z_Mechanics {
      * 创建传输组件 - 齿轮
      */
     private static void createCogwheels() {
-        cogwheel = new Block("cogwheel") {{
+        cogwheel = new Block("zzw-cogwheel") {{
             requirements(Category.crafting, ItemStack.with(Items.copper, 15, Z_Items.Iron, 10));
             size = 1;
             health = 120;
