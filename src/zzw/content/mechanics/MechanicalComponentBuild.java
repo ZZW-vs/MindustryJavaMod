@@ -1,116 +1,56 @@
 package zzw.content.mechanics;
 
 import arc.scene.ui.layout.Table;
-import arc.struct.IntSet;
 import arc.struct.Seq;
 import arc.util.Time;
 import mindustry.gen.Building;
 
 /**
  * 机械组件基类
- * 实现应力和转速传输机制
+ * 实现基础的应力和转速传输机制
  */
 public class MechanicalComponentBuild extends Building {
     // 机械属性
     public float rotationSpeed = 0f;  // 当前转速 (RPM)
     public float stress = 0f;         // 当前应力 (单位应力)
     public boolean isSource = false;   // 是否为动力源
-    public boolean isSink = false;     // 是否为终端用户
-
-    // 组件特性
-    // 移除最大承受应力限制，允许无限应力
-    public float stressImpact = 1f;    // 应力影响系数
-    // 移除转速比例，简化系统
-
-    // 网络计算相关
-    private int lastUpdateFrame = -1;
-    private static final IntSet visitedSet = new IntSet();
-    private static final Seq<MechanicalComponentBuild> networkComponents = new Seq<>();
 
     // 缓存相关
     private final MechanicalComponentBuild[] neighbors = new MechanicalComponentBuild[4];
     private int lastCacheFrame = -1;
-    protected boolean needsUpdate = true;
-
-    // 路径查找优化
-    private int lastPathCheckFrame = -1;
-    private Boolean hasPathToSourceCache;
 
     // 常量定义
     protected static final float SPEED_THRESHOLD = 0.01f;
-    private static final int MAX_NETWORK_SIZE = 100;              // 最大网络大小
-    private static final float EFFICIENCY_LOSS_PER_BLOCK = 0.05f;  // 每格效率损失
-    private static final int MAX_SEARCH_DEPTH = 15;               // 最大搜索深度
+    protected static final float EFFICIENCY_LOSS_PER_BLOCK = 0.05f;  // 每格效率损失
+    protected static final float MIN_EFFICIENCY = 0.1f; // 最小效率
+    private static final float SECONDARY_EFFICIENCY = 0.9f; // 次级效率
 
     @Override
     public void update() {
-        // 每隔一段时间更新网络
-        int currentFrame = (int)Time.time;
-        if (currentFrame - lastUpdateFrame > 10) {
-            lastUpdateFrame = currentFrame;
-            updateNetwork();
-        }
-
-        // 移除应力过载检测，允许无限应力
-
-        // 如果是终端用户且有动力，执行操作
-        if (isSink && rotationSpeed > SPEED_THRESHOLD) {
-            handleMechanicalOperation();
-        }
-    }
-
-    /**
-     * 更新整个机械网络
-     */
-    private void updateNetwork() {
-        // 重置网络
-        networkComponents.clear();
-        visitedSet.clear();
-
-        // 收集所有网络组件
-        collectNetworkComponents(this);
-
-        // 计算网络状态
-        if (!networkComponents.isEmpty()) {
-            calculateNetworkState();
-        }
-    }
-
-    /**
-     * 递归收集网络中的所有组件
-     */
-    private void collectNetworkComponents(MechanicalComponentBuild component) {
-        if (component == null) return;
-
-        int posId = component.pos();
-        if (visitedSet.contains(posId)) return;
-        visitedSet.add(posId);
-
-        // 添加到网络
-        networkComponents.add(component);
-
-        // 防止网络过大
-        if (networkComponents.size >= MAX_NETWORK_SIZE) return;
-
-        // 递归处理邻居
-        for (int i = 0; i < 4; i++) {
-            Building other = component.nearby(i);
-            if (other instanceof MechanicalComponentBuild mechComponent) {
-                collectNetworkComponents(mechComponent);
-            }
-        }
-    }
-
-    /**
-     * 计算网络状态
-     */
-    private void calculateNetworkState() {
-        float sourceSpeed = 0f, sourceStress = 0f;
-        boolean hasValidSource = false;
-        boolean hasSource = false;
-        int distanceFromSource = Integer.MAX_VALUE;
-
         // 更新邻居缓存
+        updateNeighborCache();
+
+        // 获取动力源信息
+        PowerSourceInfo sourceInfo = findPowerSource();
+
+        // 更新自身值
+        if (sourceInfo.hasValidSource) {
+            // 转速无损耗，直接使用源转速
+            rotationSpeed = sourceInfo.speed;
+            
+            // 应力有损耗，计算效率损失
+            float efficiency = Math.max(MIN_EFFICIENCY, 1.0f - (sourceInfo.distance * EFFICIENCY_LOSS_PER_BLOCK));
+            stress = sourceInfo.stress * efficiency;
+        } else {
+            rotationSpeed = 0f;
+            stress = 0f;
+        }
+    }
+    
+    /**
+     * 更新邻居缓存
+     */
+    private void updateNeighborCache() {
         int currentFrame = (int)Time.time;
         if (lastCacheFrame != currentFrame) {
             lastCacheFrame = currentFrame;
@@ -120,118 +60,47 @@ public class MechanicalComponentBuild extends Building {
                     (MechanicalComponentBuild) other : null;
             }
         }
+    }
+    
+    /**
+     * 查找动力源信息
+     * @return 动力源信息
+     */
+    protected PowerSourceInfo findPowerSource() {
+        PowerSourceInfo info = new PowerSourceInfo();
 
-        // 检查邻居组件
         for (MechanicalComponentBuild component : neighbors) {
             if (component == null) continue;
 
             if (component.isSource) {
-                // 直接使用动力源的值，而不是取最大值
-                sourceSpeed = component.rotationSpeed;
-                sourceStress = component.stress;
-                hasValidSource = true;
-                hasSource = true;
-                distanceFromSource = 1;
-            } else if (component.rotationSpeed > SPEED_THRESHOLD && hasValidPathToSource(component)) {
+                // 直接使用动力源的值
+                info.speed = component.rotationSpeed;
+                info.stress = component.stress;
+                info.hasValidSource = true;
+                info.hasDirectSource = true;
+                info.distance = 1;
+                break; // 找到直接动力源，立即返回
+            } else if (component.rotationSpeed > SPEED_THRESHOLD && !info.hasDirectSource) {
                 // 如果没有动力源，使用非动力源邻居的值
-                if (!hasSource) {
-                    float distance = getDistanceToSource(component);
-                    float efficiency = Math.max(0.1f, 1.0f - (distance * EFFICIENCY_LOSS_PER_BLOCK));
-
-                    sourceSpeed = Math.max(sourceSpeed, component.rotationSpeed * efficiency);
-                    sourceStress = Math.max(sourceStress, component.stress * efficiency);
-                    hasValidSource = true;
-                    distanceFromSource = Math.min(distanceFromSource, (int)distance + 1);
-                }
+                info.speed = Math.max(info.speed, component.rotationSpeed * SECONDARY_EFFICIENCY);
+                info.stress = Math.max(info.stress, component.stress * SECONDARY_EFFICIENCY);
+                info.hasValidSource = true;
+                info.distance = 2;
             }
         }
 
-        // 更新旋转速度和应力
-        float oldSpeed = rotationSpeed, oldStress = stress;
-
-        if (hasValidSource) {
-            float efficiency = Math.max(0.1f, 1.0f - (distanceFromSource * EFFICIENCY_LOSS_PER_BLOCK));
-            rotationSpeed = sourceSpeed * efficiency;
-            stress = sourceStress * efficiency;
-        } else {
-            rotationSpeed = stress = 0f;
-        }
-
-        // 仅在值变化时更新
-        if (Math.abs(oldSpeed - rotationSpeed) > SPEED_THRESHOLD ||
-            Math.abs(oldStress - stress) > SPEED_THRESHOLD) {
-            notifyNeighborsNeedUpdate();
-        }
+        return info;
     }
-
+    
     /**
-     * 检查是否有通往动力源的有效路径
+     * 动力源信息封装类
      */
-    private boolean hasValidPathToSource(MechanicalComponentBuild start) {
-        if (start.isSource) return true;
-
-        int currentFrame = (int)Time.time;
-        if (lastPathCheckFrame == currentFrame && hasPathToSourceCache != null) {
-            return hasPathToSourceCache;
-        }
-
-        lastPathCheckFrame = currentFrame;
-        visitedSet.clear();
-        hasPathToSourceCache = hasValidPathToSourceRecursive(start, 0);
-        return hasPathToSourceCache;
-    }
-
-    /**
-     * 获取到动力源的距离
-     */
-    private float getDistanceToSource(MechanicalComponentBuild start) {
-        if (start.isSource) return 0;
-        visitedSet.clear();
-        return getDistanceToSourceRecursive(start, 0);
-    }
-
-    private boolean hasValidPathToSourceRecursive(MechanicalComponentBuild current, int depth) {
-        if (depth > MAX_SEARCH_DEPTH || current.isSource) return current.isSource;
-
-        int posId = current.pos();
-        if (visitedSet.contains(posId)) return false;
-        visitedSet.add(posId);
-
-        for (int i = 0; i < 4; i++) {
-            Building other = current.nearby(i);
-            if (other instanceof MechanicalComponentBuild component &&
-                hasValidPathToSourceRecursive(component, depth + 1)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private float getDistanceToSourceRecursive(MechanicalComponentBuild current, int depth) {
-        if (depth > MAX_SEARCH_DEPTH) return Float.MAX_VALUE;
-        if (current.isSource) return depth;
-
-        int posId = current.pos();
-        if (visitedSet.contains(posId)) return Float.MAX_VALUE;
-        visitedSet.add(posId);
-
-        float minDistance = Float.MAX_VALUE;
-        for (int i = 0; i < 4; i++) {
-            Building other = current.nearby(i);
-            if (other instanceof MechanicalComponentBuild component) {
-                minDistance = Math.min(minDistance, getDistanceToSourceRecursive(component, depth + 1));
-            }
-        }
-        return minDistance;
-    }
-
-    /**
-     * 通知邻居需要更新
-     */
-    protected void notifyNeighborsNeedUpdate() {
-        for (MechanicalComponentBuild component : neighbors) {
-            if (component != null) component.needsUpdate = true;
-        }
+    protected static class PowerSourceInfo {
+        public float speed = 0f;
+        public float stress = 0f;
+        public boolean hasValidSource = false;
+        public boolean hasDirectSource = false;
+        public int distance = 1;
     }
 
     @Override
@@ -245,19 +114,154 @@ public class MechanicalComponentBuild extends Building {
         // 转速和应力的显示由子类实现
     }
 
-    protected void handleMechanicalOperation() {
-        // 由子类实现
-    }
-
     @Override
     public void onRemoved() {
         super.onRemoved();
-        notifyNeighborsNeedUpdate();
     }
 
     @Override
     public void onProximityAdded() {
         super.onProximityAdded();
-        notifyNeighborsNeedUpdate();
+    }
+
+    /**
+     * 机械网络类 - 简化版
+     * 实现基础的机械动力传输机制
+     */
+    public static class MechanicalNetwork {
+        // 网络中的所有组件
+        private final Seq<MechanicalComponentBuild> components = new Seq<>();
+        
+        // 常量
+        private static final float EFFICIENCY_PER_DISTANCE = 0.05f; // 每单位距离的效率损失
+        private static final float MIN_EFFICIENCY = 0.1f; // 最小效率
+
+        /**
+         * 更新整个机械网络
+         */
+        public void updateNetwork(MechanicalComponentBuild starter) {
+            // 重置网络
+            components.clear();
+
+            // 收集所有网络组件
+            collectNetworkComponents(starter);
+
+            // 计算网络状态
+            if (components.size > 0) {
+                calculateNetworkState();
+            }
+        }
+
+        /**
+         * 递归收集网络中的所有组件
+         */
+        private void collectNetworkComponents(MechanicalComponentBuild component) {
+            if (component == null) return;
+
+            // 添加到网络
+            components.add(component);
+
+            // 递归处理邻居
+            for (int i = 0; i < 4; i++) {
+                Building other = component.nearby(i);
+                if (other instanceof MechanicalComponentBuild mechComponent) {
+                    if (!components.contains(mechComponent)) {
+                        collectNetworkComponents(mechComponent);
+                    }
+                }
+            }
+        }
+
+        /**
+         * 计算网络状态
+         */
+        private void calculateNetworkState() {
+            // 找出所有动力源
+            Seq<MechanicalComponentBuild> sources = components.select(c -> c.isSource);
+
+            // 如果没有动力源，所有组件停止工作
+            if (sources.size == 0) {
+                resetAllComponents();
+                return;
+            }
+
+            // 找出最大转速的动力源
+            PrimarySourceInfo sourceInfo = findPrimarySource(sources);
+
+            // 更新所有组件
+            updateAllComponents(sourceInfo);
+        }
+        
+        /**
+         * 重置所有组件状态
+         */
+        private void resetAllComponents() {
+            for (MechanicalComponentBuild component : components) {
+                component.rotationSpeed = 0;
+                component.stress = 0;
+            }
+        }
+        
+        /**
+         * 查找主要动力源
+         */
+        private PrimarySourceInfo findPrimarySource(Seq<MechanicalComponentBuild> sources) {
+            PrimarySourceInfo info = new PrimarySourceInfo();
+            
+            for (MechanicalComponentBuild source : sources) {
+                if (source.rotationSpeed > info.maxSpeed) {
+                    info.maxSpeed = source.rotationSpeed;
+                    info.primarySource = source;
+                }
+            }
+            
+            return info;
+        }
+        
+        /**
+         * 更新所有组件
+         */
+        private void updateAllComponents(PrimarySourceInfo sourceInfo) {
+            for (MechanicalComponentBuild component : components) {
+                if (component.isSource) {
+                    // 动力源保持原有状态
+                    continue;
+                }
+
+                // 计算到动力源的距离
+                int distance = getDistanceToSource(component, sourceInfo.primarySource);
+
+                // 计算效率损失，仅应用于应力
+                float efficiency = Math.max(MIN_EFFICIENCY, 1.0f - (distance * EFFICIENCY_PER_DISTANCE));
+
+                // 转速无损耗，直接使用源转速
+                component.rotationSpeed = sourceInfo.maxSpeed;
+                if (sourceInfo.primarySource != null) {
+                    component.stress = sourceInfo.primarySource.stress * efficiency;
+                } else {
+                    component.stress = 0f;
+                }
+            }
+        }
+
+        /**
+         * 获取组件到动力源的距离
+         */
+        private int getDistanceToSource(MechanicalComponentBuild component, MechanicalComponentBuild source) {
+            if (component == source) return 0;
+
+            // 简单的距离计算
+            int dx = Math.abs(component.tileX() - source.tileX());
+            int dy = Math.abs(component.tileY() - source.tileY());
+            return dx + dy;
+        }
+        
+        /**
+         * 主要动力源信息封装类
+         */
+        private static class PrimarySourceInfo {
+            float maxSpeed = 0;
+            MechanicalComponentBuild primarySource = null;
+        }
     }
 }
