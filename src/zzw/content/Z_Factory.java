@@ -9,23 +9,36 @@ import mindustry.world.Block;
 import mindustry.world.blocks.production.Drill;
 import mindustry.world.blocks.production.GenericCrafter;
 
+/**
+ * 工厂方块类
+ * 定义模组中的生产类方块
+ */
 public class Z_Factory {
+    // 基础板材制造机
     public static Block Plate_Maker_Iron;
     public static Block Plate_Maker_Gold;
     public static Block Plate_Maker_Copper;
 
+    // 大型板材制造机
     public static Block Large_Plate_Maker_Iron;
     public static Block Large_Plate_Maker_Gold;
     public static Block Large_Plate_Maker_Copper;
 
+    // 特殊钻机
     public static Block Pumpkin_Drill;
 
+    /**
+     * 加载所有工厂方块
+     */
     public static void load(){
         createPlateMakers();
         createLargePlateMakers();
         createDrills();
     }
 
+    /**
+     * 创建基础板材制造机
+     */
     private static void createPlateMakers() {
         Plate_Maker_Iron = new GenericCrafter("plate_maker_iron"){{
             requirements(Category.crafting, ItemStack.with(Items.copper, 90, Items.lead, 70, Z_Items.Iron, 30));
@@ -61,6 +74,9 @@ public class Z_Factory {
         }};
     }
 
+    /**
+     * 创建大型板材制造机（效率更高，需要电力）
+     */
     private static void createLargePlateMakers() {
         Large_Plate_Maker_Iron = new GenericCrafter("large_plate_maker_iron"){{
             requirements(Category.crafting, ItemStack.with(Z_Items.Iron, 120, Items.lead, 100, Z_Items.Iron, 40,
@@ -105,6 +121,9 @@ public class Z_Factory {
         }};
     }
 
+    /**
+     * 创建特殊钻机
+     */
     private static void createDrills() {
         Pumpkin_Drill = new Drill("pumpkin_drill"){{
             requirements(Category.production, ItemStack.with(Items.copper, 50, Items.lead, 30));

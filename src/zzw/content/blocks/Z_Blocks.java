@@ -39,16 +39,12 @@ public class Z_Blocks {
      * 加载所有自定义方块
      */
     public static void load(){
-        // 创建防御方块
         createDefenseBlocks();
         
-        // 创建传送带
         createConveyor();
 
-        // 其他方块
         otherBlocks();
         
-        // 注册事件监听器
         registerEventListeners();
     }
     
@@ -56,14 +52,12 @@ public class Z_Blocks {
      * 创建防御方块（墙）
      */
     private static void createDefenseBlocks() {
-        // 小铜块（1x1）
         Copper_Block = new Wall("copper_block"){{
             requirements(Category.defense, ItemStack.with(Z_Items.Copper_Sheet, 4, Items.copper, 3));
             size = 1;
             health = 380;
         }};
         
-        // 大铜块（2x2）
         Large_Copper_Block = new Wall("large_copper_block"){{
             requirements(Category.defense, ItemStack.with(Z_Items.Copper_Sheet, 16, Items.copper, 12));
             size = 2;
