@@ -23,8 +23,6 @@ public class MechanicalComponentBuild extends Building {
     private int lastCacheFrame = -1;
 
     // 传动网络相关
-    private static final Set<MechanicalComponentBuild> networkUpdateQueue = new HashSet<>();
-    private static boolean isUpdatingNetwork = false;
     private int networkId = -1;  // 所属网络ID，-1表示未分配
     private static int nextNetworkId = 0;  // 下一个可用的网络ID
     private boolean needsNetworkUpdate = false;  // 是否需要网络更新
@@ -39,26 +37,11 @@ public class MechanicalComponentBuild extends Building {
         // 更新邻居缓存
         updateNeighborCache();
 
-        // 如果需要网络更新，则加入更新队列
-        if (needsNetworkUpdate && !isUpdatingNetwork) {
-            networkUpdateQueue.add(this);
+        // 如果需要网络更新，立即执行更新，不使用队列机制
+        if (needsNetworkUpdate) {
             needsNetworkUpdate = false;
-        }
-
-        // 处理网络更新队列
-        if (!isUpdatingNetwork && !networkUpdateQueue.isEmpty()) {
-            isUpdatingNetwork = true;
-            try {
-                // 获取一个需要更新的组件
-                MechanicalComponentBuild component = networkUpdateQueue.iterator().next();
-                networkUpdateQueue.remove(component);
-
-                // 如果组件未被移除，更新整个网络
-                if (component.tile != null) {
-                    updateTransmissionNetwork(component);
-                }
-            } finally {
-                isUpdatingNetwork = false;
+            if (tile != null) {
+                updateTransmissionNetwork(this);
             }
         }
 
@@ -84,8 +67,40 @@ public class MechanicalComponentBuild extends Building {
         // 查找网络中的动力源
         MechanicalComponentBuild powerSource = null;
         float maxSpeed = 0;
-        float maxStress = 0;
+        float totalStress = 0;  // 改为应力和，而不是最大应力
 
+        // 收集所有连接的网络
+        Set<Integer> connectedNetworkIds = new HashSet<>();
+        for (MechanicalComponentBuild component : network) {
+            // 检查邻居的网络ID，收集所有不同的网络ID
+            for (MechanicalComponentBuild neighbor : component.neighbors) {
+                if (neighbor != null && neighbor.networkId != -1 && neighbor.networkId != sourceComponent.networkId) {
+                    connectedNetworkIds.add(neighbor.networkId);
+                }
+            }
+        }
+
+        // 如果有连接的其他网络，需要合并它们
+        if (!connectedNetworkIds.isEmpty()) {
+            // 找到所有连接网络中的组件
+            Set<MechanicalComponentBuild> allComponents = new HashSet<>(network);
+
+            // 遍历所有组件，找出属于连接网络的组件
+            for (MechanicalComponentBuild component : network) {
+                for (MechanicalComponentBuild neighbor : component.neighbors) {
+                    if (neighbor != null && connectedNetworkIds.contains(neighbor.networkId)) {
+                        // 找到属于连接网络的组件，将其加入网络
+                        Set<MechanicalComponentBuild> connectedNetwork = findNetwork(neighbor);
+                        allComponents.addAll(connectedNetwork);
+                    }
+                }
+            }
+
+            // 更新网络为所有组件的集合
+            network = allComponents;
+        }
+
+        // 重新计算网络参数
         for (MechanicalComponentBuild component : network) {
             // 分配相同的网络ID
             component.networkId = sourceComponent.networkId;
@@ -93,12 +108,11 @@ public class MechanicalComponentBuild extends Building {
             // 查找动力源
             if (component.isSource) {
                 powerSource = component;
-                break;  // 找到动力源，立即退出循环
             }
 
-            // 记录最大转速和应力（如果没有动力源）
+            // 记录最大转速和累计应力
             maxSpeed = Math.max(maxSpeed, component.rotationSpeed);
-            maxStress = Math.max(maxStress, component.stress);
+            totalStress += component.stress;  // 累加应力
         }
 
         // 同步整个网络的数据
@@ -109,16 +123,25 @@ public class MechanicalComponentBuild extends Building {
                 component.stress = powerSource.stress;
             }
         } else if (maxSpeed > SPEED_THRESHOLD) {
-            // 如果没有动力源但有转速，使用最大值
+            // 如果没有动力源但有转速，使用最大转速和累计应力
             for (MechanicalComponentBuild component : network) {
                 component.rotationSpeed = maxSpeed;
-                component.stress = maxStress;
+                component.stress = totalStress;  // 使用累计应力
             }
         } else {
             // 没有动力源也没有转速，全部归零
             for (MechanicalComponentBuild component : network) {
                 component.rotationSpeed = 0f;
                 component.stress = 0f;
+            }
+        }
+
+        // 通知所有邻居网络需要更新，确保连接的网络能及时响应变化
+        for (MechanicalComponentBuild component : network) {
+            for (MechanicalComponentBuild neighbor : component.neighbors) {
+                if (neighbor != null && neighbor.networkId != sourceComponent.networkId) {
+                    neighbor.markNetworkForUpdate();
+                }
             }
         }
     }

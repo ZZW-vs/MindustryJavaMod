@@ -226,7 +226,7 @@ public class MechanicalBuilds {
         infoPanel.margin(2).marginLeft(-330); // 减小边距并进一步左移
 
         // 创建应力显示标签
-        String stressText = stress >= INFINITY_STRESS ? "∞ us" : (int)stress + " us";
+        String stressText = stress >= INFINITY_STRESS * 10 ? "∞ us" : (int)stress + " us";
         infoPanel.add("[accent]应力: [white]" + stressText).width(160).left().row();
         // 创建转速显示标签
         infoPanel.add("[accent]转速: [white]" + (int)rotationSpeed + " rpm").width(160).left().row();
