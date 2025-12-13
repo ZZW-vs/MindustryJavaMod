@@ -6,8 +6,8 @@ import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
 import arc.graphics.g2d.TextureRegion;
-import arc.scene.ui.layout.Table;
 import arc.math.Mathf;
+import arc.scene.ui.layout.Table;
 
 /**
  * 机械组件构建类集合
@@ -19,6 +19,7 @@ public class MechanicalBuilds {
     private static final float STRESS_THRESHOLD = 0.5f; // 高应力阈值
     private static final Color STRESS_COLOR = new Color(1f, 0.7f, 0.4f, 1f); // 高应力颜色
     private static final int SNAP_INTERVAL = 32; // 转速吸附间隔
+    private static final float INFINITY_STRESS = 1000000f; // 无大应力阈值
 
     /**
      * 齿轮方块实现
@@ -34,8 +35,8 @@ public class MechanicalBuilds {
         @Override
         public void created() {
             super.created();
-            // 加载齿轮纹理 - 使用正确的路径
-            gearRegion = Core.atlas.find("cogwheel-z");
+            // 加载齿轮纹理 - 使用完整的子目录路径
+            gearRegion = Core.atlas.find("mechanical-cogwheel-z");
             // 如果找不到专用齿轮纹理，则使用方块区域
             if (gearRegion == null || !gearRegion.found()) {
                 gearRegion = block.region;
@@ -113,8 +114,8 @@ public class MechanicalBuilds {
             // 标记为动力源
             isSource = true;
 
-            // 设置应力源为无限应力
-            stress = Float.MAX_VALUE;
+            // 设置应力源的应力值为1000000
+            stress = INFINITY_STRESS;
 
             // 平滑调整到目标速度
             adjustSpeed();
@@ -133,6 +134,8 @@ public class MechanicalBuilds {
          */
         public void setTargetSpeed(float speed) {
             targetSpeed = speed;
+            // 标记网络需要更新
+            markNetworkForUpdate();
         }
 
         @Override
@@ -146,8 +149,11 @@ public class MechanicalBuilds {
          */
         public void configure(float value) {
             // 自动吸附到指定间隔的倍速
-            float snappedValue = Math.round(value / SNAP_INTERVAL) * SNAP_INTERVAL;
-            setTargetSpeed(snappedValue);
+            float snappedValue = Mathf.round(value / SNAP_INTERVAL) * SNAP_INTERVAL;
+            // 只有当值实际改变时才更新
+            if (Math.abs(snappedValue - targetSpeed) > 0.1f) {
+                setTargetSpeed(snappedValue);
+            }
         }
 
         @Override
@@ -160,12 +166,12 @@ public class MechanicalBuilds {
             // 创建信息面板容器
             Table infoPanel = new Table();
             infoPanel.margin(4);
-            
+
             // 创建应力显示标签
             infoPanel.add("[accent]应力: [white]∞ us").width(160).left().row();
             // 创建转速显示标签
             infoPanel.add("[accent]转速: [white]" + (int)rotationSpeed + " rpm").width(160).left().row();
-            
+
             // 将信息面板添加到主表格
             table.add(infoPanel).growX().row();
         }
@@ -191,23 +197,23 @@ public class MechanicalBuilds {
             super.display(table);
             addStatusDisplay(table, stress, rotationSpeed);
         }
-        
+
         // 重写应力计算方法，使传动箱可以传输应力
         @Override
         protected PowerSourceInfo findPowerSource() {
             PowerSourceInfo info = super.findPowerSource();
-            
+
             // 如果找到了有效的动力源，计算传动箱的应力传输
             if (info.hasValidSource) {
                 // 传动箱可以传输应力，但效率较低
                 float efficiency = Math.max(MechanicalComponentBuild.MIN_EFFICIENCY, 0.8f - (info.distance * MechanicalComponentBuild.EFFICIENCY_LOSS_PER_BLOCK));
                 info.stress = info.stress * efficiency;
             }
-            
+
             return info;
         }
     }
-    
+
     /**
      * 添加状态显示到UI表格（带参数）
      * @param table UI表格
@@ -217,13 +223,14 @@ public class MechanicalBuilds {
     private static void addStatusDisplay(Table table, float stress, float rotationSpeed) {
         // 创建信息面板容器
         Table infoPanel = new Table();
-        infoPanel.margin(2).marginLeft(-10); // 减小边距并左移
-        
+        infoPanel.margin(2).marginLeft(-330); // 减小边距并进一步左移
+
         // 创建应力显示标签
-        infoPanel.add("[accent]应力: [white]" + (int)stress + " us").width(160).left().row();
+        String stressText = stress >= INFINITY_STRESS ? "∞ us" : (int)stress + " us";
+        infoPanel.add("[accent]应力: [white]" + stressText).width(160).left().row();
         // 创建转速显示标签
         infoPanel.add("[accent]转速: [white]" + (int)rotationSpeed + " rpm").width(160).left().row();
-        
+
         // 将信息面板添加到主表格
         table.add(infoPanel).growX().row();
     }

@@ -1,5 +1,6 @@
 package zzw.content.mechanics;
 
+import arc.Core;
 import arc.graphics.Color;
 import arc.math.Mathf;
 import arc.scene.ui.layout.Table;
@@ -27,8 +28,8 @@ public class Z_Mechanics {
     public static void load() {
         createPowerSources();
         createTransmission();
-        createCogwheels();
-        
+        // createCogwheels();
+
         // UI组件将在游戏初始化完成后创建，不在此处调用
     }
 
@@ -36,12 +37,12 @@ public class Z_Mechanics {
      * 创建动力源 - 应力源
      */
     private static void createPowerSources() {
-        stressSource = createBlock("stress_source", 
+        stressSource = createBlock("stress_source",
             ItemStack.with(Items.lead, 100, Items.copper, 80),
             500, BuildVisibility.sandboxOnly,
             block -> block.config(Float.class, (MechanicalBuilds.StressSourceBuild build, Float value) ->
                 build.setTargetSpeed(Mathf.clamp(value, 0f, 256f))));
-        
+
         stressSource.buildType = MechanicalBuilds.StressSourceBuild::new;
     }
 
@@ -49,10 +50,10 @@ public class Z_Mechanics {
      * 创建传输组件 - 传动箱
      */
     private static void createTransmission() {
-        mechanicalShaft = createBlock("transmission_box", 
+        mechanicalShaft = createBlock("transmission_box",
             ItemStack.with(Items.lead, 10, Z_Items.Iron, 5),
             80);
-        
+
         mechanicalShaft.buildType = MechanicalBuilds.TransmissionBoxBuild::new;
     }
 
@@ -63,10 +64,13 @@ public class Z_Mechanics {
         cogwheel = createBlock("cogwheel-z",
             ItemStack.with(Items.copper, 15, Z_Items.Iron, 10),
             120);
-        
+
+        // 设置齿轮的纹理路径
+        cogwheel.region = Core.atlas.find("mechanical-cogwheel-z");
+
         cogwheel.buildType = MechanicalBuilds.CogwheelBuild::new;
     }
-    
+
     /**
      * 创建通用方块
      * @param name 方块名称
@@ -77,7 +81,7 @@ public class Z_Mechanics {
     private static Block createBlock(String name, ItemStack[] requirements, int health) {
         return createBlock(name, requirements, health, BuildVisibility.shown, null);
     }
-    
+
     /**
      * 创建通用方块（带配置）
      * @param name 方块名称
@@ -87,7 +91,7 @@ public class Z_Mechanics {
      * @param config 配置函数
      * @return 创建的方块
      */
-    private static Block createBlock(String name, ItemStack[] requirements, int blockHealth, 
+    private static Block createBlock(String name, ItemStack[] requirements, int blockHealth,
                                     BuildVisibility visibility, BlockConfigurator config) {
         Block block = new Block(name) {{
             requirements(Category.crafting, requirements);
@@ -97,20 +101,20 @@ public class Z_Mechanics {
             update = true;
             configurable = config != null;
             buildVisibility = visibility;
-            
+
             if (config != null) {
                 config.configure(this);
             }
         }};
-        
+
         // 使用requirements参数以消除未使用警告
         if (requirements == null) {
             throw new IllegalArgumentException("Requirements cannot be null");
         }
-        
+
         return block;
     }
-    
+
     /**
      * 方块配置接口
      */
@@ -134,17 +138,8 @@ public class Z_Mechanics {
 
         // 常量
         public static final float UPDATE_INTERVAL = 1/30f;
-        
-        // 使用这些字段以消除未使用警告
-        static {
-            // 确保所有颜色常量都被使用
-            @SuppressWarnings("unused")
-            Color[] colors = {BG_COLOR, BORDER_COLOR, NORMAL_COLOR, STRESS_COLOR, SPEED_COLOR};
-            
-            // 确保常量被使用
-            @SuppressWarnings("unused")
-            float interval = UPDATE_INTERVAL;
-        }
+
+        // 这些常量在实际UI组件中使用
 
         // 创建信息面板
         public static Table createInfoPanel(String title) {
