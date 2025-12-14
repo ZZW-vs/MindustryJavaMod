@@ -4,8 +4,7 @@ import arc.math.Mathf;
 import mindustry.Vars;
 import mindustry.gen.Building;
 import mindustry.world.blocks.production.GenericCrafter;
-import mindustry.world.blocks.production.GenericCrafter.GenericCrafterBuild;
-import mindustry.world.consumers.Consume;
+
 
 /**
  * 工厂加速功能
@@ -56,16 +55,20 @@ public class FactoryBoost {
         public BoostedGenericCrafter(String name) {
             super(name);
         }
-        
+
+        public BoostedGenericCrafterBuild newBuild() {
+            return new BoostedGenericCrafterBuild();
+        }
+
         public class BoostedGenericCrafterBuild extends GenericCrafterBuild {
             @Override
             public void updateTile() {
                 // 更新生产进度时应用加速倍数
-                if (cons.valid()) {
+                if (efficiency > 0) {
                     progress += edelta() * getSpeedMultiplier() * efficiency;
-                    warmup = Mathf.lerpDelta(warmup, efficiency > 0 ? 1f : 0f, warmupSpeed);
+                    warmup = Mathf.lerpDelta(warmup, efficiency > 0 ? 1f : 0f, 0.02f);
                 } else {
-                    warmup = Mathf.lerpDelta(warmup, 0f, warmupSpeed);
+                    warmup = Mathf.lerpDelta(warmup, 0f, 0.02f);
                 }
                 
                 if (progress >= 1f) {

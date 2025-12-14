@@ -9,6 +9,7 @@ import mindustry.world.Block;
 import mindustry.world.blocks.production.Drill;
 import zzw.content.mechanics.FactoryBoost;
 
+
 /**
  * 工厂方块类
  * 定义模组中的生产类方块
@@ -41,7 +42,7 @@ public class Z_Factory {
      */
     private static void createPlateMakers() {
         Plate_Maker_Iron = new FactoryBoost.BoostedGenericCrafter("plate_maker_iron"){{
-            buildType = FactoryBoost.BoostedGenericCrafter.BoostedGenericCrafterBuild::new;
+            buildType = () -> new BoostedGenericCrafterBuild();
             requirements(Category.crafting, ItemStack.with(Items.copper, 90, Items.lead, 70, Z_Items.Iron, 30));
             alwaysUnlocked = true;
             craftEffect = Fx.pulverizeMedium;
@@ -53,7 +54,7 @@ public class Z_Factory {
         }};
 
         Plate_Maker_Gold = new FactoryBoost.BoostedGenericCrafter("plate_maker_gold"){{
-            buildType = FactoryBoost.BoostedGenericCrafter.BoostedGenericCrafterBuild::new;
+            buildType = () -> new BoostedGenericCrafterBuild();
             requirements(Category.crafting, ItemStack.with(Items.copper, 90, Items.lead, 70, Z_Items.Gold, 30));
             alwaysUnlocked = true;
             craftEffect = Fx.pulverizeMedium;
@@ -65,7 +66,7 @@ public class Z_Factory {
         }};
 
         Plate_Maker_Copper = new FactoryBoost.BoostedGenericCrafter("plate_maker_copper"){{
-            buildType = FactoryBoost.BoostedGenericCrafter.BoostedGenericCrafterBuild::new;
+            buildType = () -> new BoostedGenericCrafterBuild();
             requirements(Category.crafting, ItemStack.with(Items.copper, 110, Items.lead, 70));
             alwaysUnlocked = true;
             craftEffect = Fx.pulverizeMedium;
@@ -82,7 +83,7 @@ public class Z_Factory {
      */
     private static void createLargePlateMakers() {
         Large_Plate_Maker_Iron = new FactoryBoost.BoostedGenericCrafter("large_plate_maker_iron"){{
-            buildType = FactoryBoost.BoostedGenericCrafter.BoostedGenericCrafterBuild::new;
+            buildType = () -> new BoostedGenericCrafterBuild();
             requirements(Category.crafting, ItemStack.with(Z_Items.Iron, 120, Items.lead, 100, Z_Items.Iron, 40,
                     Z_Items.Iron_Sheet, 23));
             alwaysUnlocked = true;
@@ -97,7 +98,7 @@ public class Z_Factory {
         }};
 
         Large_Plate_Maker_Gold = new FactoryBoost.BoostedGenericCrafter("large_plate_maker_gold"){{
-            buildType = FactoryBoost.BoostedGenericCrafter.BoostedGenericCrafterBuild::new;
+            buildType = () -> new BoostedGenericCrafterBuild();
             requirements(Category.crafting, ItemStack.with(Z_Items.Iron, 120, Items.lead, 100, Z_Items.Gold, 40,
                     Z_Items.Gold_Sheet, 30));
             alwaysUnlocked = true;
@@ -112,7 +113,7 @@ public class Z_Factory {
         }};
 
         Large_Plate_Maker_Copper = new FactoryBoost.BoostedGenericCrafter("large_plate_maker_copper"){{
-            buildType = FactoryBoost.BoostedGenericCrafter.BoostedGenericCrafterBuild::new;
+            buildType = () -> new BoostedGenericCrafterBuild();
             requirements(Category.crafting, ItemStack.with(Items.copper, 180, Items.lead, 100,
                     Z_Items.Copper_Sheet, 50));
             alwaysUnlocked = true;
