@@ -11,6 +11,7 @@ public class Z_Items {
     // 基础金属
     public static Item Iron;
     public static Item Gold;
+    public static Item Andesite;
     public static Item Andesite_Alloy;
     public static Item Brass;
     public static Item Zinc;
@@ -35,6 +36,7 @@ public class Z_Items {
         // 基础金属
         Iron = createBasicItem("iron", "cfcfcf");
         Gold = createBasicItem("gold", "f2df82");
+        Andesite = createBasicItem("andesite", "8b8680");
         Andesite_Alloy = createBasicItem("andesite_alloy", "cfcfcf");
         Brass = createBasicItem("brass", "f2df82");
         Zinc = createBasicItem("zinc", "f2df82");
