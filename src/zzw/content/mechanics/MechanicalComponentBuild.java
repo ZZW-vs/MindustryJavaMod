@@ -154,38 +154,36 @@ public class MechanicalComponentBuild extends Building {
     private Set<MechanicalComponentBuild> findNetwork(MechanicalComponentBuild startComponent) {
         Set<MechanicalComponentBuild> network = new HashSet<>();
         Set<MechanicalComponentBuild> visited = new HashSet<>();
+        java.util.Queue<MechanicalComponentBuild> queue = new java.util.LinkedList<>();
 
-        // 使用深度优先搜索查找所有连接的组件
-        findNetworkDFS(startComponent, network, visited);
+        // 初始化队列
+        queue.offer(startComponent);
 
-        return network;
-    }
+        // 使用广度优先搜索查找所有连接的组件
+        while (!queue.isEmpty()) {
+            MechanicalComponentBuild component = queue.poll();
+            
+            // 如果已访问或组件无效，跳过
+            if (visited.contains(component) || component.tile == null) continue;
 
-    /**
-     * 深度优先搜索查找连接的组件
-     * @param component 当前组件
-     * @param network 网络集合
-     * @param visited 已访问集合
-     */
-    private void findNetworkDFS(MechanicalComponentBuild component, Set<MechanicalComponentBuild> network, Set<MechanicalComponentBuild> visited) {
-        // 如果已访问或组件无效，返回
-        if (visited.contains(component) || component.tile == null) return;
+            // 标记为已访问
+            visited.add(component);
 
-        // 标记为已访问
-        visited.add(component);
+            // 添加到网络
+            network.add(component);
 
-        // 添加到网络
-        network.add(component);
+            // 更新邻居缓存
+            component.updateNeighborCache();
 
-        // 更新邻居缓存
-        component.updateNeighborCache();
-
-        // 递归访问所有邻居
-        for (MechanicalComponentBuild neighbor : component.neighbors) {
-            if (neighbor != null) {
-                findNetworkDFS(neighbor, network, visited);
+            // 访问所有邻居
+            for (MechanicalComponentBuild neighbor : component.neighbors) {
+                if (neighbor != null && !visited.contains(neighbor)) {
+                    queue.offer(neighbor);
+                }
             }
         }
+
+        return network;
     }
 
     /**

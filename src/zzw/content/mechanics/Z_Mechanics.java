@@ -28,7 +28,7 @@ public class Z_Mechanics {
     public static void load() {
         createPowerSources();
         createTransmission();
-        // createCogwheels();
+        createCogwheels();
 
         // UI组件将在游戏初始化完成后创建，不在此处调用
     }
@@ -61,13 +61,13 @@ public class Z_Mechanics {
      * 创建传输组件 - 齿轮
      */
     private static void createCogwheels() {
+        // 启用齿轮创建
         cogwheel = createBlock("cogwheel-z",
             ItemStack.with(Items.copper, 15, Z_Items.Iron, 10),
             120);
 
         // 设置齿轮的纹理路径
         cogwheel.region = Core.atlas.find("mechanical-cogwheel-z");
-
         cogwheel.buildType = MechanicalBuilds.CogwheelBuild::new;
     }
 

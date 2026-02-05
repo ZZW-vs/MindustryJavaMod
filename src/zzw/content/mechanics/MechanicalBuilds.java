@@ -19,7 +19,7 @@ public class MechanicalBuilds {
     private static final float STRESS_THRESHOLD = 0.5f; // 高应力阈值
     private static final Color STRESS_COLOR = new Color(1f, 0.7f, 0.4f, 1f); // 高应力颜色
     private static final int SNAP_INTERVAL = 32; // 转速吸附间隔
-    private static final float INFINITY_STRESS = 1000000f; // 无大应力阈值
+    private static final float INFINITY_STRESS = 10000f; // 无大应力阈值
 
     /**
      * 齿轮方块实现
