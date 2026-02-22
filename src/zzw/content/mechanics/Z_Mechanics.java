@@ -43,6 +43,7 @@ public class Z_Mechanics {
             block -> block.config(Float.class, (MechanicalBuilds.StressSourceBuild build, Float value) ->
                 build.setTargetSpeed(Mathf.clamp(value, 0f, 256f))));
 
+        stressSource.region = Core.atlas.find("mechanical/stress_source");
         stressSource.buildType = MechanicalBuilds.StressSourceBuild::new;
     }
 
@@ -54,6 +55,7 @@ public class Z_Mechanics {
             ItemStack.with(Items.lead, 10, Z_Items.Iron, 5),
             80);
 
+        mechanicalShaft.region = Core.atlas.find("mechanical/transmission_box");
         mechanicalShaft.buildType = MechanicalBuilds.TransmissionBoxBuild::new;
     }
 
@@ -66,6 +68,7 @@ public class Z_Mechanics {
             ItemStack.with(Items.copper, 15, Z_Items.Iron, 10),
             120);
 
+        cogwheel.region = Core.atlas.find("mechanical/cogwheel-z");
         cogwheel.buildType = MechanicalBuilds.CogwheelBuild::new;
     }
 

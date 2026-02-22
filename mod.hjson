@@ -2,7 +2,7 @@
 displayName: "Create Mod"
 
 #the internal name of your mod
-name: "create"
+name: "zzw"
 
 #your name
 author: "郑zip"
@@ -11,13 +11,13 @@ author: "郑zip"
 main: "zzw.TestMod"
 
 #the mod description as seen in the mod dialog
-description: "一个为Mindustry添加了基础金属加工系统的Java模组，灵感来源于Minecraft的Create模组。包含机械传动系统、金属加工设备和各种实用方块。"
+description: "一个采用JS+Java混搭架构的Mindustry模组，灵感来源于Minecraft的Create模组。Java处理高性能核心逻辑，JS处理内容创建。"
 
 #the mod version
 version: 1.2
 
 #the minimum game build required to run this mod
-minGameVersion: 136
+minGameVersion: 130
 
-#this is a java mod
+#this is a java mod with JS support
 java: true
