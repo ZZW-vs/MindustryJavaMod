@@ -17,7 +17,7 @@ description: "一个为Mindustry添加了基础金属加工系统的Java模组�
 version: 1.2
 
 #the minimum game build required to run this mod
-minGameVersion: 150
+minGameVersion: 136
 
 #this is a java mod
 java: true
