@@ -62,12 +62,12 @@ public class Z_Mechanics {
      */
     private static void createCogwheels() {
         // 启用齿轮创建
-        cogwheel = createBlock("cogwheel-z",
+        cogwheel = createBlock("cogwheelz",
             ItemStack.with(Items.copper, 15, Z_Items.Iron, 10),
             120);
 
-        // 设置齿轮的纹理路径
-        cogwheel.region = Core.atlas.find("mechanical-cogwheel-z");
+        // 显式设置纹理路径，确保能找到正确的纹理文件
+        cogwheel.region = Core.atlas.find("mechanical/cogwheel-z");
         cogwheel.buildType = MechanicalBuilds.CogwheelBuild::new;
     }
 

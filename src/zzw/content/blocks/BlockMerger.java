@@ -45,11 +45,11 @@ public class BlockMerger {
      * @param largeBlock 大方块类型
      */
     private static void checkAllPatterns(Tile tile, Block smallBlock, Block largeBlock) {
-        boolean merged = false;
-        merged |= check2x2Pattern(tile.x, tile.y, smallBlock, largeBlock, tile.team());
-        merged |= check2x2Pattern(tile.x - 1, tile.y, smallBlock, largeBlock, tile.team());
-        merged |= check2x2Pattern(tile.x, tile.y - 1, smallBlock, largeBlock, tile.team());
-        merged |= check2x2Pattern(tile.x - 1, tile.y - 1, smallBlock, largeBlock, tile.team());
+        check2x2Pattern(tile.x, tile.y, smallBlock, largeBlock, tile.team());
+        check2x2Pattern(tile.x, tile.y, smallBlock, largeBlock, tile.team());
+        check2x2Pattern(tile.x - 1, tile.y, smallBlock, largeBlock, tile.team());
+        check2x2Pattern(tile.x, tile.y - 1, smallBlock, largeBlock, tile.team());
+        check2x2Pattern(tile.x - 1, tile.y - 1, smallBlock, largeBlock, tile.team());
     }
 
     /**

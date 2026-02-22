@@ -1,0 +1,303 @@
+{
+	"type": "PowerTurret",
+	"name": "破晓",
+	"health": 16400,
+	"armor": -50,
+	"size": 8,
+	"accurateDelay": false,
+	"moveWhileCharging": false,
+	"shake": 15,
+	"inaccuracy": 0,
+	"recoil": 5,
+	"cooldownTime": 300,
+	"liquidCapacity": 60,
+	"canOverdrive": false,
+	"recoilTime": 120,
+	"warmupMaintainTime": 580,
+	"shoot": {
+		"type": "ShootPattern",
+		"firstShotDelay": 100
+	},
+	"drawer": {
+		"type": "DrawTurret",
+		"parts": [
+			{
+				"type": "RegionPart",
+				"mirror": true,
+				"under": true,
+				"suffix": "-侧",
+				"moveX": 4,
+				"moveY": 0,
+				"moveRot": -25,
+				"heatProgress": "heat",
+				"heatColor": "FF4040",
+				"moves": [{
+					"progress": "recoil",
+					"rot": -5,
+					"y": -2
+				}]
+			},
+			{
+				"type": "RegionPart",
+				"mirror": false,
+				"under": true,
+				"suffix": "-口",
+				"y": -8,
+				"moveY": 8
+			},
+			{
+				"type": "RegionPart",
+				"mirror": true,
+				"suffix": "-前",
+				"moveX": 2.75,
+				"moveY": -2.75,
+				"heatProgress": "warmup"
+			}
+		]
+	},
+	"coolantMultiplier": 0.5,
+	"heatColor": "FF4040",
+	"shootSound": "laserblast",
+	"shootEffect": {
+		"type": "WaveEffect",
+		"lifetime": 45,
+		"interp": "circleOut",
+		"sizeFrom": 0,
+		"sizeTo": 200,
+		"strokeFrom": 9,
+		"strokeTo": 0,
+		"colorFrom": "FFFFFF",
+		"colorTo": "25C9AB"
+	},
+	"chargeSound": "lasercharge",
+	"shootType": {
+		"chargeEffect": {
+			"type": "MultiEffect",
+			"effects": [
+				{
+					"type": "WaveEffect",
+					"lifetime": 85,
+					"sizeFrom": 180,
+					"sizeTo": 0,
+					"strokeFrom": 0,
+					"strokeTo": 6,
+					"colorFrom": "25C9AB",
+					"colorTo": "BFFFDB"
+				},
+				{
+					"type": "WaveEffect",
+					"lifetime": 40,
+					"startDelay": 10,
+					"sizeFrom": 180,
+					"sizeTo": 0,
+					"strokeFrom": 0,
+					"strokeTo": 6,
+					"interp": "circleIn",
+					"colorFrom": "25C9AB",
+					"colorTo": "BFFFDB"
+				},
+				{
+					"type": "WaveEffect",
+					"lifetime": 40,
+					"startDelay": 20,
+					"sizeFrom": 180,
+					"sizeTo": 0,
+					"strokeFrom": 0,
+					"strokeTo": 6,
+					"interp": "circleIn",
+					"colorFrom": "25C9AB",
+					"colorTo": "BFFFDB"
+				},
+				{
+					"type": "WaveEffect",
+					"lifetime": 40,
+					"startDelay": 30,
+					"sizeFrom": 180,
+					"sizeTo": 0,
+					"strokeFrom": 0,
+					"strokeTo": 6,
+					"interp": "circleIn",
+					"colorFrom": "25C9AB",
+					"colorTo": "BFFFDB"
+				},
+				{
+					"type": "ParticleEffect",
+					"particles": 13,
+					"strokeFrom": 0,
+					"strokeTo": 2,
+					"line": true,
+					"sizeInterp": "pow5Out",
+					"interp": "pow5In",
+					"lenFrom": 0,
+					"lenTo": 16,
+					"length": -200,
+					"baseLength": 200,
+					"lifetime": 70,
+					"colorFrom": "25C9AB",
+					"colorTo": "BFFFDB"
+				},
+				{
+					"type": "ParticleEffect",
+					"particles": 13,
+					"strokeFrom": 0,
+					"strokeTo": 2,
+					"line": true,
+					"sizeInterp": "pow5Out",
+					"interp": "pow5In",
+					"lenFrom": 0,
+					"lenTo": 16,
+					"length": -200,
+					"baseLength": 200,
+					"lifetime": 70,
+					"startDelay": 4,
+					"colorFrom": "25C9AB",
+					"colorTo": "BFFFDB"
+				},
+				{
+					"type": "ParticleEffect",
+					"particles": 13,
+					"strokeFrom": 0,
+					"strokeTo": 2,
+					"line": true,
+					"sizeInterp": "pow5Out",
+					"interp": "pow5In",
+					"lenFrom": 0,
+					"lenTo": 16,
+					"length": -200,
+					"baseLength": 200,
+					"lifetime": 70,
+					"startDelay": 8,
+					"colorFrom": "25C9AB",
+					"colorTo": "BFFFDB"
+				},
+				{
+					"type": "ParticleEffect",
+					"particles": 1,
+					"sizeFrom": 0,
+					"sizeTo": 12,
+					"length": 0,
+					"baseLength": -0,
+					"lifetime": 80,
+					"colorFrom": "25C9AB",
+					"colorTo": "BFFFDB"
+				},
+				{
+					"type": "ParticleEffect",
+					"particles": 1,
+					"startDelay": 78,
+					"sizeFrom": 12,
+					"sizeTo": 0,
+					"length": 0,
+					"baseLength": -0,
+					"lifetime": 30,
+					"sizeInterp": "pow3In",
+					"colorFrom": "BFFFDB",
+					"colorTo": "25C9AB"
+				}
+			]
+		},
+		"type": "LaserBulletType",
+		"lightningSpacing": 55,
+		"lightningDelay": 1.9,
+		"lightningLength": 8,
+		"lightningLengthRand": 5,
+		"lightningAngleRand": 75,
+		"lightningDamage": 390,
+		"lightningColor": "25C9AB",
+		"length": 1500,
+		"width": 75,
+		"sideAngle": 25,
+		"sideWidth": 2,
+		"sideLength": 420,
+		"pierceCap": 15,
+		"damage": 4200,
+		"buildingDamageMultiplier": 0.001,
+		"lifetime": 75,
+		"ammoMultiplier": 1,
+		"colors": [
+			"25C9ABCB",
+			"25C9AB",
+			"BFFFDB",
+			"FFFFFF"
+		],
+		"smokeEffect": "smokeCloud",
+		"despawnEffect": {
+			"type": "ParticleEffect",
+			"particles": 8,
+			"sizeFrom": 2.5,
+			"sizeTo": 0,
+			"length": 16,
+			"baseLength": 0,
+			"lifetime": 60,
+			"interp": "pow3Out",
+			"sizeInterp": "pow5In",
+			"colorFrom": "25C9ABAA",
+			"colorTo": "BFFFDB80"
+		},
+		"hitEffect": {
+			"type": "MultiEffect",
+			"effects": [
+				{
+					"type": "ParticleEffect",
+					"particles": 6,
+					"sizeFrom": 4,
+					"sizeTo": 0,
+					"length": 30,
+					"baseLength": 0,
+					"lifetime": 60,
+					"interp": "pow5Out",
+					"sizeInterp": "pow5In",
+					"colorFrom": "25C9AB",
+					"colorTo": "BFFFDB"
+				},
+				{
+					"type": "ParticleEffect",
+					"particles": 14,
+					"strokeFrom": 1.2,
+					"strokeTo": 0.8,
+					"line": true,
+					"lenFrom": 24,
+					"lenTo": 0,
+					"length": 50,
+					"baseLength": -18,
+					"lifetime": 22,
+					"interp": "pow5Out",
+					"sizeInterp": "pow5Out",
+					"colorFrom": "25C9AB",
+					"colorTo": "BFFFDB",
+					"cone": 36
+				}
+			]
+		}
+	},
+	"consumes": {
+		"power": 190,
+		"coolant": {
+			"amount": 2,
+			"optional": true
+		}
+	},
+	"reload": 600,
+	"rotateSpeed": 0.96,
+	"fogRadiusMultiplier": 0.167,
+	"range": 1440,
+	"category": "turret",
+	"research": {
+		"parent": "战研",
+		"objectives": [
+			{
+				"type": "OnSector",
+				"preset": "第五战区"
+			}
+		]
+	},
+	"requirements": [
+		"metaglass/1500",
+		"silicon/2200",
+		"硅钢/1800",
+		"泰勒合金/1300",
+		"裂位能/2000",
+		"二级协议/60",
+		"三级协议/30"
+	]
+}

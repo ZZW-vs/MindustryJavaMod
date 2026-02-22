@@ -110,9 +110,9 @@ public class MechanicalComponentBuild extends Building {
                 powerSource = component;
             }
 
-            // 记录最大转速和累计应力
+            // 记录最大转速和最大应力
             maxSpeed = Math.max(maxSpeed, component.rotationSpeed);
-            totalStress += component.stress;  // 累加应力
+            totalStress = Math.max(totalStress, component.stress);  // 使用最大应力而不是累加
         }
 
         // 同步整个网络的数据

@@ -30,17 +30,11 @@ public class MechanicalBuilds {
     public static class CogwheelBuild extends MechanicalComponentBuild {
         // 齿轮特有属性
         private float rotation = 0f;              // 当前旋转角度
-        private TextureRegion gearRegion;         // 齿轮纹理
 
         @Override
         public void created() {
             super.created();
-            // 加载齿轮纹理 - 使用完整的子目录路径
-            gearRegion = Core.atlas.find("mechanical-cogwheel-z");
-            // 如果找不到专用齿轮纹理，则使用方块区域
-            if (gearRegion == null || !gearRegion.found()) {
-                gearRegion = block.region;
-            }
+            // 不加载特定纹理，直接使用方块的默认纹理
         }
 
         @Override
@@ -59,9 +53,8 @@ public class MechanicalBuilds {
             boolean isRotating = rotationSpeed > SPEED_THRESHOLD;
             float drawRotation = isRotating ? rotation : 0f;
 
-            // 绘制齿轮纹理
-            TextureRegion region = gearRegion != null ? gearRegion : block.region;
-            Draw.rect(region, x, y, drawRotation);
+            // 绘制齿轮纹理 - 直接使用方块的默认纹理
+            Draw.rect(block.region, x, y, drawRotation);
 
             // 绘制应力指示器
             if (stress > STRESS_THRESHOLD) {
