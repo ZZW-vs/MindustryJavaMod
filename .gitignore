@@ -62,8 +62,6 @@ www-test/
 ## Android Studio and Intellij and Android in general
 /android/libs/
 
-## 忽略mod参考文件夹
-mod参考/armeabi/
 /android/libs/armeabi-v7a/
 /android/libs/arm64-v8a/
 /android/libs/x86/
@@ -158,6 +156,3 @@ gradle-app.setting
 .DS_Store
 Thumbs.db
 android/libs/
-
-## 忽略mod参考文件夹
-mod参考/

@@ -1,5 +1,5 @@
 #the mod name as displayed in-game
-displayName: "create"
+displayName: "Create Mod"
 
 #the internal name of your mod
 name: "create"
@@ -11,13 +11,13 @@ author: "郑zip"
 main: "zzw.TestMod"
 
 #the mod description as seen in the mod dialog
-description: "A Mindustry Java mod template."
+description: "一个为Mindustry添加了基础金属加工系统的Java模组，灵感来源于Minecraft的Create模组。包含机械传动系统、金属加工设备和各种实用方块。"
 
 #the mod version
-version: 1.1
+version: 1.2
 
 #the minimum game build required to run this mod
-minGameVersion: 145
+minGameVersion: 150
 
 #this is a java mod
 java: true
