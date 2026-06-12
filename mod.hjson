@@ -1,0 +1,23 @@
+#the mod name as displayed in-game
+displayName: "Create Mod"
+
+#the internal name of your mod
+name: "create"
+
+#your name
+author: "郑zip"
+
+#the fully qualified main class of the mod
+main: "zzw.TestMod"
+
+#the mod description as seen in the mod dialog
+description: "一个为Mindustry添加了基础金属加工系统的Java模组，灵感来源于Minecraft的Create模组。包含机械传动系统、金属加工设备和各种实用方块。"
+
+#the mod version
+version: 1.2
+
+#the minimum game build required to run this mod
+minGameVersion: 136
+
+#this is a java mod
+java: true
