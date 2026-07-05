@@ -2,7 +2,6 @@ package zzw.content.units;
 
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
-import arc.math.Mathf;
 import mindustry.gen.Hitboxc;
 import mindustry.gen.UnitEntity;
 
@@ -38,6 +37,11 @@ public class SegmentUnitEntity extends UnitEntity {
 
     /** 是否为尾部 (最后一节段身, 用 tail 贴图而不是 segment 贴图) */
     public boolean isTail = false;
+
+    /** 贴图前缀 (由头部 createSegments 时设置, 等于头部 type.name + "-")
+     *  arcnelidia 头部 → "arcnelidia-"
+     *  toxobyte 头部 → "toxobyte-" */
+    public String texturePrefix = "arcnelidia-";
 
     @Override
     public void update() {
@@ -118,13 +122,15 @@ public class SegmentUnitEntity extends UnitEntity {
     /**
      * 让头部直接设置位置和朝向 (跳过物理)
      * 由 SegmentWormEntity.update() 每帧调用
+     *
+     * 注: 不重置 vel, 因为 updateSegmentVLocal 会把段身速度同步到 segments[i].vel
+     * 段身 vel 用于碰撞/受击效果, 头部 update() 会重新覆盖
      */
     public void syncToHead(float x, float y, float rotation) {
         this.x = x;
         this.y = y;
         this.rotation = rotation;
-        // 重置速度 (避免段身被推开)
-        this.vel.setZero();
+        // vel 不清零, 由头部 updateSegmentVLocal 每帧覆盖
     }
 
     @Override
@@ -161,19 +167,19 @@ public class SegmentUnitEntity extends UnitEntity {
         if (!debugDrawLogged) {
             debugDrawLogged = true;
             String[] names = {
-                "arcnelidia-segment", "create-arcnelidia-segment",
-                "arcnelidia-tail", "create-arcnelidia-tail",
-                "arcnelidia-segment-outline", "create-arcnelidia-segment-outline",
-                "arcnelidia-tail-outline", "create-arcnelidia-tail-outline",
-                "arcnelidia-cell", "create-arcnelidia-cell",
-                "arcnelidia", "create-arcnelidia"
+                texturePrefix + "segment", "create-" + texturePrefix + "segment",
+                texturePrefix + "tail", "create-" + texturePrefix + "tail",
+                texturePrefix + "segment-outline", "create-" + texturePrefix + "segment-outline",
+                texturePrefix + "tail-outline", "create-" + texturePrefix + "tail-outline",
+                texturePrefix + "cell", "create-" + texturePrefix + "cell",
+                texturePrefix.substring(0, texturePrefix.length() - 1), "create-" + texturePrefix.substring(0, texturePrefix.length() - 1)
             };
             for (String n : names) {
                 try {
-                    System.out.println("[ARCNELIDIA-DEBUG] draw atlas.find('" + n + "') = "
+                    System.out.println("[SEG-DEBUG] draw atlas.find('" + n + "') = "
                         + (arc.Core.atlas.find(n).found() ? "OK" : "MISSING"));
                 } catch (Throwable t) {
-                    System.out.println("[ARCNELIDIA-DEBUG] draw atlas.find('" + n + "') ERR: " + t);
+                    System.out.println("[SEG-DEBUG] draw atlas.find('" + n + "') ERR: " + t);
                 }
             }
         }
@@ -186,14 +192,16 @@ public class SegmentUnitEntity extends UnitEntity {
 
         // 临时切换 region (借鉴 PU132 UnityUnitType.draw 第344-347行)
         // 尝试两种名字: 不带前缀 / 带 mod 前缀 (Mindustry 会给 mod 贴图加 modname- 前缀)
+        String p = texturePrefix;  // 头部名字 + "-" (如 "arcnelidia-" / "toxobyte-")
+        String modP = "create-" + p;  // 加 mod 前缀 (如 "create-arcnelidia-")
         if (isTail) {
-            t.region = findRegion("arcnelidia-tail", "create-arcnelidia-tail");
-            t.outlineRegion = findRegion("arcnelidia-tail-outline", "create-arcnelidia-tail-outline");
+            t.region = findRegion(p + "tail", modP + "tail");
+            t.outlineRegion = findRegion(p + "tail-outline", modP + "tail-outline");
         } else {
-            t.region = findRegion("arcnelidia-segment", "create-arcnelidia-segment");
-            t.outlineRegion = findRegion("arcnelidia-segment-outline", "create-arcnelidia-segment-outline");
+            t.region = findRegion(p + "segment", modP + "segment");
+            t.outlineRegion = findRegion(p + "segment-outline", modP + "segment-outline");
             // 非尾段身用头部的 cell 贴图
-            t.cellRegion = findRegion("arcnelidia-cell", "create-arcnelidia-cell");
+            t.cellRegion = findRegion(p + "cell", modP + "cell");
         }
 
         // 调用 super.draw() 会用切换后的 region 画

@@ -1,7 +1,6 @@
 package zzw.content.units;
 
-import arc.graphics.g2d.Draw;
-import arc.graphics.g2d.TextureRegion;
+import arc.math.Angles;
 import arc.math.Mathf;
 import arc.math.geom.Vec2;
 import arc.util.Tmp;
@@ -44,18 +43,40 @@ public class SegmentWormEntity extends UnitEntity {
     protected Vec2[] segVelocities;
     /** 段身朝向 (PU132 segmentUnits[i].rotation, 每段独立朝向, 用于约束算法) */
     protected float[] segRotations;
-    /** 段身间最大角度差 (度, PU132 angleLimit, 限制段身相对前一段的转弯角度) */
-    public float angleLimit = 80f;
-    /** 段身间距 (PU132 segmentOffset) */
+    /** 段身朝向相对父段的最大角度差 (度, 154.3 原版 segmentRotationRange)
+     *  调小 = 段身更硬 (转向幅度小), 调大 = 段身更软 (转向幅度大)
+     *  当前 25f: 段身朝向相对父段最多 ±25°, 9 段累计最多 225°, 不会折返
+     *  154.3 原版默认 80f (太软), 之前调 40f 仍嫌软, 调到 25f 更接近真实虫子 */
+    public float segmentRotationRange = 25f;
+    /** 段身朝向 slerp 到父段朝向的速率 (154.3 原版 baseRotateSpeed)
+     *  默认 0.04f: 头部移动时段身朝向慢慢转向父段方向 */
+    public float baseRotateSpeed = 0.04f;
+    /** 段身间最大角度差 (度, PU132 angleLimit, 已弃用, 保留兼容) */
+    public float angleLimit = 30f;
+    /** 段身间距 (154.3 segmentSpacing, 原 PU132 segmentOffset) */
     public float segmentSpacing = 23f;
-    /** 段身阻力 (PU132 drag, 段身速度衰减) */
-    public float segmentDrag = 0.007f;
+    /** 段身阻力 (PU132 drag, 段身速度衰减)
+     *  PU132 原版 0.007f 太小 (每帧仅衰减 0.012%), 快速摆动时尾部惯性消散不掉导致抖动
+     *  调到 3.0f: 每帧衰减约 5%, 让段身惯性快速消散, 尾部稳定 */
+    public float segmentDrag = 3.0f;
     /** 血量分布速率 (PU132 healthDistribution) */
     public float healthDistributionRate = 0.1f;
     /** 血量分布效率 (受伤降低, 慢慢恢复, PU132 healthDistributionEfficiency) */
     protected float healthDistributionEfficiency = 1f;
 
-    /** 段身配置 (在 Z_Units.load 中设置) */
+    /** 段身配置 (在 Z_Units.load 中注册, 支持多个分段单位) */
+    public static class SegmentConfig {
+        public final mindustry.type.UnitType segmentType;
+        public final int count;
+        public final float spacing;
+        public SegmentConfig(mindustry.type.UnitType t, int c, float s) {
+            segmentType = t; count = c; spacing = s;
+        }
+    }
+    /** 按 UnitType.name 注册的段身配置 (key = 头部名字, 如 "arcnelidia" / "toxobyte") */
+    public static final java.util.Map<String, SegmentConfig> configs = new java.util.HashMap<>();
+
+    /** 旧静态字段 (向后兼容, 优先用 configs Map) */
     public static mindustry.type.UnitType defaultSegmentType = null;
     public static int defaultSegmentCount = 5;
     public static float defaultSegmentSpacing = 23f;
@@ -67,8 +88,16 @@ public class SegmentWormEntity extends UnitEntity {
     /** 段身是否已创建 (兜底: add() 没触发就在 update() 里创建) */
     private boolean segmentsCreated = false;
 
+    /** 上一帧速度 (PU132 lastVelocityC, 用于段身速度平滑) */
+    protected final Vec2 lastVelocityC = new Vec2();
+    /** 上上帧速度 (PU132 lastVelocityD, 用于 3 帧平均) */
+    protected final Vec2 lastVelocityD = new Vec2();
+
     @Override
     public void update() {
+        // PU132 WormDefaultUnit.update L71-72: 保存速度历史 (用于 updateSegmentVLocal 3 帧平均)
+        lastVelocityD.set(lastVelocityC);
+        lastVelocityC.set(vel);
         super.update();
 
         // 调试: 只打印一次 (用于确认 entity 在运行)
@@ -79,16 +108,29 @@ public class SegmentWormEntity extends UnitEntity {
         }
 
         // ★ 兜底: 如果 add() 没创建段身, 在第一次 update() 时创建 ★
-        if (!segmentsCreated && defaultSegmentType != null) {
-            try {
-                segmentSpacing = defaultSegmentSpacing;
-                createSegments(defaultSegmentCount, defaultSegmentType);
-                segmentsCreated = true;
-                System.out.println("[ARCNELIDIA-DEBUG] update() created " + segments.length + " segments (fallback)");
-            } catch (Throwable t) {
-                System.out.println("[ARCNELIDIA-DEBUG] update() createSegments FAILED: " + t);
-                t.printStackTrace();
-                segmentsCreated = true;  // 避免反复失败
+        if (!segmentsCreated) {
+            SegmentConfig cfg = type != null ? configs.get(type.name) : null;
+            if (cfg != null) {
+                try {
+                    segmentSpacing = cfg.spacing;
+                    createSegments(cfg.count, cfg.segmentType);
+                    segmentsCreated = true;
+                } catch (Throwable t) {
+                    System.out.println("[WORM-DEBUG] update() createSegments FAILED: " + t);
+                    t.printStackTrace();
+                    segmentsCreated = true;
+                }
+            } else if (defaultSegmentType != null) {
+                // 旧路径 (向后兼容)
+                try {
+                    segmentSpacing = defaultSegmentSpacing;
+                    createSegments(defaultSegmentCount, defaultSegmentType);
+                    segmentsCreated = true;
+                } catch (Throwable t) {
+                    System.out.println("[WORM-DEBUG] update() createSegments (legacy) FAILED: " + t);
+                    t.printStackTrace();
+                    segmentsCreated = true;
+                }
             }
         }
 
@@ -104,39 +146,65 @@ public class SegmentWormEntity extends UnitEntity {
             }
         }
 
-        // ★ PU132 原版算法 (WormDefaultUnit.updateSegmentsLocal 第126-164行) ★
-        // segmentOffset = segmentSpacing / 2 (半间距, 用于约束)
+        // ★★★ 组合方案: PU132 约束算法 + 速度传播 + 154.3 clampRange ★★★
+        //
+        // 问题历史:
+        // - 纯 PU132 算法: 会超过 90° 脱节 (clampedAngle 限制的是 seg.angleTo(ideal) 向量角度,
+        //   不是段身真实朝向, 段身偏离 ideal 时可接近 180°)
+        // - 纯 154.3 算法: 整体一起转, 无 "一节拉一节" 拖尾感 (slerp 让段身直接朝父段方向)
+        //
+        // 组合方案:
+        // 1. updateSegmentVLocal (PU132): 速度传播, 让段身有惯性, 产生拖尾感
+        // 2. PU132 约束算法: seg = ideal - trns(segRot, offset), 段身沿自己朝向滞后 ideal
+        // 3. clampRange (154.3): 额外限制 segRot 相对父段不超过 ±segmentRotationRange
+        //    从根源避免段身真实朝向超过父段±range, 防止脱节
+        //
+        // 单位修正: PU132 原版 segV 没乘 Time.delta (bug), 段身比头部快 60 倍导致抖动
+        //          这里修正: segments[i].add(segV.x * delta, segV.y * delta)
+
+        // 1. 速度传播 (PU132 updateSegmentVLocal L101-124)
+        updateSegmentVLocal(lastVelocityC);
+
+        // 2. PU132 约束算法 (updateSegmentsLocal L126-164) + clampRange 防脱节
         float segmentOffset = segmentSpacing / 2f;
+        float parentRot = rotation;
+        float parentX = x;
+        float parentY = y;
 
         // === 第 0 段: 跟随头部 ===
         if (segments.length > 0 && segments[0] != null && segments[0].isAdded()) {
             Vec2 seg0 = segPositions[0];
             Vec2 segV0 = segVelocities[0];
 
-            // 1. 段身位置 += 速度 (PU132 第134行)
-            seg0.add(segV0);
+            // 段身位置 += 速度 (PU132 L134), ★ 修正单位: 乘 Time.delta
+            seg0.add(segV0.x * arc.util.Time.delta, segV0.y * arc.util.Time.delta);
 
-            // 2. 头部 rotation 调整: 向段身朝向转一点 (PU132 第136行)
-            //    让头部稍微跟随段身, 产生更自然的扭动
+            // 头部 rotation 调整: 向段身朝向转一点 (PU132 L136)
             rotation -= angleDistSigned(rotation, segRotations[0], angleLimit) / 1.25f;
 
-            // 3. 理想位置: 头部后方 segmentOffset 处 (PU132 第137行)
+            // 理想位置: 头部后方 segmentOffset 处 (PU132 L137)
             Tmp.v1.trns(rotation + 180f, segmentOffset).add(x, y);
 
-            // 4. 段身朝向 = 从段身指向理想位置, 限制在头部朝向 ± angleLimit 内 (PU132 第138行)
+            // 段身朝向 = 从段身指向理想位置 (PU132 L138)
             segRotations[0] = clampedAngle(seg0.angleTo(Tmp.v1), rotation, angleLimit);
 
-            // 5. ★ PU132 约束 (第139-140行):
-            //    Tmp.v2 = 沿段身朝向走 segmentOffset, 从段身位置出发, 减去理想位置
-            //    seg0 = seg0 - Tmp.v2 = 理想位置 - 沿段身朝向走 segmentOffset
+            // ★ 154.3 clampRange: 额外限制段身真实朝向相对头部不超过 ±segmentRotationRange
+            //   防止 PU132 算法在段身偏离 ideal 时 segRot 超过 90° 脱节
+            segRotations[0] = clampRange(segRotations[0], rotation, segmentRotationRange);
+
+            // PU132 约束 (L139-140): seg = ideal - trns(segRot, offset)
             Tmp.v2.trns(segRotations[0], segmentOffset).add(seg0).sub(Tmp.v1);
             seg0.sub(Tmp.v2);
 
-            // 6. 速度衰减 (PU132 第142行)
+            // 速度衰减 (PU132 L142)
             segV0.scl(Mathf.clamp(1f - (segmentDrag * arc.util.Time.delta)));
 
-            // 应用到段身实体 (位置 + 朝向)
+            // 应用到段身实体
             segments[0].syncToHead(seg0.x, seg0.y, segRotations[0]);
+
+            parentRot = segRotations[0];
+            parentX = seg0.x;
+            parentY = seg0.y;
         }
 
         // === 后续段身 (i >= 1): 跟随前一段 ===
@@ -149,26 +217,26 @@ public class SegmentWormEntity extends UnitEntity {
             Vec2 segLast = segPositions[i - 1];
             float segLastRot = segRotations[i - 1];
 
-            // 1. 段身位置 += 速度 (PU132 第152行)
-            segPos.add(segV);
+            // 段身位置 += 速度 (PU132 L152), ★ 修正单位: 乘 Time.delta
+            segPos.add(segV.x * arc.util.Time.delta, segV.y * arc.util.Time.delta);
 
-            // 2. 前一段朝向调整: 向当前段朝向转一点 (PU132 第154行)
-            //    让前一段稍微跟随当前段, 产生更自然的扭动
+            // 前一段朝向调整: 向当前段朝向转一点 (PU132 L154)
             segRotations[i - 1] -= angleDistSigned(segRotations[i - 1], segRotations[i], angleLimit) / 1.25f;
 
-            // 3. 理想位置: 前一段后方 segmentOffset 处 (PU132 第155行)
-            //    用前一段的朝向 (不是 segLast.angleTo(segPos))
+            // 理想位置: 前一段后方 segmentOffset 处 (PU132 L155)
             Tmp.v1.trns(segRotations[i - 1] + 180f, segmentOffset).add(segLast);
 
-            // 4. 段身朝向 = 从段身指向理想位置, 限制在前一段朝向 ± angleLimit 内 (PU132 第156行)
+            // 段身朝向 = 从段身指向理想位置 (PU132 L156)
             segRotations[i] = clampedAngle(segPos.angleTo(Tmp.v1), segRotations[i - 1], angleLimit);
 
-            // 5. ★ PU132 约束 (第157-158行):
-            //    segPos = 理想位置 - 沿段身朝向走 segmentOffset
+            // ★ 154.3 clampRange: 额外限制段身真实朝向相对前一段不超过 ±segmentRotationRange
+            segRotations[i] = clampRange(segRotations[i], segRotations[i - 1], segmentRotationRange);
+
+            // PU132 约束 (L157-158): seg = ideal - trns(segRot, offset)
             Tmp.v2.trns(segRotations[i], segmentOffset).add(segPos).sub(Tmp.v1);
             segPos.sub(Tmp.v2);
 
-            // 6. 速度衰减 (PU132 第160行)
+            // 速度衰减 (PU132 L160)
             segV.scl(Mathf.clamp(1f - (segmentDrag * arc.util.Time.delta)));
 
             // 应用到段身实体
@@ -229,6 +297,95 @@ public class SegmentWormEntity extends UnitEntity {
                 seg.maxHealth = Mathf.lerpDelta(seg.maxHealth, mMaxHealth, healthDistributionRate * healthDistributionEfficiency);
             }
         }
+    }
+
+    /**
+     * 限制角度到 relative ± range 范围内 (154.3 Angles.clampRange 等价实现)
+     * 直接限制段身真实朝向相对父段, 从根源避免超过 90° 脱节
+     */
+    protected static float clampRange(float angle, float relative, float range) {
+        if (range >= 180f) return angle;
+        float diff = angleDistSigned(angle, relative);
+        if (Math.abs(diff) > range) {
+            float target = diff > 0 ? relative + range : relative - range;
+            return target % 360f;
+        }
+        return angle;
+    }
+
+    /**
+     * 速度传播: 让段身继承头部速度, 产生丝滑惯性 (拖尾感)
+     * (PU132 WormDefaultUnit.updateSegmentVLocal L101-124, 1:1 复刻)
+     *
+     * 每段速度 = max(前一段速度, 自己速度, 头部 3 帧平均速度)
+     * 方向 = 段身 → 前一段 (跟在头部后面)
+     *
+     * vec = lastVelocityC (上一帧头部速度)
+     * lastVelocityD = 上上帧头部速度
+     */
+    protected void updateSegmentVLocal(Vec2 vec) {
+        int len = segments.length;
+        for (int i = 0; i < len; i++) {
+            Vec2 seg = segPositions[i];
+            Vec2 segV = segVelocities[i];
+            segV.limit(type.speed);
+            // 方向: 段身指向前一段 (i=0 时指向头部)
+            float angleB = i != 0
+                ? Angles.angle(seg.x, seg.y, segPositions[i - 1].x, segPositions[i - 1].y)
+                : Angles.angle(seg.x, seg.y, x, y);
+            // 速度大小: 取前一段速度 (i=0 时取头部上一帧速度)
+            float velocity = i != 0 ? segVelocities[i - 1].len() : vec.len();
+
+            // 头部 3 帧速度平均 (当前 + 上一帧 + 上上帧) / 3
+            Tmp.v1.set(vel).add(vec).add(lastVelocityD).scl(1f / 3f);
+
+            // 真实速度 = 三者最大值
+            float trueVel = Math.max(Math.max(velocity, segV.len()), Tmp.v1.len());
+            Tmp.v1.trns(angleB, trueVel);
+            segV.add(Tmp.v1);
+            segV.setLength(trueVel);
+            // counterDrag=false, 不额外衰减 (PU132 默认)
+            // 同步到段身实体 vel, 让段身有真实物理速度
+            segments[i].vel.set(segV);
+        }
+    }
+
+    // ==================== PU132 角度工具方法 (Utils.java) ====================
+
+    /** 带符号角度差 (PU132 Utils.angleDistSigned 第177行)
+     *  返回 a 相对 b 的角度差, 范围 -180~180 */
+    private static float angleDistSigned(float a, float b) {
+        a += 360f;
+        a %= 360f;
+        b += 360f;
+        b %= 360f;
+        float d = Math.abs(a - b) % 360f;
+        int sign = (a - b >= 0f && a - b <= 180f) || (a - b <= -180f && a - b >= -360f) ? 1 : -1;
+        return (d > 180f ? 360f - d : d) * sign;
+    }
+
+    /** 带符号角度差, 超过 start 才返回差值 (PU132 Utils.angleDistSigned 第187行)
+     *  用于头部/前一段朝向调整: 超过 angleLimit 才转 */
+    private static float angleDistSigned(float a, float b, float start) {
+        float dst = angleDistSigned(a, b);
+        if (Math.abs(dst) > start) {
+            return dst > 0 ? dst - start : dst + start;
+        }
+        return 0f;
+    }
+
+    /** 限制角度差 (PU132 Utils.clampedAngle 第200行)
+     *  将 angle 限制在 relative ± limit 范围内
+     *  用于段身朝向: 不能相对前一段转超过 angleLimit */
+    private static float clampedAngle(float angle, float relative, float limit) {
+        if (limit >= 180f) return angle;
+        if (limit <= 0f) return relative;
+        float dst = angleDistSigned(angle, relative);
+        if (Math.abs(dst) > limit) {
+            float val = dst > 0 ? dst - limit : dst + limit;
+            return (angle - val) % 360f;
+        }
+        return angle;
     }
 
     @Override
@@ -308,6 +465,8 @@ public class SegmentWormEntity extends UnitEntity {
             seg.segmentIndex = i;  // 段身在数组中的索引, 用于 z 层级
             // 最后一节段身是 tail (用 tail 贴图而不是 segment 贴图)
             seg.isTail = (i == count - 1);
+            // ★ 设置贴图前缀 = 头部 type.name + "-" (如 "arcnelidia-" / "toxobyte-")
+            seg.texturePrefix = type.name + "-";
             seg.add();
 
             segments[i] = seg;
@@ -320,21 +479,29 @@ public class SegmentWormEntity extends UnitEntity {
     @Override
     public void add() {
         super.add();
-        // 用 System.out 保证输出 (Log.info 可能被过滤)
-        System.out.println("[ARCNELIDIA-DEBUG] add() called, segments=" + segments.length
-            + " type=" + (defaultSegmentType == null ? "null" : "ok")
-            + " count=" + defaultSegmentCount);
-        // 在头部被添加到世界时创建段身
-        if (!segmentsCreated && segments.length == 0 && defaultSegmentType != null) {
-            segmentSpacing = defaultSegmentSpacing;
-            try {
-                createSegments(defaultSegmentCount, defaultSegmentType);
-                segmentsCreated = true;
-                System.out.println("[ARCNELIDIA-DEBUG] created " + segments.length + " segments");
-            } catch (Throwable t) {
-                System.out.println("[ARCNELIDIA-DEBUG] createSegments FAILED: " + t);
-                t.printStackTrace();
-                segmentsCreated = true;
+        // 在头部被添加到世界时创建段身 (优先用 configs Map, 否则用旧静态字段)
+        if (!segmentsCreated && segments.length == 0) {
+            SegmentConfig cfg = type != null ? configs.get(type.name) : null;
+            if (cfg != null) {
+                segmentSpacing = cfg.spacing;
+                try {
+                    createSegments(cfg.count, cfg.segmentType);
+                    segmentsCreated = true;
+                } catch (Throwable t) {
+                    System.out.println("[WORM-DEBUG] add() createSegments FAILED: " + t);
+                    t.printStackTrace();
+                    segmentsCreated = true;
+                }
+            } else if (defaultSegmentType != null) {
+                segmentSpacing = defaultSegmentSpacing;
+                try {
+                    createSegments(defaultSegmentCount, defaultSegmentType);
+                    segmentsCreated = true;
+                } catch (Throwable t) {
+                    System.out.println("[WORM-DEBUG] add() createSegments (legacy) FAILED: " + t);
+                    t.printStackTrace();
+                    segmentsCreated = true;
+                }
             }
         }
     }
@@ -357,43 +524,5 @@ public class SegmentWormEntity extends UnitEntity {
     public void draw() {
         // 只画头部, 段身会自己画
         super.draw();
-    }
-
-    // ==================== PU132 角度工具方法 (Utils.java) ====================
-
-    /** 带符号角度差 (PU132 Utils.angleDistSigned 第177行)
-     *  返回 a 相对 b 的角度差, 范围 -180~180 */
-    private static float angleDistSigned(float a, float b) {
-        a += 360f;
-        a %= 360f;
-        b += 360f;
-        b %= 360f;
-        float d = Math.abs(a - b) % 360f;
-        int sign = (a - b >= 0f && a - b <= 180f) || (a - b <= -180f && a - b >= -360f) ? 1 : -1;
-        return (d > 180f ? 360f - d : d) * sign;
-    }
-
-    /** 带符号角度差, 超过 start 才返回差值 (PU132 Utils.angleDistSigned 第187行)
-     *  用于头部/前一段朝向调整: 超过 angleLimit 才转 */
-    private static float angleDistSigned(float a, float b, float start) {
-        float dst = angleDistSigned(a, b);
-        if (Math.abs(dst) > start) {
-            return dst > 0 ? dst - start : dst + start;
-        }
-        return 0f;
-    }
-
-    /** 限制角度差 (PU132 Utils.clampedAngle 第200行)
-     *  将 angle 限制在 relative ± limit 范围内
-     *  用于段身朝向: 不能相对前一段转超过 angleLimit */
-    private static float clampedAngle(float angle, float relative, float limit) {
-        if (limit >= 180f) return angle;
-        if (limit <= 0f) return relative;
-        float dst = angleDistSigned(angle, relative);
-        if (Math.abs(dst) > limit) {
-            float val = dst > 0 ? dst - limit : dst + limit;
-            return (angle - val) % 360f;
-        }
-        return angle;
     }
 }

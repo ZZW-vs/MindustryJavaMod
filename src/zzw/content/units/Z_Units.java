@@ -26,7 +26,9 @@ public class Z_Units {
 
     public static UnitType
         arcnelidia,            // 头部
-        arcnelidiaSegment;     // 段身
+        arcnelidiaSegment,     // 段身
+        toxobyte,              // 头部 (PU132 瘟疫虫, 25 段)
+        toxobyteSegment;       // 段身
 
     public static void load() {
         // ★ 关键: 注册自定义 Entity 到 EntityMapping.idMap, 否则 v154.3 的 UnitType.init() 会失败 ★
@@ -112,14 +114,11 @@ public class Z_Units {
             }});
         }};
 
-        // ★ 关键: 设置段身 UnitType 和数量到 SegmentWormEntity 的静态字段 ★
-        // PU132 原版 segmentLength=9 (UnityUnitType.java 第50行默认值)
-        SegmentWormEntity.defaultSegmentType = arcnelidiaSegment;
-        SegmentWormEntity.defaultSegmentCount = 9;
-        // ★ 段间距 22.7f (PU132 原版 23f - 0.3f, 用户要求稍小一点)
-        // 碰撞计算: 段间距22.7 > 半径8.75+8.75=17.5, 不重叠 (间隙5.2)
-        SegmentWormEntity.defaultSegmentSpacing = 22.7f;
-        System.out.println("[ARCNELIDIA-DEBUG] Z_Units.load() done, defaultSegmentType=" + arcnelidiaSegment.name);
+        // ★ 注册 arcnelidia 段身配置到 configs Map ★
+        // PU132 原版 segmentLength=9, segmentOffset=23f
+        // 段间距 22.7f (PU132 23f - 0.3f, 用户要求稍小一点)
+        SegmentWormEntity.configs.put("arcnelidia",
+            new SegmentWormEntity.SegmentConfig(arcnelidiaSegment, 9, 22.7f));
 
         // 用反射设置 shootSound 和 visualElevation, 避开编译期字段差异 (v150 vs v154)
         try {
@@ -138,5 +137,53 @@ public class Z_Units {
         } catch (Throwable t) {
             try { arc.util.Log.err("set visualElevation failed", t); } catch (Throwable ignored) {}
         }
+
+        // ═══════════════════════════════════════════════════════════
+        //  Toxobyte (PU132 瘟疫虫)
+        //  - 25 段 (segmentLength=25)
+        //  - segmentOffset=16.25f, hitSize=15.75f (段间距 ≈ 半径, 紧凑)
+        //  - angleLimit=25f (PU132 原值)
+        //  - splittable=true, regenTime=15*60f (分裂/再生, 高难度, 暂不移植)
+        //  - circleTarget=true, omniMovement=false (环绕目标)
+        //  - 武器先不加 (用户要求: 先保证显示和动态)
+        // ═══════════════════════════════════════════════════════════
+
+        // —— 段身 UnitType ——
+        toxobyteSegment = new UnitType("toxobyte-segment") {{
+            health = 200;
+            speed = 0f;
+            hitSize = 15.75f;
+            flying = true;
+            rotateSpeed = 1f;
+            faceTarget = false;
+            constructor = SegmentUnitEntity::create;
+            hidden = true;
+            physics = true;
+            hittable = true;
+        }};
+
+        // —— 头部 Toxobyte ——
+        toxobyte = new UnitType("toxobyte") {{
+            // ===== 基础属性 (PU132 UnityUnitTypes.java 第3231-3248行) =====
+            health = 200f;
+            speed = 3f;
+            accel = 0.035f;
+            drag = 0.012f;
+            rotateSpeed = 3f;       // PU132 未设, 用默认
+            hitSize = 15.75f;
+            flying = true;
+            engineSize = -1f;
+            range = 130f;           // PU132 武器 length=130
+            faceTarget = false;
+            constructor = SegmentWormEntity::create;
+            // 暂不加武器 (用户要求先保证显示和动态)
+        }};
+
+        // ★ 注册 toxobyte 段身配置 ★
+        // PU132: segmentLength=25, segmentOffset=16.25f
+        SegmentWormEntity.configs.put("toxobyte",
+            new SegmentWormEntity.SegmentConfig(toxobyteSegment, 25, 16.25f));
+
+        System.out.println("[Z_Units] load done, configs=" + SegmentWormEntity.configs.keySet());
     }
 }
