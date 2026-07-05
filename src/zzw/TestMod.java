@@ -11,12 +11,12 @@ import zzw.content.Z_Items;
 import zzw.content.Z_Factory;
 import zzw.content.Z_Mine;
 import zzw.content.mechanics.Z_Mechanics;
+import zzw.content.units.Z_Units;
 
 
 public class TestMod extends Mod{
-    private static final float WELCOME_DIALOG_DELAY = 10f;
-    private static final float CLOSE_BUTTON_DELAY = 100f;
-    
+    private static final float WELCOME_DIALOG_DELAY = 3f;
+
     public TestMod(){
         Events.on(EventType.ClientLoadEvent.class, e -> {
             Time.run(WELCOME_DIALOG_DELAY, this::showWelcomeDialog);
@@ -28,18 +28,21 @@ public class TestMod extends Mod{
     public void loadContent(){
         // 加载自定义物品（基础资源）
         Z_Items.load();
-        
+
         // 加载矿物（需要物品）
         Z_Mine.load();
-        
+
         // 加载自定义工厂（需要物品）
         Z_Factory.load();
 
         // 加载机械系统（需要物品和工厂）
         Z_Mechanics.load();
-        
+
         // 加载自定义方块（可能需要物品和工厂）
         Z_Blocks.load();
+
+        // 加载自定义单位 (需要物品, 方块, 用于工厂配方)
+        Z_Units.load();
     }
     
     /**
@@ -47,12 +50,8 @@ public class TestMod extends Mod{
      */
     private void showWelcomeDialog() {
         BaseDialog dialog = new BaseDialog("欢迎来玩我的模组！");
-        dialog.cont.add("我是b站up“郑zip”，感谢您游玩我的模组");
-        
-        // 延迟添加关闭按钮，让玩家有时间阅读消息
-        Time.run(CLOSE_BUTTON_DELAY, dialog::addCloseButton);
-        
-        // 显示对话框
+        dialog.cont.add("我是b站up“郑zip”，感谢您游玩我的模组").row();
+        dialog.addCloseButton();
         dialog.show();
     }
 }

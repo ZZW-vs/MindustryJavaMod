@@ -67,15 +67,12 @@ public class Z_Blocks {
 
     private static Block decorative(String name, ItemStack[] requirements, int health) {
         return new Block(name) {{
-            requirements(Category.crafting, requirements);
+            requirements(Category.effect, requirements);
             size = 1;
             this.health = health;
-            buildVisibility = BuildVisibility.shown;
             destructible = true;
             allowDiagonal = true;
             solid = true;
-            canOverdrive = false;
-            instantDeconstruct = true;
         }};
     }
 

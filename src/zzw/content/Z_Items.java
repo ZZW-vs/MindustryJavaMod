@@ -11,7 +11,7 @@ public class Z_Items {
     // 农作物相关
     public static Item Pumpkin_Seeds, Pulp;
     // 特殊物品
-    public static Item Text_An;
+    public static Item Campfire_Fire;
 
     public static void load() {
         // 基础金属
@@ -33,7 +33,7 @@ public class Z_Items {
         Pulp = basic("pulp", "cfcfcf");
 
         // 特殊：动态贴图
-        Text_An = new Item("campfire_fire", Color.valueOf("cfcfcf")) {{
+        Campfire_Fire = new Item("campfire_fire", Color.valueOf("cfcfcf")) {{
             frames = 5;
             transitionFrames = 1;
             hardness = 1;

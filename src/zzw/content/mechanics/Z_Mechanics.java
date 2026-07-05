@@ -5,60 +5,48 @@ import mindustry.content.Items;
 import mindustry.type.Category;
 import mindustry.type.ItemStack;
 import mindustry.world.Block;
-import mindustry.world.meta.BuildVisibility;
 import zzw.content.Z_Items;
 
+/**
+ * 机械系统方块定义
+ */
 public class Z_Mechanics {
     public static Block stressSource;
-    public static Block mechanicalShaft;
+    public static Block transmissionBox;
     public static Block cogwheel;
 
     public static void load() {
-        stressSource = createConfigurableBlock("stress_source",
-                ItemStack.with(Items.lead, 100, Items.copper, 80),
-                500, block -> block.config(Float.class,
-                        (MechanicalBuilds.StressSourceBuild build, Float value) ->
-                                build.setTargetSpeed(Mathf.clamp(value, 0f, 256f))));
-        stressSource.buildType = MechanicalBuilds.StressSourceBuild::new;
-
-        mechanicalShaft = createBlock("transmission_box",
-                ItemStack.with(Items.lead, 10, Z_Items.Iron, 5), 80);
-        mechanicalShaft.buildType = MechanicalBuilds.TransmissionBoxBuild::new;
-
-        cogwheel = createBlock("cogwheel-z",
-                ItemStack.with(Items.copper, 15, Z_Items.Iron, 10), 120);
-        cogwheel.buildType = MechanicalBuilds.CogwheelBuild::new;
-    }
-
-    private static Block createBlock(String name, ItemStack[] requirements, int health) {
-        return new Block(name) {{
-            requirements(Category.crafting, requirements);
+        // 应力源: 提供动力, 可配置转速 (0-256)
+        stressSource = new Block("stress_source") {{
+            requirements(Category.crafting, ItemStack.with(Items.lead, 100, Items.copper, 80));
             size = 1;
-            this.health = health;
-            solid = true;
-            update = true;
-            configurable = false;
-            buildVisibility = BuildVisibility.shown;
-        }};
-    }
-
-    private static Block createConfigurableBlock(String name, ItemStack[] requirements,
-                                                  int health, BlockConfigurator config) {
-        Block block = new Block(name) {{
-            requirements(Category.crafting, requirements);
-            size = 1;
-            this.health = health;
+            health = 500;
             solid = true;
             update = true;
             configurable = true;
-            buildVisibility = BuildVisibility.sandboxOnly;
+            config(Float.class, (MechanicalBuilds.StressSourceBuild build, Float value) ->
+                    build.setTargetSpeed(Mathf.clamp(value, 0f, 256f)));
         }};
-        config.configure(block);
-        return block;
-    }
+        stressSource.buildType = MechanicalBuilds.StressSourceBuild::new;
 
-    @FunctionalInterface
-    private interface BlockConfigurator {
-        void configure(Block block);
+        // 传动箱: 传递机械动力, 也为相邻工厂提供加速
+        transmissionBox = new Block("transmission_box") {{
+            requirements(Category.crafting, ItemStack.with(Items.lead, 10, Z_Items.Iron, 5));
+            size = 1;
+            health = 80;
+            solid = true;
+            update = true;
+        }};
+        transmissionBox.buildType = MechanicalBuilds.TransmissionBoxBuild::new;
+
+        // 齿轮: 视觉上旋转表示动力流动
+        cogwheel = new Block("cogwheel-z") {{
+            requirements(Category.crafting, ItemStack.with(Items.copper, 15, Z_Items.Iron, 10));
+            size = 1;
+            health = 120;
+            solid = true;
+            update = true;
+        }};
+        cogwheel.buildType = MechanicalBuilds.CogwheelBuild::new;
     }
 }

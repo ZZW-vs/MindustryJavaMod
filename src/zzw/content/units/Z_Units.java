@@ -1,0 +1,142 @@
+package zzw.content.units;
+
+import arc.graphics.Color;
+import mindustry.entities.bullet.LaserBulletType;
+import mindustry.graphics.Pal;
+import mindustry.type.UnitType;
+import mindustry.type.Weapon;
+
+/**
+ * 分段单位加载类
+ *
+ * 第一个单位: arcnelidia (模仿 PU132 的 Arcnelidia)
+ * - 飞行虫子, 5 段身体
+ * - 头部装激光武器
+ * - 段身血量分布 (在 SegmentWormEntity 中实现)
+ *
+ * ★ 重要 ★
+ * 头部和段身用不同的 UnitType:
+ * - arcnelidia (头部): 用 SegmentWormEntity, 有武器和血量分布
+ * - arcnelidia-segment (段身): 用 SegmentUnitEntity, 不开火不分裂
+ *
+ * 段身 UnitType 设 hidden=true, 不会出现在数据库和 Spawner 选项中
+ * 玩家无法在游戏中单独召唤段身
+ */
+public class Z_Units {
+
+    public static UnitType
+        arcnelidia,            // 头部
+        arcnelidiaSegment;     // 段身
+
+    public static void load() {
+        // ★ 关键: 注册自定义 Entity 到 EntityMapping.idMap, 否则 v154.3 的 UnitType.init() 会失败 ★
+        // v154.3 要求每个自定义 Entity class 有唯一 classId, 必须在 idMap 占一个空 slot
+        // (模仿 PU132 的 UnityEntityMapping.register)
+        ZEntityRegister.register(SegmentWormEntity.class, SegmentWormEntity::new);
+        ZEntityRegister.register(SegmentUnitEntity.class, SegmentUnitEntity::new);
+
+        // —— 段身 UnitType (先创建, 头部要引用它) ——
+        arcnelidiaSegment = new UnitType("arcnelidia-segment") {{
+            health = 800;
+            speed = 0f;                 // 段身不需要自己移动 (由头部驱动)
+            // ★ hitSize=19f (17.5 + 1.5, 用户要求增大 1.5)
+            // 碰撞计算: 段间距22.7 > 半径9.5+9.5=19, 不重叠 (间隙3.7)
+            hitSize = 19f;
+            armor = 5f;
+            flying = true;
+            rotateSpeed = 1f;
+            faceTarget = false;
+
+            // 用 SegmentUnitEntity (禁用 AI 和自身移动)
+            constructor = SegmentUnitEntity::create;
+
+            // ★ 隐藏段身 (不出现在数据库/Spawner, 玩家无法单独召唤)
+            hidden = true;
+
+            // ★ 段身保留物理碰撞 (PU132 WormSegmentUnit 默认 physics=true)
+            // 其他单位不能穿过段身, 段身之间通过 collides() 重写过滤
+            physics = true;
+            hittable = true;
+
+            // 段身不需要武器
+            // weapons 留空
+        }};
+
+        // —— 头部 Arcnelidia 飞行分段虫子 ——
+        arcnelidia = new UnitType("arcnelidia") {{
+            // ===== 基础属性 (PU132 原值) =====
+            health = 800;
+            speed = 4f;
+            accel = 0.035f;
+            drag = 0.007f;
+            rotateSpeed = 3.2f;
+            // ★ hitSize=19f (17.5 + 1.5, 用户要求增大 1.5, 段身同值)
+            hitSize = 19f;
+            armor = 5f;
+            flying = true;
+            // PU132: engineSize=-1f (不显示引擎喷射效果)
+            engineSize = -1f;
+            range = 210f;
+            faceTarget = false;
+
+            // 用自定义 Entity (SegmentWormEntity)
+            constructor = SegmentWormEntity::create;
+
+            // ===== 头部武器: 双激光 (PU132 原配置) =====
+            // PU132 UnityUnitTypes.java 第3024-3037行原配置
+            weapons.add(new Weapon("arcnelidia-laser") {{
+                x = 0f;
+                reload = 10f;
+                rotateSpeed = 50f;
+                // shootSound 在后面用反射设置
+                mirror = true;
+                rotate = true;
+                minShootVelocity = 2.1f;
+                bullet = new LaserBulletType(200f) {{
+                    // PU132 原配置: surge 颜色 (电弧激光, 黄色)
+                    colors = new Color[]{
+                        Pal.surge.cpy().mul(1f, 1f, 1f, 0.4f),
+                        Pal.surge,
+                        Color.white
+                    };
+                    drawSize = 400f;
+                    collidesAir = false;
+                    length = 190f;
+                    // ★ 加大激光宽度: 20f (v154.3 默认 15f, 太细看起来像白线)
+                    width = 20f;
+                    // ★ 加长激光持续时间: 24f (v154.3 默认 16f, 太短看起来断断续续)
+                    lifetime = 24f;
+                    // lengthFalloff 控制每层颜色宽度递减, 0.5 = 每层减半
+                    // 保持默认 0.5f
+                }};
+            }});
+        }};
+
+        // ★ 关键: 设置段身 UnitType 和数量到 SegmentWormEntity 的静态字段 ★
+        // PU132 原版 segmentLength=9 (UnityUnitType.java 第50行默认值)
+        SegmentWormEntity.defaultSegmentType = arcnelidiaSegment;
+        SegmentWormEntity.defaultSegmentCount = 9;
+        // ★ 段间距 22.7f (PU132 原版 23f - 0.3f, 用户要求稍小一点)
+        // 碰撞计算: 段间距22.7 > 半径8.75+8.75=17.5, 不重叠 (间隙5.2)
+        SegmentWormEntity.defaultSegmentSpacing = 22.7f;
+        System.out.println("[ARCNELIDIA-DEBUG] Z_Units.load() done, defaultSegmentType=" + arcnelidiaSegment.name);
+
+        // 用反射设置 shootSound 和 visualElevation, 避开编译期字段差异 (v150 vs v154)
+        try {
+            Class<?> soundsClass = Class.forName("mindustry.gen.Sounds");
+            java.lang.reflect.Field f = soundsClass.getField("shootLaser");
+            Object snd = f.get(null);
+            arc.audio.Sound sound = (arc.audio.Sound) snd;
+            arcnelidia.weapons.first().shootSound = sound;
+        } catch (Throwable t) {
+            try { arc.util.Log.err("set shootSound failed", t); } catch (Throwable ignored) {}
+        }
+        // PU132: visualElevation=0.8f (v150 没有这个字段, 用反射设置)
+        try {
+            java.lang.reflect.Field ve = arcnelidia.getClass().getSuperclass().getField("visualElevation");
+            ve.setFloat(arcnelidia, 0.8f);
+        } catch (Throwable t) {
+            try { arc.util.Log.err("set visualElevation failed", t); } catch (Throwable ignored) {}
+        }
+    }
+}

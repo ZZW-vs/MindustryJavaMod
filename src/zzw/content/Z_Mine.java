@@ -14,10 +14,7 @@ public class Z_Mine {
     public static Block Andesite_Drill;
 
     public static void load() {
-        Andesite = new OreBlock("andesite") {{
-            itemDrop = Z_Items.Andesite;
-            variants = 3;
-        }};
+        Andesite = new OreBlock("andesite", Z_Items.Andesite);
 
         Andesite_Drill = new Drill("andesite_drill") {{
             requirements(Category.production, ItemStack.with(Items.copper, 80, Items.lead, 60));
