@@ -43,10 +43,21 @@ public class SegmentUnitEntity extends UnitEntity {
      *  toxobyte 头部 → "toxobyte-" */
     public String texturePrefix = "arcnelidia-";
 
+    /** 调试标志: update 状态只打印一次 */
+    private static boolean debugUpdateLogged = false;
+
     @Override
     public void update() {
         // ★ 不调用 super.update() 的移动/AI 部分 ★
         // 只保留必要的更新: 状态效果、武器、血量
+
+        // 调试: 只打一次, 确认段身 update 在跑
+        if (!debugUpdateLogged) {
+            debugUpdateLogged = true;
+            System.out.println("[段身] 启动: #" + segmentIndex
+                + " 头部=" + (head == null ? "无" : "正常")
+                + " 武器=" + (mounts == null ? 0 : mounts.length));
+        }
 
         // 更新状态效果时间 (让 buff 仍然生效)
         if (statuses.size > 0) {
@@ -56,13 +67,32 @@ public class SegmentUnitEntity extends UnitEntity {
         // hitTime 衰减 (受伤闪烁)
         hitTime = Math.max(0f, hitTime - arc.util.Time.delta / 10f);
 
-        // 不调用 controller.updateUnit() - 段身不需要 AI
-        // 不调用 moveAt - 段身位置由头部设置
-        // 不应用 drag - 头部直接 set 位置
-
         // ★ 状态效果转移给头部 (借鉴 PU132 WormSegmentUnit.updateStatus L261-265)
-        // 段身被施加 buff 时, 把 buff 转移到头部, 段身本身不持有
         updateStatus();
+
+        // ★ 段身武器 + 同步头部状态 (借鉴 PU132 WormSegmentUnit.wormSegmentUpdate L192-214)
+        if (head != null && head.isAdded() && !head.dead) {
+            // 同步头部 hitTime/ammo
+            hitTime = head.hitTime;
+            ammo = head.ammo;
+
+            // 段身武器: 跟随头部 aim 开火
+            if (mounts != null && mounts.length > 0 && head.mounts != null && head.mounts.length > 0) {
+                float aimX = head.mounts[0].aimX;
+                float aimY = head.mounts[0].aimY;
+                boolean headShooting = head.isShooting;
+                for (int i = 0; i < mounts.length; i++) {
+                    mounts[i].aimX = aimX;
+                    mounts[i].aimY = aimY;
+                    // ★ 关键: 跟随头部开火状态, 头部不射击时段身也不射击
+                    mounts[i].shoot = headShooting;
+                    mounts[i].rotate = headShooting;
+                    // v154.3 Weapon.update(Unit, WeaponMount) 是 public, 可直接调用
+                    mounts[i].weapon.update(this, mounts[i]);
+                    vel.setZero();
+                }
+            }
+        }
 
         // 检查头部是否还活着
         if (head == null || head.dead || !head.isAdded()) {
@@ -105,14 +135,43 @@ public class SegmentUnitEntity extends UnitEntity {
 
     @Override
     public boolean isAI() {
-        // 段身不算 AI 单位
-        return false;
+        // 段身的 AI 状态跟随头部 (借鉴 PU132 WormSegmentUnit.isAI L124-127)
+        if (head == null) return false;
+        return head.controller() instanceof mindustry.entities.units.AIController;
     }
 
     @Override
     public boolean isPlayer() {
-        // 段身永远不是玩家
-        return false;
+        // 段身是否被玩家控制 = 头部是否被玩家控制 (借鉴 PU132 WormSegmentUnit.isPlayer L118-121)
+        if (head == null) return false;
+        return head.isPlayer();
+    }
+
+    @Override
+    public mindustry.gen.Player getPlayer() {
+        // 段身的玩家 = 头部的玩家 (借鉴 PU132 WormSegmentUnit.getPlayer L135-138)
+        if (head == null) return null;
+        return isPlayer() ? (mindustry.gen.Player) head.controller() : null;
+    }
+
+    /**
+     * ★ 关键: 段身重写 controller(), 把玩家控制转给头部 (借鉴 PU132 WormSegmentUnit.controller L107-115)
+     *
+     * 这是 PU132 "选择任意段身都能操控整个单位"的核心实现:
+     * - 玩家点击段身时, 游戏会调用 unit.controller(player)
+     * - 段身把 controller 转给 head, head 持有 Player controller
+     * - 段身自己不持有 Player controller (避免段身独立移动)
+     */
+    @Override
+    public void controller(mindustry.entities.units.UnitController next) {
+        if (!(next instanceof mindustry.gen.Player)) {
+            // AI controller: 调用父类方法设置自己的 controller
+            super.controller(next);
+        } else if (head != null && head.isAdded()) {
+            // Player controller: 转给头部 (用 head.controller(next) 设置头部 controller)
+            head.controller(next);
+            System.out.println("[段身] 控制转移: #" + segmentIndex + " → 头部");
+        }
     }
 
     // 注意: 不重写 controller(UnitController), 让父类正常初始化 controller
@@ -136,9 +195,16 @@ public class SegmentUnitEntity extends UnitEntity {
     @Override
     public void add() {
         super.add();
-        try {
-            arc.util.Log.info("[arcnelidia-seg] segment added at " + x + "," + y + " head=" + (head == null ? "null" : "ok") + " isTail=" + isTail);
-        } catch (Throwable ignored) {}
+        // ★ 如果 head==null (单独生成, 如 Spawner 召唤或测试):
+        // 1. 根据 type.name 推断 texturePrefix
+        // 2. 设 isTail=true 用 tail 贴图 (单独段身更像尾部, 且避免画可能有问题的 cell 贴图)
+        if (head == null && type != null) {
+            String name = type.name;
+            if (name.startsWith("create-")) name = name.substring(7);
+            if (name.endsWith("-segment")) name = name.substring(0, name.length() - 8);
+            texturePrefix = name + "-";
+            isTail = true;
+        }
     }
 
     /**
@@ -163,25 +229,29 @@ public class SegmentUnitEntity extends UnitEntity {
         // 这样头部覆盖第1节, 第1节覆盖第2节, ...
         Draw.z(z - (segmentIndex + 1f) / 10000f);
 
-        // 调试: 只打一次, 确认 atlas 里贴图的实际名字 (运行时 atlas 已加载)
+        // 调试: 只打一次贴图查找结果
         if (!debugDrawLogged) {
             debugDrawLogged = true;
+            String p = texturePrefix;
+            String mp = "create-" + p;
             String[] names = {
-                texturePrefix + "segment", "create-" + texturePrefix + "segment",
-                texturePrefix + "tail", "create-" + texturePrefix + "tail",
-                texturePrefix + "segment-outline", "create-" + texturePrefix + "segment-outline",
-                texturePrefix + "tail-outline", "create-" + texturePrefix + "tail-outline",
-                texturePrefix + "cell", "create-" + texturePrefix + "cell",
-                texturePrefix.substring(0, texturePrefix.length() - 1), "create-" + texturePrefix.substring(0, texturePrefix.length() - 1)
+                p + "segment", mp + "segment",
+                p + "tail", mp + "tail",
+                p + "segment-outline", mp + "segment-outline",
+                p + "tail-outline", mp + "tail-outline",
+                p + "cell", mp + "cell",
+                p + "segment-cell", mp + "segment-cell"
             };
+            StringBuilder found = new StringBuilder();
             for (String n : names) {
                 try {
-                    System.out.println("[SEG-DEBUG] draw atlas.find('" + n + "') = "
-                        + (arc.Core.atlas.find(n).found() ? "OK" : "MISSING"));
-                } catch (Throwable t) {
-                    System.out.println("[SEG-DEBUG] draw atlas.find('" + n + "') ERR: " + t);
-                }
+                    if (arc.Core.atlas.find(n).found()) {
+                        if (found.length() > 0) found.append(", ");
+                        found.append(n);
+                    }
+                } catch (Throwable ignored) {}
             }
+            System.out.println("[段身] 贴图: 前缀=" + p + " 尾部=" + isTail + " 找到=" + found);
         }
 
         // 保存 type 原本的 region 字段
@@ -200,8 +270,15 @@ public class SegmentUnitEntity extends UnitEntity {
         } else {
             t.region = findRegion(p + "segment", modP + "segment");
             t.outlineRegion = findRegion(p + "segment-outline", modP + "segment-outline");
-            // 非尾段身用头部的 cell 贴图
-            t.cellRegion = findRegion(p + "cell", modP + "cell");
+            // ★ cell 贴图查找: 两种命名都试
+            //   arcnelidia 原版: "arcnelidia-cell" (PU132 风格, 文件名 arcnelidia-cell.png)
+            //   toxobyte 原版: "toxobyte-segment-cell" (文件名 toxobyte-segment-cell.png)
+            // ★ 规则: 修改时不能只改一种而破坏另一种, 必须两种都兼容 ★
+            TextureRegion cellR = findRegion(p + "cell", modP + "cell");
+            if (!cellR.found()) {
+                cellR = findRegion(p + "segment-cell", modP + "segment-cell");
+            }
+            t.cellRegion = cellR;
         }
 
         // 调用 super.draw() 会用切换后的 region 画

@@ -64,13 +64,43 @@ public class SegmentWormEntity extends UnitEntity {
     /** 血量分布效率 (受伤降低, 慢慢恢复, PU132 healthDistributionEfficiency) */
     protected float healthDistributionEfficiency = 1f;
 
+    /** 再生间隔 (PU132 regenTime, 单位 tick, 0=不再生)
+     *  每 regenTime tick 长出一节新尾部段身, 期间会扣血 (health/段数/2)
+     *  PU132 toxobyte 原值: 15*60f = 900 tick (15秒长一节)
+     *  默认 0: 不启用再生 */
+    public float regenTime = 0f;
+    /** 段身数上限 (PU132 maxSegments, 达到上限后停止再生)
+     *  toxobyte 原值 25, arcnelidia 不启用再生 */
+    public int maxSegments = 0;
+    /** 当前再生计时器 (累加 Time.delta, 达到 regenTime 后重置) */
+    protected float repairTime = 0f;
+    /** 调试计数器: 每 60 tick 打一次再生进度 */
+    protected float debugRegenLogTimer = 0f;
+    /** 是否启用轻微晃动 (arcnelidia=true 轻微晃动, toxobyte=false 完全静止)
+     *  借鉴 v154.3 UnitComp.wobble(), 但振幅更小 (0.02f vs 原版 0.05f) */
+    public boolean wobbleEnabled = false;
+
     /** 段身配置 (在 Z_Units.load 中注册, 支持多个分段单位) */
     public static class SegmentConfig {
         public final mindustry.type.UnitType segmentType;
         public final int count;
         public final float spacing;
+        /** 再生间隔 (0=不再生, toxobyte=15*60f) */
+        public final float regenTime;
+        /** 段身数上限 (0=不限制, 与 regenTime 配合使用) */
+        public final int maxSegments;
+        /** 是否启用轻微晃动 (arcnelidia=true, toxobyte=false) */
+        public final boolean wobble;
         public SegmentConfig(mindustry.type.UnitType t, int c, float s) {
+            this(t, c, s, 0f, 0, false);
+        }
+        public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments) {
+            this(t, c, s, regenTime, maxSegments, false);
+        }
+        public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble) {
             segmentType = t; count = c; spacing = s;
+            this.regenTime = regenTime; this.maxSegments = maxSegments;
+            this.wobble = wobble;
         }
     }
     /** 按 UnitType.name 注册的段身配置 (key = 头部名字, 如 "arcnelidia" / "toxobyte") */
@@ -81,10 +111,6 @@ public class SegmentWormEntity extends UnitEntity {
     public static int defaultSegmentCount = 5;
     public static float defaultSegmentSpacing = 23f;
 
-    /** 调试标志: 只打印一次, 避免刷屏 */
-    private static boolean debugLogged = false;
-    /** 调试标志: draw 贴图状态只打印一次 */
-    private static boolean debugDrawLogged = false;
     /** 段身是否已创建 (兜底: add() 没触发就在 update() 里创建) */
     private boolean segmentsCreated = false;
 
@@ -100,23 +126,21 @@ public class SegmentWormEntity extends UnitEntity {
         lastVelocityC.set(vel);
         super.update();
 
-        // 调试: 只打印一次 (用于确认 entity 在运行)
-        if (!debugLogged) {
-            debugLogged = true;
-            System.out.println("[ARCNELIDIA-DEBUG] update() called, segments.length=" + segments.length
-                + " segmentsCreated=" + segmentsCreated);
-        }
-
         // ★ 兜底: 如果 add() 没创建段身, 在第一次 update() 时创建 ★
         if (!segmentsCreated) {
             SegmentConfig cfg = type != null ? configs.get(type.name) : null;
             if (cfg != null) {
                 try {
                     segmentSpacing = cfg.spacing;
+                    regenTime = cfg.regenTime;
+                    maxSegments = cfg.maxSegments;
+                    wobbleEnabled = cfg.wobble;
                     createSegments(cfg.count, cfg.segmentType);
                     segmentsCreated = true;
+                    System.out.println("[头部] 段身创建: " + cfg.count + "节 间距=" + cfg.spacing
+                        + " 再生=" + (regenTime > 0 ? "开" : "关") + " 晃动=" + (wobbleEnabled ? "开" : "关"));
                 } catch (Throwable t) {
-                    System.out.println("[WORM-DEBUG] update() createSegments FAILED: " + t);
+                    System.out.println("[头部] 段身创建失败: " + t);
                     t.printStackTrace();
                     segmentsCreated = true;
                 }
@@ -127,7 +151,7 @@ public class SegmentWormEntity extends UnitEntity {
                     createSegments(defaultSegmentCount, defaultSegmentType);
                     segmentsCreated = true;
                 } catch (Throwable t) {
-                    System.out.println("[WORM-DEBUG] update() createSegments (legacy) FAILED: " + t);
+                    System.out.println("[头部] 旧路径创建失败: " + t);
                     t.printStackTrace();
                     segmentsCreated = true;
                 }
@@ -252,6 +276,95 @@ public class SegmentWormEntity extends UnitEntity {
                 distributeHealth(i);
             }
         }
+
+        // ★ 再生 (PU132 WormDefaultUnit.update L81-94, regenTime > 0 时启用)
+        if (regenAvailable()) {
+            repairTime += arc.util.Time.delta;
+            // 调试: 每 10 秒打一次再生进度
+            debugRegenLogTimer += arc.util.Time.delta;
+            if (debugRegenLogTimer >= 600f) {
+                debugRegenLogTimer = 0f;
+                System.out.println("[再生] 进度: " + segments.length + "/" + maxSegments
+                    + " 计时=" + String.format("%.0f%%", repairTime / regenTime * 100));
+            }
+            if (repairTime >= regenTime) {
+                // 扣血 + 长出新段
+                float damage = (health / segments.length) / 2f;
+                damage(damage);
+                addSegment();
+                repairTime = 0f;
+                System.out.println("[再生] 新段: " + segments.length + "/" + maxSegments
+                    + " 扣血=" + (int)damage + " 剩余=" + (int)health);
+            }
+        }
+
+        // ★ 轻微晃动 (arcnelidia 启用, toxobyte 不启用)
+        // 借鉴 v154.3 UnitComp.wobble(): 振幅 0.05f, 这里用 0.02f 更轻微
+        if (wobbleEnabled) {
+            x += Mathf.sin(arc.util.Time.time + (id % 10) * 12f, 25f, 0.02f) * arc.util.Time.delta * elevation;
+            y += Mathf.cos(arc.util.Time.time + (id % 10) * 12f, 25f, 0.02f) * arc.util.Time.delta * elevation;
+        }
+    }
+
+    /** 是否可再生 (PU132 WormDefaultUnit.regenAvailable L97-99)
+     *  需 regenTime > 0, 段数未达上限 */
+    public boolean regenAvailable() {
+        return regenTime > 0f && segments.length < maxSegments;
+    }
+
+    /** 添加新段身 (PU132 WormDefaultUnit.addSegment L336-368, 简化版)
+     *  在尾部追加一个新段身, 扩展所有数组 */
+    public void addSegment() {
+        if (segments.length <= 0) return;
+        int oldLen = segments.length;
+        int newLen = oldLen + 1;
+
+        // 保存旧数组
+        SegmentUnitEntity[] oldSegs = segments;
+        Vec2[] oldPos = segPositions;
+        Vec2[] oldVel = segVelocities;
+        float[] oldRot = segRotations;
+
+        // 扩展数组
+        segments = new SegmentUnitEntity[newLen];
+        segPositions = new Vec2[newLen];
+        segVelocities = new Vec2[newLen];
+        segRotations = new float[newLen];
+
+        // 复制旧数据
+        for (int i = 0; i < oldLen; i++) {
+            segments[i] = oldSegs[i];
+            segPositions[i] = oldPos[i];
+            segVelocities[i] = oldVel[i];
+            segRotations[i] = oldRot[i];
+        }
+
+        // 旧尾部段身改为普通段身 (不再用 tail 贴图)
+        if (segments[oldLen - 1] != null) {
+            segments[oldLen - 1].isTail = false;
+        }
+
+        // 新段身: 复用旧尾部的 type (segmentType), 创建实例
+        mindustry.type.UnitType segType = segments[oldLen - 1] != null ? segments[oldLen - 1].type : defaultSegmentType;
+        SegmentUnitEntity newSeg = (SegmentUnitEntity) segType.create(team);
+        // 新段身位置: 旧尾部后方 segmentSpacing 处
+        Vec2 oldTailPos = oldPos[oldLen - 1];
+        float oldTailRot = oldRot[oldLen - 1];
+        Vec2 newPos = new Vec2();
+        newPos.trns(oldTailRot + 180f, segmentSpacing).add(oldTailPos);
+        newSeg.set(newPos.x, newPos.y);
+        newSeg.rotation = oldTailRot;
+        newSeg.head = this;
+        newSeg.segmentIndex = oldLen;  // 新段索引
+        newSeg.isTail = true;  // 新段是尾部
+        newSeg.texturePrefix = type.name + "-";
+        newSeg.add();
+
+        // 新数组初始化
+        segPositions[oldLen] = newPos;
+        segVelocities[oldLen] = new Vec2();
+        segRotations[oldLen] = oldTailRot;
+        segments[oldLen] = newSeg;
     }
 
     /** 受伤降低血量分布效率 (PU132 WormDefaultUnit.damage L64-67) */
@@ -315,20 +428,39 @@ public class SegmentWormEntity extends UnitEntity {
 
     /**
      * 速度传播: 让段身继承头部速度, 产生丝滑惯性 (拖尾感)
-     * (PU132 WormDefaultUnit.updateSegmentVLocal L101-124, 1:1 复刻)
+     * (PU132 WormDefaultUnit.updateSegmentVLocal L101-124, 改良版)
      *
      * 每段速度 = max(前一段速度, 自己速度, 头部 3 帧平均速度)
      * 方向 = 段身 → 前一段 (跟在头部后面)
+     *
+     * ★ 静止抖动修复: 头部速度低于阈值时, 不传播速度, 段身 segV 快速衰减到 0
+     * 之前 bug: trueVel = max(velocity, segV.len(), headVel), 头部静止时 segV.len() 仍有值
+     *          导致段身持续移动产生抖动
      *
      * vec = lastVelocityC (上一帧头部速度)
      * lastVelocityD = 上上帧头部速度
      */
     protected void updateSegmentVLocal(Vec2 vec) {
         int len = segments.length;
+        // ★ 静止阈值: 头部速度低于此值视为静止, 段身速度快速衰减
+        float stillThreshold = type.speed * 0.05f;
+        // 头部 3 帧速度平均
+        Tmp.v3.set(vel).add(vec).add(lastVelocityD).scl(1f / 3f);
+        float headAvgVel = Tmp.v3.len();
+        boolean headStill = headAvgVel < stillThreshold;
+
         for (int i = 0; i < len; i++) {
             Vec2 seg = segPositions[i];
             Vec2 segV = segVelocities[i];
             segV.limit(type.speed);
+
+            // ★ 静止时: 段身速度直接衰减 30%/帧 (避免残留速度导致抖动)
+            if (headStill) {
+                segV.scl(0.7f);
+                segments[i].vel.set(segV);
+                continue;
+            }
+
             // 方向: 段身指向前一段 (i=0 时指向头部)
             float angleB = i != 0
                 ? Angles.angle(seg.x, seg.y, segPositions[i - 1].x, segPositions[i - 1].y)
@@ -336,11 +468,8 @@ public class SegmentWormEntity extends UnitEntity {
             // 速度大小: 取前一段速度 (i=0 时取头部上一帧速度)
             float velocity = i != 0 ? segVelocities[i - 1].len() : vec.len();
 
-            // 头部 3 帧速度平均 (当前 + 上一帧 + 上上帧) / 3
-            Tmp.v1.set(vel).add(vec).add(lastVelocityD).scl(1f / 3f);
-
             // 真实速度 = 三者最大值
-            float trueVel = Math.max(Math.max(velocity, segV.len()), Tmp.v1.len());
+            float trueVel = Math.max(Math.max(velocity, segV.len()), headAvgVel);
             Tmp.v1.trns(angleB, trueVel);
             segV.add(Tmp.v1);
             segV.setLength(trueVel);
@@ -437,16 +566,27 @@ public class SegmentWormEntity extends UnitEntity {
         }
         SegmentUnitEntity[] newSegs = new SegmentUnitEntity[newLen];
         Vec2[] newPos = new Vec2[newLen];
+        Vec2[] newVel = new Vec2[newLen];
+        float[] newRot = new float[newLen];
         int idx = 0;
         for (int i = 0; i < segments.length; i++) {
             if (segments[i] != null && segments[i] != seg && segments[i].isAdded()) {
                 newSegs[idx] = segments[i];
                 newPos[idx] = segPositions[i];
+                newVel[idx] = segVelocities[i];
+                newRot[idx] = segRotations[i];
+                // 更新段身索引 (避免 z 层级跳变)
+                newSegs[idx].segmentIndex = idx;
+                // 标记新尾部 (最后一节)
+                newSegs[idx].isTail = (idx == newLen - 1);
                 idx++;
             }
         }
         segments = newSegs;
         segPositions = newPos;
+        segVelocities = newVel;
+        segRotations = newRot;
+        System.out.println("[头部] 段身死亡: #" + seg.segmentIndex + " 剩余=" + segments.length);
     }
 
     /** 创建段身 (在 add() 时调用一次) */
@@ -484,11 +624,16 @@ public class SegmentWormEntity extends UnitEntity {
             SegmentConfig cfg = type != null ? configs.get(type.name) : null;
             if (cfg != null) {
                 segmentSpacing = cfg.spacing;
+                regenTime = cfg.regenTime;
+                maxSegments = cfg.maxSegments;
+                wobbleEnabled = cfg.wobble;
                 try {
                     createSegments(cfg.count, cfg.segmentType);
                     segmentsCreated = true;
+                    System.out.println("[头部] 启动: " + type.name + " 段身=" + cfg.count + "节"
+                        + " 再生=" + (regenTime > 0 ? "开" : "关") + " 晃动=" + (wobbleEnabled ? "开" : "关"));
                 } catch (Throwable t) {
-                    System.out.println("[WORM-DEBUG] add() createSegments FAILED: " + t);
+                    System.out.println("[头部] 段身创建失败: " + t);
                     t.printStackTrace();
                     segmentsCreated = true;
                 }
@@ -498,7 +643,7 @@ public class SegmentWormEntity extends UnitEntity {
                     createSegments(defaultSegmentCount, defaultSegmentType);
                     segmentsCreated = true;
                 } catch (Throwable t) {
-                    System.out.println("[WORM-DEBUG] add() createSegments (legacy) FAILED: " + t);
+                    System.out.println("[头部] 旧路径创建失败: " + t);
                     t.printStackTrace();
                     segmentsCreated = true;
                 }
