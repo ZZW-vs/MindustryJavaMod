@@ -51,6 +51,10 @@ public class SegmentUnitEntity extends UnitEntity {
         // ★ 不调用 super.update() 的移动/AI 部分 ★
         // 只保留必要的更新: 状态效果、武器、血量
 
+        // ★ 关键: 段身 vel 必须每帧清零, 否则 physics=true 会让段身推动头部移动
+        // (arcnelidia 段身没武器, 之前不进武器循环导致 vel 残留, 推动头部"待机自己向前走")
+        vel.setZero();
+
         // 调试: 只打一次, 确认段身 update 在跑
         if (!debugUpdateLogged) {
             debugUpdateLogged = true;
@@ -89,7 +93,6 @@ public class SegmentUnitEntity extends UnitEntity {
                     mounts[i].rotate = headShooting;
                     // v154.3 Weapon.update(Unit, WeaponMount) 是 public, 可直接调用
                     mounts[i].weapon.update(this, mounts[i]);
-                    vel.setZero();
                 }
             }
         }
@@ -118,6 +121,26 @@ public class SegmentUnitEntity extends UnitEntity {
     @Override
     public boolean serialize() {
         return false;
+    }
+
+    /**
+     * ★ 分裂模式 (splittable=true): 段身有独立血量, 自己承受伤害, 死亡时触发分裂
+     * ★ 非分裂模式 (splittable=false): 伤害转移给头部 (PU132 WormComp.damage L176-178)
+     *
+     * 借鉴 PU132 WormComp.damage:
+     * if(!isHead() && head != null && !((UnityUnitType)type).splittable){
+     *     head.damage(amount); return;
+     * }
+     */
+    @Override
+    public void damage(float amount) {
+        if (head != null && head.isAdded() && !head.splittable) {
+            // 非分裂模式: 伤害转移给头部
+            head.damage(amount);
+            return;
+        }
+        // 分裂模式: 自己承受伤害
+        super.damage(amount);
     }
 
     @Override
@@ -155,12 +178,29 @@ public class SegmentUnitEntity extends UnitEntity {
     }
 
     /**
-     * ★ 关键: 段身重写 controller(), 把玩家控制转给头部 (借鉴 PU132 WormSegmentUnit.controller L107-115)
+     * ★ 关键1: 段身重写 controller() 无参方法, 返回头部的 controller
      *
-     * 这是 PU132 "选择任意段身都能操控整个单位"的核心实现:
-     * - 玩家点击段身时, 游戏会调用 unit.controller(player)
-     * - 段身把 controller 转给 head, head 持有 Player controller
-     * - 段身自己不持有 Player controller (避免段身独立移动)
+     * v154.3 指挥模式 (CommandAI) 下令时 (InputHandler L314):
+     *   if(unit.controller() instanceof CommandAI ai) ai.commandPosition(pos)
+     * 如果段身返回自己的 controller, targetPos 会设在段身上, 段身不移动
+     * 重写后返回头部的 controller, 下令时设置头部的 targetPos, 头部移动 ✓
+     *
+     * ★ 这是 "选中段身也能控制整体移动" 的核心实现
+     */
+    @Override
+    public mindustry.entities.units.UnitController controller() {
+        if (head != null && head.isAdded()) {
+            return head.controller();
+        }
+        return super.controller();
+    }
+
+    /**
+     * ★ 关键2: 段身重写 controller(UnitController next), 把玩家控制转给头部
+     * (借鉴 PU132 WormSegmentUnit.controller L107-115)
+     *
+     * 玩家进入段身 (controller(player)) 时, 把 Player 转给头部
+     * 段身自己不持有 Player controller (避免段身独立移动)
      */
     @Override
     public void controller(mindustry.entities.units.UnitController next) {

@@ -35,6 +35,54 @@ public class SegmentWormEntity extends UnitEntity {
         return ZEntityRegister.classId(SegmentWormEntity.class);
     }
 
+    /**
+     * ★ 关键: 头部不和自己段身碰撞 (借鉴 SegmentUnitEntity.collides)
+     * 不重写会导致头部被自己段身推开, 待机时单位自己向前移动
+     */
+    @Override
+    public boolean collides(mindustry.gen.Hitboxc other) {
+        if (other instanceof SegmentUnitEntity seg && seg.head == this) return false;
+        return super.collides(other);
+    }
+
+    /**
+     * 是否处于待机状态 (无目标且无命令, 应静止)
+     * ★ v154.3 玩家队伍用 CommandAI 不用 WormAI, 所以不能依赖 WormAI.isIdle
+     *
+     * 三种 controller 情况:
+     *   1. Player (玩家进入单位): isPlayer()=true, 不静止
+     *   2. CommandAI (玩家选中单位但不进入, 玩家队伍默认): 用 targetPos 移动, 不是 target
+     *      → 用 hasCommand() (public, = targetPos != null) 判断, 有命令=玩家在指挥移动, 不静止
+     *   3. AIController (敌方/刷怪, 如 FlyingAI/GroundAI): 用 target 字段, target==null=待机
+     *      target 是 protected, 用反射访问
+     *
+     * ★ 关键修复: 之前只检查 target==null, 但 CommandAI 用 targetPos 不用 target
+     *   导致玩家给单位下令移动时 (target==null 但 targetPos!=null) 被误判为待机, vel 被清零
+     */
+    public boolean isIdle() {
+        // 玩家操控 (进入单位) 时不静止
+        if (isPlayer()) return false;
+        mindustry.entities.units.UnitController c = controller();
+        // ★ CommandAI (玩家选中单位但不进入): 检查 hasCommand() 而非 target
+        //   hasCommand() 返回 targetPos != null, 有命令=玩家在指挥单位移动, 不能清零 vel
+        if (c instanceof mindustry.ai.types.CommandAI cmd) {
+            return !cmd.hasCommand();
+        }
+        // ★ 普通 AIController (敌方/刷怪): 检查 target==null
+        //   CommandAI 也继承 AIController, 但已在上面的分支处理, 这里只处理非 CommandAI 的
+        if (c instanceof mindustry.entities.units.AIController ai) {
+            try {
+                java.lang.reflect.Field f = mindustry.entities.units.AIController.class.getDeclaredField("target");
+                f.setAccessible(true);
+                Object t = f.get(ai);
+                return t == null;
+            } catch (Throwable e) {
+                return false;
+            }
+        }
+        return false;
+    }
+
     /** 段身列表 (顺序: 头部后方第一段到最后一段) */
     public SegmentUnitEntity[] segments = new SegmentUnitEntity[0];
     /** 段身位置缓存 (PU132 segments[], 用于物理模拟) */
@@ -79,6 +127,16 @@ public class SegmentWormEntity extends UnitEntity {
     /** 是否启用轻微晃动 (arcnelidia=true 轻微晃动, toxobyte=false 完全静止)
      *  借鉴 v154.3 UnitComp.wobble(), 但振幅更小 (0.02f vs 原版 0.05f) */
     public boolean wobbleEnabled = false;
+    /** 是否启用分裂 (PU132 splittable, 段身有独立血量, 死亡时虫子分裂) */
+    public boolean splittable = false;
+    /** 是否启用链式合并 (PU132 chainable, 两条同类型虫子靠近时合并) */
+    public boolean chainable = false;
+    /** 链式合并扫描计时器 (每 5 秒扫描一次附近尾部虫子) */
+    protected float chainScanTimer = 0f;
+    /** 分裂音效 (PU132 默认 Sounds.door) */
+    public static arc.audio.Sound splitSound = null;
+    /** 链式合并音效 (PU132 默认 Sounds.door) */
+    public static arc.audio.Sound chainSound = null;
 
     /** 段身配置 (在 Z_Units.load 中注册, 支持多个分段单位) */
     public static class SegmentConfig {
@@ -91,16 +149,37 @@ public class SegmentWormEntity extends UnitEntity {
         public final int maxSegments;
         /** 是否启用轻微晃动 (arcnelidia=true, toxobyte=false) */
         public final boolean wobble;
+        /** 是否启用分裂 (PU132 splittable, 段身有独立血量, 死亡时虫子分裂)
+         *  true: 段身独立承受伤害, 中间段身死亡时后半段变成新虫子
+         *  false: 段身伤害转移给头部 (默认) */
+        public final boolean splittable;
+        /** 是否启用链式合并 (PU132 chainable, 两条同类型虫子靠近时合并)
+         *  true: 头部每 5 秒扫描附近尾部虫子, 合并成更长虫子
+         *  false: 不合并 (默认) */
+        public final boolean chainable;
+        /** 段身朝向相对父段的最大角度差 (度, 154.3 segmentRotationRange)
+         *  调小 = 段身更硬 (转向幅度小), 调大 = 段身更软 (转向幅度大)
+         *  默认 25f: arcnelidia 9 段够用
+         *  toxobyte 25 段用 35f: 转弯时段身能转更多, 避免位置偏离 ideal 导致卡顿 */
+        public final float segmentRotationRange;
         public SegmentConfig(mindustry.type.UnitType t, int c, float s) {
-            this(t, c, s, 0f, 0, false);
+            this(t, c, s, 0f, 0, false, false, false);
         }
         public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments) {
-            this(t, c, s, regenTime, maxSegments, false);
+            this(t, c, s, regenTime, maxSegments, false, false, false);
         }
         public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble) {
+            this(t, c, s, regenTime, maxSegments, wobble, false, false);
+        }
+        public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble, boolean splittable, boolean chainable) {
+            this(t, c, s, regenTime, maxSegments, wobble, splittable, chainable, 25f);
+        }
+        /** 带段身转角范围的新构造函数 (toxobyte 用 35f, arcnelidia 用默认 25f) */
+        public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble, boolean splittable, boolean chainable, float segmentRotationRange) {
             segmentType = t; count = c; spacing = s;
             this.regenTime = regenTime; this.maxSegments = maxSegments;
-            this.wobble = wobble;
+            this.wobble = wobble; this.splittable = splittable; this.chainable = chainable;
+            this.segmentRotationRange = segmentRotationRange;
         }
     }
     /** 按 UnitType.name 注册的段身配置 (key = 头部名字, 如 "arcnelidia" / "toxobyte") */
@@ -121,10 +200,28 @@ public class SegmentWormEntity extends UnitEntity {
 
     @Override
     public void update() {
+        // ★ 待机静止保障 (关键!):
+        // v154.3 VelComp.update() 用 @MethodPriority(-1) 在所有 update 之前执行,
+        // 会用 vel 移动位置 (VelComp.java L28: move(vel.x * delta, vel.y * delta))
+        // 所以必须在 super.update() 之前清零 vel, 否则单位会以"上一帧残留 vel"持续平移
+        //
+        // ★ 根本原因: v154.3 玩家队伍用 CommandAI 而非 aiController (UnitType.java L280)
+        //   playerControllable=true && team.isAI()=false → 用 CommandAI 不用 WormAI
+        //   所以 WormAI.updateMovement 从未被调用, isIdle 标志没用
+        //   修复: 直接检查 controller.target==null, 不依赖 WormAI
+        if (isIdle()) {
+            vel.setZero();
+        }
+
         // PU132 WormDefaultUnit.update L71-72: 保存速度历史 (用于 updateSegmentVLocal 3 帧平均)
         lastVelocityD.set(lastVelocityC);
         lastVelocityC.set(vel);
         super.update();
+
+        // ★ 待机静止保障 2: super.update() 后物理系统可能给 vel 加了值, 再次清零
+        if (isIdle()) {
+            vel.setZero();
+        }
 
         // ★ 兜底: 如果 add() 没创建段身, 在第一次 update() 时创建 ★
         if (!segmentsCreated) {
@@ -135,10 +232,15 @@ public class SegmentWormEntity extends UnitEntity {
                     regenTime = cfg.regenTime;
                     maxSegments = cfg.maxSegments;
                     wobbleEnabled = cfg.wobble;
+                    splittable = cfg.splittable;
+                    chainable = cfg.chainable;
+                    segmentRotationRange = cfg.segmentRotationRange;
                     createSegments(cfg.count, cfg.segmentType);
                     segmentsCreated = true;
                     System.out.println("[头部] 段身创建: " + cfg.count + "节 间距=" + cfg.spacing
-                        + " 再生=" + (regenTime > 0 ? "开" : "关") + " 晃动=" + (wobbleEnabled ? "开" : "关"));
+                        + " 转角=" + segmentRotationRange
+                        + " 再生=" + (regenTime > 0 ? "开" : "关") + " 晃动=" + (wobbleEnabled ? "开" : "关")
+                        + " 分裂=" + (splittable ? "开" : "关") + " 合并=" + (chainable ? "开" : "关"));
                 } catch (Throwable t) {
                     System.out.println("[头部] 段身创建失败: " + t);
                     t.printStackTrace();
@@ -271,7 +373,8 @@ public class SegmentWormEntity extends UnitEntity {
         healthDistributionEfficiency = Mathf.clamp(healthDistributionEfficiency + (arc.util.Time.delta / 160f));
 
         // 血量分布: 每段单独计算 (3 邻居局部平均, PU132 WormDefaultUnit.distributeHealth L179-202)
-        if (healthDistributionRate > 0) {
+        // ★ splittable=true 时段身有独立血量, 不进行血量分布 (PU132 WormComp.update L249-258)
+        if (healthDistributionRate > 0 && !splittable) {
             for (int i = 0; i < segments.length; i++) {
                 distributeHealth(i);
             }
@@ -303,6 +406,15 @@ public class SegmentWormEntity extends UnitEntity {
         if (wobbleEnabled) {
             x += Mathf.sin(arc.util.Time.time + (id % 10) * 12f, 25f, 0.02f) * arc.util.Time.delta * elevation;
             y += Mathf.cos(arc.util.Time.time + (id % 10) * 12f, 25f, 0.02f) * arc.util.Time.delta * elevation;
+        }
+
+        // ★ 链式合并扫描 (PU132 WormComp.updatePost L341-350, 每 5 秒扫描一次)
+        if (chainable && segments.length > 0) {
+            chainScanTimer += arc.util.Time.delta;
+            if (chainScanTimer >= 300f) {  // 5 秒
+                chainScanTimer = 0f;
+                tryChainMerge();
+            }
         }
     }
 
@@ -454,10 +566,10 @@ public class SegmentWormEntity extends UnitEntity {
             Vec2 segV = segVelocities[i];
             segV.limit(type.speed);
 
-            // ★ 静止时: 段身速度直接衰减 30%/帧 (避免残留速度导致抖动)
+            // ★ 静止时: 段身速度直接归零 (避免残留速度导致微震/漂移)
             if (headStill) {
-                segV.scl(0.7f);
-                segments[i].vel.set(segV);
+                segV.setZero();
+                segments[i].vel.setZero();
                 continue;
             }
 
@@ -470,6 +582,9 @@ public class SegmentWormEntity extends UnitEntity {
 
             // 真实速度 = 三者最大值
             float trueVel = Math.max(Math.max(velocity, segV.len()), headAvgVel);
+            // ★ 限制段身速度不超过头部速度, 避免段身冲过理想位置然后被拉回造成抖动
+            // (toxobyte 25 段, 段间距 16.25 小, 段身密集更容易抖)
+            trueVel = Math.min(trueVel, headAvgVel * 1.2f);
             Tmp.v1.trns(angleB, trueVel);
             segV.add(Tmp.v1);
             segV.setLength(trueVel);
@@ -557,36 +672,192 @@ public class SegmentWormEntity extends UnitEntity {
     //    段身 type.region 在 SegmentUnitEntity.draw() 中切换为 segment/tail 贴图,
     //    影子会用切换后的贴图, 与头部影子一起由 UnitType 自动绘制
 
-    /** 段身死亡通知 (由 SegmentUnitEntity.kill 调用) */
+    /** 段身死亡通知 (由 SegmentUnitEntity.kill 调用)
+     *  ★ 分裂逻辑 (PU132 WormComp.remove L397-424):
+     *  - splittable=true 且中间段身死亡: 后半段创建为新虫子
+     *  - splittable=true 且尾部段身死亡: 直接移除尾部
+     *  - splittable=false: 伤害已转移给头部, 段身死亡只移除自己 */
     public void onSegmentDied(SegmentUnitEntity seg) {
-        // 从列表中移除死段, 数组重新压缩
-        int newLen = 0;
-        for (SegmentUnitEntity s : segments) {
-            if (s != null && s != seg && s.isAdded()) newLen++;
+        int deadIdx = -1;
+        for (int i = 0; i < segments.length; i++) {
+            if (segments[i] == seg) { deadIdx = i; break; }
+        }
+        if (deadIdx < 0) return;
+
+        // ★ 分裂: 中间段身死亡, 后半段创建为新虫子 (PU132 splittable)
+        if (splittable && deadIdx < segments.length - 1) {
+            // 后半段段身 [deadIdx+1, end)
+            int tailLen = segments.length - deadIdx - 1;
+            SegmentUnitEntity[] tailSegs = new SegmentUnitEntity[tailLen];
+            Vec2[] tailPos = new Vec2[tailLen];
+            Vec2[] tailVel = new Vec2[tailLen];
+            float[] tailRot = new float[tailLen];
+            for (int i = 0; i < tailLen; i++) {
+                tailSegs[i] = segments[deadIdx + 1 + i];
+                tailPos[i] = segPositions[deadIdx + 1 + i];
+                tailVel[i] = segVelocities[deadIdx + 1 + i];
+                tailRot[i] = segRotations[deadIdx + 1 + i];
+            }
+            // 创建新头部 (与原头部同类型)
+            try {
+                SegmentWormEntity newHead = (SegmentWormEntity) type.create(team);
+                newHead.set(tailSegs[0].x, tailSegs[0].y);
+                newHead.rotation = tailRot[0];
+                newHead.segmentsCreated = true;  // 跳过自动创建段身
+                newHead.splittable = true;
+                newHead.chainable = chainable;
+                newHead.segmentSpacing = segmentSpacing;
+                newHead.regenTime = regenTime;
+                newHead.maxSegments = maxSegments;
+                newHead.wobbleEnabled = wobbleEnabled;
+                newHead.add();
+                // 转移后半段段身给新头部
+                newHead.segments = tailSegs;
+                newHead.segPositions = tailPos;
+                newHead.segVelocities = tailVel;
+                newHead.segRotations = tailRot;
+                for (int i = 0; i < tailLen; i++) {
+                    tailSegs[i].head = newHead;
+                    tailSegs[i].segmentIndex = i;
+                    tailSegs[i].isTail = (i == tailLen - 1);
+                }
+                // 播放分裂音效
+                if (splitSound != null) splitSound.at(this);
+                System.out.println("[分裂] 中间段#" + deadIdx + "死亡, 后半段" + tailLen + "节成为新虫子");
+            } catch (Throwable t) {
+                System.out.println("[分裂] 创建新头部失败: " + t);
+                t.printStackTrace();
+            }
+        } else if (splittable && splitSound != null) {
+            // 尾部段身死亡, 播放分裂音效
+            splitSound.at(this);
+        }
+
+        // 从当前头部列表中移除死段及后半段 (分裂时后半段已转移给新头部)
+        int newLen = splittable ? deadIdx : 0;
+        if (!splittable) {
+            // 非分裂模式: 保留所有存活段身
+            for (SegmentUnitEntity s : segments) {
+                if (s != null && s != seg && s.isAdded()) newLen++;
+            }
         }
         SegmentUnitEntity[] newSegs = new SegmentUnitEntity[newLen];
         Vec2[] newPos = new Vec2[newLen];
         Vec2[] newVel = new Vec2[newLen];
         float[] newRot = new float[newLen];
         int idx = 0;
-        for (int i = 0; i < segments.length; i++) {
-            if (segments[i] != null && segments[i] != seg && segments[i].isAdded()) {
-                newSegs[idx] = segments[i];
-                newPos[idx] = segPositions[i];
-                newVel[idx] = segVelocities[i];
-                newRot[idx] = segRotations[i];
-                // 更新段身索引 (避免 z 层级跳变)
-                newSegs[idx].segmentIndex = idx;
-                // 标记新尾部 (最后一节)
-                newSegs[idx].isTail = (idx == newLen - 1);
-                idx++;
+        if (splittable) {
+            // 分裂模式: 只保留死段之前的段身 [0, deadIdx)
+            for (int i = 0; i < deadIdx; i++) {
+                if (segments[i] != null && segments[i].isAdded()) {
+                    newSegs[idx] = segments[i];
+                    newPos[idx] = segPositions[i];
+                    newVel[idx] = segVelocities[i];
+                    newRot[idx] = segRotations[i];
+                    newSegs[idx].segmentIndex = idx;
+                    newSegs[idx].isTail = (idx == newLen - 1);
+                    idx++;
+                }
+            }
+        } else {
+            // 非分裂模式: 保留所有存活段身
+            for (int i = 0; i < segments.length; i++) {
+                if (segments[i] != null && segments[i] != seg && segments[i].isAdded()) {
+                    newSegs[idx] = segments[i];
+                    newPos[idx] = segPositions[i];
+                    newVel[idx] = segVelocities[i];
+                    newRot[idx] = segRotations[i];
+                    newSegs[idx].segmentIndex = idx;
+                    newSegs[idx].isTail = (idx == newLen - 1);
+                    idx++;
+                }
             }
         }
         segments = newSegs;
         segPositions = newPos;
         segVelocities = newVel;
         segRotations = newRot;
-        System.out.println("[头部] 段身死亡: #" + seg.segmentIndex + " 剩余=" + segments.length);
+        System.out.println("[头部] 段身死亡: #" + deadIdx + " 剩余=" + segments.length
+            + (splittable && deadIdx < segments.length + 1 ? " 已分裂" : ""));
+    }
+
+    /**
+     * 链式合并扫描 (PU132 WormComp.updatePost L341-350)
+     * 每 5 秒扫描附近, 找到同类型尾部虫子合并
+     */
+    protected void tryChainMerge() {
+        if (maxSegments > 0 && segments.length >= maxSegments) return;  // 已达上限
+        if (segments.length == 0) return;
+        // 扫描头部前方 segmentSpacing/2 范围内的同类型尾部虫子
+        mindustry.entities.Units.nearby(team, x, y, segmentSpacing * 2f, u -> {
+            if (!(u instanceof SegmentWormEntity)) return;
+            SegmentWormEntity other = (SegmentWormEntity) u;
+            if (other == this) return;
+            if (other.type != type) return;  // 同类型
+            if (other.segments.length == 0) return;  // 对方有段身
+            // 对方尾部段身
+            SegmentUnitEntity otherTail = other.segments[other.segments.length - 1];
+            // 距离检查
+            if (!within(otherTail, segmentSpacing * 1.2f)) return;
+            // 总段数检查
+            int totalLen = segments.length + other.segments.length;
+            if (maxSegments > 0 && totalLen >= maxSegments) return;
+            // 合并: 把对方的段身追加到自己后面
+            mergeFrom(other);
+        });
+    }
+
+    /**
+     * 把 other 的所有段身合并到自己后面 (PU132 WormComp.connect L62-81)
+     * 合并后 other 头部移除 (段身全部转移给 this)
+     */
+    public void mergeFrom(SegmentWormEntity other) {
+        int myLen = segments.length;
+        int otherLen = other.segments.length;
+        int newLen = myLen + otherLen;
+
+        SegmentUnitEntity[] newSegs = new SegmentUnitEntity[newLen];
+        Vec2[] newPos = new Vec2[newLen];
+        Vec2[] newVel = new Vec2[newLen];
+        float[] newRot = new float[newLen];
+
+        // 复制自己的段身
+        for (int i = 0; i < myLen; i++) {
+            newSegs[i] = segments[i];
+            newPos[i] = segPositions[i];
+            newVel[i] = segVelocities[i];
+            newRot[i] = segRotations[i];
+        }
+        // 追加 other 的段身
+        for (int i = 0; i < otherLen; i++) {
+            SegmentUnitEntity s = other.segments[i];
+            newSegs[myLen + i] = s;
+            newPos[myLen + i] = other.segPositions[i];
+            newVel[myLen + i] = other.segVelocities[i];
+            newRot[myLen + i] = other.segRotations[i];
+            s.head = this;  // 段身归属改为 this
+            s.segmentIndex = myLen + i;
+            s.isTail = (myLen + i == newLen - 1);  // 最后一节是尾部
+        }
+        // 旧尾部的 isTail 改为 false (不再是尾部)
+        if (myLen > 0) {
+            newSegs[myLen - 1].isTail = false;
+        }
+        segments = newSegs;
+        segPositions = newPos;
+        segVelocities = newVel;
+        segRotations = newRot;
+
+        // 移除 other 头部 (段身已转移, other 不再持有段身)
+        other.segments = new SegmentUnitEntity[0];
+        other.segPositions = null;
+        other.segVelocities = null;
+        other.segRotations = null;
+        other.remove();
+
+        // 播放合并音效
+        if (chainSound != null) chainSound.at(this);
+        System.out.println("[合并] " + type.name + " 吸收对方" + otherLen + "节, 总段数=" + newLen);
     }
 
     /** 创建段身 (在 add() 时调用一次) */
@@ -627,11 +898,14 @@ public class SegmentWormEntity extends UnitEntity {
                 regenTime = cfg.regenTime;
                 maxSegments = cfg.maxSegments;
                 wobbleEnabled = cfg.wobble;
+                splittable = cfg.splittable;
+                chainable = cfg.chainable;
                 try {
                     createSegments(cfg.count, cfg.segmentType);
                     segmentsCreated = true;
                     System.out.println("[头部] 启动: " + type.name + " 段身=" + cfg.count + "节"
-                        + " 再生=" + (regenTime > 0 ? "开" : "关") + " 晃动=" + (wobbleEnabled ? "开" : "关"));
+                        + " 再生=" + (regenTime > 0 ? "开" : "关") + " 晃动=" + (wobbleEnabled ? "开" : "关")
+                        + " 分裂=" + (splittable ? "开" : "关") + " 合并=" + (chainable ? "开" : "关"));
                 } catch (Throwable t) {
                     System.out.println("[头部] 段身创建失败: " + t);
                     t.printStackTrace();

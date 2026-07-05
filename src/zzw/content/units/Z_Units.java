@@ -57,9 +57,15 @@ public class Z_Units {
             // ★ 隐藏段身 (不出现在数据库/Spawner, 玩家无法单独召唤)
             hidden = true;
 
-            // ★ 段身保留物理碰撞 (PU132 WormSegmentUnit 默认 physics=true)
-            // 其他单位不能穿过段身, 段身之间通过 collides() 重写过滤
-            physics = true;
+            // ★ 段身不计入单位上限 (PU132 WormSegmentUnit.isCounted 返回 false)
+            // v154.3 用 useUnitCap=false 而非 isCounted (旧版字段)
+            // 这样段身不占核心单位数量上限, 只有头部占上限
+            useUnitCap = false;
+
+            // ★ 段身关闭物理碰撞 (physics=false), 避免撞墙时被弹开导致尾部乱甩
+            // 段身位置完全由头部 syncToHead 控制, 不应受物理系统影响
+            // 其他单位是否能穿过段身由 collides() 决定 (双向)
+            physics = false;
             hittable = true;
 
             // 段身不需要武器
@@ -81,9 +87,10 @@ public class Z_Units {
             engineSize = -1f;
             range = 210f;
             faceTarget = false;
-            // ★ 关闭 wobble (PU132 原版静止时不晃动)
+            // ★ arcnelidia 关闭原版 wobble (振幅 0.05f 太大), 用自定义 wobbleEnabled (振幅 0.02f)
             wobble = false;
-            // ★ drag 增大 (用户要求移动阻力稍大, 防止停止后滑行)
+            // ★ drag 用飞行单位合理值 (v154.3 默认 0.3f 对飞行单位太大, 速度衰减太快显得僵硬)
+            // 原版飞行单位 drag 通常 0.012f ~ 0.18f
             drag = 0.018f;
 
             // 用自定义 Entity (SegmentWormEntity)
@@ -169,7 +176,11 @@ public class Z_Units {
             faceTarget = false;
             constructor = SegmentUnitEntity::create;
             hidden = true;
-            physics = true;
+            // ★ 段身不计入单位上限 (PU132 WormSegmentUnit.isCounted 返回 false)
+            // v154.3 用 useUnitCap=false 而非 isCounted (旧版字段)
+            useUnitCap = false;
+            // ★ 段身关闭物理碰撞, 避免撞墙尾部乱甩 (位置由头部控制)
+            physics = false;
             hittable = true;
             // ★ 关闭 wobble (飞行单位默认会小幅晃动, PU132 原版是静止的)
             wobble = false;
@@ -211,9 +222,10 @@ public class Z_Units {
             engineSize = -1f;
             range = 130f;           // PU132 武器 length=130
             faceTarget = false;
-            // ★ 关闭 wobble (PU132 原版静止时不晃动)
+            // ★ 关闭 wobble (PU132 原版 toxobyte 静止时不晃动)
             wobble = false;
-            // ★ drag 增大 (用户要求移动阻力稍大, 防止停止后滑行)
+            // ★ drag 用飞行单位合理值 (v154.3 默认 0.3f 对飞行单位太大, 速度衰减太快显得僵硬)
+            // 原版飞行单位 drag 通常 0.012f ~ 0.18f
             drag = 0.025f;
             // ★ PU132: circleTarget=true, omniMovement=false
             // 154.3 FlyingAI 内置 circleAttack, 设 circleTarget=true 即自动环绕
@@ -253,8 +265,19 @@ public class Z_Units {
         // ★ key 用 type.name (v154.3 mod 单位的 name 带 mod 前缀, 如 "create-toxobyte")
         // PU132: segmentLength=25, segmentOffset=16.25f
         // PU132: regenTime=15*60f (15秒长一节), maxSegments 默认上限 25
+        // PU132: splittable=true (段身有独立血量, 死亡时虫子分裂)
+        // ★ chainable=true (用户要求实现链式合并, 两条虫子靠近时合并)
+        // ★ segmentRotationRange=35f (toxobyte 25 段, 25f 太严格转弯卡顿, 35f 更顺畅)
         SegmentWormEntity.configs.put(toxobyte.name,
-            new SegmentWormEntity.SegmentConfig(toxobyteSegment, 25, 16.25f, 15f * 60f, 25));
+            new SegmentWormEntity.SegmentConfig(toxobyteSegment, 25, 16.25f, 15f * 60f, 25, false, true, true, 35f));
+
+        // ★ 初始化分裂/合并音效 (PU132 默认 Sounds.door)
+        try {
+            SegmentWormEntity.splitSound = mindustry.gen.Sounds.door;
+            SegmentWormEntity.chainSound = mindustry.gen.Sounds.door;
+        } catch (Throwable t) {
+            System.out.println("[Z_Units] 音效初始化失败: " + t);
+        }
 
         System.out.println("[Z_Units] load done, configs=" + SegmentWormEntity.configs.keySet());
     }
