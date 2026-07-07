@@ -28,7 +28,9 @@ public class Z_Units {
         arcnelidia,            // 头部
         arcnelidiaSegment,     // 段身
         toxobyte,              // 头部 (PU132 瘟疫虫, 25 段)
-        toxobyteSegment;       // 段身
+        toxobyteSegment,       // 段身
+        catenapede,            // 头部 (PU132 Catenapede, 15 段)
+        catenapedeSegment;     // 段身
 
     public static void load() {
         // ★ 关键: 注册自定义 Entity 到 EntityMapping.idMap, 否则 v154.3 的 UnitType.init() 会失败 ★
@@ -295,6 +297,131 @@ public class Z_Units {
         SegmentWormEntity.configs.put(toxobyte.name,
             new SegmentWormEntity.SegmentConfig(toxobyteSegment, 25, 16.25f, 15f * 60f, 25, false, true, true, 35f, 8f));
 
+        // ═══════════════════════════════════════════════════════════
+        //  Catenapede (PU132 吸血虫)
+        //  - 15 段 (segmentLength=15)
+        //  - segmentOffset=31f, hitSize=30f
+        //  - angleLimit=25f, lowAltitude=true
+        //  - splittable=true, chainable=true (分裂/合并)
+        //  - segmentDamageScl=12f (段身更脆, 原版值)
+        //  - healthDistribution=0.15f (血量分布)
+        // ═══════════════════════════════════════════════════════════
+
+        // —— 段身 UnitType ——
+        catenapedeSegment = new UnitType("catenapede-segment") {{
+            health = 500;
+            speed = 0f;
+            hitSize = 28f;
+            armor = 5f;
+            flying = true;
+            rotateSpeed = 1f;
+            faceTarget = false;
+            constructor = SegmentUnitEntity::create;
+            hidden = true;
+            useUnitCap = false;
+            physics = false;
+            hittable = true;
+            wobble = false;
+
+            // ===== 段身武器: plagueMissile (PU132 第3329-3345行) =====
+            // 双武器交替发射瘟疫导弹
+            weapons.add(new Weapon("catenapede-segment-missile") {{
+                y = -8f;
+                x = 14.75f;
+                rotate = true;
+                reload = 25f;
+                minShootVelocity = 0.01f;
+                bullet = new mindustry.entities.bullet.MissileBulletType(3.8f, 12f) {{
+                    width = height = 8f;
+                    backColor = hitColor = lightColor = trailColor = Color.valueOf("54de3b");
+                    frontColor = Color.valueOf("a3f080");
+                    shrinkY = 0f;
+                    drag = -0.01f;
+                    splashDamage = 30f;
+                    splashDamageRadius = 35f;
+                    hitEffect = mindustry.content.Fx.blastExplosion;
+                    despawnEffect = mindustry.content.Fx.blastExplosion;
+                }};
+            }});
+            weapons.add(new Weapon("catenapede-segment-missile-2") {{
+                y = -12.5f;
+                x = 7.25f;
+                rotate = true;
+                reload = 15f;
+                minShootVelocity = 0.01f;
+                bullet = new mindustry.entities.bullet.MissileBulletType(3.8f, 12f) {{
+                    width = height = 8f;
+                    backColor = hitColor = lightColor = trailColor = Color.valueOf("54de3b");
+                    frontColor = Color.valueOf("a3f080");
+                    shrinkY = 0f;
+                    drag = -0.01f;
+                    splashDamage = 30f;
+                    splashDamageRadius = 35f;
+                    hitEffect = mindustry.content.Fx.blastExplosion;
+                    despawnEffect = mindustry.content.Fx.blastExplosion;
+                }};
+            }});
+        }};
+
+        // —— 头部 Catenapede ——
+        catenapede = new UnitType("catenapede") {{
+            // ===== 基础属性 (PU132 UnityUnitTypes.java 第3284-3306行) =====
+            health = 750f;
+            speed = 2.4f;
+            accel = 0.06f;
+            drag = 0.03f;
+            hitSize = 30f;
+            armor = 5f;
+            flying = true;
+            engineSize = -1f;
+            range = 160f;
+            faceTarget = false;
+            wobble = false;
+            // ★ PU132: circleTarget=true, omniMovement=false
+            circleTarget = true;
+            omniMovement = false;
+            // ★ PU132: rotateSpeed=2.7f, angleLimit=25f
+            rotateSpeed = 2.7f;
+            constructor = SegmentWormEntity::create;
+            aiController = zzw.content.units.WormAI::new;
+
+            // ===== 头部武器: PointDrainLaser (PU132 第3309-3327行) =====
+            // 吸血激光: 持续发射, 吸血 0.5%, 最大长度 160, 击退 -34 (拉向自己)
+            weapons.add(new Weapon("catenapede-drain-laser") {{
+                y = -9f;
+                x = 14f;
+                shootY = 6.75f;
+                rotateSpeed = 5f;
+                reload = 5f * 60f;
+                shootCone = 45f;
+                rotate = true;
+                continuous = true;
+                alternate = false;
+                minShootVelocity = 0.01f;
+                bullet = new mindustry.entities.bullet.LaserBulletType(45f) {{
+                    colors = new Color[]{
+                        Color.valueOf("54de3b").cpy().mul(1f, 1f, 1f, 0.4f),
+                        Color.valueOf("54de3b"),
+                        Color.white
+                    };
+                    drawSize = 320f;
+                    length = 160f;
+                    width = 15f;
+                    lifetime = 600f;
+                    collidesAir = false;
+                    knockback = -34f;
+                }};
+            }});
+        }};
+
+        // ★ 注册 catenapede 段身配置 ★
+        // PU132: segmentLength=15, segmentOffset=31f
+        // PU132: regenTime=30*60f (30秒长一节), maxSegments=15
+        // PU132: splittable=true, chainable=true
+        // PU132: segmentDamageScl=12f (段身受击时血量×12倍掉)
+        SegmentWormEntity.configs.put(catenapede.name,
+            new SegmentWormEntity.SegmentConfig(catenapedeSegment, 15, 31f, 30f * 60f, 15, false, true, true, 25f, 12f));
+
         // ★ 初始化分裂/合并音效 (PU132 默认 Sounds.door)
         try {
             SegmentWormEntity.splitSound = mindustry.gen.Sounds.door;
@@ -323,6 +450,20 @@ public class Z_Units {
                 java.lang.reflect.Field f = soundsClass.getField("shootBomb");
                 arc.audio.Sound snd = (arc.audio.Sound) f.get(null);
                 arcnelidiaSegment.weapons.first().shootSound = snd;
+            } catch (Throwable ignored) {}
+            // catenapede 头部吸血激光音效 (PU132: Sounds.respawning)
+            try {
+                java.lang.reflect.Field f = soundsClass.getField("respawning");
+                arc.audio.Sound snd = (arc.audio.Sound) f.get(null);
+                catenapede.weapons.first().shootSound = snd;
+            } catch (Throwable ignored) {}
+            // catenapede 段身导弹音效 (PU132: Sounds.missile)
+            try {
+                java.lang.reflect.Field f = soundsClass.getField("missile");
+                arc.audio.Sound snd = (arc.audio.Sound) f.get(null);
+                for (mindustry.type.Weapon w : catenapedeSegment.weapons) {
+                    w.shootSound = snd;
+                }
             } catch (Throwable ignored) {}
         } catch (Throwable t) {
             try { arc.util.Log.err("set toxobyte sounds failed", t); } catch (Throwable ignored) {}
