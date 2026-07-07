@@ -273,15 +273,13 @@ public class SegmentUnitEntity extends UnitEntity {
     @Override
     public void add() {
         super.add();
-        // ★ 如果 head==null (单独生成, 如 Spawner 召唤或测试):
-        // 1. 根据 type.name 推断 texturePrefix
-        // 2. 设 isTail=true 用 tail 贴图 (单独段身更像尾部, 且避免画可能有问题的 cell 贴图)
-        if (head == null && type != null) {
-            String name = type.name;
-            if (name.startsWith("create-")) name = name.substring(7);
-            if (name.endsWith("-segment")) name = name.substring(0, name.length() - 8);
-            texturePrefix = name + "-";
-            isTail = true;
+        // ★ 如果 head==null (单独生成, 如 Spawner 召唤或作弊): 直接自爆
+        //   段身只能由头部 createSegments 创建, 单独生成没有意义
+        if (head == null) {
+            health = 0f;
+            dead = true;
+            remove();
+            return;
         }
     }
 
