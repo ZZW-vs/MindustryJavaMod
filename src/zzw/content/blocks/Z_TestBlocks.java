@@ -99,12 +99,19 @@ public class Z_TestBlocks {
             }
 
             @Override
+            public BulletType peekAmmo() {
+                // 无限弹药：直接返回铜弹药类型，不检查 ammo 列表
+                return ammoTypes.get(Items.copper);
+            }
+
+            @Override
             public void tapped() {
+                Team old = team;
                 Team next = nextTeam(team);
                 changeTeam(next);
                 Fx.placeBlock.at(x, y, size);
                 Sounds.click.at(x, y);
-                Log.info("[TestTurret] 阵营切换: @ -> @", team, next);
+                Log.info("[TestTurret] 阵营切换: @ -> @", old, next);
             }
 
             @Override
@@ -128,11 +135,12 @@ public class Z_TestBlocks {
         public class TestWallBuild extends WallBuild {
             @Override
             public void tapped() {
+                Team old = team;
                 Team next = nextTeam(team);
                 changeTeam(next);
                 Fx.placeBlock.at(x, y, size);
                 Sounds.click.at(x, y);
-                Log.info("[TestWall] 阵营切换: @ -> @", team, next);
+                Log.info("[TestWall] 阵营切换: @ -> @", old, next);
             }
         }
     }
