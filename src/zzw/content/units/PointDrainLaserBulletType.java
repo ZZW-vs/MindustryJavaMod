@@ -68,7 +68,7 @@ public class PointDrainLaserBulletType extends BulletType {
             dld.pos.trns(b.rotation(), maxLength);
         }
 
-        float length = Damage.findLaserLength(b, maxLength);
+        float length = Damage.findLaserLength(b, dld.pos.len());
         dld.pos.setLength(length).add(b);
 
         dld.trail.update(dld.pos.x, dld.pos.y);

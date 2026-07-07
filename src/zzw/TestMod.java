@@ -7,7 +7,6 @@ import mindustry.mod.Mod;
 import mindustry.ui.dialogs.BaseDialog;
 
 import zzw.content.blocks.Z_Blocks;
-import zzw.content.blocks.Z_TestBlocks;
 import zzw.content.Z_Items;
 import zzw.content.Z_Factory;
 import zzw.content.Z_Mine;
@@ -41,9 +40,6 @@ public class TestMod extends Mod{
 
         // 加载自定义方块（可能需要物品和工厂）
         Z_Blocks.load();
-
-        // 加载测试方块（沙盒专用）
-        Z_TestBlocks.load();
 
         // 加载自定义单位 (需要物品, 方块, 用于工厂配方)
         Z_Units.load();

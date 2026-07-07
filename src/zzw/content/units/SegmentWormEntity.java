@@ -1,5 +1,6 @@
 package zzw.content.units;
 
+import arc.graphics.g2d.Draw;
 import arc.math.Angles;
 import arc.math.Mathf;
 import arc.math.geom.Vec2;
@@ -143,6 +144,9 @@ public class SegmentWormEntity extends UnitEntity {
     /** 链式合并音效 (PU132 默认 Sounds.door) */
     public static arc.audio.Sound chainSound = null;
 
+    /** 贴图前缀缓存 (type.name + "-", 用于快速查找段身贴图) */
+    protected String texturePrefix = null;
+
     /** 段身配置 (在 Z_Units.load 中注册, 支持多个分段单位) */
     public static class SegmentConfig {
         public final mindustry.type.UnitType segmentType;
@@ -250,6 +254,8 @@ public class SegmentWormEntity extends UnitEntity {
             SegmentConfig cfg = type != null ? configs.get(type.name) : null;
             if (cfg != null) {
                 try {
+                    // 缓存贴图前缀 (兜底路径)
+                    if (type != null && texturePrefix == null) texturePrefix = type.name + "-";
                     segmentSpacing = cfg.spacing;
                     regenTime = cfg.regenTime;
                     maxSegments = cfg.maxSegments;
@@ -913,6 +919,8 @@ public class SegmentWormEntity extends UnitEntity {
     @Override
     public void add() {
         super.add();
+        // 缓存贴图前缀
+        if (type != null) texturePrefix = type.name + "-";
         // 在头部被添加到世界时创建段身 (优先用 configs Map, 否则用旧静态字段)
         if (!segmentsCreated && segments.length == 0) {
             SegmentConfig cfg = type != null ? configs.get(type.name) : null;
@@ -967,5 +975,44 @@ public class SegmentWormEntity extends UnitEntity {
     public void draw() {
         // 只画头部, 段身会自己画
         super.draw();
+
+        // ★ 再生建造动画 (参考 PU132 UnityUnitType.drawBody 第670-675行)
+        // 当可再生时, 在尾部后面绘制 Drawf.construct 扫描效果
+        if (regenAvailable() && segments.length > 0) {
+            SegmentUnitEntity tail = segments[segments.length - 1];
+            if (tail != null && tail.isAdded()) {
+                float z = Draw.z();
+                // 在尾部段身 z 层级之下绘制 (更靠后)
+                Draw.z(z - (segments.length + 2f) / 10000f);
+
+                arc.util.Tmp.v1.trns(tail.rotation + 180f, segmentSpacing).add(tail);
+
+                // 查找尾部贴图 (与 SegmentUnitEntity.draw 中相同的逻辑)
+                String p = texturePrefix != null ? texturePrefix : "arcnelidia-";
+                String modP = "create-" + p;
+                arc.graphics.g2d.TextureRegion tailRegion = findRegion(p + "tail", modP + "tail");
+
+                if (tailRegion.found()) {
+                    float progress = repairTime / regenTime;
+                    mindustry.graphics.Drawf.construct(
+                        arc.util.Tmp.v1.x, arc.util.Tmp.v1.y,
+                        tailRegion,
+                        tail.rotation - 90f,
+                        progress,
+                        1f,
+                        repairTime
+                    );
+                }
+
+                Draw.z(z);
+            }
+        }
+    }
+
+    /** 查找贴图: 先试 name, 找不到再试 prefixedName (与 SegmentUnitEntity 相同逻辑) */
+    private static arc.graphics.g2d.TextureRegion findRegion(String name, String prefixedName) {
+        arc.graphics.g2d.TextureRegion r = arc.Core.atlas.find(name);
+        if (r.found()) return r;
+        return arc.Core.atlas.find(prefixedName);
     }
 }
