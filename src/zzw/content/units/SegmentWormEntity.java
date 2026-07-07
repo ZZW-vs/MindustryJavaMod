@@ -111,6 +111,11 @@ public class SegmentWormEntity extends UnitEntity {
     public float healthDistributionRate = 0.1f;
     /** 血量分布效率 (受伤降低, 慢慢恢复, PU132 healthDistributionEfficiency) */
     protected float healthDistributionEfficiency = 1f;
+    /** 段身伤害缩放 (PU132 segmentDamageScl, splittable 模式下有效)
+     *  段身受伤害时, 血量减少 amount × segmentDamageScl
+     *  越大 = 段身越脆, 越容易死亡分裂
+     *  默认 6f (PU132 UnityUnitType 默认值), toxobyte 8f, catenapede 12f */
+    public float segmentDamageScl = 6f;
 
     /** 再生间隔 (PU132 regenTime, 单位 tick, 0=不再生)
      *  每 regenTime tick 长出一节新尾部段身, 期间会扣血 (health/段数/2)
@@ -158,10 +163,15 @@ public class SegmentWormEntity extends UnitEntity {
          *  false: 不合并 (默认) */
         public final boolean chainable;
         /** 段身朝向相对父段的最大角度差 (度, 154.3 segmentRotationRange)
-         *  调小 = 段身更硬 (转向幅度小), 调大 = 段身更软 (转向幅度大)
-         *  默认 25f: arcnelidia 9 段够用
-         *  toxobyte 25 段用 35f: 转弯时段身能转更多, 避免位置偏离 ideal 导致卡顿 */
+     *  调小 = 段身更硬 (转向幅度小), 调大 = 段身更软 (转向幅度大)
+     *  默认 25f: arcnelidia 9 段够用
+     *  toxobyte 25 段用 35f: 转弯时段身能转更多, 避免位置偏离 ideal 导致卡顿 */
         public final float segmentRotationRange;
+        /** 段身伤害缩放 (PU132 segmentDamageScl, splittable 模式下有效)
+         *  段身受到伤害时, 血量减少 amount × segmentDamageScl
+         *  越大 = 段身越脆, 越容易死亡分裂
+         *  toxobyte 原版 8f, catenapede 原版 12f */
+        public final float segmentDamageScl;
         public SegmentConfig(mindustry.type.UnitType t, int c, float s) {
             this(t, c, s, 0f, 0, false, false, false);
         }
@@ -176,10 +186,15 @@ public class SegmentWormEntity extends UnitEntity {
         }
         /** 带段身转角范围的新构造函数 (toxobyte 用 35f, arcnelidia 用默认 25f) */
         public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble, boolean splittable, boolean chainable, float segmentRotationRange) {
+            this(t, c, s, regenTime, maxSegments, wobble, splittable, chainable, segmentRotationRange, 6f);
+        }
+        /** 完整构造函数: 带段身转角范围和伤害缩放 (toxobyte 用 35f/8f, arcnelidia 用 25f/6f 默认) */
+        public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble, boolean splittable, boolean chainable, float segmentRotationRange, float segmentDamageScl) {
             segmentType = t; count = c; spacing = s;
             this.regenTime = regenTime; this.maxSegments = maxSegments;
             this.wobble = wobble; this.splittable = splittable; this.chainable = chainable;
             this.segmentRotationRange = segmentRotationRange;
+            this.segmentDamageScl = segmentDamageScl;
         }
     }
     /** 按 UnitType.name 注册的段身配置 (key = 头部名字, 如 "arcnelidia" / "toxobyte") */
@@ -235,6 +250,7 @@ public class SegmentWormEntity extends UnitEntity {
                     splittable = cfg.splittable;
                     chainable = cfg.chainable;
                     segmentRotationRange = cfg.segmentRotationRange;
+                    segmentDamageScl = cfg.segmentDamageScl;
                     createSegments(cfg.count, cfg.segmentType);
                     segmentsCreated = true;
                     System.out.println("[头部] 段身创建: " + cfg.count + "节 间距=" + cfg.spacing

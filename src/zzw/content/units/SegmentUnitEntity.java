@@ -127,10 +127,13 @@ public class SegmentUnitEntity extends UnitEntity {
      * ★ 分裂模式 (splittable=true): 段身有独立血量, 自己承受伤害, 死亡时触发分裂
      * ★ 非分裂模式 (splittable=false): 伤害转移给头部 (PU132 WormComp.damage L176-178)
      *
-     * 借鉴 PU132 WormComp.damage:
-     * if(!isHead() && head != null && !((UnityUnitType)type).splittable){
-     *     head.damage(amount); return;
-     * }
+     * 借鉴 PU132 WormSegmentUnit.damage:
+     * if(wormType.splittable) segmentHealth -= amount * wormType.segmentDamageScl;
+     * trueParentUnit.damage(amount);
+     *
+     * ★ segmentDamageScl: 段身伤害缩放 (splittable 模式下有效)
+     *   越大 = 段身越脆, 越容易死亡分裂
+     *   toxobyte 原版 8f, catenapede 原版 12f
      */
     @Override
     public void damage(float amount) {
@@ -139,8 +142,13 @@ public class SegmentUnitEntity extends UnitEntity {
             head.damage(amount);
             return;
         }
-        // 分裂模式: 自己承受伤害
-        super.damage(amount);
+        // 分裂模式: 自己承受伤害 (应用 segmentDamageScl 缩放)
+        float scl = (head != null) ? head.segmentDamageScl : 1f;
+        super.damage(amount * scl);
+        // 头部也受到原始伤害 (PU132 原版行为: 段身受击时头部也掉血)
+        if (head != null && head.isAdded()) {
+            head.damage(amount);
+        }
     }
 
     @Override

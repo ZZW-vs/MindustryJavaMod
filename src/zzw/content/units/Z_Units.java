@@ -68,8 +68,30 @@ public class Z_Units {
             physics = false;
             hittable = true;
 
-            // 段身不需要武器
-            // weapons 留空
+            // ===== 段身武器: BombBullet (PU132 第3039-3045行, 借用 horizon 炸弹) =====
+            // 电弧虫段身投弹: splashDamage=25, 爆炸色同电弧
+            weapons.add(new Weapon("arcnelidia-segment-bomb") {{
+                x = 0f;
+                rotate = true;
+                mirror = false;
+                reload = 60f;
+                rotateSpeed = 50f;
+                minShootVelocity = 0.01f;
+                shootCone = 180f;
+                bullet = new mindustry.entities.bullet.BombBulletType(27f, 25f) {{
+                    width = 10f;
+                    height = 14f;
+                    hitEffect = mindustry.content.Fx.flakExplosion;
+                    shootEffect = mindustry.content.Fx.none;
+                    smokeEffect = mindustry.content.Fx.none;
+                    collidesAir = false;
+                    collidesGround = true;
+                    splashDamage = 25f;
+                    splashDamageRadius = 25f;
+                    status = mindustry.content.StatusEffects.blasted;
+                    statusDuration = 60f;
+                }};
+            }});
         }};
 
         // —— 头部 Arcnelidia 飞行分段虫子 ——
@@ -194,6 +216,7 @@ public class Z_Units {
                 shootCone = 90f;
                 // 154.3 武器需要 recoil/rotateSpeed
                 rotateSpeed = 50f;
+                minShootVelocity = 0.01f;
                 bullet = new mindustry.entities.bullet.ArtilleryBulletType(5f, 7f) {{
                     collidesTiles = true;
                     collidesAir = true;
@@ -268,8 +291,9 @@ public class Z_Units {
         // PU132: splittable=true (段身有独立血量, 死亡时虫子分裂)
         // ★ chainable=true (用户要求实现链式合并, 两条虫子靠近时合并)
         // ★ segmentRotationRange=35f (toxobyte 25 段, 25f 太严格转弯卡顿, 35f 更顺畅)
+        // ★ segmentDamageScl=8f (PU132 原版 toxobyte 值, 段身受击时血量×8倍掉, 更脆更容易分裂)
         SegmentWormEntity.configs.put(toxobyte.name,
-            new SegmentWormEntity.SegmentConfig(toxobyteSegment, 25, 16.25f, 15f * 60f, 25, false, true, true, 35f));
+            new SegmentWormEntity.SegmentConfig(toxobyteSegment, 25, 16.25f, 15f * 60f, 25, false, true, true, 35f, 8f));
 
         // ★ 初始化分裂/合并音效 (PU132 默认 Sounds.door)
         try {
@@ -277,6 +301,31 @@ public class Z_Units {
             SegmentWormEntity.chainSound = mindustry.gen.Sounds.door;
         } catch (Throwable t) {
             System.out.println("[Z_Units] 音效初始化失败: " + t);
+        }
+
+        // 用反射设置 toxobyte 武器音效 (v154.3 编译期可能找不到字段)
+        try {
+            Class<?> soundsClass = Class.forName("mindustry.gen.Sounds");
+            // 头部 Sap 武器音效
+            try {
+                java.lang.reflect.Field f = soundsClass.getField("shootSap");
+                arc.audio.Sound snd = (arc.audio.Sound) f.get(null);
+                toxobyte.weapons.first().shootSound = snd;
+            } catch (Throwable ignored) {}
+            // 段身榴弹音效
+            try {
+                java.lang.reflect.Field f = soundsClass.getField("shootArtillery");
+                arc.audio.Sound snd = (arc.audio.Sound) f.get(null);
+                toxobyteSegment.weapons.first().shootSound = snd;
+            } catch (Throwable ignored) {}
+            // arcnelidia 段身炸弹音效
+            try {
+                java.lang.reflect.Field f = soundsClass.getField("shootBomb");
+                arc.audio.Sound snd = (arc.audio.Sound) f.get(null);
+                arcnelidiaSegment.weapons.first().shootSound = snd;
+            } catch (Throwable ignored) {}
+        } catch (Throwable t) {
+            try { arc.util.Log.err("set toxobyte sounds failed", t); } catch (Throwable ignored) {}
         }
 
         System.out.println("[Z_Units] load done, configs=" + SegmentWormEntity.configs.keySet());
