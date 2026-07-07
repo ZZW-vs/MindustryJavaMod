@@ -897,16 +897,26 @@ public class SegmentWormEntity extends UnitEntity {
         segRotations = new float[count];
 
         // ★ 段数多的虫子生成时卷起来 (如 toxobyte 25 段)
-        //   段数 <= 5: 直线排列 (arcnelidia 9 段也轻微弧形)
-        //   段数 > 5: 呈弧形排列, 避免排成太长一条直线
-        float totalArc = count > 5 ? Math.min(count * 3.5f, 100f) : 0f; // 总弧形角度, 最多100度
+        //   波浪形排列: 正弦波 + 随机偏移, 越靠后摆动越大
+        //   段数 <= 3: 基本直线 (catenapede 2 段)
+        //   段数 4~10: 轻微波浪 (arcnelidia 9 段)
+        //   段数 > 10: 明显卷起来 (toxobyte 25 段)
+        float maxWaveAmp = count > 3 ? Math.min(count * 3f, 90f) : 0f; // 最大摆动角度
+        float waveFreq = 0.15f + Mathf.random(0.25f); // 随机频率, 每次生成不同
+        float wavePhase = Mathf.random(360f);         // 随机相位, 每次生成不同
+        float baseAngle = rotation + 180f;
 
         float segX = x;
         float segY = y;
         for (int i = 0; i < count; i++) {
-            // 计算第 i 段的角度: 头部后方 + 弧形偏移
-            float angleOffset = count > 5 ? ((i / (float) Math.max(count - 1, 1)) - 0.5f) * totalArc : 0f;
-            float angle = rotation + 180f + angleOffset;
+            // 越靠后的段, 摆动幅度越大 (distFactor 0~1)
+            float distFactor = i / (float) Math.max(count - 1, 1);
+            float waveAmp = maxWaveAmp * distFactor;
+
+            // 正弦波偏移 + 随机噪声
+            float sineOffset = Mathf.sin(distFactor * waveFreq * Mathf.PI2 + wavePhase) * waveAmp;
+            float randomOffset = Mathf.random(-waveAmp * 0.35f, waveAmp * 0.35f);
+            float angle = baseAngle + sineOffset + randomOffset;
 
             // 沿角度方向前进 segmentSpacing
             segX += Angles.trnsx(angle, segmentSpacing);
