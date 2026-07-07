@@ -991,15 +991,11 @@ public class SegmentWormEntity extends UnitEntity {
         // 只画头部, 段身会自己画
         super.draw();
 
-        // ★ 再生建造动画 (参考 PU132 UnityUnitType.drawBody 第670-675行)
+        // ★ 再生建造动画 (参考 PU132 UnityUnitType.drawBody 第670-675行 + UnitSpawnAbility.draw)
         // 当可再生时, 在尾部后面绘制 Drawf.construct 扫描效果
         if (regenAvailable() && segments.length > 0) {
             SegmentUnitEntity tail = segments[segments.length - 1];
             if (tail != null && tail.isAdded()) {
-                float z = Draw.z();
-                // 在尾部段身 z 层级之下绘制 (更靠后)
-                Draw.z(z - (segments.length + 2f) / 10000f);
-
                 arc.util.Tmp.v1.trns(tail.rotation + 180f, segmentSpacing).add(tail);
 
                 // 查找尾部贴图 (与 SegmentUnitEntity.draw 中相同的逻辑)
@@ -1009,9 +1005,11 @@ public class SegmentWormEntity extends UnitEntity {
 
                 if (tailRegion.found()) {
                     float progress = repairTime / regenTime;
+                    // 在尾部段身 z 层级之下绘制 (更靠后), 避免与段身贴图重叠
+                    float drawZ = Draw.z() - (segments.length + 2f) / 10000f;
                     // ★ 必须用 Draw.draw() 包裹 Drawf.construct, 因为 construct 内部设置 shader
-                    //   在排序阶段不能直接设置 shader (v154.3 + MindustryX 会报错)
-                    Draw.draw(z - (segments.length + 2f) / 10000f, () -> {
+                    //   只用一个 Draw.draw() 设 z, 不再额外调 Draw.z() (避免排序冲突导致忽闪忽现)
+                    Draw.draw(drawZ, () -> {
                         mindustry.graphics.Drawf.construct(
                             arc.util.Tmp.v1.x, arc.util.Tmp.v1.y,
                             tailRegion,
@@ -1022,8 +1020,6 @@ public class SegmentWormEntity extends UnitEntity {
                         );
                     });
                 }
-
-                Draw.z(z);
             }
         }
     }
