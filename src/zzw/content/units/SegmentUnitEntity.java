@@ -97,6 +97,13 @@ public class SegmentUnitEntity extends UnitEntity {
             }
         }
 
+        // ★ 非分裂模式: 段身血量同步为头部血量 (参考 PU132 WormComp.update L249-250)
+        // 这样鼠标悬停任意段身时, 显示的血量都与头部相同, 所有节段"共用一个血条"
+        if (head != null && head.isAdded() && !head.splittable) {
+            health = head.health;
+            maxHealth = head.maxHealth;
+        }
+
         // 检查头部是否还活着
         if (head == null || head.dead || !head.isAdded()) {
             // 头部死了, 段身也跟着死
