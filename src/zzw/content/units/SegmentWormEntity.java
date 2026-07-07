@@ -172,6 +172,9 @@ public class SegmentWormEntity extends UnitEntity {
          *  越大 = 段身越脆, 越容易死亡分裂
          *  toxobyte 原版 8f, catenapede 原版 12f */
         public final float segmentDamageScl;
+        /** 血量分布速率 (PU132 healthDistribution)
+         *  默认 0.1f, catenapede 原版 0.15f */
+        public final float healthDistribution;
         public SegmentConfig(mindustry.type.UnitType t, int c, float s) {
             this(t, c, s, 0f, 0, false, false, false);
         }
@@ -190,11 +193,15 @@ public class SegmentWormEntity extends UnitEntity {
         }
         /** 完整构造函数: 带段身转角范围和伤害缩放 (toxobyte 用 35f/8f, arcnelidia 用 25f/6f 默认) */
         public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble, boolean splittable, boolean chainable, float segmentRotationRange, float segmentDamageScl) {
+            this(t, c, s, regenTime, maxSegments, wobble, splittable, chainable, segmentRotationRange, segmentDamageScl, 0.1f);
+        }
+        public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble, boolean splittable, boolean chainable, float segmentRotationRange, float segmentDamageScl, float healthDistribution) {
             segmentType = t; count = c; spacing = s;
             this.regenTime = regenTime; this.maxSegments = maxSegments;
             this.wobble = wobble; this.splittable = splittable; this.chainable = chainable;
             this.segmentRotationRange = segmentRotationRange;
             this.segmentDamageScl = segmentDamageScl;
+            this.healthDistribution = healthDistribution;
         }
     }
     /** 按 UnitType.name 注册的段身配置 (key = 头部名字, 如 "arcnelidia" / "toxobyte") */
@@ -251,6 +258,7 @@ public class SegmentWormEntity extends UnitEntity {
                     chainable = cfg.chainable;
                     segmentRotationRange = cfg.segmentRotationRange;
                     segmentDamageScl = cfg.segmentDamageScl;
+                    healthDistributionRate = cfg.healthDistribution;
                     createSegments(cfg.count, cfg.segmentType);
                     segmentsCreated = true;
                     System.out.println("[头部] 段身创建: " + cfg.count + "节 间距=" + cfg.spacing
@@ -916,6 +924,7 @@ public class SegmentWormEntity extends UnitEntity {
                 wobbleEnabled = cfg.wobble;
                 splittable = cfg.splittable;
                 chainable = cfg.chainable;
+                healthDistributionRate = cfg.healthDistribution;
                 try {
                     createSegments(cfg.count, cfg.segmentType);
                     segmentsCreated = true;

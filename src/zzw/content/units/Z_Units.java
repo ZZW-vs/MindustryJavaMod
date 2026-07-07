@@ -380,6 +380,8 @@ public class Z_Units {
             // ★ PU132: circleTarget=true, omniMovement=false
             circleTarget = true;
             omniMovement = false;
+            // ★ PU132: lowAltitude=true (渲染层级更低, 在 Layer.flyingUnitLow)
+            lowAltitude = true;
             // ★ PU132: rotateSpeed=2.7f, angleLimit=25f
             rotateSpeed = 2.7f;
             constructor = SegmentWormEntity::create;
@@ -419,8 +421,9 @@ public class Z_Units {
         // PU132: regenTime=30*60f (30秒长一节), maxSegments=15
         // PU132: splittable=true, chainable=true
         // PU132: segmentDamageScl=12f (段身受击时血量×12倍掉)
+        // PU132: healthDistribution=0.15f (血量分布速率)
         SegmentWormEntity.configs.put(catenapede.name,
-            new SegmentWormEntity.SegmentConfig(catenapedeSegment, 15, 31f, 30f * 60f, 15, false, true, true, 25f, 12f));
+            new SegmentWormEntity.SegmentConfig(catenapedeSegment, 15, 31f, 30f * 60f, 15, false, true, true, 25f, 12f, 0.15f));
 
         // ★ 初始化分裂/合并音效 (PU132 默认 Sounds.door)
         try {
