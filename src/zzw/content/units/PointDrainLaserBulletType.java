@@ -38,6 +38,7 @@ public class PointDrainLaserBulletType extends BulletType {
         collidesGround = true;
         collidesTiles = true;
         collidesAir = false;
+        lifetime = 10f * 60f;
     }
 
     @Override
