@@ -1002,34 +1002,50 @@ public class SegmentWormEntity extends UnitEntity {
         super.draw();
 
         // ★ 再生建造动画 (参考 PU132 UnityUnitType.drawBody 第670-675行 + UnitSpawnAbility.draw)
-        // 当可再生时, 在尾部后面绘制 Drawf.construct 扫描效果
+        // 当可再生时, 在尾部后面绘制扫描效果
         if (regenAvailable() && segments.length > 0) {
             SegmentUnitEntity tail = segments[segments.length - 1];
             if (tail != null && tail.isAdded()) {
                 arc.util.Tmp.v1.trns(tail.rotation + 180f, segmentSpacing).add(tail);
+                float sx = arc.util.Tmp.v1.x, sy = arc.util.Tmp.v1.y;
 
                 // 查找尾部贴图 (与 SegmentUnitEntity.draw 中相同的逻辑)
                 String p = texturePrefix != null ? texturePrefix : "arcnelidia-";
                 String modP = "create-" + p;
                 arc.graphics.g2d.TextureRegion tailRegion = findRegion(p + "tail", modP + "tail");
 
-                if (tailRegion.found()) {
-                    float progress = repairTime / regenTime;
-                    // 在尾部段身 z 层级之下绘制 (更靠后), 避免与段身贴图重叠
-                    float drawZ = Draw.z() - (segments.length + 2f) / 10000f;
-                    // ★ 必须用 Draw.draw() 包裹 Drawf.construct, 因为 construct 内部设置 shader
-                    //   只用一个 Draw.draw() 设 z, 不再额外调 Draw.z() (避免排序冲突导致忽闪忽现)
-                    Draw.draw(drawZ, () -> {
+                float progress = repairTime / regenTime;
+                // 在尾部段身 z 层级之下绘制 (更靠后), 避免与段身贴图重叠
+                float drawZ = Draw.z() - (segments.length + 2f) / 10000f;
+
+                Draw.draw(drawZ, () -> {
+                    // 1) 始终可见的脉动扫描圈 (progress 低时也看得见)
+                    float pulse = 0.6f + 0.4f * Mathf.sin(repairTime / 10f); // 脉动 0.6~1.0
+                    float radius = 6f + pulse * 8f; // 半径 6~14
+                    Draw.color(mindustry.graphics.Pal.accent, pulse * 0.5f);
+                    arc.graphics.g2d.Lines.stroke(2f * pulse);
+                    arc.graphics.g2d.Lines.circle(sx, sy, radius);
+
+                    // 2) 扫描线 (随 progress 从底部扫到顶部)
+                    float scanY = Mathf.lerp(-radius, radius, progress);
+                    Draw.alpha(pulse * 0.7f);
+                    arc.graphics.g2d.Lines.stroke(1.5f);
+                    arc.graphics.g2d.Lines.line(sx - radius, sy + scanY, sx + radius, sy + scanY);
+
+                    Draw.reset();
+
+                    // 3) Drawf.construct 显示建造进度 (shader 裁剪, progress 低时很淡)
+                    if (tailRegion.found()) {
                         mindustry.graphics.Drawf.construct(
-                            arc.util.Tmp.v1.x, arc.util.Tmp.v1.y,
+                            sx, sy,
                             tailRegion,
                             tail.rotation - 90f,
                             progress,
                             1f,
                             repairTime
                         );
-                    });
-                }
+                    }
+                });
             }
         }
     }
