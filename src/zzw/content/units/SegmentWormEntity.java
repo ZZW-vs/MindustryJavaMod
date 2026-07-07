@@ -896,11 +896,26 @@ public class SegmentWormEntity extends UnitEntity {
         segVelocities = new Vec2[count];
         segRotations = new float[count];
 
+        // ★ 段数多的虫子生成时卷起来 (如 toxobyte 25 段)
+        //   段数 <= 5: 直线排列 (arcnelidia 9 段也轻微弧形)
+        //   段数 > 5: 呈弧形排列, 避免排成太长一条直线
+        float totalArc = count > 5 ? Math.min(count * 3.5f, 100f) : 0f; // 总弧形角度, 最多100度
+
+        float segX = x;
+        float segY = y;
         for (int i = 0; i < count; i++) {
+            // 计算第 i 段的角度: 头部后方 + 弧形偏移
+            float angleOffset = count > 5 ? ((i / (float) Math.max(count - 1, 1)) - 0.5f) * totalArc : 0f;
+            float angle = rotation + 180f + angleOffset;
+
+            // 沿角度方向前进 segmentSpacing
+            segX += Angles.trnsx(angle, segmentSpacing);
+            segY += Angles.trnsy(angle, segmentSpacing);
+
             // 用 segmentType 创建段身 (SegmentUnitEntity 实例)
             SegmentUnitEntity seg = (SegmentUnitEntity) segmentType.create(team);
-            seg.set(x - (i + 1) * segmentSpacing, y);
-            seg.rotation = rotation;
+            seg.set(segX, segY);
+            seg.rotation = angle;
             seg.head = this;
             seg.segmentIndex = i;  // 段身在数组中的索引, 用于 z 层级
             // 最后一节段身是 tail (用 tail 贴图而不是 segment 贴图)
@@ -912,7 +927,7 @@ public class SegmentWormEntity extends UnitEntity {
             segments[i] = seg;
             segPositions[i] = new Vec2(seg.x, seg.y);
             segVelocities[i] = new Vec2();  // 初始速度为 0
-            segRotations[i] = rotation;     // 初始朝向 = 头部朝向
+            segRotations[i] = angle;        // 初始朝向 = 该段角度
         }
     }
 
@@ -994,14 +1009,18 @@ public class SegmentWormEntity extends UnitEntity {
 
                 if (tailRegion.found()) {
                     float progress = repairTime / regenTime;
-                    mindustry.graphics.Drawf.construct(
-                        arc.util.Tmp.v1.x, arc.util.Tmp.v1.y,
-                        tailRegion,
-                        tail.rotation - 90f,
-                        progress,
-                        1f,
-                        repairTime
-                    );
+                    // ★ 必须用 Draw.draw() 包裹 Drawf.construct, 因为 construct 内部设置 shader
+                    //   在排序阶段不能直接设置 shader (v154.3 + MindustryX 会报错)
+                    Draw.draw(z - (segments.length + 2f) / 10000f, () -> {
+                        mindustry.graphics.Drawf.construct(
+                            arc.util.Tmp.v1.x, arc.util.Tmp.v1.y,
+                            tailRegion,
+                            tail.rotation - 90f,
+                            progress,
+                            1f,
+                            repairTime
+                        );
+                    });
                 }
 
                 Draw.z(z);

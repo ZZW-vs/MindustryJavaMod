@@ -171,13 +171,11 @@ public class Z_Units {
         } catch (Throwable t) {
             try { arc.util.Log.err("set shootSound failed", t); } catch (Throwable ignored) {}
         }
-        // PU132: visualElevation=0.8f (v150 没有这个字段, 用反射设置)
+        // PU132: visualElevation=0.8f (v154.3 已移除该字段, 静默忽略)
         try {
             java.lang.reflect.Field ve = arcnelidia.getClass().getSuperclass().getField("visualElevation");
             ve.setFloat(arcnelidia, 0.8f);
-        } catch (Throwable t) {
-            try { arc.util.Log.err("set visualElevation failed", t); } catch (Throwable ignored) {}
-        }
+        } catch (Throwable ignored) {}
 
         // ═══════════════════════════════════════════════════════════
         //  Toxobyte (PU132 瘟疫虫)
