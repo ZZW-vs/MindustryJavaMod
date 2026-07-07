@@ -400,18 +400,14 @@ public class Z_Units {
                 continuous = true;
                 alternate = false;
                 minShootVelocity = 0.01f;
-                bullet = new mindustry.entities.bullet.LaserBulletType(45f) {{
-                    colors = new Color[]{
-                        Color.valueOf("54de3b").cpy().mul(1f, 1f, 1f, 0.4f),
-                        Color.valueOf("54de3b"),
-                        Color.white
-                    };
-                    drawSize = 320f;
-                    length = 160f;
-                    width = 15f;
-                    lifetime = 600f;
-                    collidesAir = false;
+                bullet = new zzw.content.units.PointDrainLaserBulletType(45f) {{
+                    maxLength = 160f;
+                    drainPercent = 0.5f;
+                    width = 6f;
+                    area = 9f;
                     knockback = -34f;
+                    backColor = Color.valueOf("54de3b");
+                    frontColor = Color.valueOf("a3f080");
                 }};
             }});
         }};
