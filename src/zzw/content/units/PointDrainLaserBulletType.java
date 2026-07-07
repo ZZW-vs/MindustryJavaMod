@@ -75,24 +75,47 @@ public class PointDrainLaserBulletType extends BulletType {
 
         if (b.timer(1, 5f)) {
             if (hOwner != null) {
-                Damage.damageUnits(b.team, dld.pos.x, dld.pos.y, area, damage,
-                    unit -> unit.hittable() && unit.checkTarget(collidesAir, collidesGround),
-                    unit -> hOwner.heal(damage * drainPercent));
+                // ★ 沿激光线段扫描所有命中目标, 每个目标都回血一次 (参考 PU132 collideLineRawEnemy)
+                //   v154.3 没有 collideLineRawEnemy, 手动用 Units.nearbyEnemies + 矩形范围 + 距离检查实现
+                //   rect 沿激光线段扩展, 覆盖所有可能命中的目标
+                final float laserX1 = b.x, laserY1 = b.y, laserX2 = dld.pos.x, laserY2 = dld.pos.y;
+                float cx = (laserX1 + laserX2) * 0.5f, cy = (laserY1 + laserY2) * 0.5f;
+                float searchRange = Math.max(dld.pos.len(), area * 2f) + area;
+                tmpRect.setCentered(cx, cy, searchRange * 2f, searchRange * 2f);
 
-                Vars.indexer.eachBlock(null, dld.pos.x, dld.pos.y, area,
+                Units.nearbyEnemies(b.team, tmpRect, unit -> {
+                    if (!unit.hittable() || !unit.checkTarget(collidesAir, collidesGround)) return;
+                    // 距离激光线段 < area
+                    if (arc.math.geom.Intersector.distanceSegmentPoint(laserX1, laserY1, laserX2, laserY2, unit.x, unit.y) > area) return;
+                    unit.damage(damage);
+                    hOwner.heal(damage * drainPercent);
+                });
+
+                Vars.indexer.eachBlock(null, cx, cy, searchRange,
                     build -> build.team != b.team && build.health > 0,
                     build -> {
+                        if (arc.math.geom.Intersector.distanceSegmentPoint(laserX1, laserY1, laserX2, laserY2, build.x, build.y) > area) return;
                         build.damage(damage * buildingDamageMultiplier);
                         hOwner.heal(damage * drainPercent);
                     });
             } else {
-                Damage.damageUnits(b.team, dld.pos.x, dld.pos.y, area, damage,
-                    unit -> unit.hittable() && unit.checkTarget(collidesAir, collidesGround),
-                    unit -> {});
+                final float laserX1 = b.x, laserY1 = b.y, laserX2 = dld.pos.x, laserY2 = dld.pos.y;
+                float cx = (laserX1 + laserX2) * 0.5f, cy = (laserY1 + laserY2) * 0.5f;
+                float searchRange = Math.max(dld.pos.len(), area * 2f) + area;
+                tmpRect.setCentered(cx, cy, searchRange * 2f, searchRange * 2f);
 
-                Vars.indexer.eachBlock(null, dld.pos.x, dld.pos.y, area,
+                Units.nearbyEnemies(b.team, tmpRect, unit -> {
+                    if (!unit.hittable() || !unit.checkTarget(collidesAir, collidesGround)) return;
+                    if (arc.math.geom.Intersector.distanceSegmentPoint(laserX1, laserY1, laserX2, laserY2, unit.x, unit.y) > area) return;
+                    unit.damage(damage);
+                });
+
+                Vars.indexer.eachBlock(null, cx, cy, searchRange,
                     build -> build.team != b.team && build.health > 0,
-                    build -> build.damage(damage * buildingDamageMultiplier));
+                    build -> {
+                        if (arc.math.geom.Intersector.distanceSegmentPoint(laserX1, laserY1, laserX2, laserY2, build.x, build.y) > area) return;
+                        build.damage(damage * buildingDamageMultiplier);
+                    });
             }
 
             if (knockback != 0) {

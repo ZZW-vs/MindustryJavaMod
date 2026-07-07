@@ -2,6 +2,7 @@ package zzw.content.units;
 
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
+import arc.scene.ui.layout.Table;
 import mindustry.gen.Hitboxc;
 import mindustry.gen.UnitEntity;
 
@@ -245,6 +246,28 @@ public class SegmentUnitEntity extends UnitEntity {
         this.y = y;
         this.rotation = rotation;
         // vel 不清零, 由头部 updateSegmentVLocal 每帧覆盖
+    }
+
+    /**
+     * ★ 鼠标悬停时, 段身显示头部的贴图和名称 (参考 PU132 WormComp.icon + 自定义 display)
+     *
+     * v154.3 UnitType.display(unit, table) 内部:
+     *   - 用 unit.type.uiIcon 显示贴图
+     *   - 用 unit.type.localizedName 显示名称
+     *   - 用 unit::healthf 显示血量
+     *
+     * 我们重写后, 让段身调用头部 type.display(head, table),
+     * 这样贴图/名称/血量都跟头部一致
+     */
+    @Override
+    public void display(Table table) {
+        if (head != null && head.isAdded() && head.type != null) {
+            // 调用头部的 type.display, 用头部的贴图/名称, 血量也跟头部一致
+            head.type.display(head, table);
+        } else {
+            // 兜底: 没有头部时, 调用默认显示
+            super.display(table);
+        }
     }
 
     @Override
