@@ -455,19 +455,16 @@ public class SegmentWormEntity extends UnitEntity {
         int oldLen = segments.length;
         int newLen = oldLen + 1;
 
-        // 保存旧数组
         SegmentUnitEntity[] oldSegs = segments;
         Vec2[] oldPos = segPositions;
         Vec2[] oldVel = segVelocities;
         float[] oldRot = segRotations;
 
-        // 扩展数组
         segments = new SegmentUnitEntity[newLen];
         segPositions = new Vec2[newLen];
         segVelocities = new Vec2[newLen];
         segRotations = new float[newLen];
 
-        // 复制旧数据
         for (int i = 0; i < oldLen; i++) {
             segments[i] = oldSegs[i];
             segPositions[i] = oldPos[i];
@@ -475,30 +472,32 @@ public class SegmentWormEntity extends UnitEntity {
             segRotations[i] = oldRot[i];
         }
 
-        // 旧尾部段身改为普通段身 (不再用 tail 贴图)
         if (segments[oldLen - 1] != null) {
             segments[oldLen - 1].isTail = false;
         }
 
-        // 新段身: 复用旧尾部的 type (segmentType), 创建实例
         mindustry.type.UnitType segType = segments[oldLen - 1] != null ? segments[oldLen - 1].type : defaultSegmentType;
         SegmentUnitEntity newSeg = (SegmentUnitEntity) segType.create(team);
-        // 新段身位置: 旧尾部后方 segmentSpacing 处
+
         Vec2 oldTailPos = oldPos[oldLen - 1];
         float oldTailRot = oldRot[oldLen - 1];
         Vec2 newPos = new Vec2();
         newPos.trns(oldTailRot + 180f, segmentSpacing).add(oldTailPos);
+
         newSeg.set(newPos.x, newPos.y);
         newSeg.rotation = oldTailRot;
         newSeg.head = this;
-        newSeg.segmentIndex = oldLen;  // 新段索引
-        newSeg.isTail = true;  // 新段是尾部
+        newSeg.segmentIndex = oldLen;
+        newSeg.isTail = true;
         newSeg.texturePrefix = type.name + "-";
+        newSeg.elevation = elevation;
+        newSeg.health = health;
+        newSeg.maxHealth = maxHealth;
+        newSeg.dead = false;
         newSeg.add();
 
-        // 新数组初始化
         segPositions[oldLen] = newPos;
-        segVelocities[oldLen] = new Vec2();
+        segVelocities[oldLen] = new Vec2(segVelocities[oldLen - 1]);
         segRotations[oldLen] = oldTailRot;
         segments[oldLen] = newSeg;
     }

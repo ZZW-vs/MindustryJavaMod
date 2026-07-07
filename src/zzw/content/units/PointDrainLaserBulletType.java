@@ -51,7 +51,7 @@ public class PointDrainLaserBulletType extends BulletType {
     public void init(Bullet b) {
         super.init(b);
         b.data = new DrainLaserData();
-        ((DrainLaserData) b.data).pos.set(b.x, b.y);
+        ((DrainLaserData) b.data).pos.set(b);
     }
 
     @Override
@@ -63,16 +63,13 @@ public class PointDrainLaserBulletType extends BulletType {
 
         if (b.owner instanceof Unit) {
             Unit e = (Unit) b.owner;
-            tmpVec.trns(b.rotation(), e.dst(e.aimX, e.aimY)).limit(maxLength);
-            dld.pos.set(b.x + tmpVec.x, b.y + tmpVec.y);
+            dld.pos.trns(b.rotation(), e.dst(e.aimX, e.aimY)).limit(maxLength);
         } else {
-            tmpVec.trns(b.rotation(), maxLength);
-            dld.pos.set(b.x + tmpVec.x, b.y + tmpVec.y);
+            dld.pos.trns(b.rotation(), maxLength);
         }
 
         float length = Damage.findLaserLength(b, maxLength);
-        tmpVec.trns(b.rotation(), length);
-        dld.pos.set(b.x + tmpVec.x, b.y + tmpVec.y);
+        dld.pos.setLength(length).add(b);
 
         dld.trail.update(dld.pos.x, dld.pos.y);
 
@@ -80,9 +77,7 @@ public class PointDrainLaserBulletType extends BulletType {
             if (hOwner != null) {
                 Damage.damageUnits(b.team, dld.pos.x, dld.pos.y, area, damage,
                     unit -> unit.hittable() && unit.checkTarget(collidesAir, collidesGround),
-                    unit -> {
-                        hOwner.heal(damage * drainPercent);
-                    });
+                    unit -> hOwner.heal(damage * drainPercent));
 
                 Vars.indexer.eachBlock(null, dld.pos.x, dld.pos.y, area,
                     build -> build.team != b.team && build.health > 0,
@@ -140,7 +135,7 @@ public class PointDrainLaserBulletType extends BulletType {
     public void drawLight(Bullet b) {}
 
     public float range() {
-        return maxLength;
+        return maxRange;
     }
 
     private static class DrainLaserData {
