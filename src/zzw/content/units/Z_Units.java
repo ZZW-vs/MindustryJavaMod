@@ -159,9 +159,11 @@ public class Z_Units {
         // PU132 原版 segmentLength=9, segmentOffset=23f
         // 段间距 22.7f (PU132 23f - 0.3f, 用户要求稍小一点)
         // wobble=true (arcnelidia 轻微晃动)
-        // segmentRotationRange=15f (电弧虫比较硬, 防止旋转过度)
+        // angleLimit=25f (电弧虫比较硬, 防止旋转过度)
+        // segmentCast=4, jointStrength=1f, anglePhysicsSmooth=0f (PU132 默认值)
         SegmentWormEntity.configs.put(arcnelidia.name,
-            new SegmentWormEntity.SegmentConfig(arcnelidiaSegment, 9, 22.7f, 0f, 0, true, false, false, 15f));
+            new SegmentWormEntity.SegmentConfig(arcnelidiaSegment, 9, 22.7f, 0f, 0, true, false, false,
+                25f, 6f, 0.1f, 1f, 4, 0f, false, 0f));
 
         // 用反射设置 shootSound 和 visualElevation, 避开编译期字段差异 (v150 vs v154)
         try {
@@ -292,10 +294,12 @@ public class Z_Units {
         // PU132: regenTime=15*60f (15秒长一节), maxSegments 默认上限 25
         // PU132: splittable=true (段身有独立血量, 死亡时虫子分裂)
         // ★ chainable=true (用户要求实现链式合并, 两条虫子靠近时合并)
-        // ★ segmentRotationRange=35f (toxobyte 25 段, 25f 太严格转弯卡顿, 35f 更顺畅)
+        // ★ angleLimit=25f (PU132 toxobyte 原值)
         // ★ segmentDamageScl=8f (PU132 原版 toxobyte 值, 段身受击时血量×8倍掉, 更脆更容易分裂)
+        // segmentCast=4, jointStrength=1f, anglePhysicsSmooth=0f (PU132 默认值)
         SegmentWormEntity.configs.put(toxobyte.name,
-            new SegmentWormEntity.SegmentConfig(toxobyteSegment, 25, 16.25f, 15f * 60f, 25, false, true, true, 35f, 8f));
+            new SegmentWormEntity.SegmentConfig(toxobyteSegment, 25, 16.25f, 15f * 60f, 25, false, true, true,
+                25f, 8f, 0.1f, 1f, 4, 0f, false, 0f));
 
         // ═══════════════════════════════════════════════════════════
         //  Catenapede (PU132 吸血虫)
@@ -418,8 +422,10 @@ public class Z_Units {
         // PU132: splittable=true, chainable=true
         // PU132: segmentDamageScl=12f (段身受击时血量×12倍掉)
         // PU132: healthDistribution=0.15f (血量分布速率)
+        // angleLimit=25f, segmentCast=4, jointStrength=1f (PU132 默认值)
         SegmentWormEntity.configs.put(catenapede.name,
-            new SegmentWormEntity.SegmentConfig(catenapedeSegment, 2, 31f, 30f * 60f, 15, false, true, true, 25f, 12f, 0.15f));
+            new SegmentWormEntity.SegmentConfig(catenapedeSegment, 2, 31f, 30f * 60f, 15, false, true, true,
+                25f, 12f, 0.15f, 1f, 4, 0f, false, 0f));
 
         // ===== Devourer (PU132 devourer-of-eldrich-gods) =====
         // End 阵营超级虫子, 60段, 全免疫, 头部激光+段身多种武器
@@ -586,8 +592,10 @@ public class Z_Units {
         // PU132: segmentLength=60, segmentOffset=(41f*1.55)+7f ≈ 70.55f
         // PU132: splittable=false, chainable=false (不可分裂合并)
         // PU132: 无 regen (初始就60段)
+        // angleLimit=30f, segmentCast=8 (60段需要更大的力传播防止打结)
         SegmentWormEntity.configs.put(devourer.name,
-            new SegmentWormEntity.SegmentConfig(devourerSegment, 60, 70.55f, 0f, 60, false, false, false));
+            new SegmentWormEntity.SegmentConfig(devourerSegment, 60, 70.55f, 0f, 60, false, false, false,
+                30f, 6f, 0.1f, 1f, 8, 0f, false, 0f));
 
         // ★ 初始化分裂/合并音效 (PU132 默认 Sounds.door)
         try {

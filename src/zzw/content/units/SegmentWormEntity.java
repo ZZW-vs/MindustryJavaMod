@@ -97,24 +97,42 @@ public class SegmentWormEntity extends UnitEntity {
     protected Vec2[] segVelocities;
     /** 段身朝向 (PU132 segmentUnits[i].rotation, 每段独立朝向, 用于约束算法) */
     protected float[] segRotations;
-    /** 路径点数组: 记录头部走过的位置, 段身延迟跟随这些位置 */
+    /** 头部移动轨迹点 (段身延迟跟随用, PU132 老式延迟跟随模式)
+     *  长度 = 段数 * 8, 环形数组, pathIndex 是当前写入位置 */
     protected Vec2[] pathPoints;
-    /** 路径点写入索引 */
-    protected int pathWriteIndex = 0;
+    protected int pathIndex = 0;
     /** 段身朝向相对父段的最大角度差 (度, PU132 angleLimit)
      *  调小 = 段身更硬 (转向幅度小), 调大 = 段身更软 (转向幅度大)
-     *  PU132 原版 toxobyte 30f, arcnelidia 默认 25f */
+     *  PU132 原版默认 30f */
     public float angleLimit = 30f;
     /** 段身间距 (PU132 segmentOffset) */
     public float segmentSpacing = 23f;
-    /** 段身阻力 (PU132 drag, 段身速度衰减)
-     *  PU132 原版 0.007f, 这里用 0.02f 让段身惯性适中 */
-    public float segmentDrag = 0.02f;
+    /** 段身阻力 (PU132 drag, 速度传播模式下用)
+     *  PU132 原版 0.007f */
+    public float segmentDrag = 0.007f;
     /** 关节强度 (PU132 jointStrength, 0~1)
      *  越大 = 段身越快被拉回理想位置 = 越硬
-     *  越小 = 段身越松散, 容易甩动
-     *  PU132 原版 0.08f */
-    public float jointStrength = 0.08f;
+     *  PU132 原版默认 1f (WormComp), WormDefaultUnit 用 0.08f
+     *  我们用 WormComp 式约束, 所以默认 1f */
+    public float jointStrength = 1f;
+    /** 拉回力传播段数 (PU132 segmentCast)
+     *  每段的拉回力会传播到后面 segmentCast 段, 越靠后力越小
+     *  越大 = 段身之间越连贯, 不容易打结
+     *  PU132 原版默认 4 */
+    public int segmentCast = 4;
+    /** 角度物理平滑 (PU132 anglePhysicsSmooth, 0~1)
+     *  0 = 完全硬限制 (clampedAngle), 1 = 完全平滑
+     *  越大 = 转向越平滑, 但越容易超角度
+     *  PU132 原版默认 0f */
+    public float anglePhysicsSmooth = 0f;
+    /** 防止角度漂移 (PU132 preventDrifting)
+     *  静止时使用段身自身朝向而非 angleTo, 避免 atan2 精度问题导致缓慢漂移
+     *  PU132 原版默认 false */
+    public boolean preventDrifting = false;
+    /** 头部偏移 (PU132 headOffset, 第0段身相对头部的额外偏移)
+     *  正数 = 第0段身离头部更远
+     *  PU132 原版默认 0f */
+    public float headOffset = 0f;
     /** 血量分布速率 (PU132 healthDistribution) */
     public float healthDistributionRate = 0.1f;
     /** 血量分布效率 (受伤降低, 慢慢恢复, PU132 healthDistributionEfficiency) */
@@ -187,8 +205,22 @@ public class SegmentWormEntity extends UnitEntity {
         public final float healthDistribution;
         /** 关节强度 (PU132 jointStrength, 0~1)
          *  越大 = 段身越快被拉回理想位置 = 越硬
-         *  默认 0.08f */
+         *  默认 1f (WormComp式约束) */
         public final float jointStrength;
+        /** 拉回力传播段数 (PU132 segmentCast)
+         *  越大 = 段身越连贯, 不容易打结
+         *  默认 4 */
+        public final int segmentCast;
+        /** 角度物理平滑 (PU132 anglePhysicsSmooth, 0~1)
+         *  默认 0f (硬限制) */
+        public final float anglePhysicsSmooth;
+        /** 防止角度漂移 (PU132 preventDrifting)
+         *  默认 false */
+        public final boolean preventDrifting;
+        /** 头部偏移 (PU132 headOffset)
+         *  默认 0f */
+        public final float headOffset;
+
         public SegmentConfig(mindustry.type.UnitType t, int c, float s) {
             this(t, c, s, 0f, 0, false, false, false);
         }
@@ -199,20 +231,30 @@ public class SegmentWormEntity extends UnitEntity {
             this(t, c, s, regenTime, maxSegments, wobble, false, false);
         }
         public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble, boolean splittable, boolean chainable) {
-            this(t, c, s, regenTime, maxSegments, wobble, splittable, chainable, 25f);
+            this(t, c, s, regenTime, maxSegments, wobble, splittable, chainable, 30f);
         }
-        /** 带段身转角范围的新构造函数 (toxobyte 用 30f, arcnelidia 用默认 25f) */
         public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble, boolean splittable, boolean chainable, float angleLimit) {
             this(t, c, s, regenTime, maxSegments, wobble, splittable, chainable, angleLimit, 6f);
         }
-        /** 完整构造函数: 带段身转角范围和伤害缩放 (toxobyte 用 30f/8f, arcnelidia 用 25f/6f 默认) */
         public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble, boolean splittable, boolean chainable, float angleLimit, float segmentDamageScl) {
             this(t, c, s, regenTime, maxSegments, wobble, splittable, chainable, angleLimit, segmentDamageScl, 0.1f);
         }
         public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble, boolean splittable, boolean chainable, float angleLimit, float segmentDamageScl, float healthDistribution) {
-            this(t, c, s, regenTime, maxSegments, wobble, splittable, chainable, angleLimit, segmentDamageScl, healthDistribution, 0.08f);
+            this(t, c, s, regenTime, maxSegments, wobble, splittable, chainable, angleLimit, segmentDamageScl, healthDistribution, 1f);
         }
         public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble, boolean splittable, boolean chainable, float angleLimit, float segmentDamageScl, float healthDistribution, float jointStrength) {
+            this(t, c, s, regenTime, maxSegments, wobble, splittable, chainable, angleLimit, segmentDamageScl, healthDistribution, jointStrength, 4);
+        }
+        public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble, boolean splittable, boolean chainable, float angleLimit, float segmentDamageScl, float healthDistribution, float jointStrength, int segmentCast) {
+            this(t, c, s, regenTime, maxSegments, wobble, splittable, chainable, angleLimit, segmentDamageScl, healthDistribution, jointStrength, segmentCast, 0f);
+        }
+        public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble, boolean splittable, boolean chainable, float angleLimit, float segmentDamageScl, float healthDistribution, float jointStrength, int segmentCast, float anglePhysicsSmooth) {
+            this(t, c, s, regenTime, maxSegments, wobble, splittable, chainable, angleLimit, segmentDamageScl, healthDistribution, jointStrength, segmentCast, anglePhysicsSmooth, false);
+        }
+        public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble, boolean splittable, boolean chainable, float angleLimit, float segmentDamageScl, float healthDistribution, float jointStrength, int segmentCast, float anglePhysicsSmooth, boolean preventDrifting) {
+            this(t, c, s, regenTime, maxSegments, wobble, splittable, chainable, angleLimit, segmentDamageScl, healthDistribution, jointStrength, segmentCast, anglePhysicsSmooth, preventDrifting, 0f);
+        }
+        public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble, boolean splittable, boolean chainable, float angleLimit, float segmentDamageScl, float healthDistribution, float jointStrength, int segmentCast, float anglePhysicsSmooth, boolean preventDrifting, float headOffset) {
             segmentType = t; count = c; spacing = s;
             this.regenTime = regenTime; this.maxSegments = maxSegments;
             this.wobble = wobble; this.splittable = splittable; this.chainable = chainable;
@@ -220,6 +262,10 @@ public class SegmentWormEntity extends UnitEntity {
             this.segmentDamageScl = segmentDamageScl;
             this.healthDistribution = healthDistribution;
             this.jointStrength = jointStrength;
+            this.segmentCast = segmentCast;
+            this.anglePhysicsSmooth = anglePhysicsSmooth;
+            this.preventDrifting = preventDrifting;
+            this.headOffset = headOffset;
         }
     }
     /** 按 UnitType.name 注册的段身配置 (key = 头部名字, 如 "arcnelidia" / "toxobyte") */
@@ -280,11 +326,16 @@ public class SegmentWormEntity extends UnitEntity {
                     segmentDamageScl = cfg.segmentDamageScl;
                     healthDistributionRate = cfg.healthDistribution;
                     jointStrength = cfg.jointStrength;
+                    segmentCast = cfg.segmentCast;
+                    anglePhysicsSmooth = cfg.anglePhysicsSmooth;
+                    preventDrifting = cfg.preventDrifting;
+                    headOffset = cfg.headOffset;
                     createSegments(cfg.count, cfg.segmentType);
                     segmentsCreated = true;
                     System.out.println("[头部] 段身创建: " + cfg.count + "节 间距=" + cfg.spacing
-                        + " 转角=" + angleLimit
-                        + " 关节强度=" + jointStrength
+                        + " 转角=" + angleLimit + " 关节强度=" + jointStrength
+                        + " 力传播=" + segmentCast + " 平滑=" + anglePhysicsSmooth
+                        + " 防漂移=" + preventDrifting
                         + " 再生=" + (regenTime > 0 ? "开" : "关") + " 晃动=" + (wobbleEnabled ? "开" : "关")
                         + " 分裂=" + (splittable ? "开" : "关") + " 合并=" + (chainable ? "开" : "关"));
                 } catch (Throwable t) {
@@ -534,78 +585,91 @@ public class SegmentWormEntity extends UnitEntity {
     }
 
     /**
-     * 约束修正: 按速度移动后, 将段身拉回理想位置 (PU132 WormDefaultUnit.updateSegmentsLocal L126-177)
+     * 约束修正: 融合 PU132 WormComp 稳定算法 (WormComp.updatePost)
      *
-     * 核心流程:
-     * 1. 段身按速度移动 (seg.add(segmentVelocities[i]))
-     * 2. 计算理想位置 (父段后方 segmentOffset 处)
-     * 3. 将段身拉回理想位置 (jointStrength 控制拉回力度)
-     * 4. 更新段身朝向 (限制角度差)
+     * 核心流程 (PU132 WormComp 方式):
+     * 1. 计算理想位置 (父段后方 segmentOffset 处)
+     * 2. 段身朝向 = angleTo(理想位置), 带角度限制 + anglePhysicsSmooth 平滑
+     * 3. 段身沿自己朝向移动父段的 deltaLen (跟随父段移动)
+     * 4. 计算拉回向量, 乘 jointStrength * Time.delta
+     * 5. 拉回力传播到后面 segmentCast 段 (越靠后力越小), 防止打结
+     *
+     * 配合 updateSegmentVLocal 的速度传播作为惯性补充
      */
     protected void updateSegmentsLocal() {
         float segmentOffset = segmentSpacing / 2f;
         int len = segments.length;
         if (len == 0) return;
 
-        // ★ 第 0 段 (最接近头部的段身)
-        Vec2 seg0 = segPositions[0];
-        SegmentUnitEntity segU0 = segments[0];
-        Vec2 segV0 = segVelocities[0];
+        // 记录上一段的位置和朝向 (从头部开始, last = 头部)
+        float lastX = x, lastY = y;
+        float lastRot = rotation;
+        float lastDeltaLen = vel.len();
 
-        // 按速度移动
-        seg0.add(segV0);
+        // 第 0 段: 头部偏移用 headOffset
+        float offset = headOffset;
 
-        // 计算理想位置: 头部后方 segmentOffset 处
-        Tmp.v1.trns(rotation + 180f, segmentOffset).add(this);
-
-        // 段身朝向 = 指向理想位置, 带角度限制
-        segU0.rotation = clampedAngle(seg0.angleTo(Tmp.v1), rotation, angleLimit);
-
-        // 计算拉回向量: 从当前位置到理想位置的差向量 × jointStrength
-        Tmp.v2.trns(segU0.rotation, segmentOffset).add(seg0).sub(Tmp.v1);
-        seg0.sub(Tmp.v2);
-
-        // 速度衰减
-        segV0.scl(Mathf.clamp(1f - segmentDrag * arc.util.Time.delta));
-
-        // 应用到段身实体
-        segU0.syncToHead(seg0.x, seg0.y, segU0.rotation);
-
-        // 血量分布
-        if (healthDistributionRate > 0) distributeHealth(0);
-
-        // ★ 第 1~n 段
-        for (int i = 1; i < len; i++) {
+        for (int i = 0; i < len; i++) {
             Vec2 seg = segPositions[i];
-            Vec2 segLast = segPositions[i - 1];
             SegmentUnitEntity segU = segments[i];
-            SegmentUnitEntity segULast = segments[i - 1];
             Vec2 segV = segVelocities[i];
 
-            // 按速度移动
+            // ★ Step 1: 计算理想位置 (上一段后方 segmentOffset + offset 处)
+            Tmp.v1.trns(lastRot + 180f, segmentOffset + offset).add(lastX, lastY);
+
+            // ★ Step 2: 计算段身朝向 (angleTo 理想位置, 带角度限制和平滑)
+            float angTo;
+            if (preventDrifting && lastDeltaLen < 0.001f) {
+                // 防止漂移: 静止时用自身朝向, 避免 atan2 精度问题
+                angTo = segU.rotation;
+            } else {
+                angTo = Angles.angle(seg.x, seg.y, Tmp.v1.x, Tmp.v1.y);
+            }
+
+            // 角度限制: PU132 方式 - 差值 * (1 - anglePhysicsSmooth)
+            // anglePhysicsSmooth = 0 → 完全硬限制; = 1 → 完全平滑
+            float angleDiff = angleDistSigned(angTo, lastRot, angleLimit);
+            segU.rotation = angTo - (angleDiff * (1f - anglePhysicsSmooth));
+
+            // ★ Step 3: 段身沿自己朝向移动 (跟随上一段移动)
+            // 速度传播补充惯性
             seg.add(segV);
+            // 沿朝向移动上一段的 deltaLen (WormComp 方式)
+            Tmp.v3.trns(segU.rotation, lastDeltaLen);
+            seg.add(Tmp.v3);
 
-            // 前一段朝向修正 (前一段向当前段方向转一点)
-            segULast.rotation -= angleDistSigned(segULast.rotation, segU.rotation, angleLimit) / 1.25f;
-
-            // 计算理想位置: 前一段后方 segmentOffset 处
-            Tmp.v1.trns(segULast.rotation + 180f, segmentOffset).add(segLast);
-
-            // 段身朝向 = 指向理想位置, 带角度限制
-            segU.rotation = clampedAngle(segU.angleTo(Tmp.v1), segULast.rotation, angleLimit);
-
-            // 计算拉回向量: 从当前位置到理想位置的差向量 × jointStrength
+            // ★ Step 4: 计算拉回向量
             Tmp.v2.trns(segU.rotation, segmentOffset).add(seg).sub(Tmp.v1);
-            seg.sub(Tmp.v2);
+            // 拉回力 = 差值 * jointStrength * Time.delta (PU132 WormComp 方式)
+            float pullScl = Mathf.clamp(jointStrength * arc.util.Time.delta);
+            Tmp.v2.scl(pullScl);
+
+            // ★ Step 5: 拉回力传播到后面 segmentCast 段 (防止打结)
+            int cast = Math.min(segmentCast, len - i);
+            for (int j = 0; j < cast; j++) {
+                float scl = (cast - j) / (float) cast;  // 越靠后力越小
+                segPositions[i + j].sub(Tmp.v2.x * scl, Tmp.v2.y * scl);
+                // 更新上一段位置记录 (用于下一轮循环的 lastX/lastY)
+                if (j == 0) {
+                    seg.set(segPositions[i]);
+                }
+            }
 
             // 速度衰减
             segV.scl(Mathf.clamp(1f - segmentDrag * arc.util.Time.delta));
 
-            // 应用到段身实体
+            // 同步到段身实体
             segU.syncToHead(seg.x, seg.y, segU.rotation);
 
             // 血量分布
             if (healthDistributionRate > 0) distributeHealth(i);
+
+            // 更新 last 变量, 下一段用
+            lastX = seg.x;
+            lastY = seg.y;
+            lastRot = segU.rotation;
+            lastDeltaLen = segV.len() + Tmp.v3.len();
+            offset = 0f;  // 只有第 0 段有 headOffset
         }
     }
 
@@ -940,11 +1004,17 @@ public class SegmentWormEntity extends UnitEntity {
                 segmentDamageScl = cfg.segmentDamageScl;
                 healthDistributionRate = cfg.healthDistribution;
                 jointStrength = cfg.jointStrength;
+                segmentCast = cfg.segmentCast;
+                anglePhysicsSmooth = cfg.anglePhysicsSmooth;
+                preventDrifting = cfg.preventDrifting;
+                headOffset = cfg.headOffset;
                 try {
                     createSegments(cfg.count, cfg.segmentType);
                     segmentsCreated = true;
                     System.out.println("[头部] 启动: " + type.name + " 段身=" + cfg.count + "节"
                         + " 转角=" + angleLimit + " 关节强度=" + jointStrength
+                        + " 力传播=" + segmentCast + " 平滑=" + anglePhysicsSmooth
+                        + " 防漂移=" + preventDrifting
                         + " 再生=" + (regenTime > 0 ? "开" : "关") + " 晃动=" + (wobbleEnabled ? "开" : "关")
                         + " 分裂=" + (splittable ? "开" : "关") + " 合并=" + (chainable ? "开" : "关"));
                 } catch (Throwable t) {
