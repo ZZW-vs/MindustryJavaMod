@@ -592,10 +592,10 @@ public class Z_Units {
         // PU132: segmentLength=60, segmentOffset=(41f*1.55)+7f ≈ 70.55f
         // PU132: splittable=false, chainable=false (不可分裂合并)
         // PU132: 无 regen (初始就60段)
-        // angleLimit=30f, segmentCast=8 (60段需要更大的力传播防止打结)
+        // PU132 原版: segmentCast=7, anglePhysicsSmooth=0.5f, jointStrength=1f, preventDrifting=true
         SegmentWormEntity.configs.put(devourer.name,
             new SegmentWormEntity.SegmentConfig(devourerSegment, 60, 70.55f, 0f, 60, false, false, false,
-                30f, 6f, 0.1f, 1f, 8, 0f, false, 0f));
+                30f, 6f, 0.1f, 1f, 7, 0.5f, true, 0f));
 
         // ★ 初始化分裂/合并音效 (PU132 默认 Sounds.door)
         try {

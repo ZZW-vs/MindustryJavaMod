@@ -585,91 +585,82 @@ public class SegmentWormEntity extends UnitEntity {
     }
 
     /**
-     * 约束修正: 融合 PU132 WormComp 稳定算法 (WormComp.updatePost)
+     * 约束修正: 完全照搬 PU132 WormComp.updatePost 算法 (L299-351)
      *
-     * 核心流程 (PU132 WormComp 方式):
-     * 1. 计算理想位置 (父段后方 segmentOffset 处)
-     * 2. 段身朝向 = angleTo(理想位置), 带角度限制 + anglePhysicsSmooth 平滑
-     * 3. 段身沿自己朝向移动父段的 deltaLen (跟随父段移动)
-     * 4. 计算拉回向量, 乘 jointStrength * Time.delta
-     * 5. 拉回力传播到后面 segmentCast 段 (越靠后力越小), 防止打结
-     *
-     * 配合 updateSegmentVLocal 的速度传播作为惯性补充
+     * PU132 原版核心流程:
+     * 1. 遍历段身链, last = 上一段 (从头部开始)
+     * 2. 计算理想位置 = 上一段后方 (segmentOffset/2 + offset) 处
+     * 3. 计算 angTo = 段身指向理想位置的角度
+     *    - preventDrifting 且静止时用自身朝向, 避免 atan2 精度问题
+     * 4. 角度平滑: rotation = angTo - (差值 * (1 - anglePhysicsSmooth))
+     * 5. 段身沿自身朝向移动 = 上一段的 deltaLen
+     * 6. 计算拉回向量 = (段身位置 + 段身朝向*segmentOffset/2) - 理想位置
+     *    - 拉回力 = 向量 * jointStrength * Time.delta
+     * 7. 拉回力传播到后面 segmentCast 段, scl = cast / segmentCast
+     * 8. 更新 last 为当前段, 继续下一段
      */
     protected void updateSegmentsLocal() {
         float segmentOffset = segmentSpacing / 2f;
         int len = segments.length;
         if (len == 0) return;
 
-        // 记录上一段的位置和朝向 (从头部开始, last = 头部)
-        float lastX = x, lastY = y;
-        float lastRot = rotation;
-        float lastDeltaLen = vel.len();
-
-        // 第 0 段: 头部偏移用 headOffset
-        float offset = headOffset;
+        // PU132: last = 头部, 从头部开始遍历
+        Unit last = this;
 
         for (int i = 0; i < len; i++) {
             Vec2 seg = segPositions[i];
             SegmentUnitEntity segU = segments[i];
-            Vec2 segV = segVelocities[i];
 
             // ★ Step 1: 计算理想位置 (上一段后方 segmentOffset + offset 处)
-            Tmp.v1.trns(lastRot + 180f, segmentOffset + offset).add(lastX, lastY);
+            float offset = (last == this) ? headOffset : 0f;
+            Tmp.v1.trns(last.rotation + 180f, segmentOffset + offset).add(last);
 
-            // ★ Step 2: 计算段身朝向 (angleTo 理想位置, 带角度限制和平滑)
+            // ★ Step 2: 计算 angTo (段身指向理想位置的角度)
+            // PU132: preventDrifting 且静止时用自身朝向
+            float rdx = segU.deltaX - last.deltaX;
+            float rdy = segU.deltaY - last.deltaY;
             float angTo;
-            if (preventDrifting && lastDeltaLen < 0.001f) {
-                // 防止漂移: 静止时用自身朝向, 避免 atan2 精度问题
-                angTo = segU.rotation;
+            if (!preventDrifting || (last.deltaLen() > 0.001f && (rdx * rdx) + (rdy * rdy) > 0.00001f)) {
+                angTo = Angles.angle(segU.x, segU.y, Tmp.v1.x, Tmp.v1.y);
             } else {
-                angTo = Angles.angle(seg.x, seg.y, Tmp.v1.x, Tmp.v1.y);
+                angTo = segU.rotation;
             }
 
-            // 角度限制: PU132 方式 - 差值 * (1 - anglePhysicsSmooth)
-            // anglePhysicsSmooth = 0 → 完全硬限制; = 1 → 完全平滑
-            float angleDiff = angleDistSigned(angTo, lastRot, angleLimit);
+            // ★ Step 3: 角度平滑 (PU132 原版公式)
+            // rotation = angTo - (差值 * (1 - anglePhysicsSmooth))
+            float angleDiff = angleDistSigned(angTo, last.rotation, angleLimit);
             segU.rotation = angTo - (angleDiff * (1f - anglePhysicsSmooth));
 
-            // ★ Step 3: 段身沿自己朝向移动 (跟随上一段移动)
-            // 速度传播补充惯性
-            seg.add(segV);
-            // 沿朝向移动上一段的 deltaLen (WormComp 方式)
-            Tmp.v3.trns(segU.rotation, lastDeltaLen);
-            seg.add(Tmp.v3);
+            // ★ Step 4: 段身沿自身朝向移动 = 上一段的 deltaLen (PU132 原版)
+            Tmp.v3.trns(segU.rotation, last.deltaLen());
+            segU.trns(Tmp.v3.x, Tmp.v3.y);
+            seg.set(segU.x, segU.y);
 
-            // ★ Step 4: 计算拉回向量
+            // ★ Step 5: 计算拉回向量 (PU132 原版)
             Tmp.v2.trns(segU.rotation, segmentOffset).add(seg).sub(Tmp.v1);
-            // 拉回力 = 差值 * jointStrength * Time.delta (PU132 WormComp 方式)
-            float pullScl = Mathf.clamp(jointStrength * arc.util.Time.delta);
-            Tmp.v2.scl(pullScl);
+            Tmp.v2.scl(Mathf.clamp(jointStrength * arc.util.Time.delta));
 
-            // ★ Step 5: 拉回力传播到后面 segmentCast 段 (防止打结)
-            int cast = Math.min(segmentCast, len - i);
-            for (int j = 0; j < cast; j++) {
-                float scl = (cast - j) / (float) cast;  // 越靠后力越小
-                segPositions[i + j].sub(Tmp.v2.x * scl, Tmp.v2.y * scl);
-                // 更新上一段位置记录 (用于下一轮循环的 lastX/lastY)
-                if (j == 0) {
-                    seg.set(segPositions[i]);
-                }
+            // ★ Step 6: 拉回力传播到后面 segmentCast 段 (PU132 原版逻辑, 适配数组)
+            // scl = cast / segmentCast → 越靠前力越大
+            int cast = segmentCast;
+            int idx = i;
+            while (cast > 0 && idx < len) {
+                float scl = cast / (float) segmentCast;
+                segments[idx].set(segments[idx].x - (Tmp.v2.x * scl), segments[idx].y - (Tmp.v2.y * scl));
+                segments[idx].updateLastPosition();
+                segPositions[idx].set(segments[idx].x, segments[idx].y);
+                idx++;
+                cast--;
             }
 
-            // 速度衰减
-            segV.scl(Mathf.clamp(1f - segmentDrag * arc.util.Time.delta));
-
-            // 同步到段身实体
-            segU.syncToHead(seg.x, seg.y, segU.rotation);
+            // ★ Step 7: 同步到 Vec2 位置 (用于 draw 等)
+            seg.set(segU.x, segU.y);
 
             // 血量分布
             if (healthDistributionRate > 0) distributeHealth(i);
 
-            // 更新 last 变量, 下一段用
-            lastX = seg.x;
-            lastY = seg.y;
-            lastRot = segU.rotation;
-            lastDeltaLen = segV.len() + Tmp.v3.len();
-            offset = 0f;  // 只有第 0 段有 headOffset
+            // ★ Step 8: 更新 last 为当前段, 继续下一段
+            last = segU;
         }
     }
 
