@@ -434,7 +434,7 @@ public class Z_Units {
         devourerSegment = new UnitType("devourer-segment") {{
             health = 25000f;
             speed = 0f;
-            hitSize = 30f;
+            hitSize = 40f;  // 原 30f + 10
             armor = 8f;
             flying = true;
             rotateSpeed = 1f;

@@ -943,36 +943,38 @@ public class SegmentWormEntity extends UnitEntity {
             pathPoints[i] = new Vec2(x, y);
         }
 
-        // ★ PU132 原版做法: 所有段身初始都挤在头部同一点
-        //   靠非相邻段身碰撞 + 约束算法自然弹开, 形成卷绕散开效果
-        //   比预生成波浪形更自然, 且每次生成形状都不同
-        float baseAngle = rotation + 180f;
+        // ★ PU132 原版做法: 段身初始展开成扇形 (WormComp.add L454-468)
+        //   每段角度 = rotation + angleLimit + i * angleLimit
+        //   位置 = 前一段后方 segmentOffset 处
+        //   这样初始就是自然的展开状态, 不需要靠碰撞弹开
+        float[] rot = {rotation + angleLimit};
+        Tmp.v1.trns(rot[0] + 180f, segmentSpacing + headOffset).add(this);
 
         for (int i = 0; i < count; i++) {
-            // 所有段身初始位置 = 头部位置 (稍微加一点点随机偏移, 避免完全重合导致碰撞不稳定)
-            float segX = x + Mathf.range(0.5f);
-            float segY = y + Mathf.range(0.5f);
-            // 初始朝向随机, 让弹开方向更随机, 形成自然卷绕
-            float angle = baseAngle + Mathf.random(360f);
+            // PU132 原版: 段身初始位置和朝向
+            float segX = Tmp.v1.x;
+            float segY = Tmp.v1.y;
+            float angle = rot[0];
 
             // 用 segmentType 创建段身 (SegmentUnitEntity 实例)
             SegmentUnitEntity seg = (SegmentUnitEntity) segmentType.create(team);
             seg.set(segX, segY);
             seg.rotation = angle;
             seg.head = this;
-            seg.segmentIndex = i;  // 段身在数组中的索引, 用于 z 层级
-            // 最后一节段身是 tail (用 tail 贴图而不是 segment 贴图)
+            seg.segmentIndex = i;
             seg.isTail = (i == count - 1);
-            // ★ 设置贴图前缀 = 头部 type.name + "-" (如 "arcnelidia-" / "toxobyte-")
             seg.texturePrefix = type.name + "-";
             seg.add();
 
             segments[i] = seg;
             segPositions[i] = new Vec2(seg.x, seg.y);
-            // 初始给一个微小的向外速度, 帮助碰撞启动
-            float pushSpeed = 0.5f + Mathf.random(1f);
-            segVelocities[i] = new Vec2().trns(angle, pushSpeed);
-            segRotations[i] = angle;        // 初始朝向 = 随机角度
+            segVelocities[i] = new Vec2();
+            segRotations[i] = angle;
+
+            // 计算下一段的位置 (PU132 原版逻辑)
+            rot[0] += angleLimit;
+            Tmp.v2.trns(rot[0] + 180f, segmentSpacing);
+            Tmp.v1.add(Tmp.v2);
         }
     }
 
