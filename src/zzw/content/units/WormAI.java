@@ -32,7 +32,12 @@ public class WormAI extends FlyingAI {
                 circleAttack(80f);
             } else {
                 moveTo(target, unit.range() * 0.8f);
-                unit.lookAt(target);
+                // ★ 尊重 faceTarget: 只有 faceTarget=true 才让单位面向目标
+                //   faceTarget=false (如 arcnelidia): 单位保持移动方向, 武器自己旋转瞄准
+                //   这样激光可以偏转, 不永远正对朝向
+                if (unit.type.faceTarget) {
+                    unit.lookAt(target);
+                }
             }
         } else {
             // ★ 待机静止: 无目标时速度清零 (不管是不是波次模式)

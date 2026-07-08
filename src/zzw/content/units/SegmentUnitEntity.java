@@ -89,19 +89,34 @@ public class SegmentUnitEntity extends UnitEntity {
             // 发射/冷却/旋转交给 v154.3 原版 Weapon.update() 处理
             if (mounts != null && mounts.length > 0) {
                 boolean can = canShoot();
+
+                // ★ PU132 弹幕同步机制 (WormAI.updateWeapons L48-63):
+                // 当头部被玩家控制且正在射击, 段身在 barrageRange 内时,
+                // 段身复制头部的 aimX/aimY, 跟随玩家瞄准方向齐射
+                boolean barrageSync = head.isPlayer() && head.isShooting
+                    && within(head, head.barrageRange + hitSize / 2f);
+
                 for (WeaponMount mount : mounts) {
                     Weapon weapon = mount.weapon;
 
-                    // ★ 索敌: 搜索自己射程内的目标, 更新 aimX/aimY
-                    Unit target = Units.closestEnemy(team, x, y, weapon.range(), u -> !u.dead);
-                    if (target != null) {
-                        mount.aimX = target.x;
-                        mount.aimY = target.y;
+                    if (barrageSync && weapon.controllable) {
+                        // ★ 弹幕模式: 复制头部瞄准目标, 跟随玩家射击
+                        mount.aimX = head.aimX;
+                        mount.aimY = head.aimY;
                         mount.shoot = true;
                         mount.rotate = true;
                     } else {
-                        mount.shoot = false;
-                        mount.rotate = false;
+                        // ★ 自动索敌: 搜索自己射程内的目标
+                        Unit target = Units.closestEnemy(team, x, y, weapon.range(), u -> !u.dead);
+                        if (target != null) {
+                            mount.aimX = target.x;
+                            mount.aimY = target.y;
+                            mount.shoot = true;
+                            mount.rotate = true;
+                        } else {
+                            mount.shoot = false;
+                            mount.rotate = false;
+                        }
                     }
 
                     // ★ 交给原版 Weapon.update 处理冷却、旋转、发射

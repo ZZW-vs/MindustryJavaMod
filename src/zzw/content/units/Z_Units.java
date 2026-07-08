@@ -72,15 +72,15 @@ public class Z_Units {
             physics = false;
             hittable = true;
 
-            // ===== 段身武器: BombBullet (PU132 第3039-3045行, 借用 horizon 炸弹) =====
+            // ===== 段身武器: BombBullet (PU132 第3039-3045行, 匿名武器无贴图) =====
+            // PU132 原版: 段身武器是匿名的 new Weapon(){{...}}, 没有 name, 不加载炮台贴图
             // 电弧虫段身投弹: splashDamage=25, 爆炸色同电弧
-            weapons.add(new Weapon("create-arcnelidia-segment-bomb") {{
+            weapons.add(new Weapon() {{
                 x = 0f;
                 rotate = true;
                 mirror = false;
                 reload = 60f;
                 rotateSpeed = 50f;
-                minShootVelocity = 0.01f;
                 shootCone = 180f;
                 bullet = new mindustry.entities.bullet.BombBulletType(27f, 25f) {{
                     width = 10f;
@@ -211,16 +211,15 @@ public class Z_Units {
             // ★ 关闭 wobble (飞行单位默认会小幅晃动, PU132 原版是静止的)
             wobble = false;
 
-            // ===== 段身武器: ArtilleryBullet (PU132 第3269-3281行) =====
+            // ===== 段身武器: ArtilleryBullet (PU132 第3269-3281行, 匿名武器无贴图) =====
+            // PU132 原版: 段身武器是匿名的, 没有 name, 不加载炮台贴图
             // 瘟疫炮弹: splashDamage=25, splashDamageRadius=25, 瘟疫色
-            weapons.add(new Weapon("create-toxobyte-segment-launcher") {{
+            weapons.add(new Weapon() {{
                 rotate = true;
                 mirror = false;
                 reload = 60f;
                 shootCone = 90f;
-                // 154.3 武器需要 recoil/rotateSpeed
                 rotateSpeed = 50f;
-                minShootVelocity = 0.01f;
                 bullet = new mindustry.entities.bullet.ArtilleryBulletType(5f, 7f) {{
                     collidesTiles = true;
                     collidesAir = true;
@@ -334,7 +333,6 @@ public class Z_Units {
                 x = 14.75f;
                 rotate = true;
                 reload = 25f;
-                minShootVelocity = 0.01f;
                 bullet = new mindustry.entities.bullet.MissileBulletType(3.8f, 12f) {{
                     width = height = 8f;
                     backColor = hitColor = lightColor = trailColor = Color.valueOf("54de3b");
@@ -352,7 +350,6 @@ public class Z_Units {
                 x = 7.25f;
                 rotate = true;
                 reload = 15f;
-                minShootVelocity = 0.01f;
                 bullet = new mindustry.entities.bullet.MissileBulletType(3.8f, 12f) {{
                     width = height = 8f;
                     backColor = hitColor = lightColor = trailColor = Color.valueOf("54de3b");
@@ -447,7 +444,7 @@ public class Z_Units {
             physics = false;
             hittable = true;
 
-            // 段身武器1: 导弹发射器 (PU132 unity-doeg-launcher)
+            // 段身武器1: 导弹发射器 (PU132 unity-doeg-launcher, 8连发)
             weapons.add(new Weapon("create-devourer-segment-missile") {{
                 x = 19f;
                 y = 0f;
@@ -456,7 +453,10 @@ public class Z_Units {
                 rotate = true;
                 reload = 1.2f * 60f;
                 inaccuracy = 1.4f;
-                minShootVelocity = 0.01f;
+                // PU132 原版: shots=8, shotDelay=3f, xRand=12f
+                shoot.shots = 8;
+                shoot.shotDelay = 3f;
+                xRand = 12f;
 
                 bullet = new EndBasicBulletType(6f, 100f, "missile") {{
                     width = 9f;
@@ -474,7 +474,7 @@ public class Z_Units {
                 }};
             }});
 
-            // 段身武器2: 毁灭者 (PU132 unity-doeg-destroyer)
+            // 段身武器2: 毁灭者 (PU132 unity-doeg-destroyer, 6连发)
             weapons.add(new Weapon("create-devourer-segment-destroyer") {{
                 mirror = true;
                 ignoreRotation = true;
@@ -484,7 +484,9 @@ public class Z_Units {
                 shootY = 12f;
                 reload = 1.5f * 60f;
                 inaccuracy = 1.4f;
-                minShootVelocity = 0.01f;
+                // PU132 原版: shots=6, shotDelay=4f
+                shoot.shots = 6;
+                shoot.shotDelay = 4f;
 
                 bullet = new EndBasicBulletType(9.2f, 325f) {{
                     hitSize = 8f;
@@ -505,7 +507,6 @@ public class Z_Units {
                 y = 16.5f;
                 reload = 2f * 60f;
                 continuous = true;
-                minShootVelocity = 0.01f;
 
                 bullet = new EndContinuousLaserBulletType(85f) {{
                     lifetime = 2f * 60f;
@@ -565,7 +566,7 @@ public class Z_Units {
                 }};
             }});
 
-            // 头部武器2: 毁灭者 (PU132 EndBasicBulletType)
+            // 头部武器2: 毁灭者 (PU132 EndBasicBulletType, 6连发)
             weapons.add(new Weapon("create-devourer-destroyer") {{
                 x = 19.25f;
                 y = -22.75f;
@@ -575,7 +576,9 @@ public class Z_Units {
                 rotate = true;
                 reload = 1.5f * 60f;
                 inaccuracy = 1.4f;
-                minShootVelocity = 0.01f;
+                // PU132 原版: shots=6, shotDelay=4f
+                shoot.shots = 6;
+                shoot.shotDelay = 4f;
 
                 bullet = new EndBasicBulletType(9.2f, 325f) {{
                     hitSize = 8f;
@@ -595,7 +598,7 @@ public class Z_Units {
         // PU132 原版: segmentCast=7, anglePhysicsSmooth=0.5f, jointStrength=1f, preventDrifting=true
         SegmentWormEntity.configs.put(devourer.name,
             new SegmentWormEntity.SegmentConfig(devourerSegment, 60, 70.55f, 0f, 60, false, false, false,
-                30f, 6f, 0.1f, 1f, 7, 0.5f, true, 0f));
+                30f, 6f, 0.1f, 1f, 7, 0.5f, true, 0f, 240f));
 
         // ★ 初始化分裂/合并音效 (PU132 默认 Sounds.door)
         try {

@@ -142,6 +142,10 @@ public class SegmentWormEntity extends UnitEntity {
      *  越大 = 段身越脆, 越容易死亡分裂
      *  默认 6f (PU132 UnityUnitType 默认值), toxobyte 8f, catenapede 12f */
     public float segmentDamageScl = 6f;
+    /** 弹幕同步范围 (PU132 barrageRange)
+     *  当头部被玩家控制且正在射击时, 段身在 barrageRange 范围内会复制头部 aimX/aimY 齐射
+     *  PU132 默认 150f, devourer 240f */
+    public float barrageRange = 150f;
 
     /** 再生间隔 (PU132 regenTime, 单位 tick, 0=不再生)
      *  每 regenTime tick 长出一节新尾部段身, 期间会扣血 (health/段数/2)
@@ -220,6 +224,9 @@ public class SegmentWormEntity extends UnitEntity {
         /** 头部偏移 (PU132 headOffset)
          *  默认 0f */
         public final float headOffset;
+        /** 弹幕同步范围 (PU132 barrageRange)
+         *  默认 150f, devourer 240f */
+        public final float barrageRange;
 
         public SegmentConfig(mindustry.type.UnitType t, int c, float s) {
             this(t, c, s, 0f, 0, false, false, false);
@@ -255,6 +262,9 @@ public class SegmentWormEntity extends UnitEntity {
             this(t, c, s, regenTime, maxSegments, wobble, splittable, chainable, angleLimit, segmentDamageScl, healthDistribution, jointStrength, segmentCast, anglePhysicsSmooth, preventDrifting, 0f);
         }
         public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble, boolean splittable, boolean chainable, float angleLimit, float segmentDamageScl, float healthDistribution, float jointStrength, int segmentCast, float anglePhysicsSmooth, boolean preventDrifting, float headOffset) {
+            this(t, c, s, regenTime, maxSegments, wobble, splittable, chainable, angleLimit, segmentDamageScl, healthDistribution, jointStrength, segmentCast, anglePhysicsSmooth, preventDrifting, headOffset, 150f);
+        }
+        public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble, boolean splittable, boolean chainable, float angleLimit, float segmentDamageScl, float healthDistribution, float jointStrength, int segmentCast, float anglePhysicsSmooth, boolean preventDrifting, float headOffset, float barrageRange) {
             segmentType = t; count = c; spacing = s;
             this.regenTime = regenTime; this.maxSegments = maxSegments;
             this.wobble = wobble; this.splittable = splittable; this.chainable = chainable;
@@ -266,6 +276,7 @@ public class SegmentWormEntity extends UnitEntity {
             this.anglePhysicsSmooth = anglePhysicsSmooth;
             this.preventDrifting = preventDrifting;
             this.headOffset = headOffset;
+            this.barrageRange = barrageRange;
         }
     }
     /** 按 UnitType.name 注册的段身配置 (key = 头部名字, 如 "arcnelidia" / "toxobyte") */
@@ -330,6 +341,7 @@ public class SegmentWormEntity extends UnitEntity {
                     anglePhysicsSmooth = cfg.anglePhysicsSmooth;
                     preventDrifting = cfg.preventDrifting;
                     headOffset = cfg.headOffset;
+                    barrageRange = cfg.barrageRange;
                     createSegments(cfg.count, cfg.segmentType);
                     segmentsCreated = true;
                     System.out.println("[头部] 段身创建: " + cfg.count + "节 间距=" + cfg.spacing
@@ -1001,6 +1013,7 @@ public class SegmentWormEntity extends UnitEntity {
                 anglePhysicsSmooth = cfg.anglePhysicsSmooth;
                 preventDrifting = cfg.preventDrifting;
                 headOffset = cfg.headOffset;
+                barrageRange = cfg.barrageRange;
                 try {
                     createSegments(cfg.count, cfg.segmentType);
                     segmentsCreated = true;
