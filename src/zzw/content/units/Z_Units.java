@@ -525,8 +525,13 @@ public class Z_Units {
             armor = 16f;
             range = 480f;
             outlineColor = Color.valueOf("282828");
+            faceTarget = false;
+            wobble = false;
+            circleTarget = true;
+            omniMovement = false;
 
             constructor = SegmentWormEntity::create;
+            aiController = zzw.content.units.WormAI::new;
 
             // 头部武器1: 主激光 (PU132 UnityBullets.endLaser, 简化版)
             weapons.add(new Weapon("devourer-main-laser") {{
@@ -537,7 +542,7 @@ public class Z_Units {
                 reload = 15f * 60f;
                 continuous = true;
                 shake = 4f;
-                firstShotDelay = 41f;
+                shoot.firstShotDelay = 41f;
                 minShootVelocity = 0.01f;
 
                 bullet = new EndContinuousLaserBulletType(2400f) {{

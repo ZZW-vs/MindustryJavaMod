@@ -55,11 +55,6 @@ public class EndContinuousLaserBulletType extends BasicBulletType {
     }
 
     @Override
-    public float range() {
-        return Math.max(length, maxRange);
-    }
-
-    @Override
     public void init() {
         super.init();
         drawSize = Math.max(drawSize, length * 2f);
@@ -77,8 +72,7 @@ public class EndContinuousLaserBulletType extends BasicBulletType {
             float searchRange = length + w;
             float cx = (laserX1 + laserX2) * 0.5f, cy = (laserY1 + laserY2) * 0.5f;
 
-            mindustry.util.Tmp.rect.setCentered(cx, cy, searchRange * 2f, searchRange * 2f);
-            Units.nearbyEnemies(b.team, mindustry.util.Tmp.rect, unit -> {
+            Units.nearbyEnemies(b.team, cx - searchRange, cy - searchRange, searchRange * 2f, searchRange * 2f, unit -> {
                 if (!unit.hittable() || !unit.checkTarget(collidesAir, collidesGround)) return;
                 if (arc.math.geom.Intersector.distanceSegmentPoint(laserX1, laserY1, laserX2, laserY2, unit.x, unit.y) > w) return;
                 unit.damage(damage);
