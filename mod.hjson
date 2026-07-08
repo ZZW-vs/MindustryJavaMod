@@ -11,10 +11,10 @@ author: "郑zip"
 main: "zzw.TestMod"
 
 #the mod description as seen in the mod dialog
-description: "一个为Mindustry添加了基础金属加工系统的Java模组，灵感来源于Minecraft的Create模组。包含机械传动系统、金属加工设备和各种实用方块。"
+description: "一个为Mindustry添加了基础金属加工系统的Java模组，灵感来源于Minecraft的Create模组。包含机械传动系统、金属加工设备、方块合并系统，以及移植自PU132的多节单位系统（电弧虫、噬界虫、压迫者）。"
 
 #the mod version
-version: 1.3
+version: 1.4
 
 #the minimum game build required to run this mod
 minGameVersion: 154

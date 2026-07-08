@@ -3,19 +3,31 @@ package zzw.content.units;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Lines;
+import arc.graphics.g2d.Fill;
 import arc.math.Angles;
 import arc.math.Mathf;
 import arc.math.geom.Vec2;
 import arc.util.Tmp;
 import mindustry.Vars;
 import mindustry.entities.Damage;
+import mindustry.entities.Effect;
 import mindustry.entities.Units;
 import mindustry.gen.Bullet;
 import mindustry.gen.Healthc;
 import mindustry.gen.Unit;
 import mindustry.entities.bullet.BasicBulletType;
+import mindustry.graphics.Drawf;
 
-public class EndContinuousLaserBulletType extends BasicBulletType {
+/**
+ * PU132 EndContinuousLaserBulletType 移植版
+ * - 4色 × 4时间缩放叠加渲染 (16条线段)
+ * - 振荡宽度 (oscScl/oscMag)
+ * - 闪电效果 (lightningChance)
+ * - 充能特效 (chargeEffect)
+ * - 防作弊伤害 (继承 AntiCheatBulletTypeBase)
+ * 参考: PU132 main/src/unity/entities/bullet/anticheat/EndContinuousLaserBulletType.java
+ */
+public class EndContinuousLaserBulletType extends AntiCheatBulletTypeBase {
     public float length = 220f;
     public float shake = 1f;
     public float fadeTime = 16f;
@@ -28,10 +40,14 @@ public class EndContinuousLaserBulletType extends BasicBulletType {
     public float width = 9f, oscScl = 0.8f, oscMag = 1.5f;
     public boolean largeHit = true;
 
+    // 闪电效果参数 (PU132 endLaser 独有)
     public float lightningChance = 0f;
     public float lightningDamage = 0f;
     public int lightningLength = 0;
     public int lightningLengthRand = 0;
+
+    // 充能特效 (PU132 ChargeFx.devourerChargeEffect)
+    public Effect chargeEffect = mindustry.content.Fx.none;
 
     public EndContinuousLaserBulletType(float damage) {
         this.damage = damage;
@@ -63,52 +79,76 @@ public class EndContinuousLaserBulletType extends BasicBulletType {
     @Override
     public void update(Bullet b) {
         if (b.timer(1, 5f)) {
-            b.fdata = length;
+            b.fdata = Damage.findLaserLength(b, length);
 
-            Vec2 v = Tmp.v1.trns(b.rotation(), length).add(b);
+            Vec2 v = Tmp.v1.trns(b.rotation(), b.fdata).add(b);
             float w = largeHit ? 15f : 3f;
 
-            float laserX1 = b.x, laserY1 = b.y, laserX2 = v.x, laserY2 = v.y;
-            float searchRange = length + w;
-            float cx = (laserX1 + laserX2) * 0.5f, cy = (laserY1 + laserY2) * 0.5f;
-
-            Units.nearbyEnemies(b.team, cx - searchRange, cy - searchRange, searchRange * 2f, searchRange * 2f, unit -> {
+            // 沿激光线检测敌方单位 (使用防作弊伤害)
+            Units.nearbyEnemies(b.team, b.x, b.y, b.fdata + w, unit -> {
                 if (!unit.hittable() || !unit.checkTarget(collidesAir, collidesGround)) return;
-                if (arc.math.geom.Intersector.distanceSegmentPoint(laserX1, laserY1, laserX2, laserY2, unit.x, unit.y) > w) return;
-                unit.damage(damage);
+                if (arc.math.geom.Intersector.distanceSegmentPoint(b.x, b.y, v.x, v.y, unit.x, unit.y) > w + unit.hitSize / 2f) return;
+                hitUnitAntiCheat(b, unit);
                 if (b.owner instanceof Healthc h) {
                     h.heal(damage * 0.1f);
                 }
             });
 
-            Vars.indexer.eachBlock(null, cx, cy, searchRange,
+            // 检测建筑 (使用防作弊伤害)
+            Vars.indexer.eachBlock(null, b.x, b.y, b.fdata + w,
                     build -> build.team != b.team && build.health > 0,
                     build -> {
-                        if (arc.math.geom.Intersector.distanceSegmentPoint(laserX1, laserY1, laserX2, laserY2, build.x, build.y) > w) return;
-                        build.damage(damage);
+                        if (arc.math.geom.Intersector.distanceSegmentPoint(b.x, b.y, v.x, v.y, build.x, build.y) > w) return;
+                        hitBuildingAntiCheat(b, build);
                     });
+
+            // 闪电效果 (PU132 endLaser: lightningChance=0.8f)
+            if (lightningChance > 0 && lightningLength > 0 && Mathf.chanceDelta(lightningChance)) {
+                mindustry.entities.Lightning.create(b, colors[2],
+                    lightningDamage < 0 ? damage : lightningDamage,
+                    b.x + Mathf.range(length * 0.5f), b.y + Mathf.range(length * 0.5f),
+                    b.rotation() + Mathf.range(60f),
+                    lightningLength + Mathf.random(lightningLengthRand));
+            }
+
+            // 震屏
+            if (shake > 0) {
+                Effect.shake(shake, shake, b);
+            }
         }
     }
 
     @Override
     public void draw(Bullet b) {
-        float realLen = b.fdata > 0 ? b.fdata : length;
-        float width = this.width;
+        // ★ 对齐 PU132 原版 draw() (EndContinuousLaserBulletType L109-128)
+        // - 用 Damage.findLaserLength 获取实际长度 (考虑碰撞截断)
+        // - 先画主线, 再 4色×4tscales 叠加 (PU132 顺序)
+        // - 无末端三角形 (之前的"激光箭头"是多余的 Drawf.tri)
+        float realLength = mindustry.entities.Damage.findLaserLength(b, length);
+        float fout = Mathf.clamp(b.time > b.lifetime - fadeTime ? 1f - (b.time - (lifetime - fadeTime)) / fadeTime : 1f);
+        float baseLen = realLength * fout;
 
-        Draw.color(colors[0]);
-        Draw.alpha(0.5f);
+        // 主线 (PU132 L114)
+        Lines.lineAngle(b.x, b.y, b.rotation(), baseLen);
 
-        for (int i = 0; i < strokes.length; i++) {
-            Draw.color(colors[i]);
-            Draw.alpha(0.35f + i * 0.15f);
-            Lines.stroke(width * strokes[i]);
-            Lines.lineAngle(b.x, b.y, b.rotation(), realLen * lenscales[i]);
+        // 4色 × 4 tscales 叠加 (PU132 L115-122)
+        for (int s = 0; s < colors.length; s++) {
+            Draw.color(Tmp.c1.set(colors[s]).mul(1f + Mathf.absin(arc.util.Time.time, 1f, 0.1f)));
+            for (int i = 0; i < tscales.length; i++) {
+                Tmp.v1.trns(b.rotation() + 180f, (lenscales[i] - 1f) * spaceMag);
+                Lines.stroke((width + Mathf.absin(arc.util.Time.time, oscScl, oscMag)) * fout * strokes[s] * tscales[i]);
+                Lines.lineAngle(b.x + Tmp.v1.x, b.y + Tmp.v1.y, b.rotation(), baseLen * lenscales[i], false);
+            }
         }
 
-        Draw.color(colors[2]);
-        Lines.stroke(width * 0.5f);
-        Lines.lineAngle(b.x, b.y, b.rotation(), realLen);
-
+        // 光源 (PU132 L124-126, v154.3 用 7 参数版本)
+        Tmp.v1.trns(b.rotation(), baseLen * 1.1f);
+        Drawf.light(b.x, b.y, b.x + Tmp.v1.x, b.y + Tmp.v1.y, lightStroke, lightColor, 0.7f);
         Draw.reset();
+    }
+
+    @Override
+    public void drawLight(Bullet b) {
+        // 光源在 draw() 中处理
     }
 }

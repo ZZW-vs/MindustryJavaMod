@@ -32,7 +32,9 @@ public class Z_Units {
         catenapede,            // 头部 (PU132 Catenapede, 15 段)
         catenapedeSegment,     // 段身
         devourer,              // 头部 (PU132 Devourer, 60 段)
-        devourerSegment;       // 段身
+        devourerSegment,       // 段身
+        oppression,            // 头部 (PU132 Oppression, 55 段)
+        oppressionSegment;     // 段身
 
     public static void load() {
         // ★ 关键: 注册自定义 Entity 到 EntityMapping.idMap, 否则 v154.3 的 UnitType.init() 会失败 ★
@@ -40,6 +42,8 @@ public class Z_Units {
         // (模仿 PU132 的 UnityEntityMapping.register)
         ZEntityRegister.register(SegmentWormEntity.class, SegmentWormEntity::new);
         ZEntityRegister.register(SegmentUnitEntity.class, SegmentUnitEntity::new);
+        // ★ 注册 SlowLightningEntity (慢闪电 Entity, 实现 Drawc 接口)
+        SlowLightningEntity.register();
 
         // —— 段身 UnitType (先创建, 头部要引用它) ——
         arcnelidiaSegment = new UnitType("arcnelidia-segment") {{
@@ -126,8 +130,8 @@ public class Z_Units {
             aiController = zzw.content.units.WormAI::new;
 
             // ===== 头部武器: 双激光 (PU132 原配置) =====
-            // PU132 UnityUnitTypes.java 第3024-3037行原配置
-            weapons.add(new Weapon("create-arcnelidia-laser") {{
+            // PU132 UnityUnitTypes.java 第3024-3037行: 匿名武器, 无炮台贴图
+            weapons.add(new Weapon() {{
                 x = 0f;
                 reload = 10f;
                 rotateSpeed = 50f;
@@ -264,8 +268,9 @@ public class Z_Units {
 
             // ===== 头部武器: 12 发散 SapBullet (PU132 第3250-3267行) =====
             // 瘟疫激光: 12 发同时散射, SapBullet 自动回血
+            // PU132 原版: 匿名武器, 无炮台贴图
             // ★ v154.3: shots/shotDelay 在 shoot (ShootPattern) 字段里, 不在 Weapon 上
-            weapons.add(new Weapon("create-toxobyte-sap") {{
+            weapons.add(new Weapon() {{
                 x = 0f;
                 rotate = false;
                 mirror = false;
@@ -431,7 +436,7 @@ public class Z_Units {
         devourerSegment = new UnitType("devourer-segment") {{
             health = 25000f;
             speed = 0f;
-            hitSize = 40f;  // 原 30f + 10
+            hitSize = 52f;  // 原 40f + 12 (用户要求加大12)
             armor = 8f;
             flying = true;
             rotateSpeed = 1f;
@@ -469,8 +474,9 @@ public class Z_Units {
                     trailChance = 0.2f;
                     weaveMag = 18f;
                     weaveScale = 1.6f;
-                    backColor = Color.valueOf("ec745855");
-                    frontColor = Color.valueOf("ff9c5a");
+                    // PU132 原版: backColor=scarColor(#f53036), frontColor=endColor(#ff786e)
+                    backColor = Color.valueOf("f53036");
+                    frontColor = Color.valueOf("ff786e");
                 }};
             }});
 
@@ -493,8 +499,9 @@ public class Z_Units {
                     shrinkY = 0f;
                     width = 19f;
                     height = 25f;
-                    backColor = Color.valueOf("ec745855");
-                    frontColor = Color.valueOf("ff9c5a");
+                    // PU132 原版: backColor=scarColor(#f53036), frontColor=endColor(#ff786e)
+                    backColor = Color.valueOf("f53036");
+                    frontColor = Color.valueOf("ff786e");
                 }};
             }});
 
@@ -512,7 +519,9 @@ public class Z_Units {
                     lifetime = 2f * 60f;
                     length = 230f;
                     strokes = new float[]{2f * 0.4f, 1.5f * 0.4f, 1f * 0.4f, 0.3f * 0.4f};
-                    colors = new Color[]{Color.valueOf("ec745855"), Color.valueOf("ec7458aa"), Color.valueOf("ff9c5a"), Color.white};
+                    // PU132 原版: scarColorAlpha, scarColor, endColor, white
+                    colors = new Color[]{Color.valueOf("f5303690"), Color.valueOf("f53036"), Color.valueOf("ff786e"), Color.white};
+                    lightColor = lightningColor = hitColor = Color.valueOf("f53036");
                     width = 9f;
                 }};
             }});
@@ -542,7 +551,7 @@ public class Z_Units {
             constructor = SegmentWormEntity::create;
             aiController = zzw.content.units.WormAI::new;
 
-            // 头部武器1: 主激光 (PU132 UnityBullets.endLaser, 简化版)
+            // 头部武器1: 主激光 (PU132 UnityBullets.endLaser, 完整移植)
             weapons.add(new Weapon("create-devourer-main-laser") {{
                 x = 0f;
                 y = 23f;
@@ -552,17 +561,27 @@ public class Z_Units {
                 continuous = true;
                 shake = 4f;
                 shoot.firstShotDelay = 41f;
-                minShootVelocity = 0.01f;
 
                 bullet = new EndContinuousLaserBulletType(2400f) {{
                     length = 340f;
                     lifetime = 5f * 60f;
-                    colors = new Color[]{Color.valueOf("ec745855"), Color.valueOf("ec7458aa"), Color.valueOf("ff9c5a"), Color.white};
+                    // PU132 原版颜色: scarColorAlpha(#f5303690), scarColor(#f53036), endColor(#ff786e), white
+                    colors = new Color[]{Color.valueOf("f5303690"), Color.valueOf("f53036"), Color.valueOf("ff786e"), Color.white};
+                    lightColor = lightningColor = hitColor = Color.valueOf("f53036");
                     lightningChance = 0.8f;
                     lightningDamage = 80f;
                     lightningLength = 42;
                     lightningLengthRand = 5;
                     width = 15f;
+                    chargeEffect = ChargeEffect.devourerCharge;
+                    // 防作弊参数 (PU132 devourer 主激光配置)
+                    ratioStart = 100000f;
+                    ratioDamage = 1f / 60f;
+                    overDamage = 650000f;
+                    overDamagePower = 2.7f;
+                    bleedDuration = 10f * 60f;
+                    pierceShields = true;
+                    modules = new AntiCheatBulletModule[]{new ArmorDamageModule(0f, 12f, 30f, 20f)};
                 }};
             }});
 
@@ -585,8 +604,9 @@ public class Z_Units {
                     shrinkY = 0f;
                     width = 19f;
                     height = 25f;
-                    backColor = Color.valueOf("ec745855");
-                    frontColor = Color.valueOf("ff9c5a");
+                    // PU132 原版: backColor=scarColor(#f53036), frontColor=endColor(#ff786e)
+                    backColor = Color.valueOf("f53036");
+                    frontColor = Color.valueOf("ff786e");
                 }};
             }});
         }};
@@ -607,6 +627,335 @@ public class Z_Units {
         } catch (Throwable t) {
             System.out.println("[Z_Units] 音效初始化失败: " + t);
         }
+
+        // ═══════════════════════════════════════════════════════════
+        //  Oppression (PU132 压迫者)
+        //  - 55 段 (segmentLength=55)
+        //  - segmentOffset=228f (114f*2f), hitSize=218f (114*2-10)
+        //  - angleLimit=35f, barrageRange=490f
+        //  - segmentCast=11, anglePhysicsSmooth=0.5f, jointStrength=1f
+        //  - preventDrifting=true, lowAltitude=true
+        //  - immuneAll=true (免疫所有状态效果)
+        //  - 阶段1: 空壳 (基础属性+段身配置, 无武器)
+        //  - 后续阶段逐步添加武器和特效
+        // ═══════════════════════════════════════════════════════════
+
+        // —— 段身 UnitType ——
+        oppressionSegment = new UnitType("oppression-segment") {{
+            // PU132: 段身血量由头部 healthDistribution 分配, 这里设基础值
+            health = 10000f;
+            speed = 0f;
+            // ★ hitSize=180 (用户指定)
+            hitSize = 180f;
+            armor = 10f;
+            flying = true;
+            rotateSpeed = 1f;
+            faceTarget = false;
+            wobble = false;
+
+            constructor = SegmentUnitEntity::create;
+            hidden = true;
+            useUnitCap = false;
+            physics = false;
+            hittable = true;
+
+            // 阶段1: 段身无武器, 后续阶段添加
+
+            // ===== 阶段2: 段身武器组 (PU132 segmentWeapons, 4组每组2个) =====
+            // PU132 第4127-4292行: segmentWeapons 是 Seq<Weapon>[]
+            // 这里按 PU132 分组添加到段身 weapons
+
+            // —— 段身武器组1: soul-destroyer + destroyer-2 ——
+            // soul-destroyer: 轨道穿透激光 (PU132 EndRailBulletType, 完整移植)
+            // PU132 第4129-4162行: damage=15000, length=850, pierceDamageFactor=0.001
+            weapons.add(new Weapon("create-oppression-soul-destroyer") {{
+                mirror = false;
+                x = 0f;
+                y = 72f;
+                shootY = 0f;
+                rotate = true;
+                rotateSpeed = 1.5f;
+                reload = 4.75f * 60f;
+
+                bullet = new EndRailBulletType() {{
+                    damage = 15000f;
+                    length = 850f;
+                    collisionWidth = 4f;
+                    // PU132: pierceDamageFactor=0.001 几乎不衰减穿透
+                    pierceDamageFactor = 0.001f;
+                    // 防作弊参数 (PU132 EndRail 原版配置)
+                    ratioStart = 100000f;
+                    ratioDamage = 1f / 60f;
+                    overDamage = 650000f;
+                    overDamagePower = 2.7f;
+                    bleedDuration = 10f * 60f;
+                    pierceShields = true;
+                    modules = new AntiCheatBulletModule[]{new ArmorDamageModule(0f, 12f, 30f, 20f)};
+                }};
+            }});
+
+            // destroyer-2: 连续激光 (PU132 EndContinuousLaserBulletType, 550伤害)
+            // PU132 第4163-4191行: damage=550, length=370, strokes*0.7
+            weapons.add(new Weapon("create-oppression-destroyer-2") {{
+                x = 98f;
+                y = -26.25f;
+                shootY = 22f;
+                shootCone = 0.5f;
+                alternate = false;
+                rotate = true;
+                rotateSpeed = 1.75f;
+                continuous = true;
+                reload = 3.5f * 60f;
+
+                bullet = new EndContinuousLaserBulletType(550f) {{
+                    lifetime = 1.5f * 60f;
+                    length = 370f;
+                    // PU132: strokes[i] *= 0.7f
+                    strokes = new float[]{2f * 0.7f, 1.5f * 0.7f, 1f * 0.7f, 0.3f * 0.7f};
+                    // PU132 原版颜色: scarColorAlpha, scarColor, endColor, white
+                    colors = new Color[]{
+                        Color.valueOf("f5303690"),
+                        Color.valueOf("f53036"),
+                        Color.valueOf("ff786e"),
+                        Color.white
+                    };
+                    lightColor = Color.valueOf("f53036");
+                }};
+            }});
+
+            // —— 段身武器组2: oppressor + destroyer-3 ——
+            // oppressor: 扫射激光 (PU132 SweepWeapon + EndSweepLaser, 完整移植)
+            // PU132 第4194-4224行: damage=7000, length=850, width=25, lifetime=130
+            weapons.add(new SweepWeapon("create-oppression-oppressor") {{
+                mirror = false;
+                x = 0f;
+                y = 72f;
+                shootY = 21f;
+                rotateSpeed = 2f;
+                reload = 4f * 60f;
+                // SweepWeapon 构造函数已设 rotate=true, continuous=true
+                // PU132: sweepTime=120, sweepAngle=60
+                sweepTime = 120f;
+                sweepAngle = 60f;
+
+                bullet = new EndSweepLaser(7000f) {{
+                    lifetime = 130f;
+                    length = 850f;
+                    width = 25f;
+                    // PU132: collisionWidth=3, widthLoss=0.7, distance=150
+                    collisionWidth = 3f;
+                    widthLoss = 0.7f;
+                    distance = 150f;
+                    // 防作弊参数 (PU132 EndSweepLaser 原版配置)
+                    ratioStart = 100000f;
+                    ratioDamage = 1f / 60f;
+                    overDamage = 650000f;
+                    overDamagePower = 2.7f;
+                    bleedDuration = 10f * 60f;
+                    pierceShields = true;
+                    modules = new AntiCheatBulletModule[]{new ArmorDamageModule(0f, 12f, 30f, 20f)};
+                    // hitBullet: 暂不设置 (虚空区域 oppressionArea 需单独移植, 高风险)
+                    // PU132: hitBullet = new VoidPortalBulletType() (虚空门户, 高风险机制)
+                }};
+            }});
+
+            // destroyer-3: 导弹 (PU132 missileAntiCheat, 13连发)
+            // ★ 贴图用 create-oppression-destroyer-3 (与头部 destroyer 不同)
+            weapons.add(new Weapon("create-oppression-destroyer-3") {{
+                x = 98f;
+                y = -26.25f;
+                shootY = 6f;
+                rotate = true;
+                rotateSpeed = 4f;
+                inaccuracy = 3f;
+                xRand = 10.25f;
+                reload = 3f * 60f;
+                // PU132 原版: shots=13, shotDelay=5f
+                shoot.shots = 13;
+                shoot.shotDelay = 5f;
+
+                bullet = new EndBasicBulletType(4f, 330f, "missile") {{
+                    width = 12f;
+                    height = 12f;
+                    shrinkY = 0f;
+                    drag = -0.013f;
+                    lifetime = 90f;
+                    splashDamage = 220f;
+                    splashDamageRadius = 45f;
+                    homingPower = 0.08f;
+                    trailChance = 0.2f;
+                    weaveMag = 1f;
+                    weaveScale = 6f;
+                    // PU132 原版颜色: scarColor, endColor
+                    backColor = Color.valueOf("f53036");
+                    frontColor = Color.valueOf("ff786e");
+                }};
+            }});
+
+            // —— 段身武器组3: void + destroyer-4 ——
+            // void: 虚空门户 (PU132 VoidPortalBulletType, 完整移植触手+区域伤害)
+            // PU132 第4249-4270行: damage=1300, length=800, bleedDuration=180
+            weapons.add(new Weapon("create-oppression-void") {{
+                mirror = false;
+                x = 0f;
+                y = 72f;
+                shootY = 21f;
+                rotate = true;
+                rotateSpeed = 1.3f;
+                reload = 6f * 60f;
+
+                bullet = new VoidPortalBulletType(1300f) {{
+                    // PU132 原版参数
+                    length = 800f;
+                    width = 95f;
+                    lifetime = 4f * 60f;
+                    // 防作弊参数 (PU132 VoidPortal 原版配置)
+                    ratioStart = 100000f;
+                    ratioDamage = 1f / 60f;
+                    overDamage = 650000f;
+                    overDamagePower = 2.7f;
+                    bleedDuration = 10f * 60f;
+                    pierceShields = true;
+                    modules = new AntiCheatBulletModule[]{new ArmorDamageModule(0f, 12f, 30f, 20f)};
+                }};
+            }});
+
+            // destroyer-4: 慢闪电 (PU132 SlowLightningBulletType, 完整移植)
+            // PU132 第4272-4289行: damage=120, 5发, inaccuracy=15, range=870
+            weapons.add(new Weapon("create-oppression-destroyer-4") {{
+                x = 98f;
+                y = -26.25f;
+                shootY = 17.5f;
+                rotate = true;
+                rotateSpeed = 3f;
+                inaccuracy = 15f;
+                xRand = 6f;
+                reload = 4f * 60f;
+                // PU132 原版: shots=5
+                shoot.shots = 5;
+
+                // ★ 完整移植 PU132 SlowLightningBulletType (damage=120, range=870)
+                bullet = new SlowLightningBulletType(120f);
+            }});
+
+            // —— 段身武器组4: 空 (PU132 第4291行 new Seq<Weapon>()) ——
+        }};
+
+        // —— 头部 Oppression ——
+        oppression = new UnitType("oppression") {{
+            // ===== 基础属性 (PU132 UnityUnitTypes.java 第4055-4095行) =====
+            health = 2500000f;
+            flying = true;
+            speed = 4.5f;
+            accel = 0.13f;
+            drag = 0.12f;
+            // PU132: hitSize=(114*2)-10=218f
+            hitSize = 218f;
+            // PU132: circleTarget=true, omniMovement=false
+            circleTarget = true;
+            omniMovement = false;
+            // PU132: lowAltitude=true (渲染层级更低)
+            lowAltitude = true;
+            rotateSpeed = 2.2f;
+            engineSize = -1f;
+            armor = 30f;
+            // PU132: angleLimit=35f
+            // PU132: outlineColor=UnityPal.darkerOutline (#2e3142)
+            outlineColor = Color.valueOf("2e3142");
+            // PU132: envEnabled=terrestrial|space
+            envEnabled = mindustry.world.meta.Env.terrestrial | mindustry.world.meta.Env.space;
+            // PU132: immuneAll=true (免疫所有状态效果)
+            immunities.addAll(mindustry.Vars.content.getBy(mindustry.ctype.ContentType.status));
+
+            constructor = SegmentWormEntity::create;
+            aiController = zzw.content.units.WormAI::new;
+            // range 用最大武器射程, 后续添加武器后更新
+            range = 850f;
+
+            // 阶段1: 无武器, 后续阶段逐步添加
+            // 阶段2: destroyer-1, destroyer-3
+            // 阶段3: destroyer-2, soul-destroyer
+            // 阶段4: 主激光, oppressor, void, destroyer-4
+
+            // ===== 阶段4: 头部主激光 (PU132 OppressionLaserBulletType, 完整移植7层渲染) =====
+            // PU132 第4097-4108行: damage=9000, length=2150, width=140, lifetime=8*60
+            weapons.add(new Weapon() {{
+                x = 0f;
+                y = 0f;
+                shootY = 47.25f;
+                mirror = false;
+                continuous = true;
+                reload = 25f * 60f;
+                shoot.firstShotDelay = ChargeEffect.oppressionCharge.lifetime;
+
+                bullet = new OppressionLaserBulletType();
+            }});
+
+            // ===== 阶段2: 头部武器 destroyer-1 (PU132 oppressionShell) =====
+            // PU132 第4110-4125行: 5连发炮弹, 穿透3个目标
+            weapons.add(new Weapon("create-oppression-destroyer-1") {{
+                x = 81.75f;
+                y = -71.5f;
+                shootY = 9.75f;
+                rotate = true;
+                rotateSpeed = 1.75f;
+                reload = 2.3f * 60f;
+                inaccuracy = 2f;
+                // PU132 原版: shots=5, shotDelay=6f
+                shoot.shots = 5;
+                shoot.shotDelay = 6f;
+
+                bullet = new EndBasicBulletType(7f, 410f, "shell") {{
+                    lifetime = 95f;
+                    splashDamage = 125f;
+                    splashDamageRadius = 70f;
+                    width = 18f;
+                    height = 23f;
+                    // PU132 原版颜色: scarColor, endColor
+                    backColor = Color.valueOf("f53036");
+                    frontColor = Color.valueOf("ff786e");
+                    // PU132: lightning=5, lightningLength=10
+                    lightning = 5;
+                    lightningLength = 10;
+                    lightningLengthRand = 5;
+                    // PU132: pierceCap=3, pierce=pierceBuilding=true
+                    pierce = true;
+                    pierceCap = 3;
+                }};
+            }});
+        }};
+
+        // ★ 注册 oppression 段身配置 ★
+        // PU132: segmentLength=55, segmentOffset=228f (114*2)
+        // PU132: splittable=false, chainable=false (不可分裂合并)
+        // PU132: 无 regen (初始就55段)
+        // PU132: segmentCast=11, anglePhysicsSmooth=0.5f, jointStrength=1f, preventDrifting=true
+        // PU132: angleLimit=35f, barrageRange=490f
+        // ★ segmentWeaponGroupSize=2: oppression 段身6个武器分3组 (每组2个), 尾部空组
+        // PU132 segmentWeapons = {组0(soul-destroyer+destroyer-2), 组1(oppressor+destroyer-3), 组2(void+destroyer-4), 组3(空)}
+        SegmentWormEntity.configs.put(oppression.name,
+            new SegmentWormEntity.SegmentConfig(oppressionSegment, 55, 228f, 0f, 55, false, false, false,
+                35f, 6f, 0.1f, 1f, 11, 0.5f, true, 0f, 490f, 2, true));
+
+        // ★ 初始化 oppression 液压装饰 (WormDecal) ★
+        // PU132 UnityUnitTypes 第4064-4073行:
+        //   lineWidth=11.5, lineColor=scarColor, baseX=41.25, baseY=40.25
+        //   endX=81.75, endY=-71.75, baseOffset=19.5, segments=2
+        // ★ 用 head type.name 作为 key 存到 wormDecals Map, 段身 draw 时按头部 name 查找
+        // 这样 devourer 等其他单位查不到 WormDecal, 不会误画液压杆
+        WormDecal decal = new WormDecal("oppression-hydraulics");
+        decal.lineWidth = 11.5f;
+        decal.lineColor = Color.valueOf("f53036");
+        decal.baseX = 41.25f;
+        decal.baseY = 40.25f;
+        decal.endX = 81.75f;
+        decal.endY = -71.75f;
+        decal.baseOffset = 19.5f;
+        decal.segments = 2;
+        // ★ 不调用 decal.load() ★
+        // Z_Units.load() 在 loadContent() 阶段调用, 此时 atlas 还没加载, Core.atlas.find() 返回空贴图
+        // WormDecal 有延迟加载机制: 第一次 draw 时检查 loaded 标志, 未加载则调用 load()
+        SegmentWormEntity.wormDecals.put(oppression.name, decal);
 
         // 用反射设置 toxobyte 武器音效 (v154.3 编译期可能找不到字段)
         try {

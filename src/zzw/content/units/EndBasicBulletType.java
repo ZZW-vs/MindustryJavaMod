@@ -8,9 +8,10 @@ import arc.util.Tmp;
 import mindustry.gen.Bullet;
 import mindustry.entities.bullet.BasicBulletType;
 
-public class EndBasicBulletType extends BasicBulletType {
-    public Color backColor = Color.valueOf("ec745855");
-    public Color frontColor = Color.valueOf("ff9c5a");
+public class EndBasicBulletType extends AntiCheatBulletTypeBase {
+    // PU132 原版颜色: scarColor(#f53036), endColor(#ff786e)
+    public Color backColor = Color.valueOf("f53036");
+    public Color frontColor = Color.valueOf("ff786e");
     public float width = 5f, height = 7f;
     public float shrinkX = 0f, shrinkY = 0.5f;
     public float spin = 0;

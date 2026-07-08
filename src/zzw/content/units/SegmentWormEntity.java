@@ -89,6 +89,36 @@ public class SegmentWormEntity extends UnitEntity {
         return false;
     }
 
+    /**
+     * ★ 大招是否激活 (充能期间 + 射击期间)
+     * 只有 SegmentConfig.freezeOnUlt=true 的单位 (仅 oppression) 才生效
+     * - 检查 mount.charging (充能前摇) 或 mount.bullet != null (持续射击中)
+     * - devourer/arcnelidia 等不受影响
+     */
+    public boolean isUltActive() {
+        if (mounts == null) return false;
+        SegmentConfig cfg = configs.get(type != null ? type.name : "");
+        if (cfg == null || !cfg.freezeOnUlt) return false;
+        for (mindustry.entities.units.WeaponMount mount : mounts) {
+            if (mount.weapon != null && mount.weapon.continuous
+                && (mount.bullet != null || mount.charging)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * ★ 大招期间的减速倍率 (PU132 OppressionComp.updateLaserSpeed)
+     * PU132 原版: speedMultiplier *= 0.075f (减速到 7.5%, 不是完全锁定)
+     * - 头部 mounts[0].bullet != null 时 (主激光射击中) 触发
+     * - 充能期间(mount.charging)也减速, 让单位缓慢移动
+     */
+    public float ultSpeedMultiplier() {
+        if (!isUltActive()) return 1f;
+        return 0.075f;  // PU132 原版值
+    }
+
     /** 段身列表 (顺序: 头部后方第一段到最后一段) */
     public SegmentUnitEntity[] segments = new SegmentUnitEntity[0];
     /** 段身位置缓存 (PU132 segments[], 用于物理模拟) */
@@ -176,6 +206,9 @@ public class SegmentWormEntity extends UnitEntity {
     /** 贴图前缀缓存 (type.name + "-", 用于快速查找段身贴图) */
     protected String texturePrefix = null;
 
+    /** 液压装饰 (WormDecal), 按头部 type.name 查找 (仅 oppression 有, 其他单位为 null) */
+    public static final arc.struct.ObjectMap<String, WormDecal> wormDecals = new arc.struct.ObjectMap<>();
+
     /** 段身配置 (在 Z_Units.load 中注册, 支持多个分段单位) */
     public static class SegmentConfig {
         public final mindustry.type.UnitType segmentType;
@@ -227,6 +260,17 @@ public class SegmentWormEntity extends UnitEntity {
         /** 弹幕同步范围 (PU132 barrageRange)
          *  默认 150f, devourer 240f */
         public final float barrageRange;
+        /** 段身武器分组大小 (PU132 segmentWeapons 的每组武器数)
+         *  0 或负数 = 不分组 (所有段身绘制所有武器)
+         *  oppression: 2 (6个武器分3组, 每组2个, 尾部空组)
+         *  devourer: 0 (不分组, 所有段身绘制所有武器)
+         *  arcnelidia/toxobyte/catenapede: 0 (单武器) */
+        public final int segmentWeaponGroupSize;
+        /** 大招期间是否锁定移动和旋转 (只有 oppression=true)
+         *  true: 当 continuous 武器正在充能(mount.charging)或射击(mount.bullet!=null)时,
+         *         清零 vel 并锁定 rotation, 使单位完全静止
+         *  false: devourer/arcnelidia 等不受影响, 开大招时仍可移动 */
+        public final boolean freezeOnUlt;
 
         public SegmentConfig(mindustry.type.UnitType t, int c, float s) {
             this(t, c, s, 0f, 0, false, false, false);
@@ -265,6 +309,12 @@ public class SegmentWormEntity extends UnitEntity {
             this(t, c, s, regenTime, maxSegments, wobble, splittable, chainable, angleLimit, segmentDamageScl, healthDistribution, jointStrength, segmentCast, anglePhysicsSmooth, preventDrifting, headOffset, 150f);
         }
         public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble, boolean splittable, boolean chainable, float angleLimit, float segmentDamageScl, float healthDistribution, float jointStrength, int segmentCast, float anglePhysicsSmooth, boolean preventDrifting, float headOffset, float barrageRange) {
+            this(t, c, s, regenTime, maxSegments, wobble, splittable, chainable, angleLimit, segmentDamageScl, healthDistribution, jointStrength, segmentCast, anglePhysicsSmooth, preventDrifting, headOffset, barrageRange, 0);
+        }
+        public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble, boolean splittable, boolean chainable, float angleLimit, float segmentDamageScl, float healthDistribution, float jointStrength, int segmentCast, float anglePhysicsSmooth, boolean preventDrifting, float headOffset, float barrageRange, int segmentWeaponGroupSize) {
+            this(t, c, s, regenTime, maxSegments, wobble, splittable, chainable, angleLimit, segmentDamageScl, healthDistribution, jointStrength, segmentCast, anglePhysicsSmooth, preventDrifting, headOffset, barrageRange, segmentWeaponGroupSize, false);
+        }
+        public SegmentConfig(mindustry.type.UnitType t, int c, float s, float regenTime, int maxSegments, boolean wobble, boolean splittable, boolean chainable, float angleLimit, float segmentDamageScl, float healthDistribution, float jointStrength, int segmentCast, float anglePhysicsSmooth, boolean preventDrifting, float headOffset, float barrageRange, int segmentWeaponGroupSize, boolean freezeOnUlt) {
             segmentType = t; count = c; spacing = s;
             this.regenTime = regenTime; this.maxSegments = maxSegments;
             this.wobble = wobble; this.splittable = splittable; this.chainable = chainable;
@@ -277,6 +327,8 @@ public class SegmentWormEntity extends UnitEntity {
             this.preventDrifting = preventDrifting;
             this.headOffset = headOffset;
             this.barrageRange = barrageRange;
+            this.segmentWeaponGroupSize = segmentWeaponGroupSize;
+            this.freezeOnUlt = freezeOnUlt;
         }
     }
     /** 按 UnitType.name 注册的段身配置 (key = 头部名字, 如 "arcnelidia" / "toxobyte") */
@@ -310,6 +362,13 @@ public class SegmentWormEntity extends UnitEntity {
             vel.setZero();
         }
 
+        // ★ 大招期间减速移动 (PU132 OppressionComp: speedMultiplier *= 0.075f)
+        // vel 在 super.update() 前减速, 防止物理系统加速
+        float ultScl = ultSpeedMultiplier();
+        if (ultScl < 1f) {
+            vel.scl(ultScl);
+        }
+
         // PU132 WormDefaultUnit.update L71-72: 保存速度历史 (用于 updateSegmentVLocal 3 帧平均)
         lastVelocityD.set(lastVelocityC);
         lastVelocityC.set(vel);
@@ -318,6 +377,14 @@ public class SegmentWormEntity extends UnitEntity {
         // ★ 待机静止保障 2: super.update() 后物理系统可能给 vel 加了值, 再次清零
         if (isIdle()) {
             vel.setZero();
+        }
+
+        // ★ 大招期间减速 2: super.update() 后再次减速 vel + 减速旋转
+        // speedMultiplier 在 super.update() 中由 StatusComp 重置为 1f, 所以这里设置才有效
+        // PU132 原版: speedMultiplier *= 0.075f, 影响 rotateMove 中的旋转速度
+        if (ultScl < 1f) {
+            vel.scl(ultScl);
+            speedMultiplier *= ultScl;
         }
 
         // ★ 兜底: 如果 add() 没创建段身, 在第一次 update() 时创建 ★
@@ -1060,6 +1127,10 @@ public class SegmentWormEntity extends UnitEntity {
     public void draw() {
         // 只画头部, 段身会自己画
         super.draw();
+
+        // ★ 液压装饰 (WormDecal) 已移到 SegmentUnitEntity.draw() 中绘制
+        // PU132: wormDecal.draw(unit, unit.parent()) → base=段身, other=头部
+        // 段身 draw 时绘制, 而非头部 draw 时
 
         // ★ 再生建造动画 (参考 PU132 UnityUnitType.drawBody 第670-675行 + UnitSpawnAbility.draw)
         // 当可再生时, 在尾部后面绘制扫描效果

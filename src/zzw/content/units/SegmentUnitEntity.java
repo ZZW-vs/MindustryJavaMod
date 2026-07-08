@@ -384,16 +384,106 @@ public class SegmentUnitEntity extends UnitEntity {
             t.cellRegion = cellR;
         }
 
+        // ★ 段身武器分配 (PU132 UnityUnitType 第170行)
+        // PU132: segmentWeapons 是 Seq<Weapon>[], 段身按 weaponIdx 选择武器组
+        //   idx = i >= segmentLength - 1 ? segmentWeapons.length - 1 : i % max(1, segmentWeapons.length - 1)
+        // 当前项目: 所有段身共享 type.weapons, 需要按 segmentIndex 过滤
+        // 简化方案: 把段身 weapons 按 groupSize 分组, 每段只绘制对应组
+        mindustry.entities.units.WeaponMount[] oldMounts = mounts;
+        mindustry.entities.units.WeaponMount[] filteredMounts = filterMountsForSegment(oldMounts);
+        mounts = filteredMounts;
+
         // 调用 super.draw() 会用切换后的 region 画
         super.draw();
+
+        // 恢复 mounts
+        mounts = oldMounts;
 
         // 恢复 type 的 region 字段 (避免影响其他段身或头部)
         t.region = oldRegion;
         t.outlineRegion = oldOutline;
         t.cellRegion = oldCell;
 
+        // ★ 液压装饰 (WormDecal, PU132: 每个段身都绘制到父段的液压杆)
+        // PU132 UnityUnitType.drawWorm 第361行: if(wormDecal != null) wormDecal.draw(unit, unit.parent());
+        // - unit = 当前段身 (base), unit.parent() = 父段 (other)
+        // - 每个段身(包括尾部)都绘制自己到父段的液压杆, 形成完整的液压链
+        // 父段获取: segmentIndex==0 → head; segmentIndex>0 → head.segments[segmentIndex-1]
+        if (head != null && head.isAdded() && head.type != null) {
+            WormDecal decal = SegmentWormEntity.wormDecals.get(head.type.name);
+            if (decal != null) {
+                mindustry.gen.Unit parent = getParentSegment();
+                if (parent != null) {
+                    decal.draw(this, parent);
+                }
+            }
+        }
+
         // 恢复 z
         Draw.z(z);
+    }
+
+    /**
+     * 获取当前段身的父段 (PU132 unit.parent())
+     * - segmentIndex == 0: 父段是头部 (head)
+     * - segmentIndex > 0: 父段是前一段身 (head.segments[segmentIndex - 1])
+     * 用于 WormDecal.draw(this, parent) 绘制段身到父段的液压杆
+     */
+    private mindustry.gen.Unit getParentSegment() {
+        if (head == null || !head.isAdded() || head.segments == null) return null;
+        if (segmentIndex == 0) return head;
+        int parentIdx = segmentIndex - 1;
+        if (parentIdx < head.segments.length) {
+            return head.segments[parentIdx];
+        }
+        return null;
+    }
+
+    /**
+     * 按 segmentIndex 过滤段身武器 (PU132 weaponIdx 机制简化版)
+     * PU132: segmentWeapons = Seq<Weapon>[] {组0, 组1, 组2, 空组}
+     *   段 i 的武器组 idx = i >= length-1 ? 组数-1 : i % max(1, 组数-1)
+     * 当前项目: 段身 type.weapons 包含所有武器, 按 groupSize 分组
+     *   段 i 的组 idx = i % groupCount (非尾部), 尾部=空组(不画武器)
+     *
+     * 配置: 通过 SegmentConfig.segmentWeaponGroupSize 指定每组武器数
+     *   oppression: 6 个段身武器, 分 3 组 (每组 2 个), 尾部空组
+     *   devourer: 3 个段身武器, 1 组 (所有武器), 尾部空组
+     *   arcnelidia/toxobyte/catenapede: 1 个段身武器, 1 组
+     */
+    private mindustry.entities.units.WeaponMount[] filterMountsForSegment(mindustry.entities.units.WeaponMount[] allMounts) {
+        if (allMounts == null || allMounts.length == 0) return allMounts;
+        // 查头部 SegmentConfig 获取武器组配置
+        if (head == null) return allMounts;
+        SegmentWormEntity.SegmentConfig cfg = SegmentWormEntity.configs.get(head.type.name);
+        if (cfg == null) return allMounts;
+        int groupSize = cfg.segmentWeaponGroupSize;
+        int totalWeapons = allMounts.length;
+        if (groupSize <= 0 || groupSize >= totalWeapons) return allMounts;
+
+        // 计算组数 (最后一个组是空组, 用于尾部)
+        int groupCount = (int) Math.ceil((float) totalWeapons / groupSize);
+        if (groupCount <= 1) return allMounts;
+
+        // PU132: idx = i >= segmentLength - 1 ? groupCount : i % max(1, groupCount - 1)
+        // 但我们不知道 segmentLength, 用 isTail 判断
+        int idx;
+        if (isTail) {
+            // 尾部: 空组 (不画武器)
+            return new mindustry.entities.units.WeaponMount[0];
+        } else {
+            // 非尾部: 按 segmentIndex 分组 (mod groupCount-1, 因为最后一组是尾部空组)
+            int effectiveGroups = groupCount - 1;
+            if (effectiveGroups <= 0) return allMounts;
+            idx = segmentIndex % effectiveGroups;
+        }
+
+        // 提取对应组的 mounts
+        int start = idx * groupSize;
+        int end = Math.min(start + groupSize, totalWeapons);
+        mindustry.entities.units.WeaponMount[] result = new mindustry.entities.units.WeaponMount[end - start];
+        System.arraycopy(allMounts, start, result, 0, end - start);
+        return result;
     }
 
     /** 调试标志 */
