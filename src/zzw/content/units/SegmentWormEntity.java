@@ -307,26 +307,14 @@ public class SegmentWormEntity extends UnitEntity {
             }
         }
 
-        // ★★★ PU132 原版约束算法 + slerp 平滑拉回 ★★★
-        //
-        // 之前的问题:
-        // 1. 完全移除速度传播 → 段身太硬, 全程直线
-        // 2. 有速度传播但约束不强 → 摆动放大, 尾部甩动
-        //
-        // 解决方案:
-        // 1. 保留速度传播(产生拖尾感和弯曲)
-        // 2. 段身位置 += 速度(乘delta修正单位)
-        // 3. 计算理想位置, 用slerp平滑拉回(防止摆动放大)
-        // 4. 保留角度限制(防止脱节)
-        //
-        // slerpFactor控制弹性: 0.3f~0.5f 适中, 太大太硬, 太小太晃
+        // ★★★ PU132 原版约束算法 (WormDefaultUnit.updateSegmentsLocal) ★★★
+        // 完全按照 PU132 原版实现, 不做任何自定义修改
 
-        // 1. 速度传播
+        // 1. 速度传播 (PU132 updateSegmentVLocal)
         updateSegmentVLocal(lastVelocityC);
 
-        // 2. 约束算法
+        // 2. PU132 原版约束算法
         float segmentOffset = segmentSpacing / 2f;
-        float slerpFactor = 0.35f;
         float parentRot = rotation;
         float parentX = x;
         float parentY = y;
@@ -336,17 +324,26 @@ public class SegmentWormEntity extends UnitEntity {
             Vec2 seg0 = segPositions[0];
             Vec2 segV0 = segVelocities[0];
 
-            seg0.add(segV0.x * arc.util.Time.delta, segV0.y * arc.util.Time.delta);
+            // PU132 L134: 段身位置 += 速度 (不乘delta, PU132原版就是这样)
+            seg0.add(segV0);
 
-            Tmp.v1.trns(parentRot + 180f, segmentOffset).add(parentX, parentY);
-            seg0.lerp(Tmp.v1, slerpFactor);
+            // PU132 L136: 头部 rotation 向段身朝向转一点
+            rotation -= angleDistSigned(rotation, segRotations[0], angleLimit) / 1.25f;
 
-            float desiredAngle = seg0.angleTo(Tmp.v1);
-            segRotations[0] = clampedAngle(desiredAngle, parentRot, angleLimit);
-            segRotations[0] = clampRange(segRotations[0], parentRot, segmentRotationRange);
+            // PU132 L137: 理想位置 = 头部后方 segmentOffset 处
+            Tmp.v1.trns(rotation + 180f, segmentOffset).add(x, y);
 
-            segV0.scl(Mathf.clamp(1f - (segmentDrag * arc.util.Time.delta)));
+            // PU132 L138: 段身朝向 = 从段身指向理想位置, 带角度限制
+            segRotations[0] = clampedAngle(seg0.angleTo(Tmp.v1), rotation, angleLimit);
 
+            // PU132 L139-140: 拉回理想位置
+            Tmp.v2.trns(segRotations[0], segmentOffset).add(seg0).sub(Tmp.v1);
+            seg0.sub(Tmp.v2);
+
+            // PU132 L142: 速度衰减 (用 type.drag)
+            segV0.scl(Mathf.clamp(1f - (type.drag * arc.util.Time.delta)));
+
+            // 应用到段身实体
             segments[0].syncToHead(seg0.x, seg0.y, segRotations[0]);
 
             parentRot = segRotations[0];
@@ -361,18 +358,28 @@ public class SegmentWormEntity extends UnitEntity {
 
             Vec2 segPos = segPositions[i];
             Vec2 segV = segVelocities[i];
+            Vec2 segLast = segPositions[i - 1];
 
-            segPos.add(segV.x * arc.util.Time.delta, segV.y * arc.util.Time.delta);
+            // PU132 L152: 段身位置 += 速度 (不乘delta)
+            segPos.add(segV);
 
-            Tmp.v1.trns(parentRot + 180f, segmentOffset).add(parentX, parentY);
-            segPos.lerp(Tmp.v1, slerpFactor);
+            // PU132 L154: 前一段朝向向当前段转一点
+            segRotations[i - 1] -= angleDistSigned(segRotations[i - 1], segRotations[i], angleLimit) / 1.25f;
 
-            float desiredAngle = segPos.angleTo(Tmp.v1);
-            segRotations[i] = clampedAngle(desiredAngle, parentRot, angleLimit);
-            segRotations[i] = clampRange(segRotations[i], parentRot, segmentRotationRange);
+            // PU132 L155: 理想位置 = 前一段后方 segmentOffset 处
+            Tmp.v1.trns(segRotations[i - 1] + 180f, segmentOffset).add(segLast);
 
-            segV.scl(Mathf.clamp(1f - (segmentDrag * arc.util.Time.delta)));
+            // PU132 L156: 段身朝向 = 从段身指向理想位置, 带角度限制
+            segRotations[i] = clampedAngle(segPos.angleTo(Tmp.v1), segRotations[i - 1], angleLimit);
 
+            // PU132 L157-158: 拉回理想位置
+            Tmp.v2.trns(segRotations[i], segmentOffset).add(segPos).sub(Tmp.v1);
+            segPos.sub(Tmp.v2);
+
+            // PU132 L160: 速度衰减
+            segV.scl(Mathf.clamp(1f - (type.drag * arc.util.Time.delta)));
+
+            // 应用到段身实体
             seg.syncToHead(segPos.x, segPos.y, segRotations[i]);
 
             parentRot = segRotations[i];
