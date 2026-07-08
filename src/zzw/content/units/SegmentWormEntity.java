@@ -307,26 +307,21 @@ public class SegmentWormEntity extends UnitEntity {
             }
         }
 
-        // ★★★ 组合方案: PU132 约束算法 + 速度传播 + 154.3 clampRange ★★★
+        // ★★★ 简化版约束算法: 段身直接跟随前一段位置和朝向, 无自主速度 ★★★
         //
-        // 问题历史:
-        // - 纯 PU132 算法: 会超过 90° 脱节 (clampedAngle 限制的是 seg.angleTo(ideal) 向量角度,
-        //   不是段身真实朝向, 段身偏离 ideal 时可接近 180°)
-        // - 纯 154.3 算法: 整体一起转, 无 "一节拉一节" 拖尾感 (slerp 让段身直接朝父段方向)
+        // 之前的问题: 段身有自主速度(segPos.add(segV*delta)) + 位置约束(segPos.sub(Tmp.v2)),
+        //            两个力交互导致摆动放大: 头部转向→第0段滞后→第1段更滞后→链式放大→尾部甩动
         //
-        // 组合方案:
-        // 1. updateSegmentVLocal (PU132): 速度传播, 让段身有惯性, 产生拖尾感
-        // 2. PU132 约束算法: seg = ideal - trns(segRot, offset), 段身沿自己朝向滞后 ideal
-        // 3. clampRange (154.3): 额外限制 segRot 相对父段不超过 ±segmentRotationRange
-        //    从根源避免段身真实朝向超过父段±range, 防止脱节
+        // 修复方案: 移除段身自主速度移动, 段身位置完全由前一段决定
+        //          段身 = 前一段后方 segmentOffset 处, 沿前一段朝向的反方向
+        //          这样段身路径会和头部路径几乎重合, 不会甩动
         //
-        // 单位修正: PU132 原版 segV 没乘 Time.delta (bug), 段身比头部快 60 倍导致抖动
-        //          这里修正: segments[i].add(segV.x * delta, segV.y * delta)
+        // 保留速度传播用于计算段身朝向(产生轻微拖尾感), 但不用于移动位置
 
-        // 1. 速度传播 (PU132 updateSegmentVLocal L101-124)
+        // 1. 速度传播 (仅用于计算朝向, 不用于移动)
         updateSegmentVLocal(lastVelocityC);
 
-        // 2. PU132 约束算法 (updateSegmentsLocal L126-164) + clampRange 防脱节
+        // 2. 约束算法: 段身直接跟随前一段
         float segmentOffset = segmentSpacing / 2f;
         float parentRot = rotation;
         float parentX = x;
@@ -335,30 +330,15 @@ public class SegmentWormEntity extends UnitEntity {
         // === 第 0 段: 跟随头部 ===
         if (segments.length > 0 && segments[0] != null && segments[0].isAdded()) {
             Vec2 seg0 = segPositions[0];
-            Vec2 segV0 = segVelocities[0];
 
-            // 段身位置 += 速度 (PU132 L134), ★ 修正单位: 乘 Time.delta
-            seg0.add(segV0.x * arc.util.Time.delta, segV0.y * arc.util.Time.delta);
+            // ★ 直接计算理想位置: 头部后方 segmentOffset 处
+            Tmp.v1.trns(parentRot + 180f, segmentOffset).add(parentX, parentY);
+            seg0.set(Tmp.v1);
 
-            // 头部 rotation 调整: 向段身朝向转一点 (PU132 L136)
-            rotation -= angleDistSigned(rotation, segRotations[0], angleLimit) / 1.25f;
-
-            // 理想位置: 头部后方 segmentOffset 处 (PU132 L137)
-            Tmp.v1.trns(rotation + 180f, segmentOffset).add(x, y);
-
-            // 段身朝向 = 从段身指向理想位置 (PU132 L138)
-            segRotations[0] = clampedAngle(seg0.angleTo(Tmp.v1), rotation, angleLimit);
-
-            // ★ 154.3 clampRange: 额外限制段身真实朝向相对头部不超过 ±segmentRotationRange
-            //   防止 PU132 算法在段身偏离 ideal 时 segRot 超过 90° 脱节
-            segRotations[0] = clampRange(segRotations[0], rotation, segmentRotationRange);
-
-            // PU132 约束 (L139-140): seg = ideal - trns(segRot, offset)
-            Tmp.v2.trns(segRotations[0], segmentOffset).add(seg0).sub(Tmp.v1);
-            seg0.sub(Tmp.v2);
-
-            // 速度衰减 (PU132 L142)
-            segV0.scl(Mathf.clamp(1f - (segmentDrag * arc.util.Time.delta)));
+            // 段身朝向 = 从段身指向前一段(头部), 带角度限制
+            float desiredAngle = seg0.angleTo(parentX, parentY);
+            segRotations[0] = clampedAngle(desiredAngle, parentRot, angleLimit);
+            segRotations[0] = clampRange(segRotations[0], parentRot, segmentRotationRange);
 
             // 应用到段身实体
             segments[0].syncToHead(seg0.x, seg0.y, segRotations[0]);
@@ -374,34 +354,22 @@ public class SegmentWormEntity extends UnitEntity {
             if (seg == null || !seg.isAdded()) continue;
 
             Vec2 segPos = segPositions[i];
-            Vec2 segV = segVelocities[i];
-            Vec2 segLast = segPositions[i - 1];
-            float segLastRot = segRotations[i - 1];
 
-            // 段身位置 += 速度 (PU132 L152), ★ 修正单位: 乘 Time.delta
-            segPos.add(segV.x * arc.util.Time.delta, segV.y * arc.util.Time.delta);
+            // ★ 直接计算理想位置: 前一段后方 segmentOffset 处
+            Tmp.v1.trns(parentRot + 180f, segmentOffset).add(parentX, parentY);
+            segPos.set(Tmp.v1);
 
-            // 前一段朝向调整: 向当前段朝向转一点 (PU132 L154)
-            segRotations[i - 1] -= angleDistSigned(segRotations[i - 1], segRotations[i], angleLimit) / 1.25f;
-
-            // 理想位置: 前一段后方 segmentOffset 处 (PU132 L155)
-            Tmp.v1.trns(segRotations[i - 1] + 180f, segmentOffset).add(segLast);
-
-            // 段身朝向 = 从段身指向理想位置 (PU132 L156)
-            segRotations[i] = clampedAngle(segPos.angleTo(Tmp.v1), segRotations[i - 1], angleLimit);
-
-            // ★ 154.3 clampRange: 额外限制段身真实朝向相对前一段不超过 ±segmentRotationRange
-            segRotations[i] = clampRange(segRotations[i], segRotations[i - 1], segmentRotationRange);
-
-            // PU132 约束 (L157-158): seg = ideal - trns(segRot, offset)
-            Tmp.v2.trns(segRotations[i], segmentOffset).add(segPos).sub(Tmp.v1);
-            segPos.sub(Tmp.v2);
-
-            // 速度衰减 (PU132 L160)
-            segV.scl(Mathf.clamp(1f - (segmentDrag * arc.util.Time.delta)));
+            // 段身朝向 = 从段身指向前一段, 带角度限制
+            float desiredAngle = segPos.angleTo(parentX, parentY);
+            segRotations[i] = clampedAngle(desiredAngle, parentRot, angleLimit);
+            segRotations[i] = clampRange(segRotations[i], parentRot, segmentRotationRange);
 
             // 应用到段身实体
             seg.syncToHead(segPos.x, segPos.y, segRotations[i]);
+
+            parentRot = segRotations[i];
+            parentX = segPos.x;
+            parentY = segPos.y;
         }
 
         // 血量分布效率恢复 (PU132 WormDefaultUnit.update L74)
