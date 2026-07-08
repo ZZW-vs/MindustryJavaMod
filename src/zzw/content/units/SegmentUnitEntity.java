@@ -4,7 +4,11 @@ import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
 import arc.scene.ui.layout.Table;
 import mindustry.gen.Hitboxc;
+import mindustry.gen.Unit;
 import mindustry.gen.UnitEntity;
+import mindustry.entities.Units;
+import mindustry.type.Weapon;
+import mindustry.entities.units.WeaponMount;
 
 /**
  * 段身 Entity (借鉴 PU132 WormSegmentUnit)
@@ -81,19 +85,36 @@ public class SegmentUnitEntity extends UnitEntity {
             hitTime = head.hitTime;
             ammo = head.ammo;
 
-            // 段身武器: 跟随头部 aim 开火
-            if (mounts != null && mounts.length > 0 && head.mounts != null && head.mounts.length > 0) {
-                float aimX = head.mounts[0].aimX;
-                float aimY = head.mounts[0].aimY;
-                boolean headShooting = head.isShooting;
+            // ★ 段身武器: 独立判断目标 (借鉴 PU132 WormSegmentUnit.updateWeapon)
+            // 每个武器独立判断目标是否在自己射程内, 而不是跟随头部开火
+            if (mounts != null && mounts.length > 0) {
                 for (int i = 0; i < mounts.length; i++) {
-                    mounts[i].aimX = aimX;
-                    mounts[i].aimY = aimY;
-                    // ★ 关键: 跟随头部开火状态, 头部不射击时段身也不射击
-                    mounts[i].shoot = headShooting;
-                    mounts[i].rotate = headShooting;
-                    // v154.3 Weapon.update(Unit, WeaponMount) 是 public, 可直接调用
-                    mounts[i].weapon.update(this, mounts[i]);
+                    WeaponMount mount = mounts[i];
+                    Weapon weapon = mount.weapon;
+
+                    // 搜索段身自己范围内的目标
+                    Unit target = Units.closestEnemy(team, x, y, weapon.range(), u -> !u.dead);
+
+                    if (target != null && !target.dead) {
+                        float distance = dst(target);
+                        if (distance <= weapon.range()) {
+                            // 目标在射程内, 瞄准并开火
+                            mount.aimX = target.x;
+                            mount.aimY = target.y;
+                            mount.shoot = true;
+                            mount.rotate = true;
+                        } else {
+                            // 目标不在射程内, 不射击
+                            mount.shoot = false;
+                            mount.rotate = false;
+                        }
+                    } else {
+                        // 没有目标, 不射击
+                        mount.shoot = false;
+                        mount.rotate = false;
+                    }
+
+                    weapon.update(this, mount);
                 }
             }
         }
