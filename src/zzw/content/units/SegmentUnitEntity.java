@@ -85,47 +85,27 @@ public class SegmentUnitEntity extends UnitEntity {
             hitTime = head.hitTime;
             ammo = head.ammo;
 
-            // ★ 段身武器: 独立判断目标 + 调用原版 updateWeapons 发射
-            // 每个武器独立判断目标是否在自己射程内, 而不是跟随头部开火
+            // ★ 段身武器: 参照 PU132 WormSegmentUnit.updateWeapon 重写索敌部分
+            // 发射/冷却/旋转交给 v154.3 原版 Weapon.update() 处理
             if (mounts != null && mounts.length > 0) {
-                for (int i = 0; i < mounts.length; i++) {
-                    WeaponMount mount = mounts[i];
+                boolean can = canShoot();
+                for (WeaponMount mount : mounts) {
                     Weapon weapon = mount.weapon;
 
-                    // 搜索段身自己范围内的目标
+                    // ★ 索敌: 搜索自己射程内的目标, 更新 aimX/aimY
                     Unit target = Units.closestEnemy(team, x, y, weapon.range(), u -> !u.dead);
-
-                    if (target != null && !target.dead) {
-                        float distance = dst(target);
-                        if (distance <= weapon.range()) {
-                            // 目标在射程内, 瞄准并开火
-                            mount.aimX = target.x;
-                            mount.aimY = target.y;
-                            mount.shoot = true;
-                            mount.rotate = true;
-                        } else {
-                            // 目标不在射程内, 不射击
-                            mount.shoot = false;
-                            mount.rotate = false;
-                        }
+                    if (target != null) {
+                        mount.aimX = target.x;
+                        mount.aimY = target.y;
+                        mount.shoot = true;
+                        mount.rotate = true;
                     } else {
-                        // 没有目标, 不射击
                         mount.shoot = false;
                         mount.rotate = false;
                     }
-                }
 
-                // ★ 调用原版武器更新: 更新冷却、旋转、实际发射
-                // 原版 Unit.update() 内部会调用 updateWeapons(), 我们手动调用确保武器正常工作
-                try {
-                    java.lang.reflect.Method m = UnitEntity.class.getDeclaredMethod("updateWeapons");
-                    m.setAccessible(true);
-                    m.invoke(this);
-                } catch (Throwable e) {
-                    // 反射失败时兜底: 手动遍历武器更新
-                    for (int i = 0; i < mounts.length; i++) {
-                        mounts[i].weapon.update(this, mounts[i]);
-                    }
+                    // ★ 交给原版 Weapon.update 处理冷却、旋转、发射
+                    weapon.update(this, mount);
                 }
             }
         }

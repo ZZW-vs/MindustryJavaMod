@@ -74,7 +74,7 @@ public class Z_Units {
 
             // ===== 段身武器: BombBullet (PU132 第3039-3045行, 借用 horizon 炸弹) =====
             // 电弧虫段身投弹: splashDamage=25, 爆炸色同电弧
-            weapons.add(new Weapon("arcnelidia-segment-bomb") {{
+            weapons.add(new Weapon("create-arcnelidia-segment-bomb") {{
                 x = 0f;
                 rotate = true;
                 mirror = false;
@@ -127,7 +127,7 @@ public class Z_Units {
 
             // ===== 头部武器: 双激光 (PU132 原配置) =====
             // PU132 UnityUnitTypes.java 第3024-3037行原配置
-            weapons.add(new Weapon("arcnelidia-laser") {{
+            weapons.add(new Weapon("create-arcnelidia-laser") {{
                 x = 0f;
                 reload = 10f;
                 rotateSpeed = 50f;
@@ -213,7 +213,7 @@ public class Z_Units {
 
             // ===== 段身武器: ArtilleryBullet (PU132 第3269-3281行) =====
             // 瘟疫炮弹: splashDamage=25, splashDamageRadius=25, 瘟疫色
-            weapons.add(new Weapon("toxobyte-segment-launcher") {{
+            weapons.add(new Weapon("create-toxobyte-segment-launcher") {{
                 rotate = true;
                 mirror = false;
                 reload = 60f;
@@ -266,7 +266,7 @@ public class Z_Units {
             // ===== 头部武器: 12 发散 SapBullet (PU132 第3250-3267行) =====
             // 瘟疫激光: 12 发同时散射, SapBullet 自动回血
             // ★ v154.3: shots/shotDelay 在 shoot (ShootPattern) 字段里, 不在 Weapon 上
-            weapons.add(new Weapon("toxobyte-sap") {{
+            weapons.add(new Weapon("create-toxobyte-sap") {{
                 x = 0f;
                 rotate = false;
                 mirror = false;
@@ -329,7 +329,7 @@ public class Z_Units {
 
             // ===== 段身武器: plagueMissile (PU132 第3329-3345行) =====
             // 双武器交替发射瘟疫导弹
-            weapons.add(new Weapon("catenapede-segment-missile") {{
+            weapons.add(new Weapon("create-catenapede-segment-missile") {{
                 y = -8f;
                 x = 14.75f;
                 rotate = true;
@@ -347,7 +347,7 @@ public class Z_Units {
                     despawnEffect = mindustry.content.Fx.blastExplosion;
                 }};
             }});
-            weapons.add(new Weapon("catenapede-segment-missile-2") {{
+            weapons.add(new Weapon("create-catenapede-segment-missile-2") {{
                 y = -12.5f;
                 x = 7.25f;
                 rotate = true;
@@ -393,7 +393,7 @@ public class Z_Units {
 
             // ===== 头部武器: PointDrainLaser (PU132 第3309-3327行) =====
             // 吸血激光: 持续发射, 吸血 0.5%, 最大长度 160, 击退 -34 (拉向自己)
-            weapons.add(new Weapon("catenapede-drain-laser") {{
+            weapons.add(new Weapon("create-catenapede-drain-laser") {{
                 y = -9f;
                 x = 14f;
                 shootY = 6.75f;
@@ -448,7 +448,7 @@ public class Z_Units {
             hittable = true;
 
             // 段身武器1: 导弹发射器 (PU132 unity-doeg-launcher)
-            weapons.add(new Weapon("devourer-segment-missile") {{
+            weapons.add(new Weapon("create-devourer-segment-missile") {{
                 x = 19f;
                 y = 0f;
                 shootY = 8f;
@@ -475,7 +475,7 @@ public class Z_Units {
             }});
 
             // 段身武器2: 毁灭者 (PU132 unity-doeg-destroyer)
-            weapons.add(new Weapon("devourer-segment-destroyer") {{
+            weapons.add(new Weapon("create-devourer-segment-destroyer") {{
                 mirror = true;
                 ignoreRotation = true;
                 rotate = true;
@@ -497,7 +497,7 @@ public class Z_Units {
             }});
 
             // 段身武器3: 小型激光 (PU132 unity-doeg-small-laser)
-            weapons.add(new Weapon("devourer-segment-small-laser") {{
+            weapons.add(new Weapon("create-devourer-segment-small-laser") {{
                 mirror = true;
                 alternate = false;
                 rotate = true;
@@ -542,7 +542,7 @@ public class Z_Units {
             aiController = zzw.content.units.WormAI::new;
 
             // 头部武器1: 主激光 (PU132 UnityBullets.endLaser, 简化版)
-            weapons.add(new Weapon("devourer-main-laser") {{
+            weapons.add(new Weapon("create-devourer-main-laser") {{
                 x = 0f;
                 y = 23f;
                 mirror = false;
@@ -566,7 +566,7 @@ public class Z_Units {
             }});
 
             // 头部武器2: 毁灭者 (PU132 EndBasicBulletType)
-            weapons.add(new Weapon("devourer-destroyer") {{
+            weapons.add(new Weapon("create-devourer-destroyer") {{
                 x = 19.25f;
                 y = -22.75f;
                 shootY = 12f;
