@@ -37,12 +37,17 @@ public class SegmentWormEntity extends UnitEntity {
     }
 
     /**
-     * ★ 关键: 头部不和自己段身碰撞 (借鉴 SegmentUnitEntity.collides)
-     * 不重写会导致头部被自己段身推开, 待机时单位自己向前移动
+     * ★ 头部碰撞: 与非相邻段身(index >= 2)碰撞, 与相邻段身(0,1)不碰撞
+     *   - 防止头部穿过身体 (用户问题: 头可以穿过身体)
+     *   - 与第0段不碰撞避免头部和最前段身推挤抖动
+     *   - 与第1段不碰撞因为它离头部近, 容易触发碰撞抖动
      */
     @Override
     public boolean collides(mindustry.gen.Hitboxc other) {
-        if (other instanceof SegmentUnitEntity seg && seg.head == this) return false;
+        if (other instanceof SegmentUnitEntity seg && seg.head == this) {
+            // 头部与非相邻段身碰撞 (index >= 2), 相邻段身(index 0,1)不碰撞
+            return seg.segmentIndex >= 2;
+        }
         return super.collides(other);
     }
 
@@ -896,31 +901,17 @@ public class SegmentWormEntity extends UnitEntity {
         segVelocities = new Vec2[count];
         segRotations = new float[count];
 
-        // ★ 段数多的虫子生成时卷起来 (如 toxobyte 25 段)
-        //   波浪形排列: 正弦波 + 随机偏移, 越靠后摆动越大
-        //   段数 <= 3: 基本直线 (catenapede 2 段)
-        //   段数 4~10: 轻微波浪 (arcnelidia 9 段)
-        //   段数 > 10: 明显卷起来 (toxobyte 25 段)
-        float maxWaveAmp = count > 3 ? Math.min(count * 3f, 90f) : 0f; // 最大摆动角度
-        float waveFreq = 0.15f + Mathf.random(0.25f); // 随机频率, 每次生成不同
-        float wavePhase = Mathf.random(360f);         // 随机相位, 每次生成不同
+        // ★ PU132 原版做法: 所有段身初始都挤在头部同一点
+        //   靠非相邻段身碰撞 + 约束算法自然弹开, 形成卷绕散开效果
+        //   比预生成波浪形更自然, 且每次生成形状都不同
         float baseAngle = rotation + 180f;
 
-        float segX = x;
-        float segY = y;
         for (int i = 0; i < count; i++) {
-            // 越靠后的段, 摆动幅度越大 (distFactor 0~1)
-            float distFactor = i / (float) Math.max(count - 1, 1);
-            float waveAmp = maxWaveAmp * distFactor;
-
-            // 正弦波偏移 + 随机噪声
-            float sineOffset = Mathf.sin(distFactor * waveFreq * Mathf.PI2 + wavePhase) * waveAmp;
-            float randomOffset = Mathf.random(-waveAmp * 0.35f, waveAmp * 0.35f);
-            float angle = baseAngle + sineOffset + randomOffset;
-
-            // 沿角度方向前进 segmentSpacing
-            segX += Angles.trnsx(angle, segmentSpacing);
-            segY += Angles.trnsy(angle, segmentSpacing);
+            // 所有段身初始位置 = 头部位置 (稍微加一点点随机偏移, 避免完全重合导致碰撞不稳定)
+            float segX = x + Mathf.range(0.5f);
+            float segY = y + Mathf.range(0.5f);
+            // 初始朝向随机, 让弹开方向更随机, 形成自然卷绕
+            float angle = baseAngle + Mathf.random(360f);
 
             // 用 segmentType 创建段身 (SegmentUnitEntity 实例)
             SegmentUnitEntity seg = (SegmentUnitEntity) segmentType.create(team);
@@ -936,8 +927,10 @@ public class SegmentWormEntity extends UnitEntity {
 
             segments[i] = seg;
             segPositions[i] = new Vec2(seg.x, seg.y);
-            segVelocities[i] = new Vec2();  // 初始速度为 0
-            segRotations[i] = angle;        // 初始朝向 = 该段角度
+            // 初始给一个微小的向外速度, 帮助碰撞启动
+            float pushSpeed = 0.5f + Mathf.random(1f);
+            segVelocities[i] = new Vec2().trns(angle, pushSpeed);
+            segRotations[i] = angle;        // 初始朝向 = 随机角度
         }
     }
 

@@ -529,6 +529,8 @@ public class Z_Units {
             wobble = false;
             circleTarget = true;
             omniMovement = false;
+            envEnabled = mindustry.world.meta.Env.terrestrial | mindustry.world.meta.Env.space;
+            immunities.addAll(mindustry.Vars.content.getBy(mindustry.ctype.ContentType.status));
 
             constructor = SegmentWormEntity::create;
             aiController = zzw.content.units.WormAI::new;
