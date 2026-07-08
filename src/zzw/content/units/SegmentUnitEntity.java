@@ -384,19 +384,27 @@ public class SegmentUnitEntity extends UnitEntity {
 
     /**
      * 段身之间的碰撞过滤:
-     * - 段身 vs 同头部的其他段身/头部 → 不碰撞 (避免互相推开抖动)
+     * - 段身 vs 自己的头部 → 不碰撞
+     * - 段身 vs 同头部的相邻段身 → 不碰撞 (避免移动时抖动)
+     * - 段身 vs 同头部的非相邻段身 → 碰撞 (生成时重叠会弹开)
      * - 段身 vs 其他单位 → 正常碰撞 (其他单位不能穿过段身)
      *
-     * 借鉴 PU132 WormSegmentUnit.collides (第45-52行)
+     * 借鉴 PU132 WormSegmentUnit.collides + 原版碰撞挤压弹开效果
+     * 允许非相邻段身碰撞, 这样生成很多段时会因为重叠而互相推开, 形成自然散开效果
      */
     @Override
     public boolean collides(Hitboxc other) {
         // 段身 vs 自己的头部 → 不碰撞
         if (other == head) return false;
-        // 段身 vs 同头部的其他段身 → 不碰撞 (避免互相推开抖动)
+        // 段身 vs 同头部的其他段身 → 相邻的不碰撞, 非相邻的碰撞
         if (head != null && other instanceof SegmentUnitEntity) {
             SegmentUnitEntity o = (SegmentUnitEntity) other;
-            if (o.head == head) return false;
+            if (o.head == head) {
+                // 相邻段身 (index 差 1) 不碰撞, 避免移动时抖动
+                // 非相邻段身碰撞, 生成时重叠会弹开
+                int indexDiff = Math.abs(segmentIndex - o.segmentIndex);
+                return indexDiff > 1;
+            }
         }
         // 段身 vs 其他单位 → 正常碰撞 (其他单位不能穿过段身)
         return super.collides(other);
