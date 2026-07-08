@@ -428,7 +428,7 @@ public class Z_Units {
         devourerSegment = new UnitType("devourer-segment") {{
             health = 25000f;
             speed = 0f;
-            hitSize = 30f;
+            hitSize = (39f * 1.55f) - 5f;
             armor = 8f;
             flying = true;
             rotateSpeed = 1f;
@@ -438,7 +438,7 @@ public class Z_Units {
             constructor = SegmentUnitEntity::create;
             hidden = true;
             useUnitCap = false;
-            physics = false;
+            physics = true;
             hittable = true;
 
             // 段身武器1: 导弹发射器 (PU132 unity-doeg-launcher)
