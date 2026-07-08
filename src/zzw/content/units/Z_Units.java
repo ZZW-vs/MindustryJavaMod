@@ -30,7 +30,9 @@ public class Z_Units {
         toxobyte,              // 头部 (PU132 瘟疫虫, 25 段)
         toxobyteSegment,       // 段身
         catenapede,            // 头部 (PU132 Catenapede, 15 段)
-        catenapedeSegment;     // 段身
+        catenapedeSegment,     // 段身
+        devourer,              // 头部 (PU132 Devourer, 60 段)
+        devourerSegment;       // 段身
 
     public static void load() {
         // ★ 关键: 注册自定义 Entity 到 EntityMapping.idMap, 否则 v154.3 的 UnitType.init() 会失败 ★
@@ -418,6 +420,167 @@ public class Z_Units {
         // PU132: healthDistribution=0.15f (血量分布速率)
         SegmentWormEntity.configs.put(catenapede.name,
             new SegmentWormEntity.SegmentConfig(catenapedeSegment, 2, 31f, 30f * 60f, 15, false, true, true, 25f, 12f, 0.15f));
+
+        // ===== Devourer (PU132 devourer-of-eldrich-gods) =====
+        // End 阵营超级虫子, 60段, 全免疫, 头部激光+段身多种武器
+
+        // ★ Devourer 段身 ★
+        devourerSegment = new UnitType("devourer-segment") {{
+            health = 25000f;
+            speed = 0f;
+            hitSize = 30f;
+            armor = 8f;
+            flying = true;
+            rotateSpeed = 1f;
+            faceTarget = false;
+            wobble = false;
+
+            constructor = SegmentUnitEntity::create;
+            hidden = true;
+            useUnitCap = false;
+            physics = false;
+            hittable = true;
+
+            // 段身武器1: 导弹发射器 (PU132 unity-doeg-launcher)
+            weapons.add(new Weapon("devourer-segment-missile") {{
+                x = 19f;
+                y = 0f;
+                shootY = 8f;
+                mirror = true;
+                rotate = true;
+                reload = 1.2f * 60f;
+                inaccuracy = 1.4f;
+                minShootVelocity = 0.01f;
+
+                bullet = new EndBasicBulletType(6f, 100f, "missile") {{
+                    width = 9f;
+                    height = 11f;
+                    shrinkY = 0f;
+                    splashDamage = 90f;
+                    splashDamageRadius = 45f;
+                    homingPower = 0.08f;
+                    lifetime = 52f;
+                    trailChance = 0.2f;
+                    weaveMag = 18f;
+                    weaveScale = 1.6f;
+                    backColor = Color.valueOf("ec745855");
+                    frontColor = Color.valueOf("ff9c5a");
+                }};
+            }});
+
+            // 段身武器2: 毁灭者 (PU132 unity-doeg-destroyer)
+            weapons.add(new Weapon("devourer-segment-destroyer") {{
+                mirror = true;
+                ignoreRotation = true;
+                rotate = true;
+                x = 22f;
+                y = -15.75f;
+                shootY = 12f;
+                reload = 1.5f * 60f;
+                inaccuracy = 1.4f;
+                minShootVelocity = 0.01f;
+
+                bullet = new EndBasicBulletType(9.2f, 325f) {{
+                    hitSize = 8f;
+                    shrinkY = 0f;
+                    width = 19f;
+                    height = 25f;
+                    backColor = Color.valueOf("ec745855");
+                    frontColor = Color.valueOf("ff9c5a");
+                }};
+            }});
+
+            // 段身武器3: 小型激光 (PU132 unity-doeg-small-laser)
+            weapons.add(new Weapon("devourer-segment-small-laser") {{
+                mirror = true;
+                alternate = false;
+                rotate = true;
+                x = 17.5f;
+                y = 16.5f;
+                reload = 2f * 60f;
+                continuous = true;
+                minShootVelocity = 0.01f;
+
+                bullet = new EndContinuousLaserBulletType(85f) {{
+                    lifetime = 2f * 60f;
+                    length = 230f;
+                    strokes = new float[]{2f * 0.4f, 1.5f * 0.4f, 1f * 0.4f, 0.3f * 0.4f};
+                    colors = new Color[]{Color.valueOf("ec745855"), Color.valueOf("ec7458aa"), Color.valueOf("ff9c5a"), Color.white};
+                    width = 9f;
+                }};
+            }});
+        }};
+
+        // ★ Devourer 头部 ★
+        devourer = new UnitType("devourer") {{
+            health = 1250000f;
+            flying = true;
+            speed = 5f;
+            accel = 0.12f;
+            drag = 0.1f;
+            hitSize = 39f * 1.55f;
+            engineSize = -1f;
+            lowAltitude = true;
+            rotateSpeed = 2.2f;
+            armor = 16f;
+            range = 480f;
+            outlineColor = Color.valueOf("282828");
+
+            constructor = SegmentWormEntity::create;
+
+            // 头部武器1: 主激光 (PU132 UnityBullets.endLaser, 简化版)
+            weapons.add(new Weapon("devourer-main-laser") {{
+                x = 0f;
+                y = 23f;
+                mirror = false;
+                ignoreRotation = true;
+                reload = 15f * 60f;
+                continuous = true;
+                shake = 4f;
+                firstShotDelay = 41f;
+                minShootVelocity = 0.01f;
+
+                bullet = new EndContinuousLaserBulletType(2400f) {{
+                    length = 340f;
+                    lifetime = 5f * 60f;
+                    colors = new Color[]{Color.valueOf("ec745855"), Color.valueOf("ec7458aa"), Color.valueOf("ff9c5a"), Color.white};
+                    lightningChance = 0.8f;
+                    lightningDamage = 80f;
+                    lightningLength = 42;
+                    lightningLengthRand = 5;
+                    width = 15f;
+                }};
+            }});
+
+            // 头部武器2: 毁灭者 (PU132 EndBasicBulletType)
+            weapons.add(new Weapon("devourer-destroyer") {{
+                x = 19.25f;
+                y = -22.75f;
+                shootY = 12f;
+                mirror = true;
+                ignoreRotation = true;
+                rotate = true;
+                reload = 1.5f * 60f;
+                inaccuracy = 1.4f;
+                minShootVelocity = 0.01f;
+
+                bullet = new EndBasicBulletType(9.2f, 325f) {{
+                    hitSize = 8f;
+                    shrinkY = 0f;
+                    width = 19f;
+                    height = 25f;
+                    backColor = Color.valueOf("ec745855");
+                    frontColor = Color.valueOf("ff9c5a");
+                }};
+            }});
+        }};
+
+        // ★ 注册 devourer 段身配置 ★
+        // PU132: segmentLength=60, segmentOffset=(41f*1.55)+7f ≈ 70.55f
+        // PU132: splittable=false, chainable=false (不可分裂合并)
+        // PU132: 无 regen (初始就60段)
+        SegmentWormEntity.configs.put(devourer.name,
+            new SegmentWormEntity.SegmentConfig(devourerSegment, 60, 70.55f, 0f, 60, false, false, false));
 
         // ★ 初始化分裂/合并音效 (PU132 默认 Sounds.door)
         try {
