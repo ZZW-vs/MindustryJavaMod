@@ -307,22 +307,26 @@ public class SegmentWormEntity extends UnitEntity {
             }
         }
 
-        // ★★★ 简化版约束算法: 段身直接跟随前一段位置和朝向, 无自主速度 ★★★
+        // ★★★ PU132 原版约束算法 + slerp 平滑拉回 ★★★
         //
-        // 之前的问题: 段身有自主速度(segPos.add(segV*delta)) + 位置约束(segPos.sub(Tmp.v2)),
-        //            两个力交互导致摆动放大: 头部转向→第0段滞后→第1段更滞后→链式放大→尾部甩动
+        // 之前的问题:
+        // 1. 完全移除速度传播 → 段身太硬, 全程直线
+        // 2. 有速度传播但约束不强 → 摆动放大, 尾部甩动
         //
-        // 修复方案: 移除段身自主速度移动, 段身位置完全由前一段决定
-        //          段身 = 前一段后方 segmentOffset 处, 沿前一段朝向的反方向
-        //          这样段身路径会和头部路径几乎重合, 不会甩动
+        // 解决方案:
+        // 1. 保留速度传播(产生拖尾感和弯曲)
+        // 2. 段身位置 += 速度(乘delta修正单位)
+        // 3. 计算理想位置, 用slerp平滑拉回(防止摆动放大)
+        // 4. 保留角度限制(防止脱节)
         //
-        // 保留速度传播用于计算段身朝向(产生轻微拖尾感), 但不用于移动位置
+        // slerpFactor控制弹性: 0.3f~0.5f 适中, 太大太硬, 太小太晃
 
-        // 1. 速度传播 (仅用于计算朝向, 不用于移动)
+        // 1. 速度传播
         updateSegmentVLocal(lastVelocityC);
 
-        // 2. 约束算法: 段身直接跟随前一段
+        // 2. 约束算法
         float segmentOffset = segmentSpacing / 2f;
+        float slerpFactor = 0.35f;
         float parentRot = rotation;
         float parentX = x;
         float parentY = y;
@@ -330,17 +334,19 @@ public class SegmentWormEntity extends UnitEntity {
         // === 第 0 段: 跟随头部 ===
         if (segments.length > 0 && segments[0] != null && segments[0].isAdded()) {
             Vec2 seg0 = segPositions[0];
+            Vec2 segV0 = segVelocities[0];
 
-            // ★ 直接计算理想位置: 头部后方 segmentOffset 处
+            seg0.add(segV0.x * arc.util.Time.delta, segV0.y * arc.util.Time.delta);
+
             Tmp.v1.trns(parentRot + 180f, segmentOffset).add(parentX, parentY);
-            seg0.set(Tmp.v1);
+            seg0.lerp(Tmp.v1, slerpFactor);
 
-            // 段身朝向 = 从段身指向前一段(头部), 带角度限制
-            float desiredAngle = seg0.angleTo(parentX, parentY);
+            float desiredAngle = seg0.angleTo(Tmp.v1);
             segRotations[0] = clampedAngle(desiredAngle, parentRot, angleLimit);
             segRotations[0] = clampRange(segRotations[0], parentRot, segmentRotationRange);
 
-            // 应用到段身实体
+            segV0.scl(Mathf.clamp(1f - (segmentDrag * arc.util.Time.delta)));
+
             segments[0].syncToHead(seg0.x, seg0.y, segRotations[0]);
 
             parentRot = segRotations[0];
@@ -354,17 +360,19 @@ public class SegmentWormEntity extends UnitEntity {
             if (seg == null || !seg.isAdded()) continue;
 
             Vec2 segPos = segPositions[i];
+            Vec2 segV = segVelocities[i];
 
-            // ★ 直接计算理想位置: 前一段后方 segmentOffset 处
+            segPos.add(segV.x * arc.util.Time.delta, segV.y * arc.util.Time.delta);
+
             Tmp.v1.trns(parentRot + 180f, segmentOffset).add(parentX, parentY);
-            segPos.set(Tmp.v1);
+            segPos.lerp(Tmp.v1, slerpFactor);
 
-            // 段身朝向 = 从段身指向前一段, 带角度限制
-            float desiredAngle = segPos.angleTo(parentX, parentY);
+            float desiredAngle = segPos.angleTo(Tmp.v1);
             segRotations[i] = clampedAngle(desiredAngle, parentRot, angleLimit);
             segRotations[i] = clampRange(segRotations[i], parentRot, segmentRotationRange);
 
-            // 应用到段身实体
+            segV.scl(Mathf.clamp(1f - (segmentDrag * arc.util.Time.delta)));
+
             seg.syncToHead(segPos.x, segPos.y, segRotations[i]);
 
             parentRot = segRotations[i];
