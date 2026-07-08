@@ -335,6 +335,8 @@ public class SegmentWormEntity extends UnitEntity {
 
             // PU132 L138: 段身朝向 = 从段身指向理想位置, 带角度限制
             segRotations[0] = clampedAngle(seg0.angleTo(Tmp.v1), rotation, angleLimit);
+            // ★ 额外硬限制: 段身真实朝向相对头部不超过 segmentRotationRange
+            segRotations[0] = clampRange(segRotations[0], rotation, segmentRotationRange);
 
             // PU132 L139-140: 拉回理想位置
             Tmp.v2.trns(segRotations[0], segmentOffset).add(seg0).sub(Tmp.v1);
@@ -371,6 +373,8 @@ public class SegmentWormEntity extends UnitEntity {
 
             // PU132 L156: 段身朝向 = 从段身指向理想位置, 带角度限制
             segRotations[i] = clampedAngle(segPos.angleTo(Tmp.v1), segRotations[i - 1], angleLimit);
+            // ★ 额外硬限制: 段身真实朝向相对前一段不超过 segmentRotationRange
+            segRotations[i] = clampRange(segRotations[i], segRotations[i - 1], segmentRotationRange);
 
             // PU132 L157-158: 拉回理想位置
             Tmp.v2.trns(segRotations[i], segmentOffset).add(segPos).sub(Tmp.v1);

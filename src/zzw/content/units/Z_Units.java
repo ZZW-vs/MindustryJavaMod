@@ -156,12 +156,12 @@ public class Z_Units {
         }};
 
         // ★ 注册 arcnelidia 段身配置到 configs Map ★
-        // ★ key 用 type.name (v154.3 mod 单位的 name 带 mod 前缀, 如 "create-arcnelidia")
         // PU132 原版 segmentLength=9, segmentOffset=23f
         // 段间距 22.7f (PU132 23f - 0.3f, 用户要求稍小一点)
-        // ★ wobble=true (arcnelidia 轻微晃动, toxobyte=false 完全静止)
+        // wobble=true (arcnelidia 轻微晃动)
+        // segmentRotationRange=15f (电弧虫比较硬, 防止旋转过度)
         SegmentWormEntity.configs.put(arcnelidia.name,
-            new SegmentWormEntity.SegmentConfig(arcnelidiaSegment, 9, 22.7f, 0f, 0, true));
+            new SegmentWormEntity.SegmentConfig(arcnelidiaSegment, 9, 22.7f, 0f, 0, true, false, false, 15f));
 
         // 用反射设置 shootSound 和 visualElevation, 避开编译期字段差异 (v150 vs v154)
         try {
@@ -428,7 +428,7 @@ public class Z_Units {
         devourerSegment = new UnitType("devourer-segment") {{
             health = 25000f;
             speed = 0f;
-            hitSize = (39f * 1.55f) - 5f;
+            hitSize = 30f;
             armor = 8f;
             flying = true;
             rotateSpeed = 1f;
@@ -438,7 +438,7 @@ public class Z_Units {
             constructor = SegmentUnitEntity::create;
             hidden = true;
             useUnitCap = false;
-            physics = true;
+            physics = false;
             hittable = true;
 
             // 段身武器1: 导弹发射器 (PU132 unity-doeg-launcher)
