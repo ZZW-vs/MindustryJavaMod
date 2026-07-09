@@ -106,11 +106,15 @@ public class SegmentUnitEntity extends UnitEntity {
                         mount.shoot = true;
                         mount.rotate = true;
                     } else {
-                        // ★ 自动索敌: 搜索自己射程内的目标
-                        Unit target = Units.closestEnemy(team, x, y, weapon.range(), u -> !u.dead);
-                        if (target != null) {
-                            mount.aimX = target.x;
-                            mount.aimY = target.y;
+                        // ★ 自动索敌: 搜索自己射程内的目标 (单位 + 建筑)
+                        // 之前只搜 Units.closestEnemy (只找单位), 导致段身不打建筑
+                        // 改用 Units.closestTarget (返回 Teamc, 包含单位+建筑)
+                        mindustry.gen.Teamc tgt = Units.closestTarget(team, x, y, weapon.range(),
+                            u -> !u.dead,
+                            t -> true);
+                        if (tgt != null) {
+                            mount.aimX = tgt.getX();
+                            mount.aimY = tgt.getY();
                             mount.shoot = true;
                             mount.rotate = true;
                         } else {

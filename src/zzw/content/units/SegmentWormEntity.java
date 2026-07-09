@@ -5,6 +5,8 @@ import arc.math.Angles;
 import arc.math.Mathf;
 import arc.math.geom.Vec2;
 import arc.util.Tmp;
+import arc.util.Time;
+import mindustry.Vars;
 import mindustry.gen.Unit;
 import mindustry.gen.UnitEntity;
 import mindustry.entities.Effect;
@@ -278,6 +280,9 @@ public class SegmentWormEntity extends UnitEntity {
          *         清零 vel 并锁定 rotation, 使单位完全静止
          *  false: devourer/arcnelidia 等不受影响, 开大招时仍可移动 */
         public final boolean freezeOnUlt;
+        /** 每秒回血 (0=不回血)
+         *  压迫者: 250, 吞噬者: 120, 电弧虫: 10, 吸血虫: 10, toxobyte: 5 */
+        public float healPerSecond;
 
         public SegmentConfig(mindustry.type.UnitType t, int c, float s) {
             this(t, c, s, 0f, 0, false, false, false);
@@ -336,6 +341,7 @@ public class SegmentWormEntity extends UnitEntity {
             this.barrageRange = barrageRange;
             this.segmentWeaponGroupSize = segmentWeaponGroupSize;
             this.freezeOnUlt = freezeOnUlt;
+            this.healPerSecond = 0f;
         }
     }
     /** 按 UnitType.name 注册的段身配置 (key = 头部名字, 如 "arcnelidia" / "toxobyte") */
@@ -356,19 +362,6 @@ public class SegmentWormEntity extends UnitEntity {
 
     @Override
     public void update() {
-        // ★ 待机静止保障 (关键!):
-        // v154.3 VelComp.update() 用 @MethodPriority(-1) 在所有 update 之前执行,
-        // 会用 vel 移动位置 (VelComp.java L28: move(vel.x * delta, vel.y * delta))
-        // 所以必须在 super.update() 之前清零 vel, 否则单位会以"上一帧残留 vel"持续平移
-        //
-        // ★ 根本原因: v154.3 玩家队伍用 CommandAI 而非 aiController (UnitType.java L280)
-        //   playerControllable=true && team.isAI()=false → 用 CommandAI 不用 WormAI
-        //   所以 WormAI.updateMovement 从未被调用, isIdle 标志没用
-        //   修复: 直接检查 controller.target==null, 不依赖 WormAI
-        if (isIdle()) {
-            vel.setZero();
-        }
-
         // ★ 大招期间减速移动 (PU132 OppressionComp: speedMultiplier *= 0.075f)
         // vel 在 super.update() 前减速, 防止物理系统加速
         float ultScl = ultSpeedMultiplier();
@@ -381,9 +374,21 @@ public class SegmentWormEntity extends UnitEntity {
         lastVelocityC.set(vel);
         super.update();
 
-        // ★ 待机静止保障 2: super.update() 后物理系统可能给 vel 加了值, 再次清零
+        // ★ 待机静止: super.update() 后检查
+        // ★ 关键修复: super.update() 前不清零 vel, 否则会抵消 AI 上一帧设置的速度
+        //   导致单位永远无法有效加速移动
+        //   只在 super.update() 后确认真的待机时才清零 vel
         if (isIdle()) {
             vel.setZero();
+        }
+
+        // ★ 每秒回血 (仅服务端)
+        if (!Vars.net.client() && type != null && health < maxHealth) {
+            SegmentConfig cfg = configs.get(type.name);
+            if (cfg != null && cfg.healPerSecond > 0f) {
+                float healAmount = cfg.healPerSecond / 60f * Time.delta;
+                heal(healAmount);
+            }
         }
 
         // ★ 大招期间减速 2: super.update() 后再次减速 vel + 减速旋转

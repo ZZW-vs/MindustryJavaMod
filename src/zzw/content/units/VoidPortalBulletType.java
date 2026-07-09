@@ -21,7 +21,6 @@ import mindustry.Vars;
 import mindustry.entities.Effect;
 import mindustry.entities.Units;
 import mindustry.game.Team;
-import mindustry.game.Teams;
 import mindustry.gen.Building;
 import mindustry.gen.Bullet;
 import mindustry.gen.Healthc;
@@ -109,16 +108,17 @@ public class VoidPortalBulletType extends AntiCheatBulletTypeBase {
         if (b.timer(0, 5f)) {
             float ex = end.x, ey = end.y, mx = mid.x, my = mid.y, sx = s.x, sy = s.y;
             collided.clear();
+            int[] hitCount = {0}; // 限制每次更新产生的特效数量
 
             // 三角形1: b -> mid+s -> mid-s (建筑)
-            inTriangleBuildingEnemy(b.team, b.x, b.y, mx + sx, my + sy, mx - sx, my - sy, building -> collided.add(building.id), building -> {
-                hit(b, building.x, building.y);
+            hitCount[0] += inTriangleBuildingEnemy(b.team, b.x, b.y, mx + sx, my + sy, mx - sx, my - sy, building -> collided.add(building.id), building -> {
                 hitBuildingAntiCheat(b, building);
+                if (hitCount[0] < 5) hit(b, building.x, building.y);
             });
             // 三角形2: mid+s -> mid-s -> end (建筑)
-            inTriangleBuildingEnemy(b.team, mx + sx, my + sy, mx - sx, my - sy, ex, ey, building -> collided.add(building.id), building -> {
-                hit(b, building.x, building.y);
+            hitCount[0] += inTriangleBuildingEnemy(b.team, mx + sx, my + sy, mx - sx, my - sy, ex, ey, building -> collided.add(building.id), building -> {
                 hitBuildingAntiCheat(b, building);
+                if (hitCount[0] < 5) hit(b, building.x, building.y);
             });
 
             // 三角形1: b -> mid+s -> mid-s (单位)
@@ -238,24 +238,31 @@ public class VoidPortalBulletType extends AntiCheatBulletTypeBase {
         });
     }
 
-    /** 三角形内敌方建筑扫描 (替代 PU132 Utils.inTriangleBuilding) */
-    private static void inTriangleBuildingEnemy(Team team, float x1, float y1, float x2, float y2, float x3, float y3, arc.func.Boolf<Building> filter, arc.func.Cons<Building> cons) {
+    /**
+     * 三角形内敌方建筑扫描 (替代 PU132 Utils.inTriangleBuilding)
+     * ★ 性能优化: 使用 indexer.eachBlock 只检查区域内的建筑
+     * @return 命中建筑数量
+     */
+    private static int inTriangleBuildingEnemy(Team team, float x1, float y1, float x2, float y2, float x3, float y3, arc.func.Boolf<Building> filter, arc.func.Cons<Building> cons) {
         Rect r = rect.setCentered(x1, y1, 0f);
         r.merge(x2, y2);
         r.merge(x3, y3);
-        // 遍历所有敌方队伍的建筑 (buildings 是 Seq<Building>, 用 for 替代 QuadTree.intersect)
-        for (Teams.TeamData data : Vars.state.teams.present) {
-            if (data.team == team || data.buildings == null) continue;
-            for (Building b : data.buildings) {
-                if (!filter.get(b)) continue;
-                b.hitbox(rectAlt);
-                // 先用矩形包围盒粗筛, 再用三角形精确检测
-                if (!r.overlaps(rectAlt)) continue;
-                int sz = b.block.size;
-                boolean hit = sz > 3 ? inTriangleRect(x1, y1, x2, y2, x3, y3, rectAlt) : inTriangleCircle(x1, y1, x2, y2, x3, y3, b.x, b.y, sz * Vars.tilesize / 2f);
-                if (hit) cons.get(b);
-            }
-        }
+        float cx = r.x + r.width / 2f, cy = r.y + r.height / 2f;
+        float range = Math.max(r.width, r.height) / 2f + 8f;
+        int[] count = {0};
+        // ★ 使用 indexer.eachBlock 按区域查询, 比遍历所有建筑快得多
+        Vars.indexer.eachBlock(null, cx, cy, range,
+            build -> build.team != team && filter.get(build),
+            build -> {
+                build.hitbox(rectAlt);
+                int sz = build.block.size;
+                boolean hit = sz > 3 ? inTriangleRect(x1, y1, x2, y2, x3, y3, rectAlt) : inTriangleCircle(x1, y1, x2, y2, x3, y3, build.x, build.y, sz * Vars.tilesize / 2f);
+                if (hit) {
+                    cons.get(build);
+                    count[0]++;
+                }
+            });
+        return count[0];
     }
 
     // ====== 数据类和触手类 ======

@@ -47,7 +47,7 @@ public class Z_Units {
 
         // —— 段身 UnitType (先创建, 头部要引用它) ——
         arcnelidiaSegment = new UnitType("arcnelidia-segment") {{
-            health = 800;
+            health = 1040;  // 800 * 1.3
             speed = 0f;                 // 段身不需要自己移动 (由头部驱动)
             // ★ hitSize=19.75f (19.25 + 0.5, 用户要求增大 0.5)
             // 碰撞计算: 段间距22.7 > 半径9.875+9.875=19.75, 不重叠 (间隙2.95)
@@ -83,10 +83,10 @@ public class Z_Units {
                 x = 0f;
                 rotate = true;
                 mirror = false;
-                reload = 60f;
+                reload = 72f;  // 60 * 1.2, 攻击频率减少一点点
                 rotateSpeed = 50f;
                 shootCone = 180f;
-                bullet = new mindustry.entities.bullet.BombBulletType(27f, 25f) {{
+                bullet = new mindustry.entities.bullet.BombBulletType(27f, 250f) {{  // 25 + 250
                     width = 10f;
                     height = 14f;
                     hitEffect = mindustry.content.Fx.flakExplosion;
@@ -94,7 +94,7 @@ public class Z_Units {
                     smokeEffect = mindustry.content.Fx.none;
                     collidesAir = false;
                     collidesGround = true;
-                    splashDamage = 25f;
+                    splashDamage = 250f;  // 25 + 225
                     splashDamageRadius = 25f;
                     status = mindustry.content.StatusEffects.blasted;
                     statusDuration = 60f;
@@ -105,7 +105,7 @@ public class Z_Units {
         // —— 头部 Arcnelidia 飞行分段虫子 ——
         arcnelidia = new UnitType("arcnelidia") {{
             // ===== 基础属性 (PU132 原值) =====
-            health = 800;
+            health = 1040;  // 800 * 1.3
             speed = 4f;
             accel = 0.035f;
             rotateSpeed = 3.2f;
@@ -139,7 +139,7 @@ public class Z_Units {
                 mirror = true;
                 rotate = true;
                 minShootVelocity = 2.1f;
-                bullet = new LaserBulletType(200f) {{
+                bullet = new LaserBulletType(450f) {{  // 200 + 250
                     // PU132 原配置: surge 颜色 (电弧激光, 黄色)
                     colors = new Color[]{
                         Pal.surge.cpy().mul(1f, 1f, 1f, 0.4f),
@@ -168,6 +168,8 @@ public class Z_Units {
         SegmentWormEntity.configs.put(arcnelidia.name,
             new SegmentWormEntity.SegmentConfig(arcnelidiaSegment, 9, 22.7f, 0f, 0, true, false, false,
                 25f, 6f, 0.1f, 1f, 4, 0f, false, 0f));
+        // 电弧虫: 每秒回10血
+        SegmentWormEntity.configs.get(arcnelidia.name).healPerSecond = 10f;
 
         // 用反射设置 shootSound 和 visualElevation, 避开编译期字段差异 (v150 vs v154)
         try {
@@ -197,7 +199,7 @@ public class Z_Units {
 
         // —— 段身 UnitType ——
         toxobyteSegment = new UnitType("toxobyte-segment") {{
-            health = 200;
+            health = 320;  // 200 + 120
             speed = 0f;
             // ★ hitSize=14.2f (用户指定)
             hitSize = 14.2f;
@@ -242,7 +244,7 @@ public class Z_Units {
         // —— 头部 Toxobyte ——
         toxobyte = new UnitType("toxobyte") {{
             // ===== 基础属性 (PU132 UnityUnitTypes.java 第3231-3248行) =====
-            health = 200f;
+            health = 280f;  // 200 + 80
             speed = 3f;
             accel = 0.035f;
             rotateSpeed = 3f;       // PU132 未设, 用默认
@@ -301,9 +303,12 @@ public class Z_Units {
         // ★ angleLimit=25f (PU132 toxobyte 原值)
         // ★ segmentDamageScl=8f (PU132 原版 toxobyte 值, 段身受击时血量×8倍掉, 更脆更容易分裂)
         // segmentCast=4, jointStrength=1f, anglePhysicsSmooth=0f (PU132 默认值)
+        // ★ regenTime 减少2秒: 15*60 → 13*60
         SegmentWormEntity.configs.put(toxobyte.name,
-            new SegmentWormEntity.SegmentConfig(toxobyteSegment, 25, 16.25f, 15f * 60f, 25, false, true, true,
+            new SegmentWormEntity.SegmentConfig(toxobyteSegment, 25, 16.25f, 13f * 60f, 25, false, true, true,
                 25f, 8f, 0.1f, 1f, 4, 0f, false, 0f));
+        // toxobyte: 每秒回5血
+        SegmentWormEntity.configs.get(toxobyte.name).healPerSecond = 5f;
 
         // ═══════════════════════════════════════════════════════════
         //  Catenapede (PU132 吸血虫)
@@ -317,7 +322,7 @@ public class Z_Units {
 
         // —— 段身 UnitType ——
         catenapedeSegment = new UnitType("catenapede-segment") {{
-            health = 500;
+            health = 680;  // 500 + 180
             speed = 0f;
             hitSize = 28f;
             armor = 5f;
@@ -372,7 +377,7 @@ public class Z_Units {
         // —— 头部 Catenapede ——
         catenapede = new UnitType("catenapede") {{
             // ===== 基础属性 (PU132 UnityUnitTypes.java 第3284-3306行) =====
-            health = 750f;
+            health = 850f;  // 750 + 100
             speed = 2.4f;
             accel = 0.06f;
             drag = 0.03f;
@@ -425,16 +430,19 @@ public class Z_Units {
         // PU132: segmentDamageScl=12f (段身受击时血量×12倍掉)
         // PU132: healthDistribution=0.15f (血量分布速率)
         // angleLimit=25f, segmentCast=4, jointStrength=1f (PU132 默认值)
+        // ★ regenTime 减少3.5秒: 30*60 → 26.5*60
         SegmentWormEntity.configs.put(catenapede.name,
-            new SegmentWormEntity.SegmentConfig(catenapedeSegment, 2, 31f, 30f * 60f, 15, false, true, true,
+            new SegmentWormEntity.SegmentConfig(catenapedeSegment, 2, 31f, 26.5f * 60f, 15, false, true, true,
                 25f, 12f, 0.15f, 1f, 4, 0f, false, 0f));
+        // 吸血虫: 每秒回10血
+        SegmentWormEntity.configs.get(catenapede.name).healPerSecond = 10f;
 
         // ===== Devourer (PU132 devourer-of-eldrich-gods) =====
         // End 阵营超级虫子, 60段, 全免疫, 头部激光+段身多种武器
 
         // ★ Devourer 段身 ★
         devourerSegment = new UnitType("devourer-segment") {{
-            health = 25000f;
+            health = 45000f;  // 25000 * 1.8
             speed = 0f;
             hitSize = 52f;  // 原 40f + 12 (用户要求加大12)
             armor = 8f;
@@ -529,7 +537,7 @@ public class Z_Units {
 
         // ★ Devourer 头部 ★
         devourer = new UnitType("devourer") {{
-            health = 1250000f;
+            health = 2250000f;  // 1250000 * 1.8
             flying = true;
             speed = 5f;
             accel = 0.12f;
@@ -562,7 +570,7 @@ public class Z_Units {
                 shake = 4f;
                 shoot.firstShotDelay = 41f;
 
-                bullet = new EndContinuousLaserBulletType(2400f) {{
+                bullet = new EndContinuousLaserBulletType(2650f) {{  // 2400 + 250
                     length = 340f;
                     lifetime = 5f * 60f;
                     // PU132 原版颜色: scarColorAlpha(#f5303690), scarColor(#f53036), endColor(#ff786e), white
@@ -619,6 +627,8 @@ public class Z_Units {
         SegmentWormEntity.configs.put(devourer.name,
             new SegmentWormEntity.SegmentConfig(devourerSegment, 60, 70.55f, 0f, 60, false, false, false,
                 30f, 6f, 0.1f, 1f, 7, 0.5f, true, 0f, 240f));
+        // 吞噬者: 每秒回120血
+        SegmentWormEntity.configs.get(devourer.name).healPerSecond = 120f;
 
         // ★ 初始化分裂/合并音效 (PU132 默认 Sounds.door)
         try {
@@ -643,7 +653,7 @@ public class Z_Units {
         // —— 段身 UnitType ——
         oppressionSegment = new UnitType("oppression-segment") {{
             // PU132: 段身血量由头部 healthDistribution 分配, 这里设基础值
-            health = 10000f;
+            health = 25000f;  // 10000 * 2.5
             speed = 0f;
             // ★ hitSize=180 (用户指定)
             hitSize = 180f;
@@ -676,7 +686,7 @@ public class Z_Units {
                 shootY = 0f;
                 rotate = true;
                 rotateSpeed = 1.5f;
-                reload = 4.75f * 60f;
+                reload = 7.125f * 60f;  // 4.75 * 1.5, 降低攻击频率
 
                 bullet = new EndRailBulletType() {{
                     damage = 15000f;
@@ -706,7 +716,7 @@ public class Z_Units {
                 rotate = true;
                 rotateSpeed = 1.75f;
                 continuous = true;
-                reload = 3.5f * 60f;
+                reload = 5.25f * 60f;  // 3.5 * 1.5, 降低攻击频率
 
                 bullet = new EndContinuousLaserBulletType(550f) {{
                     lifetime = 1.5f * 60f;
@@ -733,11 +743,11 @@ public class Z_Units {
                 y = 72f;
                 shootY = 21f;
                 rotateSpeed = 2f;
-                reload = 4f * 60f;
                 // SweepWeapon 构造函数已设 rotate=true, continuous=true
                 // PU132: sweepTime=120, sweepAngle=60
                 sweepTime = 120f;
                 sweepAngle = 60f;
+                reload = 6f * 60f;  // 4 * 1.5, 降低攻击频率
 
                 bullet = new EndSweepLaser(7000f) {{
                     lifetime = 130f;
@@ -769,7 +779,7 @@ public class Z_Units {
                 rotateSpeed = 4f;
                 inaccuracy = 3f;
                 xRand = 10.25f;
-                reload = 3f * 60f;
+                reload = 4.5f * 60f;  // 3 * 1.5, 降低攻击频率
                 // PU132 原版: shots=13, shotDelay=5f
                 shoot.shots = 13;
                 shoot.shotDelay = 5f;
@@ -802,7 +812,7 @@ public class Z_Units {
                 shootY = 21f;
                 rotate = true;
                 rotateSpeed = 1.3f;
-                reload = 6f * 60f;
+                reload = 9f * 60f;  // 6 * 1.5, 降低攻击频率
 
                 bullet = new VoidPortalBulletType(1300f) {{
                     // PU132 原版参数
@@ -830,7 +840,7 @@ public class Z_Units {
                 rotateSpeed = 3f;
                 inaccuracy = 15f;
                 xRand = 6f;
-                reload = 4f * 60f;
+                reload = 6f * 60f;  // 4 * 1.5, 降低攻击频率
                 // PU132 原版: shots=5
                 shoot.shots = 5;
 
@@ -844,7 +854,7 @@ public class Z_Units {
         // —— 头部 Oppression ——
         oppression = new UnitType("oppression") {{
             // ===== 基础属性 (PU132 UnityUnitTypes.java 第4055-4095行) =====
-            health = 2500000f;
+            health = 6250000f;  // 2500000 * 2.5
             flying = true;
             speed = 4.5f;
             accel = 0.13f;
@@ -887,6 +897,8 @@ public class Z_Units {
                 continuous = true;
                 reload = 25f * 60f;
                 shoot.firstShotDelay = ChargeEffect.oppressionCharge.lifetime;
+                // ★ 蓄力特效跟随单位移动和旋转
+                parentizeEffects = true;
 
                 bullet = new OppressionLaserBulletType();
             }});
@@ -936,6 +948,8 @@ public class Z_Units {
         SegmentWormEntity.configs.put(oppression.name,
             new SegmentWormEntity.SegmentConfig(oppressionSegment, 55, 228f, 0f, 55, false, false, false,
                 35f, 6f, 0.1f, 1f, 11, 0.5f, true, 0f, 490f, 2, true));
+        // 压迫者: 每秒回250血
+        SegmentWormEntity.configs.get(oppression.name).healPerSecond = 250f;
 
         // ★ 初始化 oppression 液压装饰 (WormDecal) ★
         // PU132 UnityUnitTypes 第4064-4073行:

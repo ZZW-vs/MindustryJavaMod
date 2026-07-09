@@ -90,6 +90,8 @@ public class EndContinuousLaserBulletType extends AntiCheatBulletTypeBase {
             Rect rect = arc.util.Tmp.r1;
             rect.set(b.x, b.y, 0, 0).merge(v.x, v.y).grow(w * 2f + 50f);
 
+            int[] hitCount = {0};
+
             // 单位检测: 使用 Groups.unit.intersect + Geometry.raycastRect 精确检测碰撞框
             mindustry.gen.Groups.unit.intersect(rect.x, rect.y, rect.width, rect.height, unit -> {
                 if (unit.team == b.team) return;
@@ -100,7 +102,8 @@ public class EndContinuousLaserBulletType extends AntiCheatBulletTypeBase {
                 if (vec != null) {
                     unit.collision(b, vec.x, vec.y);
                     hitUnitAntiCheat(b, unit);
-                    hit(b, vec.x, vec.y);
+                    if (hitCount[0] < 8) hit(b, vec.x, vec.y);
+                    hitCount[0]++;
                     if (b.owner instanceof Healthc h) {
                         h.heal(damage * 0.1f);
                     }
@@ -113,7 +116,8 @@ public class EndContinuousLaserBulletType extends AntiCheatBulletTypeBase {
                     mindustry.gen.Building build = Vars.world.build(cx, cy);
                     if (build != null && build.team != b.team) {
                         hitBuildingAntiCheat(b, build);
-                        hit(b, build.x, build.y);
+                        if (hitCount[0] < 8) hit(b, build.x, build.y);
+                        hitCount[0]++;
                         return build.block.absorbLasers;
                     }
                     return false;
