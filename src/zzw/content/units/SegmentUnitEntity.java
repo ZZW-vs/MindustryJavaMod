@@ -81,9 +81,9 @@ public class SegmentUnitEntity extends UnitEntity {
 
         // ★ 段身武器 + 同步头部状态 (借鉴 PU132 WormSegmentUnit.wormSegmentUpdate L192-214)
         if (head != null && head.isAdded() && !head.dead) {
-            // 同步头部 hitTime/ammo
+            // 同步头部 hitTime
+            // ★ v158 移除了 ammo 字段, 段身武器系统会自行处理弹药
             hitTime = head.hitTime;
-            ammo = head.ammo;
 
             // ★ 段身武器: 参照 PU132 WormSegmentUnit.updateWeapon 重写索敌部分
             // 发射/冷却/旋转交给 v154.3 原版 Weapon.update() 处理

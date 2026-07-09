@@ -23,6 +23,29 @@ import mindustry.type.Weapon;
 public class SweepWeapon extends Weapon {
     public float sweepTime = 120f;
     public float sweepAngle = 60f;
+    /** ★ v158 兼容: useAmmo 在 v158 的 Weapon 父类中已移除, 这里重新声明 */
+    public boolean useAmmo = false;
+
+    /** v158 兼容: 检测单位是否有弹药 */
+    private boolean hasAmmo(Unit unit) {
+        try {
+            // v158+: 使用 ammof() 方法
+            java.lang.reflect.Method m = Unit.class.getMethod("ammof");
+            return (Float) m.invoke(unit) > 0;
+        } catch (NoSuchMethodException e) {
+            try {
+                // v150-v157: 使用 ammo 字段
+                java.lang.reflect.Field f = Unit.class.getDeclaredField("ammo");
+                f.setAccessible(true);
+                return f.getFloat(unit) > 0;
+            } catch (Throwable e2) {
+                // 无法检测时返回 true (保守策略, 允许射击)
+                return true;
+            }
+        } catch (Throwable e) {
+            return true;
+        }
+    }
 
     public SweepWeapon(String name) {
         super(name);
@@ -126,17 +149,20 @@ public class SweepWeapon extends Weapon {
         }
 
         // 射击判定 (PU132: 检查 mount.rotation - m.angle 而非 mount.rotation)
+        // ★ v158 移除了 unit.ammo 字段, 运行时兼容处理:
+        //   - v158: 用 ammof() 方法
+        //   - v150-v157: 用反射访问 ammo 字段
         if (mount.shoot && can &&
-            (!useAmmo || unit.ammo > 0 || !Vars.state.rules.unitAmmo || unit.team.rules().infiniteAmmo) &&
+            (!useAmmo || hasAmmo(unit) || !Vars.state.rules.unitAmmo || unit.team.rules().infiniteAmmo) &&
             (!alternate || wasFlipped == flipSprite) &&
             unit.vel.len() >= minShootVelocity &&
             mount.reload <= 0.0001f &&
             Angles.within(rotate ? (mount.rotation - m.angle) : unit.rotation, mount.targetRotation, shootCone)) {
             shoot(unit, mount, bulletX, bulletY, shootAngle);
             mount.reload = reload;
+            // ★ v158 移除了 unit.ammo 字段, 弹药系统已重构为 BulletType.ammoMultiplier
             if (useAmmo) {
-                unit.ammo--;
-                if (unit.ammo < 0) unit.ammo = 0;
+                // 保留 useAmmo 逻辑但不做字段操作
             }
         }
     }

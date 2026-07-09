@@ -6,6 +6,7 @@ import arc.graphics.g2d.Lines;
 import arc.graphics.g2d.Fill;
 import arc.math.Angles;
 import arc.math.Mathf;
+import arc.math.geom.Rect;
 import arc.math.geom.Vec2;
 import arc.util.Tmp;
 import mindustry.Vars;
@@ -79,28 +80,45 @@ public class EndContinuousLaserBulletType extends AntiCheatBulletTypeBase {
     @Override
     public void update(Bullet b) {
         if (b.timer(1, 5f)) {
-            b.fdata = Damage.findLaserLength(b, length);
+            // ★ 原版 PU132 直接使用 length, 不调用 findLaserLength (避免被友方建筑截断)
+            b.fdata = length;
 
-            Vec2 v = Tmp.v1.trns(b.rotation(), b.fdata).add(b);
+            Vec2 v = Tmp.v1.trns(b.rotation(), length).add(b);
             float w = largeHit ? 15f : 3f;
 
-            // 沿激光线检测敌方单位 (使用防作弊伤害)
-            Units.nearbyEnemies(b.team, b.x, b.y, b.fdata + w, unit -> {
-                if (!unit.hittable() || !unit.checkTarget(collidesAir, collidesGround)) return;
-                if (arc.math.geom.Intersector.distanceSegmentPoint(b.x, b.y, v.x, v.y, unit.x, unit.y) > w + unit.hitSize / 2f) return;
-                hitUnitAntiCheat(b, unit);
-                if (b.owner instanceof Healthc h) {
-                    h.heal(damage * 0.1f);
+            // ★ 对齐原版 Utils.collideLineRawNew 的精确碰撞框检测
+            Rect rect = arc.util.Tmp.r1;
+            rect.set(b.x, b.y, 0, 0).merge(v.x, v.y).grow(w * 2f + 50f);
+
+            // 单位检测: 使用 Groups.unit.intersect + Geometry.raycastRect 精确检测碰撞框
+            mindustry.gen.Groups.unit.intersect(rect.x, rect.y, rect.width, rect.height, unit -> {
+                if (unit.team == b.team) return;
+                if (!unit.checkTarget(collidesAir, collidesGround)) return;
+                unit.hitbox(arc.util.Tmp.r2);
+                arc.util.Tmp.r2.grow(w * 2f);
+                Vec2 vec = arc.math.geom.Geometry.raycastRect(b.x, b.y, v.x, v.y, arc.util.Tmp.r2);
+                if (vec != null) {
+                    unit.collision(b, vec.x, vec.y);
+                    hitUnitAntiCheat(b, unit);
+                    hit(b, vec.x, vec.y);
+                    if (b.owner instanceof Healthc h) {
+                        h.heal(damage * 0.1f);
+                    }
                 }
             });
 
-            // 检测建筑 (使用防作弊伤害)
-            Vars.indexer.eachBlock(null, b.x, b.y, b.fdata + w,
-                    build -> build.team != b.team && build.health > 0,
-                    build -> {
-                        if (arc.math.geom.Intersector.distanceSegmentPoint(b.x, b.y, v.x, v.y, build.x, build.y) > w) return;
+            // 建筑检测: 对齐原版 world.raycastEachWorld 沿激光线逐格检测
+            if (collidesGround) {
+                Vars.world.raycastEachWorld(b.x, b.y, v.x, v.y, (cx, cy) -> {
+                    mindustry.gen.Building build = Vars.world.build(cx, cy);
+                    if (build != null && build.team != b.team) {
                         hitBuildingAntiCheat(b, build);
-                    });
+                        hit(b, build.x, build.y);
+                        return build.block.absorbLasers;
+                    }
+                    return false;
+                });
+            }
 
             // 闪电效果 (PU132 endLaser: lightningChance=0.8f)
             if (lightningChance > 0 && lightningLength > 0 && Mathf.chanceDelta(lightningChance)) {

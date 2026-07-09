@@ -6,6 +6,7 @@ import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
 import arc.math.Interp;
 import arc.math.Mathf;
+import arc.math.geom.Rect;
 import arc.math.geom.Vec2;
 import arc.struct.FloatSeq;
 import arc.math.Rand;
@@ -124,28 +125,47 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
             float w = this.width * fw * fow;
 
             Tmp.v1.trns(b.rotation(), length + endLength).add(b);
+            float ex = Tmp.v1.x, ey = Tmp.v1.y;
 
-            // 沿激光线检测碰撞
-            Units.nearbyEnemies(b.team, b.x, b.y, length + endLength, unit -> {
+            // ★ 对齐原版 Utils.collideLineLarge: nearestSegmentPoint + within + raycastRect
+            Rect rect = Tmp.r1;
+            rect.set(b.x, b.y, 0, 0).merge(ex, ey).grow(w * 2f + 100f);
+
+            // 单位检测
+            Units.nearbyEnemies(b.team, rect, unit -> {
                 if (!unit.hittable() || !unit.checkTarget(collidesAir, collidesGround)) return;
-                float dst = b.dst(unit);
+                // nearestSegmentPoint 获取线段上离单位最近的点
+                Vec2 nearest = arc.math.geom.Intersector.nearestSegmentPoint(b.x, b.y, ex, ey, unit.x, unit.y, Tmp.v2);
+                float dst = b.dst(nearest);
                 float cw = getWidthCollision(dst, w);
-                if (cw > 0f && unit.within(b, dst + cw + unit.hitSize / 2f)) {
-                    unit.damage(damage);
-                    if (b.owner instanceof mindustry.gen.Healthc h) {
-                        h.heal(damage * 0.1f);
+                if (cw > 0f && unit.within(nearest.x, nearest.y, cw + unit.hitSize / 2f)) {
+                    // 二次精确检测: raycastRect
+                    Tmp.r2.setCentered(unit.x, unit.y, unit.hitSize()).grow(w * 2f);
+                    Vec2 hv = arc.math.geom.Geometry.raycastRect(b.x, b.y, ex, ey, Tmp.r2);
+                    if (hv != null) {
+                        hit(b, hv.x, hv.y);
+                        hitUnitAntiCheat(b, unit);
+                        if (b.owner instanceof mindustry.gen.Healthc h) {
+                            h.heal(damage * 0.1f);
+                        }
                     }
                 }
             });
 
-            // 检测建筑
+            // 建筑检测
             Vars.indexer.eachBlock(null, b.x, b.y, length + endLength,
                     build -> build.team != b.team && build.health > 0,
                     build -> {
-                        float dst = b.dst(build);
+                        Vec2 nearest = arc.math.geom.Intersector.nearestSegmentPoint(b.x, b.y, ex, ey, build.x, build.y, Tmp.v2);
+                        float dst = b.dst(nearest);
                         float cw = getWidthCollision(dst, w);
-                        if (cw > 0f && build.within(b, dst + cw)) {
-                            build.damage(damage * buildingDamageMultiplier);
+                        if (cw > 0f && build.within(nearest.x, nearest.y, cw)) {
+                            Tmp.r2.setCentered(build.x, build.y, build.block.size * Vars.tilesize).grow(w * 2f);
+                            Vec2 hv = arc.math.geom.Geometry.raycastRect(b.x, b.y, ex, ey, Tmp.r2);
+                            if (hv != null) {
+                                hit(b, hv.x, hv.y);
+                                hitBuildingAntiCheat(b, build);
+                            }
                         }
                     });
         }
