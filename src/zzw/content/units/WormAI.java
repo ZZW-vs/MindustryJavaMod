@@ -75,40 +75,59 @@ public class WormAI extends CommandAI {
             float angleDiff = Angles.angleDist(unit.rotation, targetAngle);
             float engageRange = unit.type.range - 10f;
 
-            if (distance > engageRange) {
-                // ★ 阶段1: 远离目标 → 平滑转向 + 沿当前朝向冲刺
-                //   像龙一样: 先转向目标方向, 然后沿当前朝向飞过去
-                //   身体会自然蜿蜒跟随, 形成龙飞行的姿态
+            // ★ 边界检测: 接近地图边缘时强制朝目标方向快速转向
+            float margin = 300f;
+            float worldW = world.unitWidth();
+            float worldH = world.unitHeight();
+            boolean nearBorder = unit.x < margin || unit.x > worldW - margin
+                    || unit.y < margin || unit.y > worldH - margin;
 
-                // 平滑转向目标, 转向速度受 rotateSpeed 限制
-                // rotateSpeed 是单位每秒最大旋转角度, 与玩家操控保持一致
-                float maxTurnPerFrame = unit.type.rotateSpeed / 60f;
-                float turnSpeed = Math.min(1f, maxTurnPerFrame / Math.max(0.1f, angleDiff));
+            if (distance > engageRange) {
+                // ★ 阶段1: 远离目标 → 转向目标 + 朝目标冲刺
+                //   非大招: 快速转向 (slerp 0.06f, 约每秒3.6度)
+                //   大招期间: 用 rotateSpeed 限制, 与玩家操控一致
+                boolean isUlt = (unit instanceof SegmentWormEntity) && ((SegmentWormEntity) unit).isUltActive();
+                float turnSpeed;
+                if (nearBorder) {
+                    // 接近边界时快速转向目标, 避免飞出地图
+                    turnSpeed = 0.08f;
+                } else if (isUlt) {
+                    // 大招期间: 与玩家操控相同的转速
+                    float maxTurnPerFrame = unit.type.rotateSpeed / 60f;
+                    turnSpeed = Math.min(1f, maxTurnPerFrame / Math.max(0.1f, angleDiff));
+                } else {
+                    // 非大招: 较快的转向, 但不是瞬间
+                    turnSpeed = 0.06f;
+                }
                 unit.rotation = Mathf.slerpDelta(unit.rotation, targetAngle, turnSpeed);
 
-                // 沿当前朝向冲刺
+                // 朝当前朝向移动 (龙飞行姿态)
                 vec.trns(unit.rotation, unit.speed());
                 unit.moveAt(vec);
 
                 turning = true;
             } else {
-                // ★ 阶段2: 进入攻击范围 → 锁定目标 + 环绕攻击
-                //   头部锁定目标方向, 身体摆动
-                //   像龙一样: 到达目标附近后盘旋攻击, 身体摆动展示力量感
+                // ★ 阶段2: 进入攻击范围 → 环绕攻击
+                //   像龙一样: 在目标周围盘旋, 头部转向目标
 
                 if (unit.type.circleTarget) {
-                    // 环绕模式: 沿朝向飞, 角度差大时转向, 形成盘旋
+                    // 环绕模式: 切向移动形成圆周运动
                     attack(engageRange);
                 } else {
-                    // 直线模式: 继续沿朝向飞, 越过目标后折返
+                    // 直线模式: 朝目标移动
                     vec.trns(unit.rotation, unit.speed());
                     unit.moveAt(vec);
                 }
 
-                // 大招期间头部平滑转向目标, 使用与玩家操控相同的旋转速度
-                // rotateSpeed=2.2f 意味着每秒最多转 2.2 度, 避免瞬间转动
-                float maxTurnPerFrame = unit.type.rotateSpeed / 60f;
-                float turnSpeed = Math.min(1f, maxTurnPerFrame / Math.max(0.1f, angleDiff));
+                // 头部转向目标, 大招期间用 rotateSpeed 限制
+                boolean isUlt = (unit instanceof SegmentWormEntity) && ((SegmentWormEntity) unit).isUltActive();
+                float turnSpeed;
+                if (isUlt) {
+                    float maxTurnPerFrame = unit.type.rotateSpeed / 60f;
+                    turnSpeed = Math.min(1f, maxTurnPerFrame / Math.max(0.1f, angleDiff));
+                } else {
+                    turnSpeed = 0.05f;
+                }
                 unit.rotation = Mathf.slerpDelta(unit.rotation, unit.angleTo(attackTarget), turnSpeed);
                 turning = false;
             }
@@ -145,17 +164,20 @@ public class WormAI extends CommandAI {
 
     /**
      * ★ 环绕攻击 (龙的盘旋攻击模式)
-     * - 沿单位朝向移动 (像龙一样向前飞)
-     * - 角度差>90°且不在攻击范围内时, slerp平滑转向目标
-     * - 形成"冲过去 → 绕一圈 → 再冲回来"的盘旋效果
+     * - 距离目标远: 朝目标方向移动
+     * - 距离目标近: 做切向移动 (垂直于目标方向), 形成圆周环绕
      * - 身体自然摆动, 展示力量感
      */
     protected void attack(float circleLength) {
-        vec.trns(unit.rotation, unit.speed());
-        float diff = Angles.angleDist(unit.rotation, unit.angleTo(target));
-        if (diff > 90f && !unit.within(target, circleLength)) {
-            // 平滑转向目标, 转向速度根据角度差动态调整
-            vec.setAngle(Mathf.slerpDelta(vec.angle(), unit.angleTo(target), 0.15f));
+        float distance = unit.dst(target);
+        float angleToTarget = unit.angleTo(target);
+
+        if (distance > circleLength) {
+            // 目标太远: 朝目标方向移动
+            vec.trns(angleToTarget, unit.speed());
+        } else {
+            // 在环绕范围内: 切向移动 (目标方向 + 90度), 形成圆周运动
+            vec.trns(angleToTarget + 90f, unit.speed());
         }
         unit.moveAt(vec);
     }
