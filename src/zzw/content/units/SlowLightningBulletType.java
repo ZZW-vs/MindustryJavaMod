@@ -31,6 +31,7 @@ public class SlowLightningBulletType extends AntiCheatBulletTypeBase {
         despawnEffect = hitEffect = Fx.none;
         // v150.1: BulletType.range 是字段, 直接设置 (PU132 用 range() 方法返回 slRange*0.8f)
         range = slRange * 0.8f;
+        countsAsSkill = true;
     }
 
     @Override
@@ -84,6 +85,7 @@ public class SlowLightningBulletType extends AntiCheatBulletTypeBase {
 
     @Override
     public void update(Bullet b) {
+        if (!checkSkillLimit(b)) return;
         if (b.data instanceof SlowLightningEntity) {
             SlowLightningEntity data = (SlowLightningEntity) b.data;
             b.x = data.x;

@@ -116,7 +116,11 @@ public class Z_Units {
             // PU132: engineSize=-1f (不显示引擎喷射效果)
             engineSize = -1f;
             range = 210f;
-            faceTarget = true;  // ★ 锁定朝向目标
+            // ★ PU132 原版 faceTarget=false: 单位不盯着目标, 而是朝飞行方向
+            //   配合 circleTarget=false + moveTo(target, range*0.8f), 单位直线冲过目标再折返
+            //   这样整段身体都能发挥作用 (段身投弹/激光)
+            //   激光武器有 minShootVelocity=2.1f, 必须移动才会发射
+            faceTarget = false;
             // ★ arcnelidia 关闭原版 wobble (振幅 0.05f 太大), 用自定义 wobbleEnabled (振幅 0.02f)
             wobble = false;
             // ★ drag 用飞行单位合理值 (v154.3 默认 0.3f 对飞行单位太大, 速度衰减太快显得僵硬)
@@ -127,7 +131,7 @@ public class Z_Units {
             constructor = SegmentWormEntity::create;
             // ★ 使用 WormAI (待机静止, 不自动朝 spawn 移动)
             // v154.3: defaultController 改名为 aiController
-            aiController = zzw.content.units.WormAI::new;
+            controller = unit -> new zzw.content.units.WormAI();
 
             // ===== 头部武器: 双激光 (PU132 原配置) =====
             // PU132 UnityUnitTypes.java 第3024-3037行: 匿名武器, 无炮台贴图
@@ -266,7 +270,7 @@ public class Z_Units {
             constructor = SegmentWormEntity::create;
             // ★ 使用 WormAI (待机静止, 不自动朝 spawn 移动)
             // v154.3: defaultController 改名为 aiController
-            aiController = zzw.content.units.WormAI::new;
+            controller = unit -> new zzw.content.units.WormAI();
 
             // ===== 头部武器: 12 发散 SapBullet (PU132 第3250-3267行) =====
             // 瘟疫激光: 12 发同时散射, SapBullet 自动回血
@@ -396,7 +400,7 @@ public class Z_Units {
             // ★ PU132: rotateSpeed=2.7f, angleLimit=25f
             rotateSpeed = 2.7f;
             constructor = SegmentWormEntity::create;
-            aiController = zzw.content.units.WormAI::new;
+            controller = unit -> new zzw.content.units.WormAI();
 
             // ===== 头部武器: PointDrainLaser (PU132 第3309-3327行) =====
             // 吸血激光: 持续发射, 吸血 0.5%, 最大长度 160, 击退 -34 (拉向自己)
@@ -559,7 +563,7 @@ public class Z_Units {
             immunities.addAll(mindustry.Vars.content.getBy(mindustry.ctype.ContentType.status));
 
             constructor = SegmentWormEntity::create;
-            aiController = zzw.content.units.WormAI::new;
+            controller = unit -> new zzw.content.units.WormAI();
 
             // 头部武器1: 主激光 (PU132 UnityBullets.endLaser, 完整移植)
             weapons.add(new Weapon("create-devourer-main-laser") {{
@@ -751,26 +755,34 @@ public class Z_Units {
                 // PU132: sweepTime=120, sweepAngle=60
                 sweepTime = 120f;
                 sweepAngle = 60f;
-                reload = 6f * 60f;  // 4 * 1.5, 降低攻击频率
+                reload = 9f * 60f;  // 降低攻击频率 (黑圆生成频率降低)
 
                 bullet = new EndSweepLaser(7000f) {{
                     lifetime = 130f;
                     length = 850f;
-                    width = 25f;
-                    // PU132: collisionWidth=3, widthLoss=0.7, distance=150
-                    collisionWidth = 3f;
-                    widthLoss = 0.7f;
-                    distance = 150f;
-                    // 防作弊参数 (PU132 EndSweepLaser 原版配置)
-                    ratioStart = 100000f;
-                    ratioDamage = 1f / 60f;
-                    overDamage = 650000f;
+                    overDamage = 640000f;
                     overDamagePower = 2.7f;
-                    bleedDuration = 10f * 60f;
-                    pierceShields = true;
-                    modules = new AntiCheatBulletModule[]{new ArmorDamageModule(0f, 12f, 30f, 20f)};
-                    // hitBullet: 暂不设置 (虚空区域 oppressionArea 需单独移植, 高风险)
-                    // PU132: hitBullet = new VoidPortalBulletType() (虚空门户, 高风险机制)
+                    overDamageScl = 4000f;
+                    width = 25f;
+                    widthLoss = 0.7f;
+                    // PU132: collisionWidth = (width / 2f) * widthLoss = 8.75
+                    collisionWidth = (width / 2f) * widthLoss;
+                    distance = 350f;  // PU132 原版 220, 调大间距避免黑圆太密
+                    ratioStart = 14000f;
+                    ratioDamage = 1f / 10f;
+                    hitEffect = HitEffect.endHitRedBig;
+                    pierce = true;
+                    pierceCap = 3;
+                    // ★ hitBullet: 黑色圆形虚空区域 (PU132 UnityBullets.oppressionArea, L1220-1233)
+                    //   EndSweepLaser 命中时每隔 distance 距离生成一次
+                    hitBullet = new VoidAreaBulletType(95f) {{
+                        lifetime = 5f * 60f;
+                        bleedDuration = 30f;
+                        ratioDamage = 1f / 200f;
+                        ratioStart = 600000f;
+                        // PU132 用自定义 weaken 状态, v158 无此状态故省略 (核心伤害机制不受影响)
+                        radius = 120f;
+                    }};
                 }};
             }});
 
@@ -816,7 +828,7 @@ public class Z_Units {
                 shootY = 21f;
                 rotate = true;
                 rotateSpeed = 1.3f;
-                reload = 9f * 60f;  // 6 * 1.5, 降低攻击频率
+                reload = 13.5f * 60f;  // 降低攻击频率 (虚空门户菱形)
 
                 bullet = new VoidPortalBulletType(1300f) {{
                     // PU132 原版参数
@@ -844,7 +856,7 @@ public class Z_Units {
                 rotateSpeed = 3f;
                 inaccuracy = 15f;
                 xRand = 6f;
-                reload = 6f * 60f;  // 4 * 1.5, 降低攻击频率
+                reload = 9f * 60f;  // 降低攻击频率 (慢闪电)
                 // PU132 原版: shots=5
                 shoot.shots = 5;
 
@@ -882,7 +894,7 @@ public class Z_Units {
             immunities.addAll(mindustry.Vars.content.getBy(mindustry.ctype.ContentType.status));
 
             constructor = SegmentWormEntity::create;
-            aiController = zzw.content.units.WormAI::new;
+            controller = unit -> new zzw.content.units.WormAI();
             // range 用最大武器射程, 后续添加武器后更新
             range = 850f;
 

@@ -1,6 +1,8 @@
 # Create Mod
 
-一个为Mindustry添加了基础金属加工系统的Java模组，灵感来源于Minecraft的Create模组。
+一个为Mindustry添加了基础金属加工系统和多节Boss单位的Java模组，灵感来源于Minecraft的Create模组。
+
+**交流QQ群：276860651**
 
 ## 功能特性
 
@@ -45,7 +47,7 @@
 
 ### 新增单位 (PU132 移植)
 
-本模组的多节单位系统完全照搬 PU132 原版算法，包括速度传播、约束修正、血量分布等核心机制。
+本模组的多节单位系统完全照搬 PU132 原版算法，包括速度传播、约束修正、血量分布等核心机制。段身带有正弦波蠕动动画，更具生物活性。
 
 #### 电弧虫 (arcnelidia)
 - 多节虫子单位，段身延迟跟随头部
@@ -77,13 +79,15 @@
 
 #### 压迫者 (oppression)
 - 终极 Boss 级单位，8 个武器系统（2 头部 + 6 段身）
-- **大招机制**：开大招期间（充能 + 射击）移动和旋转速度降至 7.5%（非完全锁定）
+- **大招机制**：开大招期间（充能 + 射击）移动和旋转速度降至 12%（非完全锁定）
 - **充能前摇特效**：5 阶段粒子效果（菱形辐射 → 尖刺菱形 → 方块粒子 → 短线段 → 主线）
 - **VoidPortal 黑色菱形技能**：菱形区域伤害 + 虚空触手拉拽敌人，渲染在最上层可盖住空中单位
+- **扫射激光 + 黑色圆形虚空区域**：EndSweepLaser 扫射命中时生成 VoidArea 黑色圆形，持续范围伤害
 - **慢闪电**：完整移植 PU132 SlowLightning 三件套（Entity + Type + Node）
 - 段身武器按 segmentIndex 分 3 组（每组 2 个），避免炮台叠加
 - 段身碰撞箱 hitSize=180f，大招期间 freezeOnUlt=true
 - 液压杆装饰：每节段身都绘制到父段的液压杆（WormDecal 延迟加载）
+- 技能数量上限：非大招技能同时最多 8 个存在
 
 ### 机械网络系统 (Betamindy 风格)
 - 全局注册表 + 源驱动 BFS 传播转速和应力
@@ -124,10 +128,11 @@
 ## 更新日志
 
 ### v1.2 (开发中)
-- 移植 PU132 多节单位系统（arcnelidia / devourer / oppression）
+- 移植 PU132 多节单位系统（arcnelidia / toxobyte / catenapede / devourer / oppression）
 - 完整实现 WormComp 速度传播 + 约束修正算法
 - 移植 VoidPortal 虚空门户技能（菱形区域伤害 + 触手拉拽）
 - 移植 SlowLightning 慢闪电三件套（Entity + Type + Node）
+- 移植 EndSweepLaser 扫射激光 + VoidArea 黑色圆形虚空区域
 - 移植防作弊子弹系统（AntiCheatBulletTypeBase + ArmorDamageModule）
 - 实现 WormDecal 液压杆装饰系统（延迟加载 + 多段绘制）
 - 实现 OppressionLaserBulletType 7 层渲染大激光
@@ -137,6 +142,10 @@
 - v158 兼容性适配（ammo/useAmmo 字段反射兼容）
 - 修复激光伤害检测（oppression 圆形范围 → 线段精确碰撞）
 - 修复 devourer 大激光伤害不足问题
+- 修复多节单位AI不主动索敌移动问题（优先攻击核心）
+- 实现 circleTarget 环绕与直线冲过两种移动模式
+- 技能数量上限：非大招技能同时最多 8 个存在
+- 段身蠕动动画：正弦波叠加实现生物活性视觉效果
 
 ### v1.1
 - 初始版本发布

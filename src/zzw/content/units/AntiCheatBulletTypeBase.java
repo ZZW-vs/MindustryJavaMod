@@ -1,6 +1,7 @@
 package zzw.content.units;
 
 import arc.math.Mathf;
+import arc.struct.IntSet;
 import arc.util.Tmp;
 import mindustry.entities.abilities.Ability;
 import mindustry.entities.bullet.BulletType;
@@ -36,6 +37,14 @@ public abstract class AntiCheatBulletTypeBase extends BulletType {
     public boolean pierceShields = false;
     /** 防作弊模块数组 */
     public AntiCheatBulletModule[] modules;
+    /** ★ 是否计入技能数量上限 (大招不算, 例如主激光不算) */
+    public boolean countsAsSkill = false;
+    /** ★ 技能同时存在数量上限 (非大招技能) */
+    public static final int maxActiveSkills = 8;
+    /** 当前活跃技能数量 */
+    public static int activeSkillCount = 0;
+    /** 已计数的 bullet id 集合 (避免重复计数) */
+    private static final IntSet countedBullets = new IntSet(64);
     private float[] moduleDataTmp;
 
     public AntiCheatBulletTypeBase(float speed, float damage) {
@@ -48,6 +57,37 @@ public abstract class AntiCheatBulletTypeBase extends BulletType {
     public void init() {
         super.init();
         if (modules != null) moduleDataTmp = new float[modules.length];
+    }
+
+    /**
+     * ★ 技能数量上限检查 (非大招技能调用)
+     * - 第一帧检查活跃技能数, 超过 maxActiveSkills 则立即移除
+     * - 每一帧检查子弹是否消失, 递减计数
+     * - 用 bullet id + IntSet 追踪, 不占用 bullet 的 data/fdata 字段
+     * @return true=正常继续, false=已超限被移除
+     */
+    protected boolean checkSkillLimit(Bullet b) {
+        if (!countsAsSkill) return true;
+
+        int id = b.id;
+        boolean counted = countedBullets.contains(id);
+
+        if (!counted) {
+            // 第一帧: 检查上限
+            if (activeSkillCount >= maxActiveSkills) {
+                b.remove();
+                return false;
+            }
+            activeSkillCount++;
+            countedBullets.add(id);
+        } else {
+            // 检查是否消失 (到期/被移除)
+            if (!b.isAdded() || b.time >= b.lifetime) {
+                activeSkillCount = Math.max(0, activeSkillCount - 1);
+                countedBullets.remove(id);
+            }
+        }
+        return true;
     }
 
     /**

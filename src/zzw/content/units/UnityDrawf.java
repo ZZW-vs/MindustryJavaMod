@@ -26,21 +26,21 @@ public class UnityDrawf {
     /**
      * 绘制非对称菱形 (PU132 UnityDrawf.diamond 6参数版)
      * backLengthScl 控制尾部(back顶点)长度缩放, <1时形成前长后短的尖刺菱形
+     * ★ PU132 的 width/length 是中心到顶点的偏移量(半宽/半长), 不是全宽/全长
+     *   之前误除以2导致菱形缩小一半, 现对齐原版
      * 参考: PU132 main/src/unity/graphics/UnityDrawf.java L216-223
      */
     public static void diamond(float x, float y, float width, float length, float backLengthScl, float rotation) {
-        float w2 = width / 2f;
-        float l2 = length / 2f;
         float cos = Mathf.cosDeg(rotation);
         float sin = Mathf.sinDeg(rotation);
 
-        // 4个顶点投影: 前/后(沿rotation方向) + 左/右(垂直方向)
-        float ox = cos * l2, oy = sin * l2;
-        float px = -sin * w2, py = cos * w2;
+        // 4个顶点投影: 前/后(沿rotation方向, 距离=length) + 左/右(垂直方向, 距离=width)
+        float ox = cos * length, oy = sin * length;
+        float px = -sin * width, py = cos * width;
 
         Fill.quad(
-            x + ox, y + oy,
             x + px, y + py,
+            x + ox, y + oy,
             x - ox * backLengthScl, y - oy * backLengthScl,
             x - px, y - py
         );

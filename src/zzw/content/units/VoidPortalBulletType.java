@@ -69,6 +69,7 @@ public class VoidPortalBulletType extends AntiCheatBulletTypeBase {
         pierce = true;
         pierceShields = true;
         despawnEffect = mindustry.content.Fx.none;
+        countsAsSkill = true;
     }
 
     @Override
@@ -95,6 +96,7 @@ public class VoidPortalBulletType extends AntiCheatBulletTypeBase {
 
     @Override
     public void update(Bullet b) {
+        if (!checkSkillLimit(b)) return;
         float fout = Mathf.clamp(b.time > b.lifetime - fadeOutTime ? 1f - (b.time - (lifetime - fadeOutTime)) / fadeOutTime : 1f);
         float fin = b.time < fadeInTime ? Mathf.clamp(b.time / fadeInTime) : 1f;
         float fin2 = Mathf.curve(b.fin(), 0f, 15f / lifetime);

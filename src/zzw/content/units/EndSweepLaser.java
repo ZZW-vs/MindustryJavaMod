@@ -49,6 +49,7 @@ public class EndSweepLaser extends AntiCheatBulletTypeBase {
         keepVelocity = false;
         impact = true;
         pierceShields = true;
+        countsAsSkill = true;
     }
 
     @Override
@@ -91,6 +92,7 @@ public class EndSweepLaser extends AntiCheatBulletTypeBase {
 
     @Override
     public void update(Bullet b) {
+        if (!checkSkillLimit(b)) return;
         if (b.timer(1, 5f)) {
             float len = length;
             Tmp.v1.trns(b.rotation(), len).add(b);
