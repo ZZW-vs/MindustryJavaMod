@@ -21,6 +21,7 @@ import mindustry.graphics.Drawf;
  * - 每隔 distance 距离触发 hitBullet 生成虚空区域
  * - 持续型激光 (lifetime 内每 5 tick 检测碰撞)
  * - 防作弊伤害 (继承 AntiCheatBulletTypeBase)
+ * - 黑圆优先在敌方密集处生成 (DensityCalculator)
  * 参考: PU132 main/src/unity/entities/bullet/anticheat/EndSweepLaser.java
  * 简化: 用 v154.3 的 Units.nearbyEnemies + Intersector 替代 Utils.collideLineRawEnemy
  */
@@ -39,6 +40,8 @@ public class EndSweepLaser extends AntiCheatBulletTypeBase {
     };
     /** 命中时生成的子弹类型 (用于生成虚空区域 oppressionArea) */
     public BulletType hitBullet;
+    /** 上次生成黑圆的距离 */
+    protected float lastSpawnDist = 0f;
 
     public EndSweepLaser(float damage) {
         super(0f, damage);
@@ -72,22 +75,7 @@ public class EndSweepLaser extends AntiCheatBulletTypeBase {
     @Override
     public void init(Bullet b) {
         super.init(b);
-        // data 存上次触发 hitBullet 的位置
-        b.data = new Vec2();
-    }
-
-    @Override
-    public void hit(Bullet b, float x, float y) {
-        super.hit(b, x, y);
-        if (b.data instanceof Vec2 v) {
-            // 距离上次触发位置超过 distance 时, 生成 hitBullet
-            if (v.dst(x, y) > distance) {
-                v.set(x, y);
-                if (hitBullet != null) {
-                    hitBullet.create(b.owner, b.team, x, y, b.rotation());
-                }
-            }
-        }
+        lastSpawnDist = 0f;
     }
 
     @Override
@@ -98,14 +86,25 @@ public class EndSweepLaser extends AntiCheatBulletTypeBase {
             Tmp.v1.trns(b.rotation(), len).add(b);
             float endX = Tmp.v1.x, endY = Tmp.v1.y;
 
+            float currentDist = b.dst(endX, endY);
+
+            if (hitBullet != null && currentDist - lastSpawnDist > distance) {
+                Vec2 densePos = DensityCalculator.findBestPosition(b.x, b.y, b.rotation(), len, b.team, 1);
+                if (densePos != null) {
+                    hitBullet.create(b.owner, b.team, densePos.x, densePos.y, b.rotation());
+                    lastSpawnDist = b.dst(densePos.x, densePos.y);
+                } else {
+                    hitBullet.create(b.owner, b.team, endX, endY, b.rotation());
+                    lastSpawnDist = currentDist;
+                }
+            }
+
             // 检测敌方单位 (替代 PU132 Utils.collideLineRawEnemy)
             Units.nearbyEnemies(b.team, b.x, b.y, len + 50f, unit -> {
                 if (!unit.hittable()) return;
                 if (!unit.checkTarget(collidesAir, collidesGround)) return;
                 if (Intersector.distanceSegmentPoint(b.x, b.y, endX, endY, unit.x, unit.y) > collisionWidth + unit.hitSize / 2f) return;
                 hitUnitAntiCheat(b, unit);
-                // 触发 hitBullet 机制
-                hit(b, unit.x, unit.y);
             });
 
             // 检测建筑
@@ -114,7 +113,6 @@ public class EndSweepLaser extends AntiCheatBulletTypeBase {
                     build -> {
                         if (Intersector.distanceSegmentPoint(b.x, b.y, endX, endY, build.x, build.y) > collisionWidth + build.hitSize() / 2f) return;
                         hitBuildingAntiCheat(b, build);
-                        hit(b, build.x, build.y);
                     });
 
             b.fdata = len;

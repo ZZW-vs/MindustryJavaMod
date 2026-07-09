@@ -70,7 +70,6 @@ public class WormAI extends CommandAI {
             if (targetPos == null) targetPos = new Vec2();
             targetPos.set(attackTarget);
 
-            // ★ 计算到目标的距离和角度
             float distance = unit.dst(attackTarget);
             float targetAngle = unit.angleTo(attackTarget);
             float angleDiff = Angles.angleDist(unit.rotation, targetAngle);
@@ -81,9 +80,10 @@ public class WormAI extends CommandAI {
                 //   像龙一样: 先转向目标方向, 然后沿当前朝向飞过去
                 //   身体会自然蜿蜒跟随, 形成龙飞行的姿态
 
-                // 平滑转向目标 (slerp, 转向速度取决于距离和角度差)
-                // 距离越远/角度差越大, 转向越快
-                float turnSpeed = Math.min(2.5f, 0.5f + (angleDiff / 180f) * 2f);
+                // 平滑转向目标, 转向速度受 rotateSpeed 限制
+                // rotateSpeed 是单位每秒最大旋转角度, 与玩家操控保持一致
+                float maxTurnPerFrame = unit.type.rotateSpeed / 60f;
+                float turnSpeed = Math.min(1f, maxTurnPerFrame / Math.max(0.1f, angleDiff));
                 unit.rotation = Mathf.slerpDelta(unit.rotation, targetAngle, turnSpeed);
 
                 // 沿当前朝向冲刺
@@ -105,8 +105,11 @@ public class WormAI extends CommandAI {
                     unit.moveAt(vec);
                 }
 
-                // 头部平滑转向目标 (不是瞬间锁定, 像龙一样缓慢转头瞄准)
-                unit.rotation = Mathf.slerpDelta(unit.rotation, unit.angleTo(attackTarget), 0.04f);
+                // 大招期间头部平滑转向目标, 使用与玩家操控相同的旋转速度
+                // rotateSpeed=2.2f 意味着每秒最多转 2.2 度, 避免瞬间转动
+                float maxTurnPerFrame = unit.type.rotateSpeed / 60f;
+                float turnSpeed = Math.min(1f, maxTurnPerFrame / Math.max(0.1f, angleDiff));
+                unit.rotation = Mathf.slerpDelta(unit.rotation, unit.angleTo(attackTarget), turnSpeed);
                 turning = false;
             }
         } else if (targetPos != null) {

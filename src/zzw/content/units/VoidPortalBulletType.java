@@ -93,6 +93,16 @@ public class VoidPortalBulletType extends AntiCheatBulletTypeBase {
     public void init(Bullet b) {
         super.init(b);
         b.data = new VoidPortalData();
+
+        // ★ 优先在敌方密集处生成菱形
+        Vec2 densePos = DensityCalculator.findDensePosition(b.x, b.y, b.rotation(), length, b.team);
+        if (densePos != null) {
+            float dist = b.dst(densePos);
+            if (dist > 0 && dist < length) {
+                float angle = b.angleTo(densePos);
+                b.rotation(angle);
+            }
+        }
     }
 
     @Override
