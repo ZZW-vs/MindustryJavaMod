@@ -14,17 +14,16 @@ import static mindustry.Vars.*;
 /**
  * 虫子单位专用 AI (融合 PU132 WormAI + v158 CommandAI)
  *
+ * ★ 龙的攻击方式:
+ *   1. 头部逐渐转向目标 (slerp平滑转向, 不是瞬间锁定)
+ *   2. 沿当前朝向冲刺 (不是直接朝目标移动, 像龙一样飞)
+ *   3. 身体自然蜿蜒跟随 (由段身物理约束控制)
+ *   4. 到达攻击范围后, 头部锁定目标攻击
+ *
  * ★ v158 适配: 继承 CommandAI (playerControllable=true 单位默认使用 CommandAI)
  *   - 重写 updateUnit(): 先 updateTargeting() 找 target (findMainTarget 优先核心)
  *   - 无玩家命令时自动将 target 设为 attackTarget, 并驱动移动
  *   - 设置 targetPos 使 hasCommand()=true, 避免被 SegmentWormEntity 误判待机清零 vel
- *
- * PU132 原版移动逻辑 (WormAI.updateMovement):
- *   - circleTarget=false (arcnelidia): moveTo(target, range*0.8f) + lookAt(target)
- *     → 直线冲向目标, 越过目标后再折返, 整段身体都能造成伤害
- *   - circleTarget=true (toxobyte/catenapede/oppression/devourer): attack(120f)
- *     → 环绕目标盘旋, 最大化段身武器/持续伤害的作用
- *   - attack() 方法: 沿单位朝向移动, 角度差>100°且不在环绕范围内时slerp转向
  *
  * PU132 保留:
  * - setTarget(): 段身受击时通知头部 (记仇机制)
@@ -38,7 +37,11 @@ public class WormAI extends CommandAI {
     public Vec2 pos = new Vec2();
     public float score = 0f;
     public float time = 0f;
-    protected float rotateTime = 0f;
+
+    /** 当前转向目标角度 (用于平滑转向) */
+    protected float targetAngle = 0f;
+    /** 是否正在转向目标 */
+    protected boolean turning = false;
 
     @Override
     public void updateUnit() {
@@ -61,26 +64,50 @@ public class WormAI extends CommandAI {
             targetPos = new Vec2(pos);
         }
 
-        // ===== 移动逻辑 (对齐 PU132 WormAI.updateMovement) =====
+        // ===== 移动逻辑 (龙的攻击方式) =====
         if (attackTarget != null) {
-            // 同步 target = attackTarget, 供 faceTarget / circleAttack / attack 使用
             target = attackTarget;
-            // 设置 targetPos 使 hasCommand()=true, 避免被误判待机
             if (targetPos == null) targetPos = new Vec2();
             targetPos.set(attackTarget);
 
-            if (!unit.type.circleTarget) {
-                // ★ 直线冲过模式 (arcnelidia): moveTo(target, range*0.8f) + lookAt
-                //   距离>range*0.8时冲向目标, 进入后继续沿朝向飞, 越过目标后折返
-                //   配合 faceTarget=false, 单位保持朝向飞行方向而非盯着目标
-                float circleLength = unit.type.range * 0.8f;
-                moveTo(attackTarget, circleLength, unit.isFlying() ? 40f : 100f);
-                unit.lookAt(attackTarget);
+            // ★ 计算到目标的距离和角度
+            float distance = unit.dst(attackTarget);
+            float targetAngle = unit.angleTo(attackTarget);
+            float angleDiff = Angles.angleDist(unit.rotation, targetAngle);
+            float engageRange = unit.type.range - 10f;
+
+            if (distance > engageRange) {
+                // ★ 阶段1: 远离目标 → 平滑转向 + 沿当前朝向冲刺
+                //   像龙一样: 先转向目标方向, 然后沿当前朝向飞过去
+                //   身体会自然蜿蜒跟随, 形成龙飞行的姿态
+
+                // 平滑转向目标 (slerp, 转向速度取决于距离和角度差)
+                // 距离越远/角度差越大, 转向越快
+                float turnSpeed = Math.min(2.5f, 0.5f + (angleDiff / 180f) * 2f);
+                unit.rotation = Mathf.slerpDelta(unit.rotation, targetAngle, turnSpeed);
+
+                // 沿当前朝向冲刺
+                vec.trns(unit.rotation, unit.speed());
+                unit.moveAt(vec);
+
+                turning = true;
             } else {
-                // ★ 环绕模式 (toxobyte/catenapede/oppression/devourer): attack(120f)
-                //   沿单位朝向飞行, 角度差大时转向, 形成环绕效果
-                //   配合 omniMovement=false, 单位只能向前飞, 更像虫子
-                attack(120f);
+                // ★ 阶段2: 进入攻击范围 → 锁定目标 + 环绕攻击
+                //   头部锁定目标方向, 身体摆动
+                //   像龙一样: 到达目标附近后盘旋攻击, 身体摆动展示力量感
+
+                if (unit.type.circleTarget) {
+                    // 环绕模式: 沿朝向飞, 角度差大时转向, 形成盘旋
+                    attack(engageRange);
+                } else {
+                    // 直线模式: 继续沿朝向飞, 越过目标后折返
+                    vec.trns(unit.rotation, unit.speed());
+                    unit.moveAt(vec);
+                }
+
+                // 头部锁定目标方向
+                unit.lookAt(attackTarget);
+                turning = false;
             }
         } else if (targetPos != null) {
             // 玩家移动命令 / 记仇位置
@@ -97,7 +124,6 @@ public class WormAI extends CommandAI {
         // 待机判断
         isIdle = (target == null && attackTarget == null && targetPos == null);
 
-        rotateTime = Math.max(0f, rotateTime - Time.delta);
         if (time <= 0f) score = 0f;
         time = Math.max(0f, time - Time.delta);
     }
@@ -115,20 +141,18 @@ public class WormAI extends CommandAI {
     }
 
     /**
-     * PU132 attack(): 环绕攻击 (circleTarget=true 时使用)
-     * - 沿单位朝向移动 (vec.trns(unit.rotation, unit.speed()))
-     * - 角度差>100°且不在环绕范围内时, slerp转向目标
-     * - 触发40帧的rotateTime反向旋转
-     *
-     * 原版行为: 单位一直向前飞, 当目标不在正前方且距离够远时大角度转向,
-     * 形成"冲过去 → 绕一圈 → 再冲回来"的环绕效果, 让段身武器全部发挥作用
+     * ★ 环绕攻击 (龙的盘旋攻击模式)
+     * - 沿单位朝向移动 (像龙一样向前飞)
+     * - 角度差>90°且不在攻击范围内时, slerp平滑转向目标
+     * - 形成"冲过去 → 绕一圈 → 再冲回来"的盘旋效果
+     * - 身体自然摆动, 展示力量感
      */
     protected void attack(float circleLength) {
         vec.trns(unit.rotation, unit.speed());
         float diff = Angles.angleDist(unit.rotation, unit.angleTo(target));
-        if ((diff > 100f && !unit.within(target, circleLength)) || rotateTime > 0f) {
-            vec.setAngle(Mathf.slerpDelta(vec.angle(), unit.angleTo(target), 0.2f));
-            if (rotateTime <= 0f) rotateTime = 40f;
+        if (diff > 90f && !unit.within(target, circleLength)) {
+            // 平滑转向目标, 转向速度根据角度差动态调整
+            vec.setAngle(Mathf.slerpDelta(vec.angle(), unit.angleTo(target), 0.15f));
         }
         unit.moveAt(vec);
     }

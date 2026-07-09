@@ -398,32 +398,8 @@ public class SegmentUnitEntity extends UnitEntity {
         mindustry.entities.units.WeaponMount[] filteredMounts = filterMountsForSegment(oldMounts);
         mounts = filteredMounts;
 
-        // ★ 随机扰动偏移: 基于时间和段索引的正弦波叠加, 模拟生物蠕动
-        // - 两种不同频率的正弦波叠加: 横向(垂直于身体) + 纵向(沿身体方向)
-        // - 段索引越大偏移越明显 (尾部摆幅更大), 更像真实虫子
-        // - 偏移量很小 (1~2像素), 只影响视觉不影响碰撞
-        float wobbleAmp = 1.5f + segmentIndex * 0.15f;  // 振幅: 尾部更大
-        float wobblePhase = segmentIndex * 0.4f;  // 相位: 每段错开, 形成波浪
-        float time = arc.util.Time.time;
-        // 横向摆动 (垂直于身体方向, sin波)
-        float sideWobble = Mathf.sin(time * 2.5f + wobblePhase) * wobbleAmp;
-        // 纵向伸缩 (沿身体方向, 慢频率)
-        float lenWobble = Mathf.sin(time * 1.2f + wobblePhase * 1.7f) * wobbleAmp * 0.4f;
-
-        // 保存原始位置
-        float oldX = x, oldY = y;
-        // 计算偏移: 垂直于身体方向 + sideWobble, 沿身体方向 + lenWobble
-        float cos = Mathf.cosDeg(rotation + 90f);
-        float sin = Mathf.sinDeg(rotation + 90f);
-        x += cos * sideWobble + Mathf.cosDeg(rotation) * lenWobble;
-        y += sin * sideWobble + Mathf.sinDeg(rotation) * lenWobble;
-
         // 调用 super.draw() 会用切换后的 region 画
         super.draw();
-
-        // 恢复原始位置
-        x = oldX;
-        y = oldY;
 
         // 恢复 mounts
         mounts = oldMounts;

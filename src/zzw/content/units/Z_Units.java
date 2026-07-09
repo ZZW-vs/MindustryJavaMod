@@ -167,11 +167,12 @@ public class Z_Units {
         // PU132 原版 segmentLength=9, segmentOffset=23f
         // 段间距 22.7f (PU132 23f - 0.3f, 用户要求稍小一点)
         // wobble=true (arcnelidia 轻微晃动)
-        // angleLimit=25f (电弧虫比较硬, 防止旋转过度)
-        // segmentCast=4, jointStrength=1f, anglePhysicsSmooth=0f (PU132 默认值)
+        // angleLimit=30f (龙的感觉: 更大的弯曲角度)
+        // anglePhysicsSmooth=0.3f (更平滑的转向, 段身自然跟随头部)
+        // segmentCast=4, jointStrength=1f (PU132 默认值)
         SegmentWormEntity.configs.put(arcnelidia.name,
             new SegmentWormEntity.SegmentConfig(arcnelidiaSegment, 9, 22.7f, 0f, 0, true, false, false,
-                25f, 6f, 0.1f, 1f, 4, 0f, false, 0f));
+                30f, 6f, 0.1f, 1f, 4, 0.3f, false, 0f));
         // 电弧虫: 每秒回10血
         SegmentWormEntity.configs.get(arcnelidia.name).healPerSecond = 10f;
 
@@ -304,13 +305,14 @@ public class Z_Units {
         // PU132: regenTime=15*60f (15秒长一节), maxSegments 默认上限 25
         // PU132: splittable=true (段身有独立血量, 死亡时虫子分裂)
         // ★ chainable=true (用户要求实现链式合并, 两条虫子靠近时合并)
-        // ★ angleLimit=25f (PU132 toxobyte 原值)
-        // ★ segmentDamageScl=8f (PU132 原版 toxobyte 值, 段身受击时血量×8倍掉, 更脆更容易分裂)
-        // segmentCast=4, jointStrength=1f, anglePhysicsSmooth=0f (PU132 默认值)
+        // ★ angleLimit=30f (龙的感觉: 更大的弯曲角度)
+        // ★ segmentDamageScl=3f (用户要求 3x, 段身受击时血量×3倍掉)
+        // anglePhysicsSmooth=0.3f (更平滑的转向, 段身自然跟随头部)
+        // segmentCast=4, jointStrength=1f (PU132 默认值)
         // ★ regenTime 改为6秒: 每6秒生长一节
         SegmentWormEntity.configs.put(toxobyte.name,
             new SegmentWormEntity.SegmentConfig(toxobyteSegment, 25, 16.25f, 6f * 60f, 25, false, true, true,
-                25f, 3f, 0.1f, 1f, 4, 0f, false, 0f));
+                30f, 3f, 0.1f, 1f, 4, 0.3f, false, 0f));
         // toxobyte: 每秒回15血
         SegmentWormEntity.configs.get(toxobyte.name).healPerSecond = 15f;
 
@@ -435,11 +437,13 @@ public class Z_Units {
         // PU132: splittable=true, chainable=true
         // PU132: segmentDamageScl=12f (段身受击时血量×12倍掉)
         // PU132: healthDistribution=0.15f (血量分布速率)
-        // angleLimit=25f, segmentCast=4, jointStrength=1f (PU132 默认值)
+        // angleLimit=30f (龙的感觉: 更大的弯曲角度)
+        // anglePhysicsSmooth=0.3f (更平滑的转向, 段身自然跟随头部)
+        // segmentCast=4, jointStrength=1f (PU132 默认值)
         // ★ regenTime 改为20秒: 每20秒生长一节
         SegmentWormEntity.configs.put(catenapede.name,
             new SegmentWormEntity.SegmentConfig(catenapedeSegment, 2, 31f, 20f * 60f, 15, false, true, true,
-                25f, 5f, 0.15f, 1f, 4, 0f, false, 0f));
+                30f, 5f, 0.15f, 1f, 4, 0.3f, false, 0f));
         // 吸血虫: 每秒回25血
         SegmentWormEntity.configs.get(catenapede.name).healPerSecond = 25f;
 
