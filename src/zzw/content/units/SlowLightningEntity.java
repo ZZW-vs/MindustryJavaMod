@@ -125,7 +125,7 @@ public class SlowLightningEntity implements Drawc {
         if (bullet != null && bullet.id != bulletId) {
             bullet = null;
         }
-        if (type.continuous && (timer += Time.delta) >= 5f) {
+        if (type.continuous && (timer += Time.delta) >= type.collideInterval) {
             for (SlowLightningType.SlowLightningNode n : nodes) {
                 n.collide();
             }

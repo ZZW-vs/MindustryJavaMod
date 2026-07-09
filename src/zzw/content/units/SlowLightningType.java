@@ -26,7 +26,10 @@ import mindustry.graphics.Pal;
  */
 public class SlowLightningType {
     private static int seed = 1;
-    public static final int maxNodes = 60;
+    /** ★ 优化：减少节点上限，从60降到30，降低渲染开销 */
+    public static final int maxNodes = 30;
+    /** ★ 优化：最大递归层数，防止闪电过度延伸 */
+    public static final int maxLayers = 8;
     public static final arc.util.pooling.Pool<SlowLightningNode> nodes =
         new arc.util.pooling.Pool<SlowLightningNode>(8, 300) {
             @Override
@@ -38,12 +41,15 @@ public class SlowLightningType {
     public Color colorFrom = Color.white, colorTo = Pal.lancerLaser;
     public float damage = 12;
     public float colorTime = 32f, fadeTime = 20f;
-    public float splitChance = 0.035f;
+    /** ★ 优化：降低分裂概率，从0.035降到0.02，减少节点指数增长 */
+    public float splitChance = 0.02f;
     public float nodeLength = 50f, nodeTime = 3f, range = 150f;
     public float randSpacing = 20f, splitRandSpacing = 60f;
     public float lineWidth = 2f, lifetime = 120f;
     public float maxRotationSpeed = 22f, minRotationSpeed = 1.5f, rotationDistance = 600f;
     public boolean continuous = false;
+    /** ★ 优化：碰撞检测间隔，从5tick增加到10tick */
+    public float collideInterval = 10f;
     public Effect hitEffect = mindustry.content.Fx.hitLancer;
 
     public SlowLightningEntity create(Team team, float x, float y, float rotation, Floatp liveDamage, Posc parent, Position target) {
@@ -134,7 +140,8 @@ public class SlowLightningType {
                 Position p = getLast();
                 line(p.getX(), p.getY(), x, y);
             }
-            if (!ended && main.distance < type.range && main.nodes.size < maxNodes) {
+            /** ★ 优化：增加层数限制，防止闪电过度延伸 */
+            if (!ended && main.distance < type.range && main.nodes.size < maxNodes && layer < maxLayers) {
                 main.end(this);
             }
         }

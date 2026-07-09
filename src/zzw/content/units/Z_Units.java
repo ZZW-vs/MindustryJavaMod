@@ -307,8 +307,8 @@ public class Z_Units {
         SegmentWormEntity.configs.put(toxobyte.name,
             new SegmentWormEntity.SegmentConfig(toxobyteSegment, 25, 16.25f, 13f * 60f, 25, false, true, true,
                 25f, 8f, 0.1f, 1f, 4, 0f, false, 0f));
-        // toxobyte: 每秒回5血
-        SegmentWormEntity.configs.get(toxobyte.name).healPerSecond = 5f;
+        // toxobyte: 每秒回15血
+        SegmentWormEntity.configs.get(toxobyte.name).healPerSecond = 15f;
 
         // ═══════════════════════════════════════════════════════════
         //  Catenapede (PU132 吸血虫)
@@ -434,8 +434,8 @@ public class Z_Units {
         SegmentWormEntity.configs.put(catenapede.name,
             new SegmentWormEntity.SegmentConfig(catenapedeSegment, 2, 31f, 26.5f * 60f, 15, false, true, true,
                 25f, 12f, 0.15f, 1f, 4, 0f, false, 0f));
-        // 吸血虫: 每秒回10血
-        SegmentWormEntity.configs.get(catenapede.name).healPerSecond = 10f;
+        // 吸血虫: 每秒回25血
+        SegmentWormEntity.configs.get(catenapede.name).healPerSecond = 25f;
 
         // ===== Devourer (PU132 devourer-of-eldrich-gods) =====
         // End 阵营超级虫子, 60段, 全免疫, 头部激光+段身多种武器
@@ -948,8 +948,8 @@ public class Z_Units {
         SegmentWormEntity.configs.put(oppression.name,
             new SegmentWormEntity.SegmentConfig(oppressionSegment, 55, 228f, 0f, 55, false, false, false,
                 35f, 6f, 0.1f, 1f, 11, 0.5f, true, 0f, 490f, 2, true));
-        // 压迫者: 每秒回250血
-        SegmentWormEntity.configs.get(oppression.name).healPerSecond = 250f;
+        // 压迫者: 每秒回500血
+        SegmentWormEntity.configs.get(oppression.name).healPerSecond = 500f;
 
         // ★ 初始化 oppression 液压装饰 (WormDecal) ★
         // PU132 UnityUnitTypes 第4064-4073行:
