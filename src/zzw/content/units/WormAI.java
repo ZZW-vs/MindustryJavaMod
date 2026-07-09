@@ -48,14 +48,15 @@ public class WormAI extends CommandAI {
         updateVisuals();
         updateTargeting();
 
-        // 清除无效 attackTarget
+        // 清除无效 attackTarget, 但不清零 targetPos
+        // ★ 保留 targetPos 使 hasCommand()=true, 避免 isIdle() 清零 vel 导致走走停停
         if (attackTarget != null && invalid(attackTarget)) {
             attackTarget = null;
-            targetPos = null;
         }
 
         // ★ 自动索敌: 无玩家命令时, 自动将 target 设为 attackTarget
-        if (!hasCommand() && attackTarget == null && target != null) {
+        // 检查 target 有效性, 避免把无效目标赋给 attackTarget
+        if (!hasCommand() && attackTarget == null && target != null && !invalid(target)) {
             attackTarget = target;
         }
 
