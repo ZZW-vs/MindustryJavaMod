@@ -79,14 +79,15 @@ public class ChargeEffect {
      * - 主线 (最后渐入黑色)
      * 参考: PU132 main/src/unity/content/effects/ChargeFx.java L112-202
      */
-    public static final Effect oppressionCharge = new Effect(5f * 60f, 2530f * 2f, e -> {
+    public static final Effect oppressionCharge = new Effect(4f * 60f, 2530f * 2f, e -> {
         // ★ 设置高渲染层级, 确保充能前摇特效显示在单位上方
         Draw.z(Layer.flyingUnit + 1f);
         float off = 140f / e.lifetime;
         float off2 = 70f / e.lifetime;
 
-        float fin1 = e.time >= 150f ? 1f : e.time / 150f;
-        float fin2 = e.time >= 60f ? 1f : e.time / 60f;
+        // 阶段1: 0-120tick (原150tick, 按4/5比例缩放)
+        float fin1 = e.time >= 120f ? 1f : e.time / 120f;
+        float fin2 = e.time >= 48f ? 1f : e.time / 48f;
         float time = arc.util.Time.time;
 
         // ===== 阶段1: 11个菱形粒子辐射 (0-150tick) =====
@@ -105,10 +106,10 @@ public class ChargeEffect {
             UnityDrawf.diamond(Tmp.v1.x + Mathf.range(4f) * cf, Tmp.v1.y + Mathf.range(4f) * cf, wid, len, rot);
         }
 
-        // ===== 阶段2: 13个尖刺菱形 + 中心菱形 (145tick+) =====
-        if (e.time > 145f) {
-            float fin3 = e.time - 145f >= 140f ? 1f : (e.time - 145f) / 140f;
-            float spikef = Mathf.clamp((e.time - 145f) / 20f, 0f, 13f);
+        // ===== 阶段2: 13个尖刺菱形 + 中心菱形 (116tick+, 原145tick按4/5比例缩放) =====
+        if (e.time > 116f) {
+            float fin3 = e.time - 116f >= 112f ? 1f : (e.time - 116f) / 112f;
+            float spikef = Mathf.clamp((e.time - 116f) / 16f, 0f, 13f);
             int spikei = Mathf.ceil(spikef);
 
             for (int i = 0; i < spikei; i++) {
@@ -122,7 +123,7 @@ public class ChargeEffect {
             }
 
             // 中心菱形
-            float fin4 = (e.time - 145f) / (e.lifetime - 145f);
+            float fin4 = (e.time - 116f) / (e.lifetime - 116f);
             float cw = 17f * Interp.pow2Out.apply(Mathf.curve(fin4, 0f, 0.2f));
             float cl = (160f + Mathf.absin(8f, 6f)) * Interp.pow2.apply(fin4);
             UnityDrawf.diamond(e.x, e.y, cw, cl, e.rotation + 90f);
@@ -167,8 +168,8 @@ public class ChargeEffect {
         }
 
         // ===== 阶段5: 主线 (最后渐入黑色) =====
-        float t = e.time < 3.75f * 60f ? 0f : Mathf.clamp((e.time - 3.75f * 60f) / 30f);
-        float length = Interp.pow3.apply(Mathf.clamp(e.time / 20f)) * 2530f;
+        float t = e.time < 3f * 60f ? 0f : Mathf.clamp((e.time - 3f * 60f) / 24f);
+        float length = Interp.pow3.apply(Mathf.clamp(e.time / 16f)) * 2530f;
         Draw.color(SCAR_COLOR, Color.black, t);
         Lines.stroke(5f);
         Lines.lineAngle(e.x, e.y, e.rotation, length);

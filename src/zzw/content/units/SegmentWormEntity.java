@@ -125,7 +125,8 @@ public class SegmentWormEntity extends UnitEntity {
      */
     public float ultSpeedMultiplier() {
         if (!isUltActive()) return 1f;
-        return 0.075f;  // PU132 原版值
+        SegmentConfig cfg = type != null ? configs.get(type.name) : null;
+        return cfg != null ? cfg.ultSpeedMultiplier : 0.075f;
     }
 
     /** 段身列表 (顺序: 头部后方第一段到最后一段) */
@@ -283,6 +284,12 @@ public class SegmentWormEntity extends UnitEntity {
         /** 每秒回血 (0=不回血)
          *  压迫者: 250, 吞噬者: 120, 电弧虫: 10, 吸血虫: 10, toxobyte: 5 */
         public float healPerSecond;
+        /** 受到伤害倍率 (1.0=正常, 0.9=减伤10%, 0.8=减伤20%)
+         *  吞噬者: 0.9, 压迫者: 0.8 */
+        public float damageMultiplier = 1f;
+        /** 大招期间速度倍率 (1.0=正常, 0.12=只剩12%)
+         *  压迫者: 0.12 */
+        public float ultSpeedMultiplier = 0.075f;
 
         public SegmentConfig(mindustry.type.UnitType t, int c, float s) {
             this(t, c, s, 0f, 0, false, false, false);
@@ -585,6 +592,11 @@ public class SegmentWormEntity extends UnitEntity {
     /** 受伤降低血量分布效率 (PU132 WormDefaultUnit.damage L64-67) */
     @Override
     public void damage(float amount) {
+        // ★ 伤害减免
+        SegmentConfig cfg = type != null ? configs.get(type.name) : null;
+        if (cfg != null && cfg.damageMultiplier != 1f) {
+            amount *= cfg.damageMultiplier;
+        }
         super.damage(amount);
         healthDistributionEfficiency = Mathf.clamp(healthDistributionEfficiency - (amount / 15f));
     }

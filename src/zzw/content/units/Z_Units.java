@@ -105,7 +105,7 @@ public class Z_Units {
         // —— 头部 Arcnelidia 飞行分段虫子 ——
         arcnelidia = new UnitType("arcnelidia") {{
             // ===== 基础属性 (PU132 原值) =====
-            health = 1040;  // 800 * 1.3
+            health = 1160;  // 800 * 1.3 + 120
             speed = 4f;
             accel = 0.035f;
             rotateSpeed = 3.2f;
@@ -116,7 +116,7 @@ public class Z_Units {
             // PU132: engineSize=-1f (不显示引擎喷射效果)
             engineSize = -1f;
             range = 210f;
-            faceTarget = false;
+            faceTarget = true;  // ★ 锁定朝向目标
             // ★ arcnelidia 关闭原版 wobble (振幅 0.05f 太大), 用自定义 wobbleEnabled (振幅 0.02f)
             wobble = false;
             // ★ drag 用飞行单位合理值 (v154.3 默认 0.3f 对飞行单位太大, 速度衰减太快显得僵硬)
@@ -137,7 +137,7 @@ public class Z_Units {
                 rotateSpeed = 50f;
                 // shootSound 在后面用反射设置
                 mirror = true;
-                rotate = true;
+                rotate = false;  // ★ 锁定朝向, 不独立旋转
                 minShootVelocity = 2.1f;
                 bullet = new LaserBulletType(450f) {{  // 200 + 250
                     // PU132 原配置: surge 颜色 (电弧激光, 黄色)
@@ -303,10 +303,10 @@ public class Z_Units {
         // ★ angleLimit=25f (PU132 toxobyte 原值)
         // ★ segmentDamageScl=8f (PU132 原版 toxobyte 值, 段身受击时血量×8倍掉, 更脆更容易分裂)
         // segmentCast=4, jointStrength=1f, anglePhysicsSmooth=0f (PU132 默认值)
-        // ★ regenTime 减少2秒: 15*60 → 13*60
+        // ★ regenTime 改为6秒: 每6秒生长一节
         SegmentWormEntity.configs.put(toxobyte.name,
-            new SegmentWormEntity.SegmentConfig(toxobyteSegment, 25, 16.25f, 13f * 60f, 25, false, true, true,
-                25f, 8f, 0.1f, 1f, 4, 0f, false, 0f));
+            new SegmentWormEntity.SegmentConfig(toxobyteSegment, 25, 16.25f, 6f * 60f, 25, false, true, true,
+                25f, 3f, 0.1f, 1f, 4, 0f, false, 0f));
         // toxobyte: 每秒回15血
         SegmentWormEntity.configs.get(toxobyte.name).healPerSecond = 15f;
 
@@ -419,6 +419,8 @@ public class Z_Units {
                     knockback = -34f;
                     backColor = Color.valueOf("54de3b");
                     frontColor = Color.valueOf("a3f080");
+                    // ★ 吸血激光持续时长 +3.5秒 (10s → 13.5s)
+                    lifetime = 13.5f * 60f;
                 }};
             }});
         }};
@@ -430,10 +432,10 @@ public class Z_Units {
         // PU132: segmentDamageScl=12f (段身受击时血量×12倍掉)
         // PU132: healthDistribution=0.15f (血量分布速率)
         // angleLimit=25f, segmentCast=4, jointStrength=1f (PU132 默认值)
-        // ★ regenTime 减少3.5秒: 30*60 → 26.5*60
+        // ★ regenTime 改为20秒: 每20秒生长一节
         SegmentWormEntity.configs.put(catenapede.name,
-            new SegmentWormEntity.SegmentConfig(catenapedeSegment, 2, 31f, 26.5f * 60f, 15, false, true, true,
-                25f, 12f, 0.15f, 1f, 4, 0f, false, 0f));
+            new SegmentWormEntity.SegmentConfig(catenapedeSegment, 2, 31f, 20f * 60f, 15, false, true, true,
+                25f, 5f, 0.15f, 1f, 4, 0f, false, 0f));
         // 吸血虫: 每秒回25血
         SegmentWormEntity.configs.get(catenapede.name).healPerSecond = 25f;
 
@@ -442,7 +444,7 @@ public class Z_Units {
 
         // ★ Devourer 段身 ★
         devourerSegment = new UnitType("devourer-segment") {{
-            health = 45000f;  // 25000 * 1.8
+            health = 46000f;  // 25000 * 1.8 + 1000 (按头部+5万比例)
             speed = 0f;
             hitSize = 52f;  // 原 40f + 12 (用户要求加大12)
             armor = 8f;
@@ -537,7 +539,7 @@ public class Z_Units {
 
         // ★ Devourer 头部 ★
         devourer = new UnitType("devourer") {{
-            health = 2250000f;  // 1250000 * 1.8
+            health = 2300000f;  // 1250000 * 1.8 + 50000
             flying = true;
             speed = 5f;
             accel = 0.12f;
@@ -629,6 +631,8 @@ public class Z_Units {
                 30f, 6f, 0.1f, 1f, 7, 0.5f, true, 0f, 240f));
         // 吞噬者: 每秒回120血
         SegmentWormEntity.configs.get(devourer.name).healPerSecond = 120f;
+        // 吞噬者: 受到伤害 × 0.9 (减伤10%)
+        SegmentWormEntity.configs.get(devourer.name).damageMultiplier = 0.9f;
 
         // ★ 初始化分裂/合并音效 (PU132 默认 Sounds.door)
         try {
@@ -950,6 +954,10 @@ public class Z_Units {
                 35f, 6f, 0.1f, 1f, 11, 0.5f, true, 0f, 490f, 2, true));
         // 压迫者: 每秒回500血
         SegmentWormEntity.configs.get(oppression.name).healPerSecond = 500f;
+        // 压迫者: 受到伤害 × 0.8 (减伤20%)
+        SegmentWormEntity.configs.get(oppression.name).damageMultiplier = 0.8f;
+        // 压迫者: 大招期间速度倍率 0.12 (只剩12%)
+        SegmentWormEntity.configs.get(oppression.name).ultSpeedMultiplier = 0.12f;
 
         // ★ 初始化 oppression 液压装饰 (WormDecal) ★
         // PU132 UnityUnitTypes 第4064-4073行:

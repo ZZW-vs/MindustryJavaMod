@@ -77,7 +77,7 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
         hittable = collides = absorbable = keepVelocity = false;
         impact = true;
         pierce = true;
-        lifetime = 8f * 60f;
+        lifetime = 10f * 60f;  // 8 + 2, 大招持续时间+2秒
         knockback = 9f;
         // ★ v154.3: chargeEffect 在 firstShotDelay 期间播放 (充能准备特效)
         // shootEffect 在子弹创建时播放 (由 init() 中 ShootEffect.oppressionShoot 替代)
