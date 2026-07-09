@@ -874,9 +874,9 @@ public class Z_Units {
         // —— 头部 Oppression ——
         oppression = new UnitType("oppression") {{
             // ===== 基础属性 (PU132 UnityUnitTypes.java 第4055-4095行) =====
-            health = 6250000f;  // 2500000 * 2.5
+            health = 9375000f;  // 6250000 * 1.5
             flying = true;
-            speed = 4.5f;
+            speed = 5.0f;  // 加快移动速度
             accel = 0.13f;
             drag = 0.12f;
             // PU132: hitSize=(114*2)-10=218f
@@ -970,8 +970,8 @@ public class Z_Units {
                 35f, 6f, 0.1f, 1f, 11, 0.5f, true, 0f, 490f, 2, true));
         // 压迫者: 每秒回500血
         SegmentWormEntity.configs.get(oppression.name).healPerSecond = 500f;
-        // 压迫者: 受到伤害 × 0.8 (减伤20%)
-        SegmentWormEntity.configs.get(oppression.name).damageMultiplier = 0.8f;
+        // 压迫者: 受到伤害 × 0.7 (减伤30%)
+        SegmentWormEntity.configs.get(oppression.name).damageMultiplier = 0.7f;
         // 压迫者: 大招期间速度倍率 0.12 (只剩12%)
         SegmentWormEntity.configs.get(oppression.name).ultSpeedMultiplier = 0.12f;
 

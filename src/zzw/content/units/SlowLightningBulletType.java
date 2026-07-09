@@ -32,6 +32,7 @@ public class SlowLightningBulletType extends AntiCheatBulletTypeBase {
         // v150.1: BulletType.range 是字段, 直接设置 (PU132 用 range() 方法返回 slRange*0.8f)
         range = slRange * 0.8f;
         countsAsSkill = true;
+        maxActive = 4;  // 慢闪电最多4个
     }
 
     @Override

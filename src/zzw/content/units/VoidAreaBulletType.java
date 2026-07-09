@@ -36,6 +36,7 @@ public class VoidAreaBulletType extends AntiCheatBulletTypeBase {
         layer = Layer.flyingUnit + 1f;
         keepVelocity = false;
         countsAsSkill = true;
+        maxActive = 5;  // 黑圆形最多5个
     }
 
     @Override

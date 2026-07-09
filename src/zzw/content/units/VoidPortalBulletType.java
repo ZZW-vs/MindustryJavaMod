@@ -70,6 +70,7 @@ public class VoidPortalBulletType extends AntiCheatBulletTypeBase {
         pierceShields = true;
         despawnEffect = mindustry.content.Fx.none;
         countsAsSkill = true;
+        maxActive = 6;  // 菱形(虚空门户)最多6个
     }
 
     @Override

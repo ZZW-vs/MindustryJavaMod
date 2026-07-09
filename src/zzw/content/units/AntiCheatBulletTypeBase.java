@@ -39,12 +39,12 @@ public abstract class AntiCheatBulletTypeBase extends BulletType {
     public AntiCheatBulletModule[] modules;
     /** ★ 是否计入技能数量上限 (大招不算, 例如主激光不算) */
     public boolean countsAsSkill = false;
-    /** ★ 技能同时存在数量上限 (非大招技能) */
-    public static final int maxActiveSkills = 8;
-    /** 当前活跃技能数量 */
-    public static int activeSkillCount = 0;
+    /** ★ 该技能同时存在的数量上限 (每个技能类型独立计数) */
+    public int maxActive = Integer.MAX_VALUE;
+    /** 当前该技能活跃数量 */
+    private int activeCount = 0;
     /** 已计数的 bullet id 集合 (避免重复计数) */
-    private static final IntSet countedBullets = new IntSet(64);
+    private final IntSet countedBullets = new IntSet(64);
     private float[] moduleDataTmp;
 
     public AntiCheatBulletTypeBase(float speed, float damage) {
@@ -73,17 +73,17 @@ public abstract class AntiCheatBulletTypeBase extends BulletType {
         boolean counted = countedBullets.contains(id);
 
         if (!counted) {
-            // 第一帧: 检查上限
-            if (activeSkillCount >= maxActiveSkills) {
+            // 第一帧: 检查该类型上限
+            if (activeCount >= maxActive) {
                 b.remove();
                 return false;
             }
-            activeSkillCount++;
+            activeCount++;
             countedBullets.add(id);
         } else {
             // 检查是否消失 (到期/被移除)
             if (!b.isAdded() || b.time >= b.lifetime) {
-                activeSkillCount = Math.max(0, activeSkillCount - 1);
+                activeCount = Math.max(0, activeCount - 1);
                 countedBullets.remove(id);
             }
         }

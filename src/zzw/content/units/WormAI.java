@@ -105,8 +105,8 @@ public class WormAI extends CommandAI {
                     unit.moveAt(vec);
                 }
 
-                // 头部锁定目标方向
-                unit.lookAt(attackTarget);
+                // 头部平滑转向目标 (不是瞬间锁定, 像龙一样缓慢转头瞄准)
+                unit.rotation = Mathf.slerpDelta(unit.rotation, unit.angleTo(attackTarget), 0.04f);
                 turning = false;
             }
         } else if (targetPos != null) {
