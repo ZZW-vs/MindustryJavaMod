@@ -668,7 +668,8 @@ public class Z_Units {
             // —— 段身武器组1: soul-destroyer + destroyer-2 ——
             // soul-destroyer: 轨道穿透激光 (PU132 EndRailBulletType, 完整移植)
             // PU132 第4129-4162行: damage=15000, length=850, pierceDamageFactor=0.001
-            weapons.add(new Weapon("create-oppression-soul-destroyer") {{
+            // ★ 贴图名称是 oppression-soul-destroyer.png, 不带 create- 前缀
+            weapons.add(new Weapon("oppression-soul-destroyer") {{
                 mirror = false;
                 x = 0f;
                 y = 72f;
@@ -696,7 +697,7 @@ public class Z_Units {
 
             // destroyer-2: 连续激光 (PU132 EndContinuousLaserBulletType, 550伤害)
             // PU132 第4163-4191行: damage=550, length=370, strokes*0.7
-            weapons.add(new Weapon("create-oppression-destroyer-2") {{
+            weapons.add(new Weapon("oppression-destroyer-2") {{
                 x = 98f;
                 y = -26.25f;
                 shootY = 22f;
@@ -726,7 +727,7 @@ public class Z_Units {
             // —— 段身武器组2: oppressor + destroyer-3 ——
             // oppressor: 扫射激光 (PU132 SweepWeapon + EndSweepLaser, 完整移植)
             // PU132 第4194-4224行: damage=7000, length=850, width=25, lifetime=130
-            weapons.add(new SweepWeapon("create-oppression-oppressor") {{
+            weapons.add(new SweepWeapon("oppression-oppressor") {{
                 mirror = false;
                 x = 0f;
                 y = 72f;
@@ -760,8 +761,7 @@ public class Z_Units {
             }});
 
             // destroyer-3: 导弹 (PU132 missileAntiCheat, 13连发)
-            // ★ 贴图用 create-oppression-destroyer-3 (与头部 destroyer 不同)
-            weapons.add(new Weapon("create-oppression-destroyer-3") {{
+            weapons.add(new Weapon("oppression-destroyer-3") {{
                 x = 98f;
                 y = -26.25f;
                 shootY = 6f;
@@ -795,7 +795,7 @@ public class Z_Units {
             // —— 段身武器组3: void + destroyer-4 ——
             // void: 虚空门户 (PU132 VoidPortalBulletType, 完整移植触手+区域伤害)
             // PU132 第4249-4270行: damage=1300, length=800, bleedDuration=180
-            weapons.add(new Weapon("create-oppression-void") {{
+            weapons.add(new Weapon("oppression-void") {{
                 mirror = false;
                 x = 0f;
                 y = 72f;
@@ -822,7 +822,7 @@ public class Z_Units {
 
             // destroyer-4: 慢闪电 (PU132 SlowLightningBulletType, 完整移植)
             // PU132 第4272-4289行: damage=120, 5发, inaccuracy=15, range=870
-            weapons.add(new Weapon("create-oppression-destroyer-4") {{
+            weapons.add(new Weapon("oppression-destroyer-4") {{
                 x = 98f;
                 y = -26.25f;
                 shootY = 17.5f;

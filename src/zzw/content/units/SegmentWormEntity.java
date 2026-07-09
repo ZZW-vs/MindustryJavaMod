@@ -66,24 +66,31 @@ public class SegmentWormEntity extends UnitEntity {
      *   导致玩家给单位下令移动时 (target==null 但 targetPos!=null) 被误判为待机, vel 被清零
      */
     public boolean isIdle() {
-        // 玩家操控 (进入单位) 时不静止
         if (isPlayer()) return false;
         mindustry.entities.units.UnitController c = controller();
-        // ★ CommandAI (玩家选中单位但不进入): 检查 hasCommand() 而非 target
-        //   hasCommand() 返回 targetPos != null, 有命令=玩家在指挥单位移动, 不能清零 vel
         if (c instanceof mindustry.ai.types.CommandAI cmd) {
             return !cmd.hasCommand();
         }
-        // ★ 普通 AIController (敌方/刷怪): 检查 target==null
-        //   CommandAI 也继承 AIController, 但已在上面的分支处理, 这里只处理非 CommandAI 的
+        // ★ 手机端兼容: AIController.target 反射在混淆环境下可能失败
+        //   使用 hasTarget() 方法替代反射, 如果没有该方法则返回 false (保守策略, 不静止)
         if (c instanceof mindustry.entities.units.AIController ai) {
             try {
-                java.lang.reflect.Field f = mindustry.entities.units.AIController.class.getDeclaredField("target");
-                f.setAccessible(true);
-                Object t = f.get(ai);
-                return t == null;
-            } catch (Throwable e) {
-                return false;
+                // 优先尝试 hasTarget() 方法 (v154.3 AIController 有此方法)
+                java.lang.reflect.Method m = ai.getClass().getMethod("hasTarget");
+                m.setAccessible(true);
+                return !((Boolean) m.invoke(ai));
+            } catch (Throwable e1) {
+                // fallback: 尝试反射 target 字段
+                try {
+                    java.lang.reflect.Field f = mindustry.entities.units.AIController.class.getDeclaredField("target");
+                    f.setAccessible(true);
+                    Object t = f.get(ai);
+                    return t == null;
+                } catch (Throwable e2) {
+                    // 手机端混淆环境: 无法获取 target, 返回 false (保守策略, 不静止)
+                    // 这样不会因为判断错误而导致单位异常静止
+                    return false;
+                }
             }
         }
         return false;
