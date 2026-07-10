@@ -66,11 +66,12 @@ public class WormDecal {
         if (other == null) return;
         if (!loaded) load();
         
-        Draw.mixcol();
-        Draw.color(lineColor);
-        Lines.stroke(lineWidth);
-
         for (int s : Mathf.signs) {
+            // ★ 每侧绘制前重置颜色, 防止 applyColor 影响下一侧
+            Draw.mixcol();
+            Draw.color(lineColor);
+            Lines.stroke(lineWidth);
+
             v1.trns(base.rotation - 90f, baseX * s, baseY).add(base);
             float bx = v1.x, by = v1.y;
             v1.trns(other.rotation - 90f, endX * s, endY).add(other);
@@ -81,7 +82,7 @@ public class WormDecal {
             Fill.circle(ex, ey, lineWidth / 2f);
             Lines.line(bx, by, ex, ey, false);
 
-            // ★ 贴图绘制: 每个贴图独立检查, 找到就画, 不依赖其他贴图
+            // ★ 贴图绘制: 每个贴图独立检查, 找到就画
             try {
                 base.type.applyColor(base);
                 
@@ -117,7 +118,7 @@ public class WormDecal {
                     Draw.rect(baseRegion, bx, by, angle);
                 }
             } catch (Throwable t) {
-                // 手机端防御: 贴图绘制失败时继续, 不闪退
+                // 手机端防御: 贴图绘制失败时继续
             }
         }
         Draw.reset();

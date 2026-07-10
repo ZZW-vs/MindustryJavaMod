@@ -335,14 +335,12 @@ public class SegmentUnitEntity extends UnitEntity {
         float z = Draw.z();
         // ★ 段身 z 层级: 段身依次低于头部
         //   头部 z = headZ + 0.001 (通过 Draw.draw() 推迟绘制, 最高)
-        //   段身 0 z = headZ - 0.0001 (最低, 离头部最远, 最靠后)
-        //   段身 1 z = headZ - 0.0002
+        //   段身 0 z = headZ - 0.0001 (最高段身, 紧贴头部, 最后画)
+        //   段身 1 z = headZ - 0.0002 (第2节)
         //   ...
-        //   段身 n-1 z = headZ - 0.0001 * n (倒数第2低, 紧贴头部)
-        //   头部贴图通过 Draw.draw() 用 headZ + 0.001 在所有段身之后绘制
-        //   这样从前到后: 头部在最上方, 段身依次向下排列
-        // 实际上, segmentIndex=0 应该是最高段身(紧贴头部), segmentIndex=n-1 应该是最低段身(尾部)
-        // 但为了保持从前到后的渲染顺序(头部覆盖), 段身 z 需要从前往后递减
+        //   段身 n-1 z = headZ - 0.0001 * n (最低段身, 尾部, 最先画)
+        //   渲染顺序: 尾部 → 第2节 → 第1节 → 头部
+        //   覆盖关系: 头部覆盖第1节, 第1节覆盖第2节, 依次向下
         Draw.z(z - (segmentIndex + 1f) * 0.0001f);
 
         // 调试: 只打一次贴图查找结果
@@ -379,15 +377,20 @@ public class SegmentUnitEntity extends UnitEntity {
         // 临时切换 region (借鉴 PU132 UnityUnitType.draw 第344-347行)
         String p = texturePrefix;
         String modP = "create-" + p;
+        String unitDir = "units/" + p.substring(0, p.length() - 1) + "/";  // "units/toxobyte/"
+        String modUnitDir = "create-units/" + p.substring(0, p.length() - 1) + "/";  // "create-units/toxobyte/"
         if (isTail) {
-            t.region = findRegion(p + "tail", modP + "tail");
-            t.outlineRegion = findRegion(p + "tail-outline", modP + "tail-outline");
+            t.region = findRegion(unitDir + p + "tail", modUnitDir + p + "tail");
+            t.outlineRegion = findRegion(unitDir + p + "tail-outline", modUnitDir + p + "tail-outline");
         } else {
-            t.region = findRegion(p + "segment", modP + "segment");
-            t.outlineRegion = findRegion(p + "segment-outline", modP + "segment-outline");
-            TextureRegion cellR = findRegion(p + "cell", modP + "cell");
+            t.region = findRegion(unitDir + p + "segment", modUnitDir + p + "segment");
+            t.outlineRegion = findRegion(unitDir + p + "segment-outline", modUnitDir + p + "segment-outline");
+            // ★ cell 贴图查找: 使用正确的 atlas 路径
+            //   文件路径: assets/sprites/units/toxobyte/toxobyte-segment-cell.png
+            //   atlas 路径: units/toxobyte/toxobyte-segment-cell
+            TextureRegion cellR = findRegion(unitDir + p + "cell", modUnitDir + p + "cell");
             if (!cellR.found()) {
-                cellR = findRegion(p + "segment-cell", modP + "segment-cell");
+                cellR = findRegion(unitDir + p + "segment-cell", modUnitDir + p + "segment-cell");
             }
             t.cellRegion = cellR;
         }
