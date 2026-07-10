@@ -19,10 +19,12 @@ import static mindustry.Vars.*;
  *
  * v158 适配: 继承 CommandAI, 重写 updateUnit() 实现自动索敌+移动
  *
- * ★ v2.0 修复:
- * - attack() 加边界检测, 快到地图边缘时强制转向
- * - 无目标时向最近核心移动, 避免贴墙发呆
- * - moveTo() 加距离衰减, 避免到目标附近时抖动
+ * ★ v2.1 修复:
+ * - 卡住检测: 连续多帧速度极低但目标在远处 → 强制转向
+ * - 多射线墙体检测: 正前方+侧前方3条射线, 更可靠地发现墙体
+ * - 动态边界回避: 速度越快, 提前转向距离越大
+ * - attack() 贴墙时直接转向目标, 不继续前冲
+ * - 非飞行单位避开实心方块
  */
 public class WormAI extends CommandAI {
 
@@ -41,6 +43,16 @@ public class WormAI extends CommandAI {
 
     /** 地图边界退缩距离 (单位距离边界这么近时开始转向) */
     protected static final float BOUNDARY_MARGIN = 80f;
+
+    // ===== 卡住检测 =====
+    /** 上几帧的位置 (用于计算实际移动距离) */
+    protected float lastX = Float.NaN, lastY = Float.NaN;
+    /** 连续低速帧计数 */
+    protected float stuckTimer = 0f;
+    /** 判定卡住的速度阈值 */
+    protected static final float STUCK_SPEED_THRESHOLD = 0.3f;
+    /** 判定卡住需要的持续帧数 (约2秒) */
+    protected static final float STUCK_TIME = 120f;
 
     @Override
     public void updateUnit() {
@@ -105,6 +117,9 @@ public class WormAI extends CommandAI {
             faceTarget();
         }
 
+        // ★ 卡住检测: 检查是否被墙/边界卡住
+        updateStuckDetection();
+
         // ★ 修复贴墙: 边界检测, 距离地图边界太近时强制转向中心
         clampToMapBounds();
 
@@ -134,16 +149,17 @@ public class WormAI extends CommandAI {
     }
 
     /**
-     * ★ 盘旋攻击 (移植 PU132 WormAI.attack L66-74, 加边界修正)
+     * ★ 盘旋攻击 (移植 PU132 WormAI.attack L66-74, 加边界/墙体/卡住修正)
      *
      * 原版逻辑:
      * - 保持当前速度向前
      * - 当朝向与目标方向差 > 100° 且距离 > circleLength 时, 平滑转向目标
      * - 转完后 rotateTime = 40f (冷却)
      *
-     * v2.0 修复:
-     * - 加边界检测: 如果前进方向会撞墙/出界, 强制转向目标
-     * - 避免单位贴墙移动
+     * v2.1 修复:
+     * - 多射线墙体检测: 前方3条射线 (正前方±30°), 更可靠发现墙体
+     * - 卡住时强制转向: 连续2秒低速 + 目标在远处 → 直接转向目标
+     * - 边界附近加大转向力度 (0.4 vs 0.2), 快速脱离贴墙
      */
     protected void attack(float circleLength) {
         float speed = unit.speed();
@@ -157,56 +173,128 @@ public class WormAI extends CommandAI {
 
         float diff = Angles.angleDist(unit.rotation, unit.angleTo(target));
 
-        // ★ 边界修正: 检查前进方向是否会出界
+        // ★ 检测条件
         boolean nearBoundary = isNearBoundary();
         boolean headingToWall = isHeadingToWall();
+        boolean isStuck = stuckTimer >= STUCK_TIME;
 
-        if ((diff > 100f && !unit.within(target, circleLength)) || rotateTime > 0f || nearBoundary || headingToWall) {
+        // ★ 转向条件 (PU132原版 + 边界/墙体/卡住)
+        boolean shouldTurn = (diff > 100f && !unit.within(target, circleLength)) || rotateTime > 0f;
+
+        // ★ 边界/墙体/卡住时必须转向, 即使角度差不大
+        if (nearBoundary || headingToWall || isStuck) {
+            shouldTurn = true;
+        }
+
+        if (shouldTurn) {
             // 需要转向: 平滑转到目标方向
-            // ★ 边界附近时加大转向力度 (0.4 vs 0.2), 快速脱离贴墙
-            float slerp = (nearBoundary || headingToWall) ? 0.4f : 0.2f;
+            // ★ 转向力度根据紧迫程度调整
+            float slerp;
+            if (isStuck) {
+                // ★ 卡住时强力转向, 快速脱困
+                slerp = 0.6f;
+            } else if (nearBoundary || headingToWall) {
+                // 边界/墙体附近加大转向力度
+                slerp = 0.4f;
+            } else {
+                // PU132 原版力度
+                slerp = 0.2f;
+            }
             vec.setAngle(Mathf.slerpDelta(vec.angle(), unit.angleTo(target), slerp));
-            if (rotateTime <= 0f && !nearBoundary && !headingToWall) rotateTime = 40f;
+            if (rotateTime <= 0f && !nearBoundary && !headingToWall && !isStuck) rotateTime = 40f;
         }
 
         unit.moveAt(vec);
     }
 
     /**
+     * ★ 卡住检测: 连续多帧速度极低但目标在远处 → 判定卡住
+     *
+     * 原因: 盘旋模式的单位在贴墙时会反复撞墙然后被弹开,
+     * 每帧速度很低但 AI 认为还在移动, 不触发转向,
+     * 导致卡在墙角一直抖动
+     */
+    protected void updateStuckDetection() {
+        float actualSpeed = 0f;
+        if (!Float.isNaN(lastX) && !Float.isNaN(lastY)) {
+            float dx = unit.x - lastX;
+            float dy = unit.y - lastY;
+            actualSpeed = (float) Math.sqrt(dx * dx + dy * dy) / Time.delta;
+        }
+        lastX = unit.x;
+        lastY = unit.y;
+
+        // 有目标且目标在远处, 但自身速度极低 → 可能在卡住
+        boolean hasFarTarget = (target != null && !unit.within(target, unit.range() * 0.5f))
+            || (targetPos != null && !unit.within(targetPos, 60f));
+
+        if (hasFarTarget && actualSpeed < STUCK_SPEED_THRESHOLD) {
+            stuckTimer += Time.delta;
+        } else {
+            // 正常移动时快速衰减卡住计时
+            stuckTimer = Math.max(0f, stuckTimer - Time.delta * 2f);
+        }
+    }
+
+    /**
      * ★ 检查单位是否接近地图边界
+     * 动态边界: 速度越快, 提前量越大
      */
     protected boolean isNearBoundary() {
         float w = world.unitWidth();
         float h = world.unitHeight();
-        float m = BOUNDARY_MARGIN + unit.hitSize;
-        return unit.x < m || unit.x > w - m || unit.y < m || unit.y > h - m;
+        // ★ 动态边界: 速度越快, 提前量越大 (最少80, 最多200)
+        float margin = BOUNDARY_MARGIN + unit.hitSize + Math.min(unit.speed() * 8f, 120f);
+        return unit.x < margin || unit.x > w - margin || unit.y < margin || unit.y > h - margin;
     }
 
     /**
-     * ★ 检查前进方向是否有实体墙 (solid block)
-     * 用射线检测前方一段距离内是否有实心方块
+     * ★ 多射线墙体检测: 前方3条射线 (正前方、+30°、-30°)
+     * 比单点检测更可靠, 能发现斜向墙体
      */
     protected boolean isHeadingToWall() {
-        float checkDist = 60f + unit.hitSize;
-        float nextX = unit.x + Angles.trnsx(unit.rotation, checkDist);
-        float nextY = unit.y + Angles.trnsy(unit.rotation, checkDist);
+        float baseDist = 50f + unit.hitSize + Math.min(unit.speed() * 6f, 100f);
 
-        // 出界
+        // 出界检测 (正前方)
+        float nextX = unit.x + Angles.trnsx(unit.rotation, baseDist);
+        float nextY = unit.y + Angles.trnsy(unit.rotation, baseDist);
         if (nextX < 0 || nextX > world.unitWidth() || nextY < 0 || nextY > world.unitHeight()) {
             return true;
         }
 
-        // 检查前方是否有实心方块 (只对非飞行单位)
+        // 非飞行单位: 检查实心方块 (3条射线)
         if (!unit.isFlying()) {
-            int tx = world.toTile(nextX);
-            int ty = world.toTile(nextY);
-            var tile = world.tile(tx, ty);
-            if (tile != null && tile.solid()) {
-                return true;
+            // 正前方
+            if (isSolidAt(unit.x, unit.y, unit.rotation, baseDist)) return true;
+            // 左前方 30°
+            if (isSolidAt(unit.x, unit.y, unit.rotation - 30f, baseDist * 0.8f)) return true;
+            // 右前方 30°
+            if (isSolidAt(unit.x, unit.y, unit.rotation + 30f, baseDist * 0.8f)) return true;
+        } else {
+            // 飞行单位: 只检测地图边界 (更远距离)
+            for (float angle : new float[]{unit.rotation, unit.rotation - 25f, unit.rotation + 25f}) {
+                float fx = unit.x + Angles.trnsx(angle, baseDist * 1.5f);
+                float fy = unit.y + Angles.trnsy(angle, baseDist * 1.5f);
+                if (fx < 0 || fx > world.unitWidth() || fy < 0 || fy > world.unitHeight()) {
+                    return true;
+                }
             }
         }
 
         return false;
+    }
+
+    /**
+     * 检查从 (x,y) 沿 angle 方向 dist 距离处是否有实心方块
+     */
+    protected boolean isSolidAt(float x, float y, float angle, float dist) {
+        float tx = x + Angles.trnsx(angle, dist);
+        float ty = y + Angles.trnsy(angle, dist);
+        if (tx < 0 || tx > world.unitWidth() || ty < 0 || ty > world.unitHeight()) return true;
+        int tileX = world.toTile(tx);
+        int tileY = world.toTile(ty);
+        var tile = world.tile(tileX, tileY);
+        return tile != null && tile.solid();
     }
 
     /**

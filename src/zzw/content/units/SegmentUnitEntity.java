@@ -136,6 +136,9 @@ public class SegmentUnitEntity extends UnitEntity {
         if (head != null && head.isAdded() && !head.splittable) {
             health = head.health;
             maxHealth = head.maxHealth;
+            // ★ 防作弊: dead 标志位保护 (PU132 EndWormSegmentUnit 继承 AntiCheatBase)
+            // 段身不能独立死亡, 只能通过头部死亡触发
+            if (!head.dead) dead = false;
         }
 
         // 检查头部是否还活着
