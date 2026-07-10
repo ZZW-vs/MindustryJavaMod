@@ -9,25 +9,27 @@ import mindustry.gen.Unit;
 
 /**
  * PU132 SlowLightningBulletType 移植版 (适配 v150.1)
- * - 改为快闪电模式: 节点更少, 更新更快, 性能更好
+ * - 快闪电模式: 高伤害、短持续、快速延伸、少分裂
  * - 在 init(Bullet b) 时创建 SlowLightningEntity
  * - 子弹位置跟随 SlowLightningEntity
  * - 不绘制子弹本身 (由 SlowLightningEntity.draw 绘制闪电)
  * 参考: PU132 unity.entities.bullet.anticheat.SlowLightningBulletType
  *
- * ★ 快闪电参数优化:
- *   - nodeLength: 80f → 120f (节点间距更大, 段数更少)
- *   - nodeTime: 7f → 3f (节点更新更快)
- *   - lifetime: 160f → 80f (持续时间减半)
- *   - maxActive: 4 → 5 (场上最多5个闪电)
+ * ★ 快闪电参数:
+ *   - damage: 800 (高伤害)
+ *   - nodeLength: 300f (节点间距大, 延伸快)
+ *   - nodeTime: 1f (节点更新快, 动画流畅)
+ *   - lifetime: 15f (短持续, 一闪而过)
+ *   - splitChance: 0.01f (低分裂, 主干清晰)
+ *   - maxActive: 5 (场上最多5个闪电)
  */
 public class SlowLightningBulletType extends AntiCheatBulletTypeBase {
-    protected float slRange = 870f, nodeLength = 120f, nodeTime = 3f, splitChance = 0.06f;
+    protected float slRange = 870f, nodeLength = 300f, nodeTime = 1f, splitChance = 0.01f;
     protected SlowLightningType type;
 
     public SlowLightningBulletType(float damage) {
         super(0f, damage);
-        lifetime = 80f;
+        lifetime = 15f;
         collides = false;
         hittable = absorbable = reflectable = false;
         keepVelocity = false;

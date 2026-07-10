@@ -333,70 +333,46 @@ public class SegmentUnitEntity extends UnitEntity {
     @Override
     public void draw() {
         float z = Draw.z();
-        // ★ 段身 z 层级: 段身依次低于头部
-        //   头部 z = headZ + 0.001 (通过 Draw.draw() 推迟绘制, 最高)
-        //   段身 0 z = headZ - 0.0001 (最高段身, 紧贴头部, 最后画)
-        //   段身 1 z = headZ - 0.0002 (第2节)
-        //   ...
-        //   段身 n-1 z = headZ - 0.0001 * n (最低段身, 尾部, 最先画)
-        //   渲染顺序: 尾部 → 第2节 → 第1节 → 头部
-        //   覆盖关系: 头部覆盖第1节, 第1节覆盖第2节, 依次向下
         Draw.z(z - (segmentIndex + 1f) * 0.0001f);
 
-        // 调试: 只打一次贴图状态
-        if (!debugDrawLogged) {
-            debugDrawLogged = true;
-            String p = texturePrefix;
-            System.out.println("[段身] 贴图调试: 前缀=" + p + " 尾部=" + isTail
-                + " type.region.found=" + type.region.found()
-                + " type.outline.found=" + type.outlineRegion.found()
-                + " type.cell.found=" + type.cellRegion.found());
-        }
-
-        // 保存 type 原本的字段
         mindustry.type.UnitType t = type;
         TextureRegion oldRegion = t.region;
         TextureRegion oldOutline = t.outlineRegion;
         TextureRegion oldCell = t.cellRegion;
         boolean oldDrawCell = t.drawCell;
 
-        // ★ 非尾部: 段身 UnitType 自身的 region/outline/cell 已经是正确的段身贴图
-        //    (Mindustry 在 UnitType.load() 时已加载 xxx-segment / xxx-segment-outline / xxx-segment-cell)
-        //    不需要额外替换, 避免 atlas.find 失败导致 error
-        // ★ 尾部: 才需要查找 tail 贴图替换
+        String p = texturePrefix;
+        String modP = "create-" + p;
+
         if (isTail) {
-            String p = texturePrefix;
-            String modP = "create-" + p;
             TextureRegion tailR = findRegion(p + "tail", modP + "tail");
-            if (tailR.found()) {
-                t.region = tailR;
-            }
+            if (tailR.found()) t.region = tailR;
             TextureRegion tailO = findRegion(p + "tail-outline", modP + "tail-outline");
-            if (tailO.found()) {
-                t.outlineRegion = tailO;
-            }
-            // 尾部不绘制 cell (PU132 原版行为)
+            if (tailO.found()) t.outlineRegion = tailO;
             t.drawCell = false;
+        } else {
+            TextureRegion cellR = findRegion(p + "cell", modP + "cell");
+            if (!cellR.found()) {
+                cellR = findRegion(p + "segment-cell", modP + "segment-cell");
+            }
+            if (cellR.found()) {
+                t.cellRegion = cellR;
+            }
         }
 
-        // 按 segmentIndex 过滤段身武器
         mindustry.entities.units.WeaponMount[] oldMounts = mounts;
         mindustry.entities.units.WeaponMount[] filteredMounts = filterMountsForSegment(oldMounts);
         mounts = filteredMounts;
 
-        // 调用 super.draw() 绘制 (非尾部使用 UnitType 自身已加载的段身贴图)
         super.draw();
 
-        // 恢复 mounts
         mounts = oldMounts;
 
-        // 恢复 type 的字段
         t.region = oldRegion;
         t.outlineRegion = oldOutline;
         t.cellRegion = oldCell;
         t.drawCell = oldDrawCell;
 
-        // ★ 液压装饰: 恢复原版 PU132 绘制方式, 不分层
         if (head != null && head.isAdded() && head.type != null) {
             WormDecal decal = SegmentWormEntity.wormDecals.get(head.type.name);
             if (decal != null) {
@@ -407,7 +383,6 @@ public class SegmentUnitEntity extends UnitEntity {
             }
         }
 
-        // 恢复 z
         Draw.z(z);
     }
 

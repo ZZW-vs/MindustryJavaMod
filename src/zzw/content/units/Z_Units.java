@@ -850,8 +850,9 @@ public class Z_Units {
                 }};
             }});
 
-            // destroyer-4: 慢闪电 (PU132 SlowLightningBulletType, 完整移植)
+            // destroyer-4: 快闪电 (PU132 SlowLightningBulletType 移植, 高伤害短持续)
             // PU132 第4272-4289行: damage=120, 5发, inaccuracy=15, range=870
+            // ★ 快闪电优化: 伤害×6.67, 持续时间大幅缩短, 节点间距增大, 分裂减少
             weapons.add(new Weapon("oppression-destroyer-4") {{
                 x = 98f;
                 y = -26.25f;
@@ -860,12 +861,10 @@ public class Z_Units {
                 rotateSpeed = 3f;
                 inaccuracy = 15f;
                 xRand = 6f;
-                reload = 9f * 60f;  // 降低攻击频率 (慢闪电)
-                // PU132 原版: shots=5
+                reload = 6f * 60f;
                 shoot.shots = 5;
 
-                // ★ 完整移植 PU132 SlowLightningBulletType (damage=120, range=870)
-                bullet = new SlowLightningBulletType(120f);
+                bullet = new SlowLightningBulletType(800f);
             }});
 
             // —— 段身武器组4: 空 (PU132 第4291行 new Seq<Weapon>()) ——
@@ -965,11 +964,9 @@ public class Z_Units {
         // PU132: angleLimit=35f, barrageRange=490f
         // ★ segmentWeaponGroupSize=2: oppression 段身6个武器分3组 (每组2个), 尾部空组
         // PU132 segmentWeapons = {组0(soul-destroyer+destroyer-2), 组1(oppressor+destroyer-3), 组2(void+destroyer-4), 组3(空)}
-        // ★ segmentCast=16 (增大传播范围, 55段需要更大范围保持协调)
-        // ★ jointStrength=0.5f (减小关节强度, 55段大虫子拉回更平滑)
         SegmentWormEntity.configs.put(oppression.name,
             new SegmentWormEntity.SegmentConfig(oppressionSegment, 55, 228f, 0f, 55, false, false, false,
-                35f, 6f, 0.1f, 0.5f, 16, 0.5f, true, 0f, 490f, 2, true));
+                35f, 6f, 0.1f, 1f, 11, 0.5f, true, 0f, 490f, 2, true));
         // 压迫者: 每秒回500血
         SegmentWormEntity.configs.get(oppression.name).healPerSecond = 500f;
         // 压迫者: 受到伤害 × 0.7 (减伤30%)
