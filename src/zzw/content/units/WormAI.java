@@ -49,10 +49,10 @@ public class WormAI extends CommandAI {
         updateVisuals();
         updateTargeting();
 
-        // 清除无效 attackTarget, 但不清零 targetPos
-        // ★ 保留 targetPos 使 hasCommand()=true, 避免 isIdle() 清零 vel 导致走走停停
+        // 清除无效 attackTarget, 并清空 targetPos 避免目标消失后还在转圈
         if (attackTarget != null && invalid(attackTarget)) {
             attackTarget = null;
+            targetPos = null;  // ★ 目标消失后停止转圈
         }
 
         // ★ 自动索敌: 无玩家命令时, 自动将 target 设为 attackTarget
@@ -66,7 +66,7 @@ public class WormAI extends CommandAI {
             targetPos = new Vec2(pos);
         }
 
-        // ===== 移动逻辑 (龙的穿梭+盘旋攻击方式) =====
+        // ===== 移动逻辑 =====
         if (attackTarget != null) {
             target = attackTarget;
             if (targetPos == null) targetPos = new Vec2();
@@ -77,18 +77,6 @@ public class WormAI extends CommandAI {
             float angleDiff = Angles.angleDist(unit.rotation, targetAngle);
             float engageRange = unit.type.range - 10f;
 
-            // ★ 盘旋半径: 根据单位大小自动判定
-            // 单位总长度 ≈ segmentSpacing * 段数, 盘旋半径 = 总长度的 40% + hitSize
-            // 至少为 engageRange * 0.5 (保证在攻击范围内)
-            float orbitRadius = engageRange * 0.55f;
-            if (unit instanceof SegmentWormEntity) {
-                SegmentWormEntity worm = (SegmentWormEntity) unit;
-                if (worm.segments.length > 0) {
-                    float totalLength = worm.segmentSpacing * worm.segments.length;
-                    orbitRadius = Math.max(orbitRadius, totalLength * 0.4f + unit.hitSize);
-                }
-            }
-
             // ★ 边界检测: 接近地图边缘时强制朝目标方向快速转向
             float margin = 300f;
             float worldW = world.unitWidth();
@@ -96,34 +84,55 @@ public class WormAI extends CommandAI {
             boolean nearBorder = unit.x < margin || unit.x > worldW - margin
                     || unit.y < margin || unit.y > worldH - margin;
 
-            if (distance > engageRange) {
-                // ★ 阶段1: 远离目标 → 转向目标 + 朝目标冲刺
-                boolean isUlt = (unit instanceof SegmentWormEntity) && ((SegmentWormEntity) unit).isUltActive();
-                float ultScl = isUlt ? ((SegmentWormEntity) unit).ultSpeedMultiplier() : 1f;
-                float turnSpeed;
-                if (nearBorder) {
-                    turnSpeed = 0.08f;
-                } else {
-                    turnSpeed = 0.06f * ultScl;
+            // ★ 根据 circleTarget 决定攻击模式
+            // circleTarget=true: 盘旋攻击 (toxobyte, catenapede, oppression, devourer)
+            // circleTarget=false: 直线冲刺+折返 (arcnelidia, 必须移动才能射击)
+            if (unit.type.circleTarget) {
+                // ===== 盘旋攻击模式 =====
+                float orbitRadius = engageRange * 0.55f;
+                if (unit instanceof SegmentWormEntity) {
+                    SegmentWormEntity worm = (SegmentWormEntity) unit;
+                    if (worm.segments.length > 0) {
+                        float totalLength = worm.segmentSpacing * worm.segments.length;
+                        orbitRadius = Math.max(orbitRadius, totalLength * 0.4f + unit.hitSize);
+                    }
                 }
-                unit.rotation = Mathf.slerpDelta(unit.rotation, targetAngle, turnSpeed);
 
-                // 朝当前朝向移动 (龙飞行姿态)
-                vec.trns(unit.rotation, unit.speed());
-                unit.moveAt(vec);
-            } else if (distance > orbitRadius) {
-                // ★ 阶段2: 在攻击范围内但离目标较远 → 朝目标冲近
-                boolean isUlt = (unit instanceof SegmentWormEntity) && ((SegmentWormEntity) unit).isUltActive();
-                float ultScl = isUlt ? ((SegmentWormEntity) unit).ultSpeedMultiplier() : 1f;
-                float turnSpeed = 0.06f * ultScl;
-                unit.rotation = Mathf.slerpDelta(unit.rotation, targetAngle, turnSpeed);
-                vec.trns(unit.rotation, unit.speed());
-                unit.moveAt(vec);
+                if (distance > engageRange) {
+                    // 远离目标 → 转向目标 + 冲刺
+                    boolean isUlt = (unit instanceof SegmentWormEntity) && ((SegmentWormEntity) unit).isUltActive();
+                    float ultScl = isUlt ? ((SegmentWormEntity) unit).ultSpeedMultiplier() : 1f;
+                    float turnSpeed = nearBorder ? 0.08f : 0.06f * ultScl;
+                    unit.rotation = Mathf.slerpDelta(unit.rotation, targetAngle, turnSpeed);
+                    vec.trns(unit.rotation, unit.speed());
+                    unit.moveAt(vec);
+                } else if (distance > orbitRadius) {
+                    // 在攻击范围内但离目标较远 → 朝目标冲近
+                    boolean isUlt = (unit instanceof SegmentWormEntity) && ((SegmentWormEntity) unit).isUltActive();
+                    float ultScl = isUlt ? ((SegmentWormEntity) unit).ultSpeedMultiplier() : 1f;
+                    float turnSpeed = 0.06f * ultScl;
+                    unit.rotation = Mathf.slerpDelta(unit.rotation, targetAngle, turnSpeed);
+                    vec.trns(unit.rotation, unit.speed());
+                    unit.moveAt(vec);
+                } else {
+                    // 进入盘旋半径 → 围绕目标盘旋攻击
+                    orbitAttack(attackTarget, orbitRadius);
+                }
             } else {
-                // ★ 阶段3: 进入盘旋半径 → 围绕目标盘旋攻击
-                //   盘旋方向: 垂直于目标方向 (切线方向)
-                //   旋转速度根据单位大小调整: 大单位转慢, 小单位转快
-                orbitAttack(attackTarget, orbitRadius);
+                // ===== 直线冲刺+折返模式 (arcnelidia) =====
+                // 必须正面朝目标冲刺才能命中, 不做盘旋
+                if (distance > engageRange) {
+                    // 远离目标 → 转向目标 + 冲刺
+                    boolean isUlt = (unit instanceof SegmentWormEntity) && ((SegmentWormEntity) unit).isUltActive();
+                    float ultScl = isUlt ? ((SegmentWormEntity) unit).ultSpeedMultiplier() : 1f;
+                    float turnSpeed = nearBorder ? 0.08f : 0.06f * ultScl;
+                    unit.rotation = Mathf.slerpDelta(unit.rotation, targetAngle, turnSpeed);
+                    vec.trns(unit.rotation, unit.speed());
+                    unit.moveAt(vec);
+                } else {
+                    // 进入攻击范围 → 直线冲刺+折返
+                    attack(engageRange);
+                }
             }
         } else if (targetPos != null) {
             // 玩家移动命令 / 记仇位置
