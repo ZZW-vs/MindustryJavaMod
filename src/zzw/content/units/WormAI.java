@@ -10,129 +10,66 @@ import mindustry.world.meta.BlockFlag;
 import static mindustry.Vars.*;
 
 /**
- * 虫子单位专用 AI (融合 PU132 WormAI + v158 CommandAI)
+ * 虫子单位专用 AI (移植 PU132 WormAI, 适配 v158 CommandAI)
  *
- * ★ 龙的攻击方式:
- *   1. 发现目标 → 径直朝目标冲刺
- *   2. 冲过目标 → 大幅折返 (像龙甩尾一样)
- *   3. 再次朝目标冲刺 → 反复穿梭
- *   4. 加入随机偏移和摆动, 使移动更生动不死板
- *   5. 身体自然蜿蜒跟随, 展示力量感
+ * PU132 原版逻辑 (WormAI.updateMovement L22-45):
+ * - circleTarget=false: moveTo(target, range*0.8) + lookAt(target)
+ * - circleTarget=true:  attack(circleLength) 围绕目标转圈
  *
- * ★ v158 适配: 继承 CommandAI (playerControllable=true 单位默认使用 CommandAI)
- *   - 重写 updateUnit(): 先 updateTargeting() 找 target (findMainTarget 优先核心)
- *   - 无玩家命令时自动将 target 设为 attackTarget, 并驱动移动
- *   - 设置 targetPos 使 hasCommand()=true, 避免被 SegmentWormEntity 误判待机清零 vel
- *
- * PU132 保留:
- * - setTarget(): 段身受击时通知头部 (记仇机制)
+ * v158 适配: 继承 CommandAI, 重写 updateUnit() 实现自动索敌+移动
  */
 public class WormAI extends CommandAI {
 
-    /** 是否处于待机状态 (无目标), 供 SegmentWormEntity 判断是否清零 vel */
+    /** 是否处于待机状态 */
     public boolean isIdle = false;
 
-    /** PU132: 段身受击通知的目标位置 (score高的覆盖低的, 持续180帧) */
+    /** PU132: 段身受击通知的记仇位置 (score高的覆盖低的, 持续180帧) */
     public Vec2 pos = new Vec2();
     public float score = 0f;
     public float time = 0f;
 
-    /** 穿梭攻击的甩尾方向 (1 或 -1) */
-    protected int weaveSide = 1;
-    /** 上次切换甩尾方向的时间 */
-    protected float lastWeaveSwitch = 0f;
-    /** 当前随机摆动相位 */
-    protected float weavePhase = 0f;
+    /** 盘旋方向 (1 或 -1) */
+    protected int orbitDir = 1;
+    /** 旋转计时器 (PU132 rotateTime) */
+    protected float rotateTime = 0f;
 
     @Override
     public void updateUnit() {
         updateVisuals();
         updateTargeting();
 
-        // 清除无效 attackTarget, 并清空 targetPos 避免目标消失后还在转圈
+        // 清除无效 attackTarget, 并清空 targetPos
         if (attackTarget != null && invalid(attackTarget)) {
             attackTarget = null;
-            targetPos = null;  // ★ 目标消失后停止转圈
+            targetPos = null;
         }
 
-        // ★ 自动索敌: 无玩家命令时, 自动将 target 设为 attackTarget
-        // 检查 target 有效性, 避免把无效目标赋给 attackTarget
+        // 自动索敌: 无玩家命令时自动将 target 设为 attackTarget
         if (!hasCommand() && attackTarget == null && target != null && !invalid(target)) {
             attackTarget = target;
         }
 
-        // PU132 记仇机制: 无 target 但有记仇位置时, 移动到记仇位置
+        // PU132 记仇机制: 无 target 但有记仇位置时移动过去
         if (target == null && time > 0f && attackTarget == null && targetPos == null) {
             targetPos = new Vec2(pos);
         }
 
-        // ===== 移动逻辑 =====
+        // ===== 移动逻辑 (参考 PU132 WormAI.updateMovement L26-33) =====
         if (attackTarget != null) {
             target = attackTarget;
             if (targetPos == null) targetPos = new Vec2();
             targetPos.set(attackTarget);
 
-            float distance = unit.dst(attackTarget);
-            float targetAngle = unit.angleTo(attackTarget);
-            float angleDiff = Angles.angleDist(unit.rotation, targetAngle);
-            float engageRange = unit.type.range - 10f;
-
-            // ★ 边界检测: 接近地图边缘时强制朝目标方向快速转向
-            float margin = 300f;
-            float worldW = world.unitWidth();
-            float worldH = world.unitHeight();
-            boolean nearBorder = unit.x < margin || unit.x > worldW - margin
-                    || unit.y < margin || unit.y > worldH - margin;
-
-            // ★ 根据 circleTarget 决定攻击模式
-            // circleTarget=true: 盘旋攻击 (toxobyte, catenapede, oppression, devourer)
-            // circleTarget=false: 直线冲刺+折返 (arcnelidia, 必须移动才能射击)
-            if (unit.type.circleTarget) {
-                // ===== 盘旋攻击模式 =====
-                float orbitRadius = engageRange * 0.55f;
-                if (unit instanceof SegmentWormEntity) {
-                    SegmentWormEntity worm = (SegmentWormEntity) unit;
-                    if (worm.segments.length > 0) {
-                        float totalLength = worm.segmentSpacing * worm.segments.length;
-                        orbitRadius = Math.max(orbitRadius, totalLength * 0.4f + unit.hitSize);
-                    }
-                }
-
-                if (distance > engageRange) {
-                    // 远离目标 → 转向目标 + 冲刺
-                    boolean isUlt = (unit instanceof SegmentWormEntity) && ((SegmentWormEntity) unit).isUltActive();
-                    float ultScl = isUlt ? ((SegmentWormEntity) unit).ultSpeedMultiplier() : 1f;
-                    float turnSpeed = nearBorder ? 0.08f : 0.06f * ultScl;
-                    unit.rotation = Mathf.slerpDelta(unit.rotation, targetAngle, turnSpeed);
-                    vec.trns(unit.rotation, unit.speed());
-                    unit.moveAt(vec);
-                } else if (distance > orbitRadius) {
-                    // 在攻击范围内但离目标较远 → 朝目标冲近
-                    boolean isUlt = (unit instanceof SegmentWormEntity) && ((SegmentWormEntity) unit).isUltActive();
-                    float ultScl = isUlt ? ((SegmentWormEntity) unit).ultSpeedMultiplier() : 1f;
-                    float turnSpeed = 0.06f * ultScl;
-                    unit.rotation = Mathf.slerpDelta(unit.rotation, targetAngle, turnSpeed);
-                    vec.trns(unit.rotation, unit.speed());
-                    unit.moveAt(vec);
-                } else {
-                    // 进入盘旋半径 → 围绕目标盘旋攻击
-                    orbitAttack(attackTarget, orbitRadius);
-                }
+            if (!unit.type.circleTarget) {
+                // ★ 非盘旋模式 (arcnelidia): 盯着目标冲过去
+                // PU132: moveTo(target, unit.range() * 0.8f); unit.lookAt(target);
+                // 武器 rotate=false, 必须正面对着目标才能打, 所以 lookAt(target) 很重要
+                moveTo(target, unit.range() * 0.8f, unit.isFlying() ? 20f : 100f);
+                unit.lookAt(target);
             } else {
-                // ===== 直线冲刺+折返模式 (arcnelidia) =====
-                // 必须正面朝目标冲刺才能命中, 不做盘旋
-                if (distance > engageRange) {
-                    // 远离目标 → 转向目标 + 冲刺
-                    boolean isUlt = (unit instanceof SegmentWormEntity) && ((SegmentWormEntity) unit).isUltActive();
-                    float ultScl = isUlt ? ((SegmentWormEntity) unit).ultSpeedMultiplier() : 1f;
-                    float turnSpeed = nearBorder ? 0.08f : 0.06f * ultScl;
-                    unit.rotation = Mathf.slerpDelta(unit.rotation, targetAngle, turnSpeed);
-                    vec.trns(unit.rotation, unit.speed());
-                    unit.moveAt(vec);
-                } else {
-                    // 进入攻击范围 → 直线冲刺+折返
-                    attack(engageRange);
-                }
+                // ★ 盘旋模式 (toxobyte/catenapede/devourer/oppression)
+                // 攻击范围作为盘旋半径的参考
+                attack(unit.range());
             }
         } else if (targetPos != null) {
             // 玩家移动命令 / 记仇位置
@@ -149,131 +86,56 @@ public class WormAI extends CommandAI {
         // 待机判断
         isIdle = (target == null && attackTarget == null && targetPos == null);
 
+        // rotateTime 衰减 (PU132 L42)
+        rotateTime = Math.max(0f, rotateTime - Time.delta);
         if (time <= 0f) score = 0f;
         time = Math.max(0f, time - Time.delta);
     }
 
     /**
-     * ★ 优先攻击最近的目标 (核心或单位)
-     * 不区分目标类型, 谁近打谁
+     * 优先攻击最近的目标 (核心或单位)
      */
     @Override
     public Teamc findMainTarget(float x, float y, float range, boolean air, boolean ground) {
-        // ★ 找最近的目标: 先找核心, 再找单位, 比较距离后返回近的
         Teamc core = targetFlag(x, y, BlockFlag.core, true);
         Teamc unitTarget = super.findMainTarget(x, y, range, air, ground);
 
         if (core == null) return unitTarget;
         if (unitTarget == null) return core;
 
-        // 比较距离, 返回近的
         float coreDist = unit.dst(core);
         float unitDist = unit.dst(unitTarget);
         return coreDist < unitDist ? core : unitTarget;
     }
 
     /**
-     * ★ 穿梭折返攻击 (龙的攻击方式)
-     * - 朝目标径直冲刺, 加入轻微左右摆动
-     * - 冲过目标后(背对目标且距离变远), 大幅折返
-     * - 折返方向有随机偏移, 每次不完全对称
-     * - 身体自然甩动, 展示力量感
-     */
-    protected void attack(float engageRange) {
-        float distance = unit.dst(target);
-        float angleToTarget = unit.angleTo(target);
-        float angleDiff = Angles.angleDist(unit.rotation, angleToTarget);
-
-        // 判断是否"冲过"了目标:
-        // 1. 距离目标很近 (在攻击范围的60%内)
-        // 2. 且当前朝向背离目标 (angleDiff > 90°, 说明正在远离目标)
-        boolean passedThrough = distance < engageRange * 0.6f && angleDiff > 90f;
-
-        // 判断是否"远离"了目标: 距离很远且背对目标
-        boolean tooFarAway = distance > engageRange * 2.5f && angleDiff > 100f;
-
-        if (passedThrough || tooFarAway) {
-            // 需要折返: 朝目标方向 + 随机偏移
-            // 偏移角度: 基础30° + 随机0~25°, 由 weaveSide 决定左右
-            float randomOffset = weaveSide * (30f + Mathf.random(25f));
-            float targetDir = angleToTarget + randomOffset;
-
-            // 平滑转向折返方向 (比正常转向更快, 模拟龙甩尾)
-            unit.rotation = Mathf.slerpDelta(unit.rotation, targetDir, 0.06f);
-
-            // 随机切换下次折返方向 (增加生动性)
-            if (Time.time - lastWeaveSwitch > 60f + Mathf.random(60f)) {
-                weaveSide *= -1;
-                lastWeaveSwitch = Time.time;
-            }
-        } else {
-            // 继续朝目标冲刺: 加入正弦波摆动, 模拟龙飞行时的身体起伏
-            if (weavePhase == 0f) weavePhase = unit.id * 0.5f;
-            float weaveFreq = 0.004f + Mathf.randomSeed(unit.id, 0.002f);
-            float weaveAmp = 10f + Mathf.randomSeed(unit.id + 1, 5f);
-            float weave = Mathf.sin(Time.time * weaveFreq + weavePhase) * weaveAmp;
-
-            float desiredRot = unit.rotation + weave * 0.015f;
-            unit.rotation = Mathf.slerpDelta(unit.rotation, desiredRot, 0.03f);
-        }
-
-        // 沿当前朝向移动
-        vec.trns(unit.rotation, unit.speed());
-        unit.moveAt(vec);
-    }
-
-    /**
-     * ★ 盘旋攻击 (围绕目标做圆周运动)
+     * ★ 盘旋攻击 (移植 PU132 WormAI.attack L66-74)
      *
-     * - 在 orbitRadius 处围绕目标盘旋
-     * - 朝向: 切线方向 (垂直于到目标的方向)
-     * - 盘旋速度: 根据单位大小调整, 大单位转慢, 小单位转快
-     * - 加入轻微径向修正, 保持距离稳定
+     * 原版逻辑非常简单:
+     * - 保持当前速度向前
+     * - 当朝向与目标方向差 > 100° 且距离 > circleLength 时, 平滑转向目标
+     * - 转完后 rotateTime = 40f (冷却)
+     *
+     * 这样单位会自然形成围绕目标的大圆, 路径平滑不会变成六边形
      */
-    protected void orbitAttack(Teamc target, float orbitRadius) {
-        float angleToTarget = unit.angleTo(target);
-        float distance = unit.dst(target);
+    protected void attack(float circleLength) {
+        float speed = unit.speed();
 
-        // ★ 切线方向: 垂直于到目标的方向 (weaveSide 决定顺时针/逆时针)
-        float tangentAngle = angleToTarget + 90f * weaveSide;
-
-        // ★ 径向修正: 距离过远时朝目标拉近, 过近时推远
-        float radialCorrection = 0f;
-        if (distance > orbitRadius * 1.2f) {
-            // 太远: 朝目标方向修正
-            radialCorrection = -15f;
-        } else if (distance < orbitRadius * 0.8f) {
-            // 太近: 背离目标方向修正
-            radialCorrection = 15f;
-        }
-        float desiredAngle = tangentAngle + radialCorrection;
-
-        // ★ 旋转速度: 大单位转慢, 小单位转快
-        // base 0.08f, 根据段身数衰减
-        float turnSpeed = 0.08f;
-        if (unit instanceof SegmentWormEntity) {
-            SegmentWormEntity worm = (SegmentWormEntity) unit;
-            int segCount = worm.segments.length;
-            // 段数越多转越慢, 但不低于 0.04f
-            turnSpeed = Math.max(0.04f, 0.08f - segCount * 0.003f);
-
-            // 大招期间减速
-            if (worm.isUltActive()) {
-                turnSpeed *= worm.ultSpeedMultiplier();
-            }
+        // 大招期间减速
+        if (unit instanceof SegmentWormEntity worm && worm.isUltActive()) {
+            speed *= worm.ultSpeedMultiplier();
         }
 
-        unit.rotation = Mathf.slerpDelta(unit.rotation, desiredAngle, turnSpeed);
+        vec.trns(unit.rotation, speed);
 
-        // 沿当前朝向移动
-        vec.trns(unit.rotation, unit.speed());
+        float diff = Angles.angleDist(unit.rotation, unit.angleTo(target));
+        if ((diff > 100f && !unit.within(target, circleLength)) || rotateTime > 0f) {
+            // 需要转向: 平滑转到目标方向
+            vec.setAngle(Mathf.slerpDelta(vec.angle(), unit.angleTo(target), 0.2f));
+            if (rotateTime <= 0f) rotateTime = 40f;
+        }
+
         unit.moveAt(vec);
-
-        // 随机切换盘旋方向 (每 10-20 秒切换一次, 增加生动性)
-        if (Time.time - lastWeaveSwitch > 600f + Mathf.random(600f)) {
-            weaveSide *= -1;
-            lastWeaveSwitch = Time.time;
-        }
     }
 
     /**
