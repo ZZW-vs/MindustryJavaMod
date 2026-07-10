@@ -154,15 +154,22 @@ public class WormAI extends CommandAI {
     }
 
     /**
-     * ★ 优先攻击敌方核心, 无核心才追踪单位
+     * ★ 优先攻击最近的目标 (核心或单位)
+     * 不区分目标类型, 谁近打谁
      */
     @Override
     public Teamc findMainTarget(float x, float y, float range, boolean air, boolean ground) {
+        // ★ 找最近的目标: 先找核心, 再找单位, 比较距离后返回近的
         Teamc core = targetFlag(x, y, BlockFlag.core, true);
-        if (core != null) {
-            return core;
-        }
-        return super.findMainTarget(x, y, range, air, ground);
+        Teamc unitTarget = super.findMainTarget(x, y, range, air, ground);
+
+        if (core == null) return unitTarget;
+        if (unitTarget == null) return core;
+
+        // 比较距离, 返回近的
+        float coreDist = unit.dst(core);
+        float unitDist = unit.dst(unitTarget);
+        return coreDist < unitDist ? core : unitTarget;
     }
 
     /**
