@@ -3,8 +3,6 @@ package zzw.content.units;
 import arc.math.*;
 import arc.math.geom.*;
 import arc.util.*;
-import mindustry.ai.UnitCommand;
-import mindustry.ai.UnitStance;
 import mindustry.ai.types.*;
 import mindustry.gen.*;
 import mindustry.world.meta.BlockFlag;
@@ -15,10 +13,11 @@ import static mindustry.Vars.*;
  * 虫子单位专用 AI (融合 PU132 WormAI + v158 CommandAI)
  *
  * ★ 龙的攻击方式:
- *   1. 头部逐渐转向目标 (slerp平滑转向, 不是瞬间锁定)
- *   2. 沿当前朝向冲刺 (不是直接朝目标移动, 像龙一样飞)
- *   3. 身体自然蜿蜒跟随 (由段身物理约束控制)
- *   4. 到达攻击范围后, 头部锁定目标攻击
+ *   1. 发现目标 → 径直朝目标冲刺
+ *   2. 冲过目标 → 大幅折返 (像龙甩尾一样)
+ *   3. 再次朝目标冲刺 → 反复穿梭
+ *   4. 加入随机偏移和摆动, 使移动更生动不死板
+ *   5. 身体自然蜿蜒跟随, 展示力量感
  *
  * ★ v158 适配: 继承 CommandAI (playerControllable=true 单位默认使用 CommandAI)
  *   - 重写 updateUnit(): 先 updateTargeting() 找 target (findMainTarget 优先核心)
@@ -38,10 +37,12 @@ public class WormAI extends CommandAI {
     public float score = 0f;
     public float time = 0f;
 
-    /** 当前转向目标角度 (用于平滑转向) */
-    protected float targetAngle = 0f;
-    /** 是否正在转向目标 */
-    protected boolean turning = false;
+    /** 穿梭攻击的甩尾方向 (1 或 -1) */
+    protected int weaveSide = 1;
+    /** 上次切换甩尾方向的时间 */
+    protected float lastWeaveSwitch = 0f;
+    /** 当前随机摆动相位 */
+    protected float weavePhase = 0f;
 
     @Override
     public void updateUnit() {
@@ -65,7 +66,7 @@ public class WormAI extends CommandAI {
             targetPos = new Vec2(pos);
         }
 
-        // ===== 移动逻辑 (龙的攻击方式) =====
+        // ===== 移动逻辑 (龙的穿梭攻击方式) =====
         if (attackTarget != null) {
             target = attackTarget;
             if (targetPos == null) targetPos = new Vec2();
@@ -85,19 +86,14 @@ public class WormAI extends CommandAI {
 
             if (distance > engageRange) {
                 // ★ 阶段1: 远离目标 → 转向目标 + 朝目标冲刺
-                //   非大招: 快速转向 (slerp 0.06f, 约每秒3.6度)
-                //   大招期间: 用 rotateSpeed 限制, 与玩家操控一致
                 boolean isUlt = (unit instanceof SegmentWormEntity) && ((SegmentWormEntity) unit).isUltActive();
                 float turnSpeed;
                 if (nearBorder) {
-                    // 接近边界时快速转向目标, 避免飞出地图
                     turnSpeed = 0.08f;
                 } else if (isUlt) {
-                    // 大招期间: 与玩家操控相同的转速
                     float maxTurnPerFrame = unit.type.rotateSpeed / 60f;
                     turnSpeed = Math.min(1f, maxTurnPerFrame / Math.max(0.1f, angleDiff));
                 } else {
-                    // 非大招: 较快的转向, 但不是瞬间
                     turnSpeed = 0.06f;
                 }
                 unit.rotation = Mathf.slerpDelta(unit.rotation, targetAngle, turnSpeed);
@@ -105,22 +101,12 @@ public class WormAI extends CommandAI {
                 // 朝当前朝向移动 (龙飞行姿态)
                 vec.trns(unit.rotation, unit.speed());
                 unit.moveAt(vec);
-
-                turning = true;
             } else {
-                // ★ 阶段2: 进入攻击范围 → 环绕攻击
-                //   像龙一样: 在目标周围盘旋, 头部转向目标
+                // ★ 阶段2: 进入攻击范围 → 穿梭折返攻击
+                //   像龙一样: 冲过目标 → 甩尾折返 → 再冲回来
+                attack(engageRange);
 
-                if (unit.type.circleTarget) {
-                    // 环绕模式: 切向移动形成圆周运动
-                    attack(engageRange);
-                } else {
-                    // 直线模式: 朝目标移动
-                    vec.trns(unit.rotation, unit.speed());
-                    unit.moveAt(vec);
-                }
-
-                // 头部转向目标, 大招期间用 rotateSpeed 限制
+                // 头部转向目标
                 boolean isUlt = (unit instanceof SegmentWormEntity) && ((SegmentWormEntity) unit).isUltActive();
                 float turnSpeed;
                 if (isUlt) {
@@ -130,7 +116,6 @@ public class WormAI extends CommandAI {
                     turnSpeed = 0.05f;
                 }
                 unit.rotation = Mathf.slerpDelta(unit.rotation, unit.angleTo(attackTarget), turnSpeed);
-                turning = false;
             }
         } else if (targetPos != null) {
             // 玩家移动命令 / 记仇位置
@@ -164,22 +149,54 @@ public class WormAI extends CommandAI {
     }
 
     /**
-     * ★ 环绕攻击 (龙的盘旋攻击模式)
-     * - 距离目标远: 朝目标方向移动
-     * - 距离目标近: 做切向移动 (垂直于目标方向), 形成圆周环绕
-     * - 身体自然摆动, 展示力量感
+     * ★ 穿梭折返攻击 (龙的攻击方式)
+     * - 朝目标径直冲刺, 加入轻微左右摆动
+     * - 冲过目标后(背对目标且距离变远), 大幅折返
+     * - 折返方向有随机偏移, 每次不完全对称
+     * - 身体自然甩动, 展示力量感
      */
-    protected void attack(float circleLength) {
+    protected void attack(float engageRange) {
         float distance = unit.dst(target);
         float angleToTarget = unit.angleTo(target);
+        float angleDiff = Angles.angleDist(unit.rotation, angleToTarget);
 
-        if (distance > circleLength) {
-            // 目标太远: 朝目标方向移动
-            vec.trns(angleToTarget, unit.speed());
+        // 判断是否"冲过"了目标:
+        // 1. 距离目标很近 (在攻击范围的60%内)
+        // 2. 且当前朝向背离目标 (angleDiff > 90°, 说明正在远离目标)
+        boolean passedThrough = distance < engageRange * 0.6f && angleDiff > 90f;
+
+        // 判断是否"远离"了目标: 距离很远且背对目标
+        boolean tooFarAway = distance > engageRange * 2.5f && angleDiff > 100f;
+
+        if (passedThrough || tooFarAway) {
+            // 需要折返: 朝目标方向 + 随机偏移
+            // 偏移角度: 基础30° + 随机0~25°, 由 weaveSide 决定左右
+            float randomOffset = weaveSide * (30f + Mathf.random(25f));
+            float targetDir = angleToTarget + randomOffset;
+
+            // 平滑转向折返方向 (比正常转向更快, 模拟龙甩尾)
+            unit.rotation = Mathf.slerpDelta(unit.rotation, targetDir, 0.06f);
+
+            // 随机切换下次折返方向 (增加生动性)
+            if (Time.time - lastWeaveSwitch > 60f + Mathf.random(60f)) {
+                weaveSide *= -1;
+                lastWeaveSwitch = Time.time;
+            }
         } else {
-            // 在环绕范围内: 切向移动 (目标方向 + 90度), 形成圆周运动
-            vec.trns(angleToTarget + 90f, unit.speed());
+            // 继续朝目标冲刺: 加入正弦波摆动, 模拟龙飞行时的身体起伏
+            // 摆动幅度: 8~15度, 频率: 0.3~0.5 Hz, 每个单位有独立相位
+            if (weavePhase == 0f) weavePhase = unit.id * 0.5f;
+            float weaveFreq = 0.004f + Mathf.randomSeed(unit.id, 0.002f);
+            float weaveAmp = 10f + Mathf.randomSeed(unit.id + 1, 5f);
+            float weave = Mathf.sin(Time.time * weaveFreq + weavePhase) * weaveAmp;
+
+            // 轻微调整方向, 模拟龙飞行时的自然摆动
+            float desiredRot = unit.rotation + weave * 0.015f;
+            unit.rotation = Mathf.slerpDelta(unit.rotation, desiredRot, 0.03f);
         }
+
+        // 沿当前朝向移动
+        vec.trns(unit.rotation, unit.speed());
         unit.moveAt(vec);
     }
 

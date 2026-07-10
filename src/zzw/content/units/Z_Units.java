@@ -168,11 +168,11 @@ public class Z_Units {
         // 段间距 22.7f (PU132 23f - 0.3f, 用户要求稍小一点)
         // wobble=true (arcnelidia 轻微晃动)
         // angleLimit=30f (龙的感觉: 更大的弯曲角度)
-        // anglePhysicsSmooth=0.3f (更平滑的转向, 段身自然跟随头部)
-        // segmentCast=4, jointStrength=1f (PU132 默认值)
+        // anglePhysicsSmooth=0.5f (更平滑的转向, 段身自然跟随头部)
+        // segmentCast=6, jointStrength=0.6f (增大传播范围, 减小关节强度防止脱节)
         SegmentWormEntity.configs.put(arcnelidia.name,
             new SegmentWormEntity.SegmentConfig(arcnelidiaSegment, 9, 22.7f, 0f, 0, true, false, false,
-                30f, 6f, 0.1f, 1f, 4, 0.3f, false, 0f));
+                30f, 6f, 0.1f, 0.6f, 6, 0.5f, false, 0f));
         // 电弧虫: 每秒回10血
         SegmentWormEntity.configs.get(arcnelidia.name).healPerSecond = 10f;
 
@@ -307,10 +307,8 @@ public class Z_Units {
         // ★ chainable=true (用户要求实现链式合并, 两条虫子靠近时合并)
         // ★ angleLimit=30f (龙的感觉: 更大的弯曲角度)
         // ★ segmentDamageScl=3f (用户要求 3x, 段身受击时血量×3倍掉)
-        // ★ anglePhysicsSmooth=0.5f (更平滑的转向, 段身自然跟随头部)
-        // ★ segmentCast=8 (增大传播范围, 防止脱臼)
-        // ★ jointStrength=0.5f (减小关节强度, 拉回更平滑)
-        // segmentCast=4, jointStrength=1f (PU132 默认值)
+        // anglePhysicsSmooth=0.5f (更平滑的转向)
+        // segmentCast=8, jointStrength=0.5f (增大传播范围, 减小关节强度防止脱臼)
         // ★ regenTime 改为6秒: 每6秒生长一节
         SegmentWormEntity.configs.put(toxobyte.name,
             new SegmentWormEntity.SegmentConfig(toxobyteSegment, 25, 16.25f, 6f * 60f, 25, false, true, true,
@@ -440,12 +438,12 @@ public class Z_Units {
         // PU132: segmentDamageScl=12f (段身受击时血量×12倍掉)
         // PU132: healthDistribution=0.15f (血量分布速率)
         // angleLimit=30f (龙的感觉: 更大的弯曲角度)
-        // anglePhysicsSmooth=0.3f (更平滑的转向, 段身自然跟随头部)
-        // segmentCast=4, jointStrength=1f (PU132 默认值)
+        // anglePhysicsSmooth=0.5f (更平滑的转向)
+        // segmentCast=8, jointStrength=0.5f (增大传播范围, 减小关节强度防止脱节)
         // ★ regenTime 改为20秒: 每20秒生长一节
         SegmentWormEntity.configs.put(catenapede.name,
             new SegmentWormEntity.SegmentConfig(catenapedeSegment, 2, 31f, 20f * 60f, 15, false, true, true,
-                30f, 5f, 0.15f, 1f, 4, 0.3f, false, 0f));
+                30f, 5f, 0.15f, 0.5f, 8, 0.5f, false, 0f));
         // 吸血虫: 每秒回25血
         SegmentWormEntity.configs.get(catenapede.name).healPerSecond = 25f;
 
@@ -636,9 +634,10 @@ public class Z_Units {
         // PU132: splittable=false, chainable=false (不可分裂合并)
         // PU132: 无 regen (初始就60段)
         // PU132 原版: segmentCast=7, anglePhysicsSmooth=0.5f, jointStrength=1f, preventDrifting=true
+        // ★ segmentCast=18, jointStrength=0.5f (60段需要更大传播范围, 减小关节强度防止脱节)
         SegmentWormEntity.configs.put(devourer.name,
             new SegmentWormEntity.SegmentConfig(devourerSegment, 60, 70.55f, 0f, 60, false, false, false,
-                30f, 6f, 0.1f, 1f, 7, 0.5f, true, 0f, 240f));
+                30f, 6f, 0.1f, 0.5f, 18, 0.5f, true, 0f, 240f));
         // 吞噬者: 每秒回120血
         SegmentWormEntity.configs.get(devourer.name).healPerSecond = 120f;
         // 吞噬者: 受到伤害 × 0.9 (减伤10%)
