@@ -87,14 +87,12 @@ public class WormAI extends CommandAI {
             if (distance > engageRange) {
                 // ★ 阶段1: 远离目标 → 转向目标 + 朝目标冲刺
                 boolean isUlt = (unit instanceof SegmentWormEntity) && ((SegmentWormEntity) unit).isUltActive();
+                float ultScl = isUlt ? ((SegmentWormEntity) unit).ultSpeedMultiplier() : 1f;
                 float turnSpeed;
                 if (nearBorder) {
                     turnSpeed = 0.08f;
-                } else if (isUlt) {
-                    float maxTurnPerFrame = unit.type.rotateSpeed / 60f;
-                    turnSpeed = Math.min(1f, maxTurnPerFrame / Math.max(0.1f, angleDiff));
                 } else {
-                    turnSpeed = 0.06f;
+                    turnSpeed = 0.06f * ultScl;
                 }
                 unit.rotation = Mathf.slerpDelta(unit.rotation, targetAngle, turnSpeed);
 
@@ -108,13 +106,8 @@ public class WormAI extends CommandAI {
 
                 // 头部转向目标
                 boolean isUlt = (unit instanceof SegmentWormEntity) && ((SegmentWormEntity) unit).isUltActive();
-                float turnSpeed;
-                if (isUlt) {
-                    float maxTurnPerFrame = unit.type.rotateSpeed / 60f;
-                    turnSpeed = Math.min(1f, maxTurnPerFrame / Math.max(0.1f, angleDiff));
-                } else {
-                    turnSpeed = 0.05f;
-                }
+                float ultScl = isUlt ? ((SegmentWormEntity) unit).ultSpeedMultiplier() : 1f;
+                float turnSpeed = 0.05f * ultScl;
                 unit.rotation = Mathf.slerpDelta(unit.rotation, unit.angleTo(attackTarget), turnSpeed);
             }
         } else if (targetPos != null) {

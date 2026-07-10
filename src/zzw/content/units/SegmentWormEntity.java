@@ -748,7 +748,6 @@ public class SegmentWormEntity extends UnitEntity {
             // scl = cast / segmentCast → 越靠前力越大
             int cast = segmentCast;
             int idx = i;
-            float totalPull = Tmp.v2.len();
             while (cast > 0 && idx < len) {
                 float scl = cast / (float) segmentCast;
                 segments[idx].set(segments[idx].x - (Tmp.v2.x * scl), segments[idx].y - (Tmp.v2.y * scl));
@@ -756,20 +755,6 @@ public class SegmentWormEntity extends UnitEntity {
                 segPositions[idx].set(segments[idx].x, segments[idx].y);
                 idx++;
                 cast--;
-            }
-
-            // ★ 额外优化: 对剩余段身施加衰减拉回力 (防止长虫子尾部脱节)
-            // 从 segmentCast 后开始, 力按距离平方衰减
-            int decayStart = i + segmentCast;
-            if (decayStart < len) {
-                float decayFactor = 0.02f; // 衰减系数
-                for (int j = decayStart; j < len; j++) {
-                    float dist = j - decayStart;
-                    float decay = decayFactor / ((dist + 1) * (dist + 1));
-                    segments[j].set(segments[j].x - (Tmp.v2.x * decay), segments[j].y - (Tmp.v2.y * decay));
-                    segments[j].updateLastPosition();
-                    segPositions[j].set(segments[j].x, segments[j].y);
-                }
             }
 
             // ★ Step 7: 同步到 Vec2 位置 (用于 draw 等)
