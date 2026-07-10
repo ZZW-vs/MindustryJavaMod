@@ -683,8 +683,11 @@ public class SegmentWormEntity extends UnitEntity {
             segV.add(Tmp.v1);
             segV.setLength(trueVel);
 
-            // 同步到段身实体 vel
-            segments[i].vel.set(segV);
+            // ★ 不同步到段身实体 vel
+            // 原因: VelComp.update() 会根据 vel 移动段身位置,
+            //   然后 updateSegmentsLocal 又重置位置, 造成每帧抖动
+            // segVelocities 是内部物理模拟用的, 段身实体 vel 保持为零
+            // segments[i].vel.set(segV);
         }
     }
 

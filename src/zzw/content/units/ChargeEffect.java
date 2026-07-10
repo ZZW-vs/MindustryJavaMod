@@ -67,7 +67,7 @@ public class ChargeEffect {
             }
         }
         Draw.reset();
-    });
+    }).followParent(true).rotWithParent(true);
 
     /**
      * Oppression 充能特效 (5*60tick, 完整移植 PU132)
@@ -175,5 +175,5 @@ public class ChargeEffect {
         Lines.lineAngle(e.x, e.y, e.rotation, length);
 
         Draw.reset();
-    });
+    }).followParent(true).rotWithParent(true);
 }

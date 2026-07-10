@@ -19,7 +19,7 @@ import mindustry.gen.Unit;
  *   - damage: 800 (高伤害)
  *   - nodeLength: 300f (节点间距大, 延伸快)
  *   - nodeTime: 1f (节点更新快, 动画流畅)
- *   - lifetime: 60f (持续约1秒)
+ *   - lifetime: 90f (持续约1.5秒)
  *   - splitChance: 0.01f (低分裂, 主干清晰)
  *   - maxActive: 5 (场上最多5个闪电)
  */
@@ -29,7 +29,7 @@ public class SlowLightningBulletType extends AntiCheatBulletTypeBase {
 
     public SlowLightningBulletType(float damage) {
         super(0f, damage);
-        lifetime = 60f;
+        lifetime = 90f;
         collides = false;
         hittable = absorbable = reflectable = false;
         keepVelocity = false;
