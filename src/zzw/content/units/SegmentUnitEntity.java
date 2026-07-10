@@ -1,5 +1,6 @@
 package zzw.content.units;
 
+import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
@@ -316,63 +317,93 @@ public class SegmentUnitEntity extends UnitEntity {
     }
 
     /**
-     * 段身自己绘制: 临时切换 type 的 region/outlineRegion/cellRegion, 然后调用 super.draw()
+     * ★ 段身 draw() 为空 (还原 PU132 WormSegmentUnit.draw L397-399 空方法)
      *
-     * 借鉴 PU132 UnityUnitType.draw 第342-347行:
-     * - 保存 type 原本的 region/outlineRegion/cellRegion
-     * - 临时切换为 segment/tail 贴图
-     * - 调用 super.draw() (会用切换后的 region 画)
-     * - 恢复
+     * PU132 原版架构:
+     * - WormSegmentUnit.add() 不加入 Groups.draw (L61 注释掉)
+     * - WormSegmentUnit.draw() 为空方法
+     * - 段身渲染由头部 UnityUnitType.drawBody() 驱动:
+     *   遍历 segmentUnits[], 设 Draw.z(z - (i+1)/10000), 调 segment.drawBody()
      *
-     * z 层级控制 (借鉴 PU132 UnityUnitType.drawBody 第669行):
-     * - 段身 0 z = 头部z - 1/10000 (头部覆盖第1节)
-     * - 段身 1 z = 头部z - 2/10000 (第1节覆盖第2节)
-     * - ...
-     * - 段身 n-1 z = 头部z - n/10000 (最低)
+     * ★ 为什么不能让段身在 Groups.draw 中自己绘制:
+     *   Mindustry 的 Draw 批处理在不同 entity 的 draw() 之间会 flush,
+     *   z-sorting 只在同一 flush (同一 entity 的 draw 调用) 内生效,
+     *   跨 entity 的 z 值不会被正确排序, 导致:
+     *   1) 渲染顺序错误 (高 index 段身后 flush 覆盖低 index 段身)
+     *   2) 段身可能被方块覆盖 (flush 顺序问题)
+     *
+     * ★ 正确做法: 段身 draw() 为空, 由头部 SegmentWormEntity.draw() 统一绘制所有段身
      */
     @Override
     public void draw() {
-        float z = Draw.z();
-        Draw.z(z - (segmentIndex + 1f) * 0.0001f);
+        // 空: 段身由头部 SegmentWormEntity.draw() 统一绘制
+    }
 
+    /**
+     * 段身实际绘制 (由头部 SegmentWormEntity.draw() 调用)
+     *
+     * 借鉴 PU132 WormSegmentUnit.drawBody (L366-381):
+     *   type.applyColor(this);
+     *   Draw.rect(region, this, rotation - 90);
+     *   if(segmentType == 0 && cellRegion != error) drawCell(cellRegion);
+     *   Draw.rect(outline, this, rotation - 90);
+     *
+     * ★ z 层级由头部设置: head.draw() 中 Draw.z(baseZ - (i+1)/10000) 后调用本方法
+     *   段身 0 z = 头部z - 1/10000 (头部覆盖第1节)
+     *   段身 1 z = 头部z - 2/10000 (第1节覆盖第2节)
+     *   ...
+     *   段身 n-1 z = 头部z - n/10000 (最低, 尾部)
+     */
+    public void drawBody() {
         mindustry.type.UnitType t = type;
+
+        // 保存 type 原本的字段
         TextureRegion oldRegion = t.region;
         TextureRegion oldOutline = t.outlineRegion;
         TextureRegion oldCell = t.cellRegion;
         boolean oldDrawCell = t.drawCell;
 
-        String p = texturePrefix;
-        String modP = "create-" + p;
-
+        // ★ 尾部: 查找 tail 贴图替换; 非尾部: 直接用 UnitType.load() 加载的段身贴图
         if (isTail) {
+            String p = texturePrefix;
+            String modP = "create-" + p;
             TextureRegion tailR = findRegion(p + "tail", modP + "tail");
             if (tailR.found()) t.region = tailR;
             TextureRegion tailO = findRegion(p + "tail-outline", modP + "tail-outline");
             if (tailO.found()) t.outlineRegion = tailO;
             t.drawCell = false;
-        } else {
-            TextureRegion cellR = findRegion(p + "cell", modP + "cell");
-            if (!cellR.found()) {
-                cellR = findRegion(p + "segment-cell", modP + "segment-cell");
-            }
-            if (cellR.found()) {
-                t.cellRegion = cellR;
-            }
         }
 
+        // 手动绘制 (参考 PU132 WormSegmentUnit.drawBody L366-381)
+        t.applyColor(this);
+        Draw.rect(t.region, x, y, rotation - 90);
+
+        // cell (非尾部, PU132 WormSegmentUnit.drawBody L372: segmentType == 0 时绘制)
+        if (!isTail && t.drawCell && t.cellRegion.found()) {
+            Draw.color(t.cellColor(this));
+            Draw.rect(t.cellRegion, x, y, rotation - 90);
+        }
+
+        // outline (PU132 WormSegmentUnit.drawBody L373-378)
+        if (t.outlineRegion.found()) {
+            Draw.color(Color.white);
+            Draw.rect(t.outlineRegion, x, y, rotation - 90);
+        }
+
+        // 段身武器 (PU132 UnityUnitType.drawBody L678: drawWeapons(segment))
         mindustry.entities.units.WeaponMount[] oldMounts = mounts;
         mindustry.entities.units.WeaponMount[] filteredMounts = filterMountsForSegment(oldMounts);
         mounts = filteredMounts;
-
-        super.draw();
-
+        t.drawWeapons(this);
         mounts = oldMounts;
 
+        // 恢复 type 字段
         t.region = oldRegion;
         t.outlineRegion = oldOutline;
         t.cellRegion = oldCell;
         t.drawCell = oldDrawCell;
 
+        // 液压杆 (WormDecal, PU132 UnityUnitType.drawBody L361)
         if (head != null && head.isAdded() && head.type != null) {
             WormDecal decal = SegmentWormEntity.wormDecals.get(head.type.name);
             if (decal != null) {
@@ -383,7 +414,7 @@ public class SegmentUnitEntity extends UnitEntity {
             }
         }
 
-        Draw.z(z);
+        Draw.reset();
     }
 
     /**

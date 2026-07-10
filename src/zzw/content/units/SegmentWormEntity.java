@@ -1150,88 +1150,71 @@ public class SegmentWormEntity extends UnitEntity {
     }
 
     /**
-     * 重写 draw(): 只画头部, 段身自己画 (SegmentUnitEntity.draw)
+     * ★ 头部绘制: 先画头部, 再统一绘制所有段身 (还原 PU132 UnityUnitType.drawBody L640-681)
      *
-     * 段身的 draw 会临时切换 type.region 为 segment/tail 贴图, 然后调用 super.draw()
-     * 这样段身用 UnitType 默认逻辑画, 贴图查找最可靠
+     * PU132 原版架构:
+     * - WormSegmentUnit.add() 不加入 Groups.draw (L61 注释掉)
+     * - WormSegmentUnit.draw() 为空方法 (L397-399)
+     * - 段身渲染由头部 UnityUnitType.drawBody() 驱动:
+     *   float z = Draw.z();  // 头部 z
+     *   for(int i = 0; i < segmentUnits.length; i++){
+     *       Draw.z(z - (i + 1f) / 10000f);  // 段身 z 递减
+     *       segmentUnits[i].drawBody();
+     *       drawWeapons(segmentUnits[i]);
+     *   }
      *
-     * ★ z 层级控制 (头部在最上方):
-     * - 头部 z = 当前z (由 Renderer 设置, 通常为 Layer.flyingUnit)
-     * - 段身 0 z = 头部z - (n+1)/10000 (最低, 离头部最远)
-     * - 段身 1 z = 头部z - n/10000
+     * ★ z 层级 (头部在最上方):
+     * - 头部 z = flyingLayer (由 super.draw() → UnitType.draw 设置)
+     * - 段身 0 z = flyingLayer - 1/10000 (紧贴头部下方, 最高段身)
+     * - 段身 1 z = flyingLayer - 2/10000
      * - ...
-     * - 段身 n-1 z = 头部z - 2/10000 (最高段身, 紧贴头部下方)
-     * - 头部贴图通过 Draw.draw() 推迟到最顶层绘制, 确保覆盖所有段身
+     * - 段身 n-1 z = flyingLayer - n/10000 (最低, 尾部)
+     * - 覆盖: 头部 > 段身0 > 段身1 > ... > 尾部
      *
-     * (借鉴 PU132 UnityUnitType.drawBody 第669行)
+     * ★ 关键: 段身必须由头部在同一 draw() 调用中绘制
+     *   Mindustry 的 Draw 批处理在不同 entity 的 draw() 之间会 flush,
+     *   z-sorting 只在同一 flush 内生效, 跨 entity 的 z 值不会被正确排序
+     *   所以段身不能在 Groups.draw 中自己绘制, 必须由头部统一绘制
      */
     @Override
     public void draw() {
-        // ★ 推迟头部贴图绘制到所有段身之后, 使用最高 z 覆盖段身
-        // 这样头部始终在最上方, 段身依次向下排列
-        float headZ = Draw.z();
-        int segCount = (segments != null) ? segments.length : 0;
-        // 头部贴图 z = 头部z + 0.001 (比所有段身都高)
-        float topHeadZ = headZ + 0.001f;
-        Draw.draw(topHeadZ, () -> {
-            float oldZ = Draw.z();
-            Draw.z(topHeadZ);
-            // 保存 type 原本的 region, 确保头部用头部贴图
-            mindustry.type.UnitType t = type;
-            TextureRegion oldRegion = t.region;
-            TextureRegion oldOutline = t.outlineRegion;
-            TextureRegion oldCell = t.cellRegion;
-            // 头部贴图就是 type 默认的 region (无前缀切换)
-            t.region = arc.Core.atlas.find(type.name);
-            if (t.region == null || !t.region.found()) {
-                t.region = arc.Core.atlas.find("create-" + type.name);
-            }
-            t.outlineRegion = arc.Core.atlas.find(type.name + "-outline");
-            if (t.outlineRegion == null || !t.outlineRegion.found()) {
-                t.outlineRegion = arc.Core.atlas.find("create-" + type.name + "-outline");
-            }
-            t.cellRegion = arc.Core.atlas.find(type.name + "-cell");
-            if (t.cellRegion == null || !t.cellRegion.found()) {
-                t.cellRegion = arc.Core.atlas.find("create-" + type.name + "-cell");
-            }
-            // 画头部贴图 (用 mounts 包含头部武器)
-            super.draw();
-            // 恢复
-            t.region = oldRegion;
-            t.outlineRegion = oldOutline;
-            t.cellRegion = oldCell;
-            Draw.z(oldZ);
-        });
+        // ★ 先绘制头部 (UnitType.draw 设置 z = flyingLayer, 绘制头部 body/cell/weapons)
+        super.draw();
 
-        // 立即画头部贴图 (会被段身覆盖, 但作为后备保留)
-        // 不再调用 super.draw(), 改用推迟绘制
+        // ★ 头部绘制完后, 统一绘制所有段身 (借鉴 PU132 UnityUnitType.drawBody L656-681)
+        if (segments.length > 0) {
+            float baseZ = type.flyingLayer;
+            for (int i = 0; i < segments.length; i++) {
+                SegmentUnitEntity seg = segments[i];
+                if (seg != null && seg.isAdded() && !seg.dead) {
+                    // ★ z 递减: 段身 0 最高 (紧贴头部), 段身 n-1 最低 (尾部)
+                    Draw.z(baseZ - (i + 1f) / 10000f);
+                    seg.drawBody();
+                }
+            }
+        }
 
         // ★ 再生建造动画 (参考 PU132 UnityUnitType.drawBody 第670-675行 + UnitSpawnAbility.draw)
-        // 当可再生时, 在尾部后面绘制扫描效果
         if (regenAvailable() && segments.length > 0) {
             SegmentUnitEntity tail = segments[segments.length - 1];
             if (tail != null && tail.isAdded()) {
                 arc.util.Tmp.v1.trns(tail.rotation + 180f, segmentSpacing).add(tail);
                 float sx = arc.util.Tmp.v1.x, sy = arc.util.Tmp.v1.y;
 
-                // 查找尾部贴图 (与 SegmentUnitEntity.draw 中相同的逻辑)
                 String p = texturePrefix != null ? texturePrefix : "arcnelidia-";
                 String modP = "create-" + p;
                 arc.graphics.g2d.TextureRegion tailRegion = findRegion(p + "tail", modP + "tail");
 
                 float progress = repairTime / regenTime;
-                // 在尾部段身 z 层级之下绘制 (更靠后), 避免与段身贴图重叠
-                float drawZ = Draw.z() - (segments.length + 2f) / 10000f;
+                float drawZ = type.flyingLayer - (segments.length + 2f) / 10000f;
 
                 Draw.draw(drawZ, () -> {
-                    // 1) 始终可见的脉动扫描圈 (progress 低时也看得见)
-                    float pulse = 0.6f + 0.4f * Mathf.sin(repairTime / 10f); // 脉动 0.6~1.0
-                    float radius = 6f + pulse * 8f; // 半径 6~14
+                    float pulse = 0.6f + 0.4f * Mathf.sin(repairTime / 10f);
+                    float radius = 6f + pulse * 8f;
                     Draw.color(mindustry.graphics.Pal.accent, pulse * 0.5f);
                     arc.graphics.g2d.Lines.stroke(2f * pulse);
                     arc.graphics.g2d.Lines.circle(sx, sy, radius);
 
-                    // 2) 扫描线 (随 progress 从底部扫到顶部)
                     float scanY = Mathf.lerp(-radius, radius, progress);
                     Draw.alpha(pulse * 0.7f);
                     arc.graphics.g2d.Lines.stroke(1.5f);
@@ -1239,7 +1222,6 @@ public class SegmentWormEntity extends UnitEntity {
 
                     Draw.reset();
 
-                    // 3) Drawf.construct 显示建造进度 (shader 裁剪, progress 低时很淡)
                     if (tailRegion.found()) {
                         mindustry.graphics.Drawf.construct(
                             sx, sy,
