@@ -220,6 +220,15 @@ public class SegmentUnitEntity extends UnitEntity {
     }
 
     @Override
+    public void heal(float amount) {
+        // 段身治疗时同步治疗头部 (借鉴 PU132 WormSegmentUnit.heal L146-151)
+        if (head != null && head.isAdded()) {
+            head.heal(amount);
+        }
+        super.heal(amount);
+    }
+
+    @Override
     public mindustry.gen.Player getPlayer() {
         // 段身的玩家 = 头部的玩家 (借鉴 PU132 WormSegmentUnit.getPlayer L135-138)
         if (head == null) return null;

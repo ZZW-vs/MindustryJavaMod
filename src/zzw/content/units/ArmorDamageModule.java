@@ -1,18 +1,23 @@
 package zzw.content.units;
 
+import mindustry.content.Fx;
+import mindustry.entities.abilities.Ability;
+import mindustry.entities.abilities.ForceFieldAbility;
 import mindustry.entities.abilities.ShieldRegenFieldAbility;
 import mindustry.gen.Bullet;
 import mindustry.gen.Unit;
 
 /**
- * PU132 护甲/护盾削减模块
- * - 削减单位护甲、护盾
- * - 削减 ShieldRegenFieldAbility 的最大护盾值
- * - 取 max(固定削减, 比例削减) 双管齐下
- * 参考: PU132 main/src/unity/entities/bullet/anticheat/modules/ArmorDamageModule.java
+ * 装甲/盾削弱模块 (移植自 PU132 ArmorDamageModule)
+ * - 削甲 (armor): 护甲降到 minimumArmorShield
+ * - 削盾 (shield): 护盾降到 minimumArmorShield
  */
 public class ArmorDamageModule implements AntiCheatBulletModule {
-    private final float armorDamage, shieldDamage, efficiencyDamage, ratioDamage;
+    private final float armorDamage;
+    private final float shieldDamage;
+    private final float efficiencyDamage;
+    private final float ratioDamage;
+
     private float minimumArmorShield = 20f;
     private float minimumEfficiency = 2f;
 
@@ -31,31 +36,29 @@ public class ArmorDamageModule implements AntiCheatBulletModule {
     }
 
     public ArmorDamageModule set(float minAS, float minE) {
-        minimumArmorShield = minAS;
-        minimumEfficiency = minE;
+        this.minimumArmorShield = minAS;
+        this.minimumEfficiency = minE;
         return this;
     }
 
     @Override
     public void hitUnit(Unit unit, Bullet bullet) {
-        // 削甲: 取 max(固定值, 比例值), 不低于最低值
-        if (unit.armor > minimumArmorShield) {
-            unit.armor = Math.max(unit.armor - Math.max(armorDamage, unit.armor * ratioDamage), 0f);
-            if (unit.armor < minimumArmorShield) unit.armor = minimumArmorShield;
+        if (unit.armor() > minimumArmorShield) {
+            unit.armor(Math.max(unit.armor() - Math.max(armorDamage, unit.armor() * ratioDamage), 0f));
+            if (unit.armor() < minimumArmorShield) unit.armor(minimumArmorShield);
         }
-        // 削盾
-        if (unit.shield > minimumArmorShield) {
-            unit.shield = Math.max(unit.shield - Math.max(shieldDamage, unit.shield * ratioDamage), 0f);
-            if (unit.shield < minimumArmorShield) unit.shield = minimumArmorShield;
+        if (unit.shield() > minimumArmorShield) {
+            unit.shield(Math.max(unit.shield() - Math.max(shieldDamage, unit.shield() * ratioDamage), 0f));
+            if (unit.shield() < minimumArmorShield) unit.shield(minimumArmorShield);
         }
     }
 
     @Override
-    public void handleAbility(mindustry.entities.abilities.Ability ability, Unit unit, Bullet bullet) {
-        // 削减护盾再生力场的最大值
+    public void handleAbility(Ability ability, Unit unit, Bullet bullet) {
         if (ability instanceof ShieldRegenFieldAbility s) {
             if (s.max > minimumEfficiency) {
-                s.max = Math.max(s.max - Math.max(efficiencyDamage, s.max * ratioDamage), 0f);
+                s.max = Math.max(minimumEfficiency,
+                    s.max - Math.max(efficiencyDamage, s.max * ratioDamage));
                 if (s.max < minimumEfficiency) s.max = minimumEfficiency;
             }
         }
