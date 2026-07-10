@@ -343,56 +343,40 @@ public class SegmentUnitEntity extends UnitEntity {
         //   覆盖关系: 头部覆盖第1节, 第1节覆盖第2节, 依次向下
         Draw.z(z - (segmentIndex + 1f) * 0.0001f);
 
-        // 调试: 只打一次贴图查找结果
+        // 调试: 只打一次贴图状态
         if (!debugDrawLogged) {
             debugDrawLogged = true;
             String p = texturePrefix;
-            String mp = "create-" + p;
-            String[] names = {
-                p + "segment", mp + "segment",
-                p + "tail", mp + "tail",
-                p + "segment-outline", mp + "segment-outline",
-                p + "tail-outline", mp + "tail-outline",
-                p + "cell", mp + "cell",
-                p + "segment-cell", mp + "segment-cell"
-            };
-            StringBuilder found = new StringBuilder();
-            for (String n : names) {
-                try {
-                    if (arc.Core.atlas.find(n).found()) {
-                        if (found.length() > 0) found.append(", ");
-                        found.append(n);
-                    }
-                } catch (Throwable ignored) {}
-            }
-            System.out.println("[段身] 贴图: 前缀=" + p + " 尾部=" + isTail + " 找到=" + found);
+            System.out.println("[段身] 贴图调试: 前缀=" + p + " 尾部=" + isTail
+                + " type.region.found=" + type.region.found()
+                + " type.outline.found=" + type.outlineRegion.found()
+                + " type.cell.found=" + type.cellRegion.found());
         }
 
-        // 保存 type 原本的 region 字段
+        // 保存 type 原本的字段
         mindustry.type.UnitType t = type;
         TextureRegion oldRegion = t.region;
         TextureRegion oldOutline = t.outlineRegion;
         TextureRegion oldCell = t.cellRegion;
+        boolean oldDrawCell = t.drawCell;
 
-        // 临时切换 region (借鉴 PU132 UnityUnitType.draw 第344-347行)
-        String p = texturePrefix;
-        String modP = "create-" + p;
-        String unitDir = "units/" + p.substring(0, p.length() - 1) + "/";  // "units/toxobyte/"
-        String modUnitDir = "create-units/" + p.substring(0, p.length() - 1) + "/";  // "create-units/toxobyte/"
+        // ★ 非尾部: 段身 UnitType 自身的 region/outline/cell 已经是正确的段身贴图
+        //    (Mindustry 在 UnitType.load() 时已加载 xxx-segment / xxx-segment-outline / xxx-segment-cell)
+        //    不需要额外替换, 避免 atlas.find 失败导致 error
+        // ★ 尾部: 才需要查找 tail 贴图替换
         if (isTail) {
-            t.region = findRegion(unitDir + p + "tail", modUnitDir + p + "tail");
-            t.outlineRegion = findRegion(unitDir + p + "tail-outline", modUnitDir + p + "tail-outline");
-        } else {
-            t.region = findRegion(unitDir + p + "segment", modUnitDir + p + "segment");
-            t.outlineRegion = findRegion(unitDir + p + "segment-outline", modUnitDir + p + "segment-outline");
-            // ★ cell 贴图查找: 使用正确的 atlas 路径
-            //   文件路径: assets/sprites/units/toxobyte/toxobyte-segment-cell.png
-            //   atlas 路径: units/toxobyte/toxobyte-segment-cell
-            TextureRegion cellR = findRegion(unitDir + p + "cell", modUnitDir + p + "cell");
-            if (!cellR.found()) {
-                cellR = findRegion(unitDir + p + "segment-cell", modUnitDir + p + "segment-cell");
+            String p = texturePrefix;
+            String modP = "create-" + p;
+            TextureRegion tailR = findRegion(p + "tail", modP + "tail");
+            if (tailR.found()) {
+                t.region = tailR;
             }
-            t.cellRegion = cellR;
+            TextureRegion tailO = findRegion(p + "tail-outline", modP + "tail-outline");
+            if (tailO.found()) {
+                t.outlineRegion = tailO;
+            }
+            // 尾部不绘制 cell (PU132 原版行为)
+            t.drawCell = false;
         }
 
         // 按 segmentIndex 过滤段身武器
@@ -400,30 +384,28 @@ public class SegmentUnitEntity extends UnitEntity {
         mindustry.entities.units.WeaponMount[] filteredMounts = filterMountsForSegment(oldMounts);
         mounts = filteredMounts;
 
-        // 调用 super.draw() 会用切换后的 region 画
+        // 调用 super.draw() 绘制 (非尾部使用 UnitType 自身已加载的段身贴图)
         super.draw();
 
         // 恢复 mounts
         mounts = oldMounts;
 
-        // 恢复 type 的 region 字段
+        // 恢复 type 的字段
         t.region = oldRegion;
         t.outlineRegion = oldOutline;
         t.cellRegion = oldCell;
+        t.drawCell = oldDrawCell;
 
         // ★ 液压装饰: 恢复原版 PU132 绘制方式, 不分层
-            // PU132 UnityUnitType.drawWorm 第361行: if(wormDecal != null) wormDecal.draw(unit, unit.parent());
-            // base=段身, other=父段, 使用相同的 z 层级
-            // 原版不区分前后段的 z 层级, 只绘制线条和贴图
-            if (head != null && head.isAdded() && head.type != null) {
-                WormDecal decal = SegmentWormEntity.wormDecals.get(head.type.name);
-                if (decal != null) {
-                    mindustry.gen.Unit parent = getParentSegment();
-                    if (parent != null) {
-                        decal.draw(this, parent);
-                    }
+        if (head != null && head.isAdded() && head.type != null) {
+            WormDecal decal = SegmentWormEntity.wormDecals.get(head.type.name);
+            if (decal != null) {
+                mindustry.gen.Unit parent = getParentSegment();
+                if (parent != null) {
+                    decal.draw(this, parent);
                 }
             }
+        }
 
         // 恢复 z
         Draw.z(z);

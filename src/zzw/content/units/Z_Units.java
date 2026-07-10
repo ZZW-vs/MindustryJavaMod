@@ -633,11 +633,10 @@ public class Z_Units {
         // PU132: segmentLength=60, segmentOffset=(41f*1.55)+7f ≈ 70.55f
         // PU132: splittable=false, chainable=false (不可分裂合并)
         // PU132: 无 regen (初始就60段)
-        // PU132 原版: segmentCast=7, anglePhysicsSmooth=0.5f, jointStrength=1f, preventDrifting=true
-        // ★ segmentCast=18, jointStrength=0.5f (60段需要更大传播范围, 减小关节强度防止脱节)
+        // PU132 原版: segmentCast=7, anglePhysicsSmooth=0.5f, jointStrength=1f, preventDrifting=true, headOffset=27.75f
         SegmentWormEntity.configs.put(devourer.name,
             new SegmentWormEntity.SegmentConfig(devourerSegment, 60, 70.55f, 0f, 60, false, false, false,
-                30f, 6f, 0.1f, 0.5f, 18, 0.5f, true, 0f, 240f));
+                30f, 6f, 0.1f, 1f, 7, 0.5f, true, 27.75f, 240f));
         // 吞噬者: 每秒回120血
         SegmentWormEntity.configs.get(devourer.name).healPerSecond = 120f;
         // 吞噬者: 受到伤害 × 0.9 (减伤10%)
