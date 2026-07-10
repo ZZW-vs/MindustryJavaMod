@@ -183,22 +183,22 @@ public class WormDecal {
                             if (r.found()) {
                                 float p = (i + 1f) / (segments + 1f);
                                 v1.set(bx, by).lerp(ex, ey, p);
-                                // z插值: base端(0) → oldZ - 0.5/10000, end端(1) → oldZ + 0.5/10000
-                                float zInterp = Mathf.lerp(oldZ - 0.5f/10000f, oldZ + 0.5f/10000f, p);
+                                // z插值: base端(0) → oldZ - 0.00005, end端(1) → oldZ + 0.00005
+                                float zInterp = Mathf.lerp(oldZ - 0.00005f, oldZ + 0.00005f, p);
                                 Draw.z(zInterp);
                                 Draw.rect(r, v1.x, v1.y, angle);
                             }
                         }
                     }
 
-                    // ★ end端(父段): 在单位贴图上方
-                    Draw.z(oldZ + 0.5f/10000f);
+                    // ★ end端(父段): 在段身贴图上方
+                    Draw.z(oldZ + 0.00005f);
                     if (endRegion.found()) {
                         Draw.rect(endRegion, ex, ey, angle + 180f);
                     }
 
-                    // ★ base端(当前段身): 在单位贴图下方
-                    Draw.z(oldZ - 0.5f/10000f);
+                    // ★ base端(当前段身): 在段身贴图下方
+                    Draw.z(oldZ - 0.00005f);
                     if (baseRegion.found()) {
                         Draw.rect(baseRegion, bx, by, angle);
                     }

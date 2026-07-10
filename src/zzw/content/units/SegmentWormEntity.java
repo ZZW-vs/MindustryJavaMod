@@ -1,6 +1,7 @@
 package zzw.content.units;
 
 import arc.graphics.g2d.Draw;
+import arc.graphics.g2d.TextureRegion;
 import arc.math.Angles;
 import arc.math.Mathf;
 import arc.math.geom.Vec2;
@@ -1154,22 +1155,56 @@ public class SegmentWormEntity extends UnitEntity {
      * 段身的 draw 会临时切换 type.region 为 segment/tail 贴图, 然后调用 super.draw()
      * 这样段身用 UnitType 默认逻辑画, 贴图查找最可靠
      *
-     * z 层级控制:
-     * - 头部 z = Layer.flyingUnit (默认)
-     * - 段身 0 z = 头部z - 1/10000 (头部覆盖第1节)
-     * - 段身 1 z = 头部z - 2/10000 (第1节覆盖第2节)
+     * ★ z 层级控制 (头部在最上方):
+     * - 头部 z = 当前z (由 Renderer 设置, 通常为 Layer.flyingUnit)
+     * - 段身 0 z = 头部z - (n+1)/10000 (最低, 离头部最远)
+     * - 段身 1 z = 头部z - n/10000
      * - ...
+     * - 段身 n-1 z = 头部z - 2/10000 (最高段身, 紧贴头部下方)
+     * - 头部贴图通过 Draw.draw() 推迟到最顶层绘制, 确保覆盖所有段身
      *
      * (借鉴 PU132 UnityUnitType.drawBody 第669行)
      */
     @Override
     public void draw() {
-        // 只画头部, 段身会自己画
-        super.draw();
+        // ★ 推迟头部贴图绘制到所有段身之后, 使用最高 z 覆盖段身
+        // 这样头部始终在最上方, 段身依次向下排列
+        float headZ = Draw.z();
+        int segCount = (segments != null) ? segments.length : 0;
+        // 头部贴图 z = 头部z + 0.001 (比所有段身都高)
+        float topHeadZ = headZ + 0.001f;
+        Draw.draw(topHeadZ, () -> {
+            float oldZ = Draw.z();
+            Draw.z(topHeadZ);
+            // 保存 type 原本的 region, 确保头部用头部贴图
+            mindustry.type.UnitType t = type;
+            TextureRegion oldRegion = t.region;
+            TextureRegion oldOutline = t.outlineRegion;
+            TextureRegion oldCell = t.cellRegion;
+            // 头部贴图就是 type 默认的 region (无前缀切换)
+            t.region = arc.Core.atlas.find(type.name);
+            if (t.region == null || !t.region.found()) {
+                t.region = arc.Core.atlas.find("create-" + type.name);
+            }
+            t.outlineRegion = arc.Core.atlas.find(type.name + "-outline");
+            if (t.outlineRegion == null || !t.outlineRegion.found()) {
+                t.outlineRegion = arc.Core.atlas.find("create-" + type.name + "-outline");
+            }
+            t.cellRegion = arc.Core.atlas.find(type.name + "-cell");
+            if (t.cellRegion == null || !t.cellRegion.found()) {
+                t.cellRegion = arc.Core.atlas.find("create-" + type.name + "-cell");
+            }
+            // 画头部贴图 (用 mounts 包含头部武器)
+            super.draw();
+            // 恢复
+            t.region = oldRegion;
+            t.outlineRegion = oldOutline;
+            t.cellRegion = oldCell;
+            Draw.z(oldZ);
+        });
 
-        // ★ 液压装饰 (WormDecal) 已移到 SegmentUnitEntity.draw() 中绘制
-        // PU132: wormDecal.draw(unit, unit.parent()) → base=段身, other=头部
-        // 段身 draw 时绘制, 而非头部 draw 时
+        // 立即画头部贴图 (会被段身覆盖, 但作为后备保留)
+        // 不再调用 super.draw(), 改用推迟绘制
 
         // ★ 再生建造动画 (参考 PU132 UnityUnitType.drawBody 第670-675行 + UnitSpawnAbility.draw)
         // 当可再生时, 在尾部后面绘制扫描效果

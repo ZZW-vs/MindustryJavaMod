@@ -333,14 +333,17 @@ public class SegmentUnitEntity extends UnitEntity {
     @Override
     public void draw() {
         float z = Draw.z();
-        // ★ 段身 z 层级: 头部最高, 段身递减
-        //   头部 z = 当前z (最高)
-        //   段身 0 z = 头部z - 1/10000
-        //   段身 1 z = 头部z - 2/10000
+        // ★ 段身 z 层级: 段身依次低于头部
+        //   头部 z = headZ + 0.001 (通过 Draw.draw() 推迟绘制, 最高)
+        //   段身 0 z = headZ - 0.0001 (最低, 离头部最远, 最靠后)
+        //   段身 1 z = headZ - 0.0002
         //   ...
-        //   尾部 z = 头部z - n/10000 (最低)
-        //   这样头部覆盖第1节, 第1节覆盖第2节, 形成"从上到下"的渲染顺序
-        Draw.z(z - (segmentIndex + 1f) / 10000f);
+        //   段身 n-1 z = headZ - 0.0001 * n (倒数第2低, 紧贴头部)
+        //   头部贴图通过 Draw.draw() 用 headZ + 0.001 在所有段身之后绘制
+        //   这样从前到后: 头部在最上方, 段身依次向下排列
+        // 实际上, segmentIndex=0 应该是最高段身(紧贴头部), segmentIndex=n-1 应该是最低段身(尾部)
+        // 但为了保持从前到后的渲染顺序(头部覆盖), 段身 z 需要从前往后递减
+        Draw.z(z - (segmentIndex + 1f) * 0.0001f);
 
         // 调试: 只打一次贴图查找结果
         if (!debugDrawLogged) {
