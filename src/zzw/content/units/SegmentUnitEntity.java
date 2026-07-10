@@ -179,7 +179,7 @@ public class SegmentUnitEntity extends UnitEntity {
     @Override
     public void damage(float amount) {
         if (head != null && head.isAdded() && !head.splittable) {
-            // 非分裂模式: 伤害转移给头部
+            // 非分裂模式: 伤害转移给头部 (头部有防作弊)
             head.damage(amount);
             return;
         }
@@ -193,10 +193,47 @@ public class SegmentUnitEntity extends UnitEntity {
     }
 
     @Override
+    public void damagePierce(float amount) {
+        // ★ 修复: damagePierce 绕过 damage() 重写, 必须也重定向到头部
+        // (借鉴 PU132 EndWormSegmentUnit 所有伤害方法都走 trueParentUnit)
+        if (head != null && head.isAdded() && !head.splittable) {
+            head.damagePierce(amount);
+            return;
+        }
+        float scl = (head != null) ? head.segmentDamageScl : 1f;
+        super.damagePierce(amount * scl);
+        if (head != null && head.isAdded()) {
+            head.damagePierce(amount);
+        }
+    }
+
+    @Override
+    public void damageContinuous(float amount) {
+        // ★ 修复: damageContinuous 也需要重定向
+        if (head != null && head.isAdded() && !head.splittable) {
+            head.damageContinuous(amount);
+            return;
+        }
+        float scl = (head != null) ? head.segmentDamageScl : 1f;
+        super.damageContinuous(amount * scl);
+        if (head != null && head.isAdded()) {
+            head.damageContinuous(amount);
+        }
+    }
+
+    @Override
     public void kill() {
         if (dead) return;
+        // ★ 修复: PU132 原版 EndWormSegmentUnit.kill() 杀的是头部而不是段身
+        // Call.unitDeath(trueParentUnit.id); Call.unitDeath(id);
+        // 非分裂模式: 段身不能被单独杀死, 只有头部能死
+        if (head != null && head.isAdded() && !head.splittable) {
+            // 通知头部被攻击致死 (走头部的 kill, 有防秒杀)
+            head.kill();
+            return;
+        }
+        // 分裂模式: 段身可以独立死亡, 触发分裂
         dead = true;
-        // 通知头部: 我死了, 请重新分配段身列表
         if (head != null && head.isAdded()) {
             head.onSegmentDied(this);
         }
