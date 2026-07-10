@@ -66,7 +66,7 @@ public class WormAI extends CommandAI {
             targetPos = new Vec2(pos);
         }
 
-        // ===== 移动逻辑 (龙的穿梭攻击方式) =====
+        // ===== 移动逻辑 (龙的穿梭+盘旋攻击方式) =====
         if (attackTarget != null) {
             target = attackTarget;
             if (targetPos == null) targetPos = new Vec2();
@@ -76,6 +76,18 @@ public class WormAI extends CommandAI {
             float targetAngle = unit.angleTo(attackTarget);
             float angleDiff = Angles.angleDist(unit.rotation, targetAngle);
             float engageRange = unit.type.range - 10f;
+
+            // ★ 盘旋半径: 根据单位大小自动判定
+            // 单位总长度 ≈ segmentSpacing * 段数, 盘旋半径 = 总长度的 40% + hitSize
+            // 至少为 engageRange * 0.5 (保证在攻击范围内)
+            float orbitRadius = engageRange * 0.55f;
+            if (unit instanceof SegmentWormEntity) {
+                SegmentWormEntity worm = (SegmentWormEntity) unit;
+                if (worm.segments.length > 0) {
+                    float totalLength = worm.segmentSpacing * worm.segments.length;
+                    orbitRadius = Math.max(orbitRadius, totalLength * 0.4f + unit.hitSize);
+                }
+            }
 
             // ★ 边界检测: 接近地图边缘时强制朝目标方向快速转向
             float margin = 300f;
@@ -99,16 +111,19 @@ public class WormAI extends CommandAI {
                 // 朝当前朝向移动 (龙飞行姿态)
                 vec.trns(unit.rotation, unit.speed());
                 unit.moveAt(vec);
-            } else {
-                // ★ 阶段2: 进入攻击范围 → 穿梭折返攻击
-                //   像龙一样: 冲过目标 → 甩尾折返 → 再冲回来
-                attack(engageRange);
-
-                // 头部转向目标
+            } else if (distance > orbitRadius) {
+                // ★ 阶段2: 在攻击范围内但离目标较远 → 朝目标冲近
                 boolean isUlt = (unit instanceof SegmentWormEntity) && ((SegmentWormEntity) unit).isUltActive();
                 float ultScl = isUlt ? ((SegmentWormEntity) unit).ultSpeedMultiplier() : 1f;
-                float turnSpeed = 0.05f * ultScl;
-                unit.rotation = Mathf.slerpDelta(unit.rotation, unit.angleTo(attackTarget), turnSpeed);
+                float turnSpeed = 0.06f * ultScl;
+                unit.rotation = Mathf.slerpDelta(unit.rotation, targetAngle, turnSpeed);
+                vec.trns(unit.rotation, unit.speed());
+                unit.moveAt(vec);
+            } else {
+                // ★ 阶段3: 进入盘旋半径 → 围绕目标盘旋攻击
+                //   盘旋方向: 垂直于目标方向 (切线方向)
+                //   旋转速度根据单位大小调整: 大单位转慢, 小单位转快
+                orbitAttack(attackTarget, orbitRadius);
             }
         } else if (targetPos != null) {
             // 玩家移动命令 / 记仇位置
@@ -177,13 +192,11 @@ public class WormAI extends CommandAI {
             }
         } else {
             // 继续朝目标冲刺: 加入正弦波摆动, 模拟龙飞行时的身体起伏
-            // 摆动幅度: 8~15度, 频率: 0.3~0.5 Hz, 每个单位有独立相位
             if (weavePhase == 0f) weavePhase = unit.id * 0.5f;
             float weaveFreq = 0.004f + Mathf.randomSeed(unit.id, 0.002f);
             float weaveAmp = 10f + Mathf.randomSeed(unit.id + 1, 5f);
             float weave = Mathf.sin(Time.time * weaveFreq + weavePhase) * weaveAmp;
 
-            // 轻微调整方向, 模拟龙飞行时的自然摆动
             float desiredRot = unit.rotation + weave * 0.015f;
             unit.rotation = Mathf.slerpDelta(unit.rotation, desiredRot, 0.03f);
         }
@@ -191,6 +204,60 @@ public class WormAI extends CommandAI {
         // 沿当前朝向移动
         vec.trns(unit.rotation, unit.speed());
         unit.moveAt(vec);
+    }
+
+    /**
+     * ★ 盘旋攻击 (围绕目标做圆周运动)
+     *
+     * - 在 orbitRadius 处围绕目标盘旋
+     * - 朝向: 切线方向 (垂直于到目标的方向)
+     * - 盘旋速度: 根据单位大小调整, 大单位转慢, 小单位转快
+     * - 加入轻微径向修正, 保持距离稳定
+     */
+    protected void orbitAttack(Teamc target, float orbitRadius) {
+        float angleToTarget = unit.angleTo(target);
+        float distance = unit.dst(target);
+
+        // ★ 切线方向: 垂直于到目标的方向 (weaveSide 决定顺时针/逆时针)
+        float tangentAngle = angleToTarget + 90f * weaveSide;
+
+        // ★ 径向修正: 距离过远时朝目标拉近, 过近时推远
+        float radialCorrection = 0f;
+        if (distance > orbitRadius * 1.2f) {
+            // 太远: 朝目标方向修正
+            radialCorrection = -15f;
+        } else if (distance < orbitRadius * 0.8f) {
+            // 太近: 背离目标方向修正
+            radialCorrection = 15f;
+        }
+        float desiredAngle = tangentAngle + radialCorrection;
+
+        // ★ 旋转速度: 大单位转慢, 小单位转快
+        // base 0.08f, 根据段身数衰减
+        float turnSpeed = 0.08f;
+        if (unit instanceof SegmentWormEntity) {
+            SegmentWormEntity worm = (SegmentWormEntity) unit;
+            int segCount = worm.segments.length;
+            // 段数越多转越慢, 但不低于 0.04f
+            turnSpeed = Math.max(0.04f, 0.08f - segCount * 0.003f);
+
+            // 大招期间减速
+            if (worm.isUltActive()) {
+                turnSpeed *= worm.ultSpeedMultiplier();
+            }
+        }
+
+        unit.rotation = Mathf.slerpDelta(unit.rotation, desiredAngle, turnSpeed);
+
+        // 沿当前朝向移动
+        vec.trns(unit.rotation, unit.speed());
+        unit.moveAt(vec);
+
+        // 随机切换盘旋方向 (每 10-20 秒切换一次, 增加生动性)
+        if (Time.time - lastWeaveSwitch > 600f + Mathf.random(600f)) {
+            weaveSide *= -1;
+            lastWeaveSwitch = Time.time;
+        }
     }
 
     /**

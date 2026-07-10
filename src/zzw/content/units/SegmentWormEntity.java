@@ -217,6 +217,16 @@ public class SegmentWormEntity extends UnitEntity {
     /** 贴图前缀缓存 (type.name + "-", 用于快速查找段身贴图) */
     protected String texturePrefix = null;
 
+    // ===== 防作弊系统 (移植自 PU132 EndWormUnit) =====
+    /** 真实血量 (防止被外部代码直接修改 health 秒杀) */
+    protected float lastHealth = 0f;
+    /** 无敌帧计时器 (30帧内免疫伤害, PU132 EndWormUnit.invTime) */
+    protected float invTime = 0f;
+    /** 抗性 (受击递增, 缓慢衰减, PU132 EndWormUnit.immunity) */
+    protected float immunity = 1f;
+    /** 流氓伤害抗性 (受击递增, 缓慢衰减, PU132 EndWormUnit.rogueDamageResist) */
+    protected float rogueDamageResist = 1f;
+
     /** 液压装饰 (WormDecal), 按头部 type.name 查找 (仅 oppression 有, 其他单位为 null) */
     public static final arc.struct.ObjectMap<String, WormDecal> wormDecals = new arc.struct.ObjectMap<>();
 
@@ -380,7 +390,19 @@ public class SegmentWormEntity extends UnitEntity {
         // PU132 WormDefaultUnit.update L71-72: 保存速度历史 (用于 updateSegmentVLocal 3 帧平均)
         lastVelocityD.set(lastVelocityC);
         lastVelocityC.set(vel);
+
+        // ★ 防秒杀: 血量保护 (PU132 EndWormUnit.update L32-36)
+        // 防止外部代码直接修改 health 秒杀, health 不能低于 lastHealth
+        if (lastHealth > health) health = lastHealth;
+        if (lastHealth > 0f) dead = false;
+        lastHealth = health;
+
         super.update();
+
+        // ★ 防秒杀: 抗性衰减 (PU132 EndWormUnit.update L38-43)
+        invTime += Time.delta;
+        immunity = Math.max(1f, immunity - (Time.delta / 4f));
+        rogueDamageResist = Math.max(1f, rogueDamageResist - (Time.delta / 2f));
 
         // ★ 待机静止: super.update() 后检查
         // ★ 关键修复: super.update() 前不清零 vel, 否则会抵消 AI 上一帧设置的速度
@@ -590,7 +612,18 @@ public class SegmentWormEntity extends UnitEntity {
         segments[oldLen] = newSeg;
     }
 
-    /** 受伤降低血量分布效率 (PU132 WormDefaultUnit.damage L64-67) */
+    /**
+     * ★ 防秒杀 damage (移植自 PU132 EndWormUnit.damage L103-113)
+     *
+     * 三层防护:
+     * 1. 无敌帧 (30帧内免疫, invTime < 30f 时直接 return)
+     * 2. 单次最大伤害限制 = max(220, maxHealth/700), 超过部分转化为抗性
+     * 3. 抗性递增 (immunity + rogueDamageResist), 缓慢衰减
+     *
+     * 这样即使被代码 damage(99999999) 也不会被秒杀:
+     * - 99999999 / immunity / rogueDamageResist 后 clamp 到 max
+     * - 超出 max 的部分转化为 immunity 指数增长
+     */
     @Override
     public void damage(float amount) {
         // ★ 伤害减免
@@ -598,8 +631,64 @@ public class SegmentWormEntity extends UnitEntity {
         if (cfg != null && cfg.damageMultiplier != 1f) {
             amount *= cfg.damageMultiplier;
         }
-        super.damage(amount);
+
+        // ★ 防秒杀: 无敌帧内免疫 (PU132 EndWormUnit L104)
+        if (invTime < 30f) return;
+        invTime = 0f;
+
+        // ★ 单次最大伤害 = max(220, 最大血量/700) (PU132 EndWormUnit L106)
+        float max = Math.max(220f, lastHealth / 700f);
+
+        // ★ 抗性减免后 clamp 限制 (PU132 EndWormUnit L107)
+        float trueDamage = Mathf.clamp((amount / immunity) / rogueDamageResist, 0f, max);
+
+        // ★ 抗性递增 (PU132 EndWormUnit L108-110)
+        rogueDamageResist += 1.5f;
+        max *= 1.5f;
+        immunity += Math.pow(Math.max(amount - max, 0f) / max, 2) * 2f;
+
+        // ★ 扣真实血量
+        lastHealth -= trueDamage;
+        super.damage(trueDamage);
         healthDistributionEfficiency = Mathf.clamp(healthDistributionEfficiency - (amount / 15f));
+    }
+
+    /**
+     * ★ 死亡拒绝 (移植自 PU132 EndWormUnit.kill/destroy L46-62)
+     * 真实血量 > 0 时拒绝死亡, 增加大量抗性
+     */
+    @Override
+    public void kill() {
+        if (lastHealth > 0f) {
+            immunity += 3500f;
+            dead = false;
+            return;
+        }
+        super.kill();
+    }
+
+    /**
+     * ★ 死亡拒绝 + 销毁段身
+     * 真实血量 > 0 时拒绝死亡 (PU132 EndWormUnit.destroy L47-53)
+     * 真正死亡时销毁所有段身 (PU132 WormDefaultUnit.destroy L234-267, 简化版)
+     */
+    @Override
+    public void destroy() {
+        if (lastHealth > 0f) {
+            immunity += 3500f;
+            return;
+        }
+        super.destroy();
+        // 销毁所有段身
+        for (SegmentUnitEntity seg : segments) {
+            if (seg == null || !seg.isAdded()) continue;
+            seg.head = null;
+            float shake = seg.hitSize / 3f;
+            Fx.explosion.at(seg);
+            Effect.shake(shake, shake, seg);
+            type.deathSound.at(seg);
+            seg.remove();
+        }
     }
 
     /** 获取段身 (index=-1 表示头部自己, PU132 WormDefaultUnit.getSegment L204-208) */
@@ -688,6 +777,10 @@ public class SegmentWormEntity extends UnitEntity {
             //   然后 updateSegmentsLocal 又重置位置, 造成每帧抖动
             // segVelocities 是内部物理模拟用的, 段身实体 vel 保持为零
             // segments[i].vel.set(segV);
+
+            // ★ 速度衰减 (PU132 WormDefaultUnit.updateSegmentsLocal L142/L160)
+            //   防止 segVelocities 无限增长导致抖动
+            segV.scl(Mathf.clamp(1f - (segmentDrag * arc.util.Time.delta)));
         }
     }
 
@@ -809,25 +902,14 @@ public class SegmentWormEntity extends UnitEntity {
         return angle;
     }
 
-    @Override
-    public void destroy() {
-        super.destroy();
-        // 销毁所有段身 (借鉴 PU132 WormDefaultUnit.destroy L234-267, 简化版)
-        for (SegmentUnitEntity seg : segments) {
-            if (seg == null || !seg.isAdded()) continue;
-            seg.head = null;  // 避免段身死亡时再通知头部
-            // 段身位置爆炸特效 (简化版, 不做 item 爆炸/wreck decal)
-            float shake = seg.hitSize / 3f;
-            Fx.explosion.at(seg);
-            Effect.shake(shake, shake, seg);
-            type.deathSound.at(seg);
-            seg.remove();
-        }
-    }
-
-    /** 重写 remove(): 确保所有段身也被移除 (借鉴 PU132 WormDefaultUnit.remove L270-276) */
+    /** 重写 remove(): 确保所有段身也被移除 (借鉴 PU132 WormDefaultUnit.remove L270-276)
+     *  ★ 防秒杀: lastHealth > 0 时拒绝移除 (PU132 EndWormUnit.remove L72-85) */
     @Override
     public void remove() {
+        if (lastHealth > 0f) {
+            immunity += 3500f;
+            return;
+        }
         super.remove();
         for (SegmentUnitEntity seg : segments) {
             if (seg != null && seg.isAdded()) {
@@ -1090,6 +1172,10 @@ public class SegmentWormEntity extends UnitEntity {
         super.add();
         // 缓存贴图前缀
         if (type != null) texturePrefix = type.name + "-";
+        // ★ 防秒杀: 初始化真实血量 (PU132 EndWormUnit.setType L90)
+        if (lastHealth <= 0f && type != null) {
+            lastHealth = type.health;
+        }
         // 在头部被添加到世界时创建段身 (优先用 configs Map, 否则用旧静态字段)
         if (!segmentsCreated && segments.length == 0) {
             SegmentConfig cfg = type != null ? configs.get(type.name) : null;
