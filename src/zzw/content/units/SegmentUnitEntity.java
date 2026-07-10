@@ -333,8 +333,13 @@ public class SegmentUnitEntity extends UnitEntity {
     @Override
     public void draw() {
         float z = Draw.z();
-        // 每段降低 z (segmentIndex+1)/10000, 头部 z 最高, 段身递减
-        // 这样头部覆盖第1节, 第1节覆盖第2节, ...
+        // ★ 段身 z 层级: 头部最高, 段身递减
+        //   头部 z = 当前z (最高)
+        //   段身 0 z = 头部z - 1/10000
+        //   段身 1 z = 头部z - 2/10000
+        //   ...
+        //   尾部 z = 头部z - n/10000 (最低)
+        //   这样头部覆盖第1节, 第1节覆盖第2节, 形成"从上到下"的渲染顺序
         Draw.z(z - (segmentIndex + 1f) / 10000f);
 
         // 调试: 只打一次贴图查找结果
@@ -369,19 +374,14 @@ public class SegmentUnitEntity extends UnitEntity {
         TextureRegion oldCell = t.cellRegion;
 
         // 临时切换 region (借鉴 PU132 UnityUnitType.draw 第344-347行)
-        // 尝试两种名字: 不带前缀 / 带 mod 前缀 (Mindustry 会给 mod 贴图加 modname- 前缀)
-        String p = texturePrefix;  // 头部名字 + "-" (如 "arcnelidia-" / "toxobyte-")
-        String modP = "create-" + p;  // 加 mod 前缀 (如 "create-arcnelidia-")
+        String p = texturePrefix;
+        String modP = "create-" + p;
         if (isTail) {
             t.region = findRegion(p + "tail", modP + "tail");
             t.outlineRegion = findRegion(p + "tail-outline", modP + "tail-outline");
         } else {
             t.region = findRegion(p + "segment", modP + "segment");
             t.outlineRegion = findRegion(p + "segment-outline", modP + "segment-outline");
-            // ★ cell 贴图查找: 两种命名都试
-            //   arcnelidia 原版: "arcnelidia-cell" (PU132 风格, 文件名 arcnelidia-cell.png)
-            //   toxobyte 原版: "toxobyte-segment-cell" (文件名 toxobyte-segment-cell.png)
-            // ★ 规则: 修改时不能只改一种而破坏另一种, 必须两种都兼容 ★
             TextureRegion cellR = findRegion(p + "cell", modP + "cell");
             if (!cellR.found()) {
                 cellR = findRegion(p + "segment-cell", modP + "segment-cell");
@@ -389,11 +389,7 @@ public class SegmentUnitEntity extends UnitEntity {
             t.cellRegion = cellR;
         }
 
-        // ★ 段身武器分配 (PU132 UnityUnitType 第170行)
-        // PU132: segmentWeapons 是 Seq<Weapon>[], 段身按 weaponIdx 选择武器组
-        //   idx = i >= segmentLength - 1 ? segmentWeapons.length - 1 : i % max(1, segmentWeapons.length - 1)
-        // 当前项目: 所有段身共享 type.weapons, 需要按 segmentIndex 过滤
-        // 简化方案: 把段身 weapons 按 groupSize 分组, 每段只绘制对应组
+        // 按 segmentIndex 过滤段身武器
         mindustry.entities.units.WeaponMount[] oldMounts = mounts;
         mindustry.entities.units.WeaponMount[] filteredMounts = filterMountsForSegment(oldMounts);
         mounts = filteredMounts;
@@ -404,22 +400,20 @@ public class SegmentUnitEntity extends UnitEntity {
         // 恢复 mounts
         mounts = oldMounts;
 
-        // 恢复 type 的 region 字段 (避免影响其他段身或头部)
+        // 恢复 type 的 region 字段
         t.region = oldRegion;
         t.outlineRegion = oldOutline;
         t.cellRegion = oldCell;
 
-        // ★ 液压装饰 (WormDecal, PU132: 每个段身都绘制到父段的液压杆)
-        // PU132 UnityUnitType.drawWorm 第361行: if(wormDecal != null) wormDecal.draw(unit, unit.parent());
-        // - unit = 当前段身 (base), unit.parent() = 父段 (other)
-        // - 每个段身(包括尾部)都绘制自己到父段的液压杆, 形成完整的液压链
-        // 父段获取: segmentIndex==0 → head; segmentIndex>0 → head.segments[segmentIndex-1]
+        // ★ 液压装饰: 前段(base端)在单位贴图下方, 后段(end端)在上方
+        //   base端(当前段身) → z = 段身z - 0.5/10000 (在段身贴图之下)
+        //   end端(父段) → z = 段身z + 0.5/10000 (在段身贴图之上)
         if (head != null && head.isAdded() && head.type != null) {
             WormDecal decal = SegmentWormEntity.wormDecals.get(head.type.name);
             if (decal != null) {
                 mindustry.gen.Unit parent = getParentSegment();
                 if (parent != null) {
-                    decal.draw(this, parent);
+                    decal.drawBelow(this, parent);
                 }
             }
         }
@@ -522,10 +516,10 @@ public class SegmentUnitEntity extends UnitEntity {
         if (head != null && other instanceof SegmentUnitEntity) {
             SegmentUnitEntity o = (SegmentUnitEntity) other;
             if (o.head == head) {
-                // 相邻段身 (index 差 1) 不碰撞, 避免移动时抖动
-                // 非相邻段身碰撞, 生成时重叠会弹开
+                // ★ 扩大不碰撞范围: index 差 ≤ 2 的段身都不碰撞
+                //   之前只排除差1的相邻段, 导致快速转向时非相邻段互相挤压抖动
                 int indexDiff = Math.abs(segmentIndex - o.segmentIndex);
-                return indexDiff > 1;
+                return indexDiff > 2;
             }
         }
         // 段身 vs 其他单位 → 正常碰撞 (其他单位不能穿过段身)

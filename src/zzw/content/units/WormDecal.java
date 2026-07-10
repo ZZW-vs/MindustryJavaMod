@@ -128,4 +128,85 @@ public class WormDecal {
         }
         Draw.reset();
     }
+
+    /**
+     * ★ 分层绘制液压装饰: 前段(base端)在单位贴图下方, 后段(end端)在上方
+     * - base端(当前段身) → 在更低的z层级绘制
+     * - end端(父段) → 在更高的z层级绘制
+     * - 中间段 → 两端之间插值
+     */
+    public void drawBelow(Unit base, Unit other) {
+        if (other == null) return;
+        if (!loaded) load();
+        
+        boolean hasTextures = baseRegion.found() && endRegion.found();
+        if (!hasTextures && segmentRegions != null) {
+            for (TextureRegion r : segmentRegions) {
+                if (r.found()) { hasTextures = true; break; }
+            }
+        }
+
+        float oldZ = Draw.z();
+
+        for (int s : Mathf.signs) {
+            v1.trns(base.rotation - 90f, baseX * s, baseY).add(base);
+            float bx = v1.x, by = v1.y;
+            v1.trns(other.rotation - 90f, endX * s, endY).add(other);
+            float ex = v1.x, ey = v1.y;
+            float angle = Angles.angle(bx, by, ex, ey);
+
+            Draw.mixcol();
+            Draw.color(lineColor);
+            Fill.circle(bx, by, lineWidth / 2f);
+            Fill.circle(ex, ey, lineWidth / 2f);
+            Lines.stroke(lineWidth);
+            Lines.line(bx, by, ex, ey, false);
+
+            if (hasTextures) {
+                try {
+                    base.type.applyColor(base);
+                    
+                    float endW = endRegion.found() ? (endRegion.width * Draw.scl * 0.5f) - baseOffset : 0f;
+                    float baseW = baseRegion.found() ? (baseRegion.width * Draw.scl * 0.5f) - baseOffset : 0f;
+                    
+                    v1.trns(angle + 180f, endW).add(ex, ey);
+                    ex = v1.x;
+                    ey = v1.y;
+                    v1.trns(angle, baseW).add(bx, by);
+                    bx = v1.x;
+                    by = v1.y;
+
+                    // ★ 中间段: 按距离插值z层级 (base端低, end端高)
+                    if (segmentRegions != null) {
+                        for (int i = segmentRegions.length - 1; i >= 0; i--) {
+                            TextureRegion r = segmentRegions[i];
+                            if (r.found()) {
+                                float p = (i + 1f) / (segments + 1f);
+                                v1.set(bx, by).lerp(ex, ey, p);
+                                // z插值: base端(0) → oldZ - 0.5/10000, end端(1) → oldZ + 0.5/10000
+                                float zInterp = Mathf.lerp(oldZ - 0.5f/10000f, oldZ + 0.5f/10000f, p);
+                                Draw.z(zInterp);
+                                Draw.rect(r, v1.x, v1.y, angle);
+                            }
+                        }
+                    }
+
+                    // ★ end端(父段): 在单位贴图上方
+                    Draw.z(oldZ + 0.5f/10000f);
+                    if (endRegion.found()) {
+                        Draw.rect(endRegion, ex, ey, angle + 180f);
+                    }
+
+                    // ★ base端(当前段身): 在单位贴图下方
+                    Draw.z(oldZ - 0.5f/10000f);
+                    if (baseRegion.found()) {
+                        Draw.rect(baseRegion, bx, by, angle);
+                    }
+                } catch (Throwable t) {}
+            }
+        }
+        
+        Draw.z(oldZ);
+        Draw.reset();
+    }
 }

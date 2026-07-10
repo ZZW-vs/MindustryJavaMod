@@ -31,7 +31,7 @@ public class EndSweepLaser extends AntiCheatBulletTypeBase {
     public float widthLoss = 0.7f;
     public float width = 9f, oscScl = 0.8f, oscMag = 1.5f;
     /** 每隔 distance 距离触发一次 hitBullet */
-    public float distance = 150f;
+    public float distance = 250f;
     public Color[] colors = {
         Color.valueOf("f5303690"),
         Color.valueOf("f53036"),

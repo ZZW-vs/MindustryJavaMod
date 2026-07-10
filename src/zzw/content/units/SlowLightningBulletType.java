@@ -9,30 +9,32 @@ import mindustry.gen.Unit;
 
 /**
  * PU132 SlowLightningBulletType 移植版 (适配 v150.1)
+ * - 改为快闪电模式: 节点更少, 更新更快, 性能更好
  * - 在 init(Bullet b) 时创建 SlowLightningEntity
  * - 子弹位置跟随 SlowLightningEntity
  * - 不绘制子弹本身 (由 SlowLightningEntity.draw 绘制闪电)
  * 参考: PU132 unity.entities.bullet.anticheat.SlowLightningBulletType
  *
- * PU132 原版参数: damage=120, range=870, nodeLength=80, nodeTime=7,
- *   splitChance=0.06, continuous=true, lifetime=160, lineWidth=3
+ * ★ 快闪电参数优化:
+ *   - nodeLength: 80f → 120f (节点间距更大, 段数更少)
+ *   - nodeTime: 7f → 3f (节点更新更快)
+ *   - lifetime: 160f → 80f (持续时间减半)
+ *   - maxActive: 4 → 5 (场上最多5个闪电)
  */
 public class SlowLightningBulletType extends AntiCheatBulletTypeBase {
-    // ★ 用 slRange 字段名, 避免隐藏 BulletType.range 字段 (v150.1 有 range 字段)
-    protected float slRange = 870f, nodeLength = 80f, nodeTime = 7f, splitChance = 0.06f;
+    protected float slRange = 870f, nodeLength = 120f, nodeTime = 3f, splitChance = 0.06f;
     protected SlowLightningType type;
 
     public SlowLightningBulletType(float damage) {
         super(0f, damage);
-        lifetime = 160f;
+        lifetime = 80f;
         collides = false;
         hittable = absorbable = reflectable = false;
         keepVelocity = false;
         despawnEffect = hitEffect = Fx.none;
-        // v150.1: BulletType.range 是字段, 直接设置 (PU132 用 range() 方法返回 slRange*0.8f)
         range = slRange * 0.8f;
         countsAsSkill = true;
-        maxActive = 4;  // 慢闪电最多4个
+        maxActive = 5;
     }
 
     @Override
