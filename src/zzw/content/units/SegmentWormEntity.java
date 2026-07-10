@@ -625,33 +625,46 @@ public class SegmentWormEntity extends UnitEntity {
      * - 超出 max 的部分转化为 immunity 指数增长
      */
     @Override
-    public void damage(float amount) {
-        // ★ 伤害减免
-        SegmentConfig cfg = type != null ? configs.get(type.name) : null;
-        if (cfg != null && cfg.damageMultiplier != 1f) {
-            amount *= cfg.damageMultiplier;
-        }
+	public void damage(float amount) {
+		float trueDamage = computeAntiCheatDamage(amount);
+		if (Float.isNaN(trueDamage)) return;
+		lastHealth -= trueDamage;
+		super.damage(trueDamage);
+		healthDistributionEfficiency = Mathf.clamp(healthDistributionEfficiency - (amount / 15f));
+	}
 
-        // ★ 防秒杀: 无敌帧内免疫 (PU132 EndWormUnit L104)
-        if (invTime < 30f) return;
-        invTime = 0f;
+	@Override
+	public void damagePierce(float amount) {
+		float trueDamage = computeAntiCheatDamage(amount);
+		if (Float.isNaN(trueDamage)) return;
+		lastHealth -= trueDamage;
+		super.damagePierce(trueDamage);
+		healthDistributionEfficiency = Mathf.clamp(healthDistributionEfficiency - (amount / 15f));
+	}
 
-        // ★ 单次最大伤害 = max(220, 最大血量/700) (PU132 EndWormUnit L106)
-        float max = Math.max(220f, lastHealth / 700f);
+	@Override
+	public void damageContinuous(float amount) {
+		float trueDamage = computeAntiCheatDamage(amount);
+		if (Float.isNaN(trueDamage)) return;
+		lastHealth -= trueDamage;
+		super.damageContinuous(trueDamage);
+		healthDistributionEfficiency = Mathf.clamp(healthDistributionEfficiency - (amount / 15f));
+	}
 
-        // ★ 抗性减免后 clamp 限制 (PU132 EndWormUnit L107)
-        float trueDamage = Mathf.clamp((amount / immunity) / rogueDamageResist, 0f, max);
-
-        // ★ 抗性递增 (PU132 EndWormUnit L108-110)
-        rogueDamageResist += 1.5f;
-        max *= 1.5f;
-        immunity += Math.pow(Math.max(amount - max, 0f) / max, 2) * 2f;
-
-        // ★ 扣真实血量
-        lastHealth -= trueDamage;
-        super.damage(trueDamage);
-        healthDistributionEfficiency = Mathf.clamp(healthDistributionEfficiency - (amount / 15f));
-    }
+	private float computeAntiCheatDamage(float amount) {
+		SegmentConfig cfg = type != null ? configs.get(type.name) : null;
+		if (cfg != null && cfg.damageMultiplier != 1f) {
+			amount *= cfg.damageMultiplier;
+		}
+		if (invTime < 30f) return Float.NaN;
+		invTime = 0f;
+		float max = Math.max(220f, lastHealth / 700f);
+		float trueDamage = Mathf.clamp((amount / immunity) / rogueDamageResist, 0f, max);
+		rogueDamageResist += 1.5f;
+		max *= 1.5f;
+		immunity += Math.pow(Math.max(amount - max, 0f) / max, 2) * 2f;
+		return trueDamage;
+	}
 
     /**
      * ★ 死亡拒绝 (移植自 PU132 EndWormUnit.kill/destroy L46-62)
