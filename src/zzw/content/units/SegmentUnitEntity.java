@@ -408,18 +408,19 @@ public class SegmentUnitEntity extends UnitEntity {
         t.outlineRegion = oldOutline;
         t.cellRegion = oldCell;
 
-        // ★ 液压装饰: 前段(base端)在单位贴图下方, 后段(end端)在上方
-        //   base端(当前段身) → z = 段身z - 0.5/10000 (在段身贴图之下)
-        //   end端(父段) → z = 段身z + 0.5/10000 (在段身贴图之上)
-        if (head != null && head.isAdded() && head.type != null) {
-            WormDecal decal = SegmentWormEntity.wormDecals.get(head.type.name);
-            if (decal != null) {
-                mindustry.gen.Unit parent = getParentSegment();
-                if (parent != null) {
-                    decal.drawBelow(this, parent);
+        // ★ 液压装饰: 恢复原版 PU132 绘制方式, 不分层
+            // PU132 UnityUnitType.drawWorm 第361行: if(wormDecal != null) wormDecal.draw(unit, unit.parent());
+            // base=段身, other=父段, 使用相同的 z 层级
+            // 原版不区分前后段的 z 层级, 只绘制线条和贴图
+            if (head != null && head.isAdded() && head.type != null) {
+                WormDecal decal = SegmentWormEntity.wormDecals.get(head.type.name);
+                if (decal != null) {
+                    mindustry.gen.Unit parent = getParentSegment();
+                    if (parent != null) {
+                        decal.draw(this, parent);
+                    }
                 }
             }
-        }
 
         // 恢复 z
         Draw.z(z);

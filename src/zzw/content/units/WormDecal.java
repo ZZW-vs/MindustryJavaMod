@@ -66,13 +66,9 @@ public class WormDecal {
         if (other == null) return;
         if (!loaded) load();
         
-        // ★ 手机端防御: 贴图未加载成功时只画线条, 不访问贴图
-        boolean hasTextures = baseRegion.found() && endRegion.found();
-        if (!hasTextures && segmentRegions != null) {
-            for (TextureRegion r : segmentRegions) {
-                if (r.found()) { hasTextures = true; break; }
-            }
-        }
+        Draw.mixcol();
+        Draw.color(lineColor);
+        Lines.stroke(lineWidth);
 
         for (int s : Mathf.signs) {
             v1.trns(base.rotation - 90f, baseX * s, baseY).add(base);
@@ -81,49 +77,47 @@ public class WormDecal {
             float ex = v1.x, ey = v1.y;
             float angle = Angles.angle(bx, by, ex, ey);
 
-            Draw.mixcol();
-            Draw.color(lineColor);
             Fill.circle(bx, by, lineWidth / 2f);
             Fill.circle(ex, ey, lineWidth / 2f);
-            Lines.stroke(lineWidth);
             Lines.line(bx, by, ex, ey, false);
 
-            // ★ 贴图绘制部分只在贴图有效时执行
-            if (hasTextures) {
-                try {
-                    base.type.applyColor(base);
-                    
-                    // 安全检查: 确保贴图宽度不为0
-                    float endW = endRegion.found() ? (endRegion.width * Draw.scl * 0.5f) - baseOffset : 0f;
-                    float baseW = baseRegion.found() ? (baseRegion.width * Draw.scl * 0.5f) - baseOffset : 0f;
-                    
-                    v1.trns(angle + 180f, endW).add(ex, ey);
-                    ex = v1.x;
-                    ey = v1.y;
-                    v1.trns(angle, baseW).add(bx, by);
-                    bx = v1.x;
-                    by = v1.y;
+            // ★ 贴图绘制: 每个贴图独立检查, 找到就画, 不依赖其他贴图
+            try {
+                base.type.applyColor(base);
+                
+                float endW = endRegion.found() ? (endRegion.width * Draw.scl * 0.5f) - baseOffset : 0f;
+                float baseW = baseRegion.found() ? (baseRegion.width * Draw.scl * 0.5f) - baseOffset : 0f;
+                
+                v1.trns(angle + 180f, endW).add(ex, ey);
+                ex = v1.x;
+                ey = v1.y;
+                v1.trns(angle, baseW).add(bx, by);
+                bx = v1.x;
+                by = v1.y;
 
-                    if (segmentRegions != null) {
-                        for (int i = segmentRegions.length - 1; i >= 0; i--) {
-                            TextureRegion r = segmentRegions[i];
-                            if (r.found()) {
-                                float p = (i + 1f) / (segments + 1f);
-                                v1.set(bx, by).lerp(ex, ey, p);
-                                Draw.rect(r, v1.x, v1.y, angle);
-                            }
+                // 中间段贴图
+                if (segmentRegions != null) {
+                    for (int i = segmentRegions.length - 1; i >= 0; i--) {
+                        TextureRegion r = segmentRegions[i];
+                        if (r.found()) {
+                            float p = (i + 1f) / (segments + 1f);
+                            v1.set(bx, by).lerp(ex, ey, p);
+                            Draw.rect(r, v1.x, v1.y, angle);
                         }
                     }
-
-                    if (endRegion.found()) {
-                        Draw.rect(endRegion, ex, ey, angle + 180f);
-                    }
-                    if (baseRegion.found()) {
-                        Draw.rect(baseRegion, bx, by, angle);
-                    }
-                } catch (Throwable t) {
-                    // 手机端防御: 贴图绘制失败时继续, 不闪退
                 }
+
+                // 末端贴图
+                if (endRegion.found()) {
+                    Draw.rect(endRegion, ex, ey, angle + 180f);
+                }
+
+                // 基端贴图
+                if (baseRegion.found()) {
+                    Draw.rect(baseRegion, bx, by, angle);
+                }
+            } catch (Throwable t) {
+                // 手机端防御: 贴图绘制失败时继续, 不闪退
             }
         }
         Draw.reset();
