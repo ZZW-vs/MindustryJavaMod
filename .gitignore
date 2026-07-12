@@ -160,3 +160,5 @@ android/libs/
 .trae/
 .vscode/
 /参考
+日志.txt
+*.log

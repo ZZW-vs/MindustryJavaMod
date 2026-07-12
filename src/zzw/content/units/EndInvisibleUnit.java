@@ -2,8 +2,6 @@ package zzw.content.units;
 
 import arc.math.Mathf;
 import arc.util.Time;
-import mindustry.content.Fx;
-import mindustry.entities.Units;
 import mindustry.gen.Groups;
 import mindustry.gen.UnitEntity;
 

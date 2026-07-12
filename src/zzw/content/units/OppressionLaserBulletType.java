@@ -13,13 +13,8 @@ import arc.math.Rand;
 import arc.util.Tmp;
 import arc.util.Time;
 import mindustry.Vars;
-import mindustry.entities.Damage;
-import mindustry.entities.Effect;
-import mindustry.entities.bullet.BulletType;
 import mindustry.entities.Units;
 import mindustry.gen.Bullet;
-import mindustry.gen.Building;
-import mindustry.gen.Unit;
 import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
 
