@@ -8,6 +8,7 @@ import mindustry.world.Block;
 import mindustry.world.blocks.defense.Wall;
 import mindustry.world.blocks.distribution.Conveyor;
 import mindustry.world.blocks.distribution.StackConveyor;
+import mindustry.world.meta.BuildVisibility;
 import zzw.content.Z_Items;
 
 import arc.Events;

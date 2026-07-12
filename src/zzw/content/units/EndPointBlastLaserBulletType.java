@@ -10,6 +10,7 @@ import arc.math.geom.Vec2;
 import arc.util.Tmp;
 import mindustry.Vars;
 import mindustry.content.Fx;
+import mindustry.entities.Lightning;
 import mindustry.entities.Units;
 import mindustry.gen.Bullet;
 import mindustry.gen.Groups;

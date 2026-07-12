@@ -8,6 +8,7 @@ import arc.math.Mathf;
 import arc.util.Time;
 import arc.util.Tmp;
 import mindustry.content.Fx;
+import mindustry.entities.Lightning;
 import mindustry.entities.Units;
 import mindustry.gen.Bullet;
 import mindustry.graphics.Drawf;

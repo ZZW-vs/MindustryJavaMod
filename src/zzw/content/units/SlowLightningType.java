@@ -1,6 +1,7 @@
 package zzw.content.units;
 
 import arc.func.Floatp;
+import arc.func.Cons;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Lines;

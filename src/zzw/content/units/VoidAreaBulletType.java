@@ -9,6 +9,7 @@ import arc.util.Tmp;
 import mindustry.Vars;
 import mindustry.entities.Units;
 import mindustry.gen.Bullet;
+import mindustry.gen.Building;
 import mindustry.graphics.Layer;
 
 /**

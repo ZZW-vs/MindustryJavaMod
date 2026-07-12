@@ -3,14 +3,20 @@ package zzw.content.units;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Lines;
+import arc.graphics.g2d.Fill;
+import arc.math.Angles;
 import arc.math.Mathf;
 import arc.math.geom.Rect;
 import arc.math.geom.Vec2;
 import arc.util.Tmp;
 import mindustry.Vars;
+import mindustry.entities.Damage;
 import mindustry.entities.Effect;
+import mindustry.entities.Units;
 import mindustry.gen.Bullet;
 import mindustry.gen.Healthc;
+import mindustry.gen.Unit;
+import mindustry.entities.bullet.BasicBulletType;
 import mindustry.graphics.Drawf;
 
 /**

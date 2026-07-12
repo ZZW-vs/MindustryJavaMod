@@ -9,6 +9,8 @@ import mindustry.gen.Bullet;
 import mindustry.gen.Building;
 import mindustry.gen.Hitboxc;
 import mindustry.gen.Unit;
+import mindustry.entities.abilities.ShieldRegenFieldAbility;
+import mindustry.entities.abilities.ForceFieldAbility;
 
 /**
  * PU132 防作弊子弹基类移植版

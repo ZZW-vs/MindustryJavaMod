@@ -1,5 +1,7 @@
 package zzw.content.units;
 
+import arc.math.Mathf;
+import arc.util.Time;
 import mindustry.gen.UnitEntity;
 
 /**
@@ -11,6 +13,16 @@ import mindustry.gen.UnitEntity;
 public class EndLegsUnit extends UnitEntity {
     private final AntiCheatBase antiCheat = new AntiCheatBase();
     private float lastMaxHealth = 0f;
+
+    /** 工厂方法 */
+    public static EndLegsUnit create() {
+        return new EndLegsUnit();
+    }
+
+    @Override
+    public int classId() {
+        return ZEntityRegister.classId(EndLegsUnit.class);
+    }
 
     @Override
     public void setType(mindustry.type.UnitType type) {

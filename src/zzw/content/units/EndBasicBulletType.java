@@ -4,7 +4,9 @@ import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
+import arc.util.Tmp;
 import mindustry.gen.Bullet;
+import mindustry.entities.bullet.BasicBulletType;
 
 public class EndBasicBulletType extends AntiCheatBulletTypeBase {
     // PU132 原版颜色: scarColor(#f53036), endColor(#ff786e)

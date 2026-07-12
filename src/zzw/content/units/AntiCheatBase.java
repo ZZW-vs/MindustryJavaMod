@@ -2,6 +2,8 @@ package zzw.content.units;
 
 import arc.math.Mathf;
 import arc.util.Time;
+import mindustry.gen.UnitEntity;
+import mindustry.gen.Unitc;
 
 /**
  * 防作弊单位基类 (移植自 PU132 AntiCheatBase 接口)

@@ -1,6 +1,7 @@
 package zzw.content.units;
 
 import arc.graphics.g2d.Draw;
+import arc.graphics.g2d.TextureRegion;
 import arc.math.Angles;
 import arc.math.Mathf;
 import arc.math.geom.Vec2;
@@ -760,6 +761,7 @@ public class SegmentWormEntity extends UnitEntity {
      *
      * 每段速度 = max(前一段速度, 自己速度, 头部 3 帧平均速度)
      * 方向 = 段身 → 前一段 (跟在头部后面)
+     * ★ 同步到段身实体 vel (PU132 L121: segmentUnits[i].vel.set(segV))
      */
     protected void updateSegmentVLocal(Vec2 vec) {
         int len = segments.length;
@@ -784,95 +786,92 @@ public class SegmentWormEntity extends UnitEntity {
             segV.add(Tmp.v1);
             segV.setLength(trueVel);
 
-            // ★ 不同步到段身实体 vel
-            // 原因: VelComp.update() 会根据 vel 移动段身位置,
-            //   然后 updateSegmentsLocal 又重置位置, 造成每帧抖动
-            // segVelocities 是内部物理模拟用的, 段身实体 vel 保持为零
-            // segments[i].vel.set(segV);
-
-            // ★ 速度衰减 (PU132 WormDefaultUnit.updateSegmentsLocal L142/L160)
-            //   防止 segVelocities 无限增长导致抖动
-            segV.scl(Mathf.clamp(1f - (segmentDrag * arc.util.Time.delta)));
+            // ★ 同步到段身实体 vel (PU132 L121)
+            // 段身 physics=false 不会因 vel 移动, 但 vel 用于碰撞/受击效果
+            segments[i].vel.set(segV);
         }
     }
 
     /**
-     * 约束修正: 完全照搬 PU132 WormComp.updatePost 算法 (L299-351)
+     * 约束修正: 完全照搬 PU132 WormDefaultUnit.updateSegmentsLocal (L126-164)
      *
-     * PU132 原版核心流程:
-     * 1. 遍历段身链, last = 上一段 (从头部开始)
-     * 2. 计算理想位置 = 上一段后方 (segmentOffset/2 + offset) 处
-     * 3. 计算 angTo = 段身指向理想位置的角度
-     *    - preventDrifting 且静止时用自身朝向, 避免 atan2 精度问题
-     * 4. 角度平滑: rotation = angTo - (差值 * (1 - anglePhysicsSmooth))
-     * 5. 段身沿自身朝向移动 = 上一段的 deltaLen
-     * 6. 计算拉回向量 = (段身位置 + 段身朝向*segmentOffset/2) - 理想位置
-     *    - 拉回力 = 向量 * jointStrength * Time.delta
-     * 7. 拉回力传播到后面 segmentCast 段, scl = cast / segmentCast
-     * 8. 更新 last 为当前段, 继续下一段
+     * PU132 原版算法 (与 WormComp.updatePost 不同):
+     * 1. 段身0: 先加速度到位置, 再调整头部旋转, 计算理想位置, 硬限制旋转, 直接拉回(不缩放)
+     * 2. 段身1+: 先加速度到位置, 再调整前一段旋转, 计算理想位置, 硬限制旋转, 直接拉回(不缩放)
+     *
+     * ★ 关键区别 (之前的抖动根因):
+     * - PU132 拉回力不缩放 Time.delta (直接 seg.sub(Tmp.v2)), 我们之前缩放了
+     * - PU132 调整前一段的旋转 (segULast.rotation -= diff/1.25), 我们之前只调当前段
+     * - PU132 无 cast 传播, 我们之前有
+     * - PU132 应用段身速度到位置, 我们之前不应用
      */
     protected void updateSegmentsLocal() {
         float segmentOffset = segmentSpacing / 2f;
         int len = segments.length;
         if (len == 0) return;
 
-        // PU132: last = 头部, 从头部开始遍历
-        Unit last = this;
+        // ===== 段身0 (直接在头部后方) =====
+        Vec2 seg0 = segPositions[0];
+        SegmentUnitEntity segU0 = segments[0];
 
-        for (int i = 0; i < len; i++) {
+        // 1. 应用速度到位置 (PU132 L134: segments[0].add(segmentVelocities[0]))
+        seg0.add(segVelocities[0]);
+
+        // 2. 调整头部旋转 (PU132 L136: rotation -= angleDistSigned(rotation, seg0.rotation, angleLimit) / 1.25f)
+        rotation -= angleDistSigned(rotation, segU0.rotation, angleLimit) / 1.25f;
+
+        // 3. 理想位置: 头部后方 segmentOffset + headOffset 处 (PU132 L137)
+        Tmp.v1.trns(rotation + 180f, segmentOffset + headOffset).add(this);
+
+        // 4. 硬限制旋转 (PU132 L138: clampedAngle)
+        segU0.rotation = clampedAngle(Angles.angle(seg0.x, seg0.y, Tmp.v1.x, Tmp.v1.y), rotation, angleLimit);
+
+        // 5. 拉回 (PU132 L139-140: 不缩放, 直接 sub)
+        Tmp.v2.trns(segU0.rotation, segmentOffset).add(seg0).sub(Tmp.v1);
+        seg0.sub(Tmp.v2);
+
+        // 6. 速度衰减 (PU132 L142)
+        segVelocities[0].scl(Mathf.clamp(1f - (segmentDrag * arc.util.Time.delta)));
+
+        // 7. 同步实体 (PU132 L143: segmentUnits[0].set(seg))
+        segU0.set(seg0.x, seg0.y);
+        segU0.updateLastPosition();
+
+        // 血量分布
+        if (healthDistributionRate > 0) distributeHealth(0);
+
+        // ===== 段身1+ =====
+        for (int i = 1; i < len; i++) {
             Vec2 seg = segPositions[i];
+            Vec2 segLast = segPositions[i - 1];
             SegmentUnitEntity segU = segments[i];
+            SegmentUnitEntity segULast = segments[i - 1];
 
-            // ★ Step 1: 计算理想位置 (上一段后方 segmentOffset + offset 处)
-            float offset = (last == this) ? headOffset : 0f;
-            Tmp.v1.trns(last.rotation + 180f, segmentOffset + offset).add(last);
+            // 1. 应用速度 (PU132 L152: seg.add(segmentVelocities[i]))
+            seg.add(segVelocities[i]);
 
-            // ★ Step 2: 计算 angTo (段身指向理想位置的角度)
-            // PU132: preventDrifting 且静止时用自身朝向
-            float rdx = segU.deltaX - last.deltaX;
-            float rdy = segU.deltaY - last.deltaY;
-            float angTo;
-            if (!preventDrifting || (last.deltaLen() > 0.001f && (rdx * rdx) + (rdy * rdy) > 0.00001f)) {
-                angTo = Angles.angle(segU.x, segU.y, Tmp.v1.x, Tmp.v1.y);
-            } else {
-                angTo = segU.rotation;
-            }
+            // 2. 调整前一段旋转 (PU132 L154: segULast.rotation -= diff/1.25f)
+            segULast.rotation -= angleDistSigned(segULast.rotation, segU.rotation, angleLimit) / 1.25f;
 
-            // ★ Step 3: 角度平滑 (PU132 原版公式)
-            // rotation = angTo - (差值 * (1 - anglePhysicsSmooth))
-            float angleDiff = angleDistSigned(angTo, last.rotation, angleLimit);
-            segU.rotation = angTo - (angleDiff * (1f - anglePhysicsSmooth));
+            // 3. 理想位置: 前一段后方 (PU132 L155)
+            Tmp.v1.trns(segULast.rotation + 180f, segmentOffset).add(segLast);
 
-            // ★ Step 4: 段身沿自身朝向移动 = 上一段的 deltaLen (PU132 原版)
-            Tmp.v3.trns(segU.rotation, last.deltaLen());
-            segU.trns(Tmp.v3.x, Tmp.v3.y);
-            seg.set(segU.x, segU.y);
+            // 4. 硬限制旋转 (PU132 L156)
+            segU.rotation = clampedAngle(Angles.angle(seg.x, seg.y, Tmp.v1.x, Tmp.v1.y), segULast.rotation, angleLimit);
 
-            // ★ Step 5: 计算拉回向量 (PU132 原版)
+            // 5. 拉回 (PU132 L157-158: 不缩放)
             Tmp.v2.trns(segU.rotation, segmentOffset).add(seg).sub(Tmp.v1);
-            Tmp.v2.scl(Mathf.clamp(jointStrength * arc.util.Time.delta));
+            seg.sub(Tmp.v2);
 
-            // ★ Step 6: 拉回力传播到后面 segmentCast 段 (PU132 原版逻辑, 适配数组)
-            // scl = cast / segmentCast → 越靠前力越大
-            int cast = segmentCast;
-            int idx = i;
-            while (cast > 0 && idx < len) {
-                float scl = cast / (float) segmentCast;
-                segments[idx].set(segments[idx].x - (Tmp.v2.x * scl), segments[idx].y - (Tmp.v2.y * scl));
-                segments[idx].updateLastPosition();
-                segPositions[idx].set(segments[idx].x, segments[idx].y);
-                idx++;
-                cast--;
-            }
+            // 6. 速度衰减 (PU132 L160)
+            segVelocities[i].scl(Mathf.clamp(1f - (segmentDrag * arc.util.Time.delta)));
 
-            // ★ Step 7: 同步到 Vec2 位置 (用于 draw 等)
-            seg.set(segU.x, segU.y);
+            // 7. 同步实体 (PU132 L161: segU.set(seg))
+            segU.set(seg.x, seg.y);
+            segU.updateLastPosition();
 
             // 血量分布
             if (healthDistributionRate > 0) distributeHealth(i);
-
-            // ★ Step 8: 更新 last 为当前段, 继续下一段
-            last = segU;
         }
     }
 
@@ -1266,6 +1265,20 @@ public class SegmentWormEntity extends UnitEntity {
     public void draw() {
         // ★ 先绘制头部 (UnitType.draw 设置 z = flyingLayer, 绘制头部 body/cell/weapons)
         super.draw();
+
+        // ★ 绘制段身影子 (PU132 WormDefaultUnit.drawShadow L220-227)
+        // 段身不在 Groups.draw 中, 不会自动画影子, 需由头部统一绘制
+        if (segments.length > 0) {
+            float originZ = Draw.z();
+            for (int i = 0; i < segments.length; i++) {
+                SegmentUnitEntity seg = segments[i];
+                if (seg != null && seg.isAdded() && !seg.dead && seg.type != null) {
+                    Draw.z(originZ - 0.01f);
+                    seg.type.drawShadow(seg);
+                }
+            }
+            Draw.z(originZ);
+        }
 
         // ★ 头部绘制完后, 统一绘制所有段身 (借鉴 PU132 UnityUnitType.drawBody L656-681)
         if (segments.length > 0) {

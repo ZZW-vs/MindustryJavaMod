@@ -24,6 +24,7 @@ import mindustry.game.Team;
 import mindustry.gen.Building;
 import mindustry.gen.Bullet;
 import mindustry.gen.Healthc;
+import mindustry.gen.Hitboxc;
 import mindustry.gen.Unit;
 import mindustry.graphics.Layer;
 
