@@ -645,6 +645,8 @@ public class Z_Units {
         SegmentWormEntity.configs.get(devourer.name).healPerSecond = 120f;
         // 吞噬者: 受到伤害 × 0.9 (减伤10%)
         SegmentWormEntity.configs.get(devourer.name).damageMultiplier = 0.9f;
+        // 吞噬者: counterDrag=true (PU132 原版, 增加段身跟随性减小转弯半径)
+        SegmentWormEntity.configs.get(devourer.name).counterDrag = true;
 
         // ★ 初始化分裂/合并音效 (PU132 默认 Sounds.door)
         try {
@@ -977,6 +979,8 @@ public class Z_Units {
         SegmentWormEntity.configs.get(oppression.name).damageMultiplier = 0.7f;
         // 压迫者: 大招期间速度倍率 0.12 (只剩12%)
         SegmentWormEntity.configs.get(oppression.name).ultSpeedMultiplier = 0.12f;
+        // 压迫者: counterDrag=true (PU132 原版, 增加段身跟随性减小转弯半径)
+        SegmentWormEntity.configs.get(oppression.name).counterDrag = true;
 
         // ★ 初始化 oppression 液压装饰 (WormDecal) ★
         // PU132 UnityUnitTypes 第4064-4073行:
@@ -1058,7 +1062,8 @@ public class Z_Units {
             range = 200f;
             outlineColor = Color.valueOf("2e3142");
             constructor = EndLegsUnit::create;
-            controller = unit -> new mindustry.ai.types.FlyingAI();
+            // ★ 使用 WormAI (v158 CommandAI 子类, 自动索敌, 不朝刷新点跑)
+            controller = unit -> new zzw.content.units.WormAI();
 
             weapons.add(new Weapon() {{
                 x = 4.25f;
@@ -1094,7 +1099,8 @@ public class Z_Units {
             range = 300f;
             outlineColor = Color.valueOf("2e3142");
             constructor = EndLegsUnit::create;
-            controller = unit -> new mindustry.ai.types.FlyingAI();
+            // ★ 使用 WormAI (v158 CommandAI 子类, 自动索敌, 不朝刷新点跑)
+            controller = unit -> new zzw.content.units.WormAI();
 
             weapons.add(new Weapon() {{
                 x = 8.5f;
@@ -1136,7 +1142,8 @@ public class Z_Units {
             range = 510f;
             outlineColor = Color.valueOf("2e3142");
             constructor = EndLegsUnit::create;
-            controller = unit -> new mindustry.ai.types.FlyingAI();
+            // ★ 使用 WormAI (v158 CommandAI 子类, 自动索敌, 不朝刷新点跑)
+            controller = unit -> new zzw.content.units.WormAI();
 
             // 时间停止能力 (PU132: duration=15*60, rechargeTime=10*60)
             abilities.add(new TimeStopAbility(15f * 60f, 10f * 60f));

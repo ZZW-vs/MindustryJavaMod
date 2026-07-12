@@ -543,30 +543,29 @@ public class SegmentUnitEntity extends UnitEntity {
     }
 
     /**
-     * 段身之间的碰撞过滤:
+     * 段身之间的碰撞过滤 (完全匹配 PU132 WormSegmentUnit.collides L44-52):
      * - 段身 vs 自己的头部 → 不碰撞
-     * - 段身 vs 同头部的相邻段身 → 不碰撞 (避免移动时抖动)
-     * - 段身 vs 同头部的非相邻段身 → 碰撞 (生成时重叠会弹开)
-     * - 段身 vs 其他单位 → 正常碰撞 (其他单位不能穿过段身)
+     * - 段身 vs 同头部的所有段身 → 全部不碰撞 (避免打结, 之前的"非相邻碰撞"会导致急转时打结)
+     * - 段身 vs 其他单位 → 正常碰撞
      *
-     * 借鉴 PU132 WormSegmentUnit.collides + 原版碰撞挤压弹开效果
-     * 允许非相邻段身碰撞, 这样生成很多段时会因为重叠而互相推开, 形成自然散开效果
+     * PU132 原版:
+     *   if(trueParentUnit == null) return true;
+     *   WormSegmentUnit[] segs = trueParentUnit.segmentUnits;
+     *   for(int i = 0; i < len; i++) if(segs[i] == other) return false;
+     *   return true;
      */
     @Override
     public boolean collides(Hitboxc other) {
         // 段身 vs 自己的头部 → 不碰撞
         if (other == head) return false;
-        // 段身 vs 同头部的其他段身 → 相邻的不碰撞, 非相邻的碰撞
+        // 段身 vs 同头部的所有段身 → 全部不碰撞 (PU132 原版行为, 避免打结)
         if (head != null && other instanceof SegmentUnitEntity) {
             SegmentUnitEntity o = (SegmentUnitEntity) other;
             if (o.head == head) {
-                // ★ 扩大不碰撞范围: index 差 ≤ 2 的段身都不碰撞
-                //   之前只排除差1的相邻段, 导致快速转向时非相邻段互相挤压抖动
-                int indexDiff = Math.abs(segmentIndex - o.segmentIndex);
-                return indexDiff > 2;
+                return false;
             }
         }
-        // 段身 vs 其他单位 → 正常碰撞 (其他单位不能穿过段身)
+        // 段身 vs 其他单位 → 正常碰撞
         return super.collides(other);
     }
 }

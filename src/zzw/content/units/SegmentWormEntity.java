@@ -148,9 +148,14 @@ public class SegmentWormEntity extends UnitEntity {
     public float angleLimit = 30f;
     /** 段身间距 (PU132 segmentOffset) */
     public float segmentSpacing = 23f;
-    /** 段身阻力 (PU132 drag, 速度传播模式下用)
-     *  PU132 原版 0.007f */
+    /** 段身阻力 (已废弃, 现在用单位 type 的 drag 字段, 与 PU132 原版一致)
+     *  PU132 原版各单位 drag: arcnelidia=0.007f, toxobyte=0.012f, catenapede=0.03f,
+     *                       devourer=0.1f, oppression=0.12f */
     public float segmentDrag = 0.007f;
+    /** 反向阻力 (PU132 counterDrag, 仅 devourer/oppression=true)
+     *  true: 段身速度在 updateSegmentVLocal 中额外乘以 (1-drag), 增加段身跟随性
+     *  PU132 原版: devourer=true, oppression=true, 其他=false */
+    public boolean counterDrag = false;
     /** 关节强度 (PU132 jointStrength, 0~1)
      *  越大 = 段身越快被拉回理想位置 = 越硬
      *  PU132 原版默认 1f (WormComp), WormDefaultUnit 用 0.08f
@@ -301,6 +306,9 @@ public class SegmentWormEntity extends UnitEntity {
         /** 大招期间速度倍率 (1.0=正常, 0.12=只剩12%)
          *  压迫者: 0.12 */
         public float ultSpeedMultiplier = 0.075f;
+        /** 反向阻力 (PU132 counterDrag, 仅 devourer/oppression=true)
+         *  true: 段身速度在 updateSegmentVLocal 中额外乘以 (1-drag), 增加跟随性减小转弯半径 */
+        public boolean counterDrag = false;
 
         public SegmentConfig(mindustry.type.UnitType t, int c, float s) {
             this(t, c, s, 0f, 0, false, false, false);
@@ -451,6 +459,7 @@ public class SegmentWormEntity extends UnitEntity {
                     preventDrifting = cfg.preventDrifting;
                     headOffset = cfg.headOffset;
                     barrageRange = cfg.barrageRange;
+                    counterDrag = cfg.counterDrag;
                     createSegments(cfg.count, cfg.segmentType);
                     segmentsCreated = true;
                     System.out.println("[头部] 段身创建: " + cfg.count + "节 间距=" + cfg.spacing
@@ -786,6 +795,10 @@ public class SegmentWormEntity extends UnitEntity {
             segV.add(Tmp.v1);
             segV.setLength(trueVel);
 
+            // ★ PU132 counterDrag (L120): 段身速度额外乘以 (1-drag)
+            //   仅 devourer/oppression=true, 增加段身跟随性, 减小转弯半径
+            if (counterDrag) segV.scl(1f - drag);
+
             // ★ 同步到段身实体 vel (PU132 L121)
             // 段身 physics=false 不会因 vel 移动, 但 vel 用于碰撞/受击效果
             segments[i].vel.set(segV);
@@ -830,8 +843,11 @@ public class SegmentWormEntity extends UnitEntity {
         Tmp.v2.trns(segU0.rotation, segmentOffset).add(seg0).sub(Tmp.v1);
         seg0.sub(Tmp.v2);
 
-        // 6. 速度衰减 (PU132 L142)
-        segVelocities[0].scl(Mathf.clamp(1f - (segmentDrag * arc.util.Time.delta)));
+        // 6. 速度衰减 (PU132 L142: 用单位 drag, 不是固定 segmentDrag)
+        //   PU132 各单位 drag: arcnelidia=0.007f, toxobyte=0.012f, catenapede=0.03f,
+        //                     devourer=0.1f, oppression=0.12f
+        //   drag 越大段身速度衰减越快, 转弯半径越小
+        segVelocities[0].scl(Mathf.clamp(1f - (drag * arc.util.Time.delta)));
 
         // 7. 同步实体 (PU132 L143: segmentUnits[0].set(seg))
         segU0.set(seg0.x, seg0.y);
@@ -863,8 +879,8 @@ public class SegmentWormEntity extends UnitEntity {
             Tmp.v2.trns(segU.rotation, segmentOffset).add(seg).sub(Tmp.v1);
             seg.sub(Tmp.v2);
 
-            // 6. 速度衰减 (PU132 L160)
-            segVelocities[i].scl(Mathf.clamp(1f - (segmentDrag * arc.util.Time.delta)));
+            // 6. 速度衰减 (PU132 L160: 用单位 drag)
+            segVelocities[i].scl(Mathf.clamp(1f - (drag * arc.util.Time.delta)));
 
             // 7. 同步实体 (PU132 L161: segU.set(seg))
             segU.set(seg.x, seg.y);
@@ -1206,6 +1222,7 @@ public class SegmentWormEntity extends UnitEntity {
                 preventDrifting = cfg.preventDrifting;
                 headOffset = cfg.headOffset;
                 barrageRange = cfg.barrageRange;
+                counterDrag = cfg.counterDrag;
                 try {
                     createSegments(cfg.count, cfg.segmentType);
                     segmentsCreated = true;
