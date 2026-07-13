@@ -3,11 +3,12 @@ package zzw.content.units;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Lines;
+
 import arc.math.Mathf;
 import arc.math.geom.Rect;
 import arc.math.geom.Vec2;
 import arc.util.Tmp;
-import mindustry.Vars;
+// import mindustry.Vars;
 import mindustry.entities.Effect;
 import mindustry.gen.Bullet;
 import mindustry.gen.Healthc;
@@ -105,18 +106,18 @@ public class EndContinuousLaserBulletType extends AntiCheatBulletTypeBase {
             });
 
             // 建筑检测: 对齐原版 world.raycastEachWorld 沿激光线逐格检测
-            if (collidesGround) {
-                Vars.world.raycastEachWorld(b.x, b.y, v.x, v.y, (cx, cy) -> {
-                    mindustry.gen.Building build = Vars.world.build(cx, cy);
-                    if (build != null && build.team != b.team) {
-                        hitBuildingAntiCheat(b, build);
-                        if (hitCount[0] < 8) hit(b, build.x, build.y);
-                        hitCount[0]++;
-                        return build.block.absorbLasers;
-                    }
-                    return false;
-                });
-            }
+            // if (collidesGround) {
+            //     Vars.world.raycastEachWorld(b.x, b.y, v.x, v.y, (cx, cy) -> {
+            //         mindustry.gen.Building build = Vars.world.build(cx, cy);
+            //         if (build != null && build.team != b.team) {
+            //             hitBuildingAntiCheat(b, build);
+            //             if (hitCount[0] < 8) hit(b, build.x, build.y);
+            //             hitCount[0]++;
+            //             return build.block.absorbLasers;
+            //         }
+            //         return false;
+            //     });
+            // }
 
             // 闪电效果 (PU132 endLaser: lightningChance=0.8f)
             if (lightningChance > 0 && lightningLength > 0 && Mathf.chanceDelta(lightningChance)) {

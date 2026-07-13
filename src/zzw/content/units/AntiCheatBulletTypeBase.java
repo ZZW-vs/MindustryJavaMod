@@ -102,7 +102,6 @@ public abstract class AntiCheatBulletTypeBase extends BulletType {
             unit.dead = true;
             return;
         }
-        float lh = unit.health, ls = unit.shield;
         float score = health + unit.type.dpsEstimate;
         // 超量伤害: 目标越强, 指数追加伤害越大
         float pow = score > overDamage ? Mathf.pow((score - overDamage) / overDamageScl, overDamagePower) : 0f;

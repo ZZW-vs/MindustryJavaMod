@@ -6,6 +6,7 @@ import arc.graphics.g2d.Fill;
 import arc.math.Mathf;
 import arc.util.Tmp;
 import mindustry.Vars;
+
 import mindustry.gen.Bullet;
 import mindustry.gen.Groups;
 

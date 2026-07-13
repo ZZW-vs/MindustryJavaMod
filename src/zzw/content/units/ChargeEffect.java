@@ -21,8 +21,6 @@ public class ChargeEffect {
     // PU132 颜色常量
     private static final Color SCAR_COLOR = Color.valueOf("f53036");
     private static final Color END_COLOR = Color.valueOf("ff786e");
-    private static final Color SCAR_COLOR_ALPHA = Color.valueOf("f5303690");
-
     /**
      * 斜坡函数 (移植自 PU132 MathU.slope)
      * bias 处达到峰值 1, 0 和 1 处为 0, 形成非对称三角波

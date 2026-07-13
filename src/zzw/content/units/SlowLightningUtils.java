@@ -3,11 +3,9 @@ package zzw.content.units;
 import arc.func.Boolf;
 import arc.func.Cons;
 import arc.math.geom.Intersector;
-
 import mindustry.Vars;
 import mindustry.game.Team;
 import mindustry.gen.Building;
-
 import mindustry.gen.Unit;
 import mindustry.gen.Posc;
 import mindustry.world.Tile;

@@ -34,10 +34,7 @@ public class Z_Units {
         devourer,              // 头部 (PU132 Devourer, 60 段)
         devourerSegment,       // 段身
         oppression,            // 头部 (PU132 Oppression, 55 段)
-        oppressionSegment,     // 段身
-        enigma,                // PU132 谜团 (End 阵营飞行单位)
-        voidVessel,            // PU132 虚空容器 (End 阵营飞行单位)
-        chronos;               // PU132 克罗诺斯 (End 阵营飞行单位, 时间停止)
+        oppressionSegment;     // 段身
 
     public static void load() {
         // ★ 关键: 注册自定义 Entity 到 EntityMapping.idMap, 否则 v154.3 的 UnitType.init() 会失败 ★
@@ -45,7 +42,6 @@ public class Z_Units {
         // (模仿 PU132 的 UnityEntityMapping.register)
         ZEntityRegister.register(SegmentWormEntity.class, SegmentWormEntity::new);
         ZEntityRegister.register(SegmentUnitEntity.class, SegmentUnitEntity::new);
-        ZEntityRegister.register(EndLegsUnit.class, EndLegsUnit::new);
         // ★ 注册 SlowLightningEntity (慢闪电 Entity, 实现 Drawc 接口)
         SlowLightningEntity.register();
 
@@ -645,8 +641,6 @@ public class Z_Units {
         SegmentWormEntity.configs.get(devourer.name).healPerSecond = 120f;
         // 吞噬者: 受到伤害 × 0.9 (减伤10%)
         SegmentWormEntity.configs.get(devourer.name).damageMultiplier = 0.9f;
-        // 吞噬者: counterDrag=true (PU132 原版, 增加段身跟随性减小转弯半径)
-        SegmentWormEntity.configs.get(devourer.name).counterDrag = true;
 
         // ★ 初始化分裂/合并音效 (PU132 默认 Sounds.door)
         try {
@@ -979,8 +973,6 @@ public class Z_Units {
         SegmentWormEntity.configs.get(oppression.name).damageMultiplier = 0.7f;
         // 压迫者: 大招期间速度倍率 0.12 (只剩12%)
         SegmentWormEntity.configs.get(oppression.name).ultSpeedMultiplier = 0.12f;
-        // 压迫者: counterDrag=true (PU132 原版, 增加段身跟随性减小转弯半径)
-        SegmentWormEntity.configs.get(oppression.name).counterDrag = true;
 
         // ★ 初始化 oppression 液压装饰 (WormDecal) ★
         // PU132 UnityUnitTypes 第4064-4073行:
@@ -1040,123 +1032,6 @@ public class Z_Units {
         } catch (Throwable t) {
             try { arc.util.Log.err("set toxobyte sounds failed", t); } catch (Throwable ignored) {}
         }
-
-        // ═══════════════════════════════════════════════════════════
-        //  Enigma (PU132 谜团)
-        //  - 飞行单位, 2000 血, 速度 4
-        //  - 武器: VoidPelletBulletType (黑色弹丸, 比例伤害)
-        //  - 防作弊: 简化版 (无敌帧+单次上限+抗性递增)
-        // ═══════════════════════════════════════════════════════════
-        enigma = new UnitType("enigma") {{
-            health = 2000f;
-            speed = 4f;
-            drag = 0.4f;
-            accel = 0.5f;
-            flying = true;
-            lowAltitude = true;
-            hitSize = 12f;
-            engineOffset = 8f;
-            engineSize = 1f;
-            armor = 4f;
-            rotateSpeed = 5f;
-            range = 200f;
-            outlineColor = Color.valueOf("2e3142");
-            constructor = EndLegsUnit::create;
-            // ★ 使用 WormAI (v158 CommandAI 子类, 自动索敌, 不朝刷新点跑)
-            controller = unit -> new zzw.content.units.WormAI();
-
-            weapons.add(new Weapon() {{
-                x = 4.25f;
-                y = -3.75f;
-                rotate = true;
-                reload = 4f;
-                rotateSpeed = 5f;
-                bullet = new VoidPelletBulletType(5.5f, 200f) {{
-                    ratioDamage = 1f / 60f;
-                    ratioStart = damage * 30f;
-                }};
-            }});
-        }};
-
-        // ═══════════════════════════════════════════════════════════
-        //  Void Vessel (PU132 虚空容器)
-        //  - 飞行单位, 10000 血, 速度 3
-        //  - 武器: VoidFractureBulletType (黑色碎裂弹, +ArmorDamageModule)
-        //  - 防作弊: 简化版
-        // ═══════════════════════════════════════════════════════════
-        voidVessel = new UnitType("void-vessel") {{
-            health = 10000f;
-            speed = 3f;
-            accel = 0.1f;
-            drag = 0.03f;
-            hitSize = 16f;
-            engineOffset = 12.5f;
-            engineSize = 1.5f;
-            flying = true;
-            lowAltitude = true;
-            armor = 8f;
-            rotateSpeed = 4f;
-            range = 300f;
-            outlineColor = Color.valueOf("2e3142");
-            constructor = EndLegsUnit::create;
-            // ★ 使用 WormAI (v158 CommandAI 子类, 自动索敌, 不朝刷新点跑)
-            controller = unit -> new zzw.content.units.WormAI();
-
-            weapons.add(new Weapon() {{
-                x = 8.5f;
-                y = -4.5f;
-                mirror = true;
-                rotate = true;
-                reload = 30f;
-                inaccuracy = 15f;
-                rotateSpeed = 5f;
-                bullet = new VoidFractureBulletType(32f, 600f) {{
-                    ratioDamage = 1f / 50f;
-                    ratioStart = damage * 20f;
-                    modules = new AntiCheatBulletModule[]{
-                        new ArmorDamageModule(1f, 2f, 0f)
-                    };
-                }};
-            }});
-        }};
-
-        // ═══════════════════════════════════════════════════════════
-        //  Chronos (PU132 克罗诺斯)
-        //  - 飞行单位, 17000 血, 速度 2
-        //  - 能力: TimeStopAbility (时间停止, 15秒持续, 10秒充能)
-        //  - 武器: TimeStopBulletType (时间停止子弹)
-        //  - 防作弊: 简化版
-        // ═══════════════════════════════════════════════════════════
-        chronos = new UnitType("chronos") {{
-            health = 17000f;
-            speed = 2f;
-            accel = 0.1f;
-            drag = 0.08f;
-            hitSize = 36f;
-            engineOffset = 19f;
-            engineSize = 4f;
-            flying = true;
-            lowAltitude = true;
-            armor = 12f;
-            rotateSpeed = 3f;
-            range = 510f;
-            outlineColor = Color.valueOf("2e3142");
-            constructor = EndLegsUnit::create;
-            // ★ 使用 WormAI (v158 CommandAI 子类, 自动索敌, 不朝刷新点跑)
-            controller = unit -> new zzw.content.units.WormAI();
-
-            // 时间停止能力 (PU132: duration=15*60, rechargeTime=10*60)
-            abilities.add(new TimeStopAbility(15f * 60f, 10f * 60f));
-
-            weapons.add(new Weapon() {{
-                x = 12f;
-                y = -7.5f;
-                reload = 12f;
-                rotate = true;
-                rotateSpeed = 5f;
-                bullet = new TimeStopBulletType(6f, 510f);
-            }});
-        }};
 
         System.out.println("[Z_Units] load done, configs=" + SegmentWormEntity.configs.keySet());
     }

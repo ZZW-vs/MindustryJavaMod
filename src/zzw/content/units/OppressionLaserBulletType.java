@@ -41,9 +41,6 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
 
     // PU132 颜色常量
     private static final Color SCAR_COLOR = Color.valueOf("f53036");
-    private static final Color END_COLOR = Color.valueOf("ff786e");
-    private static final Color SCAR_COLOR_ALPHA = Color.valueOf("f5303690");
-
     static {
         // 初始化 shape 数组: 24个梯形, 用 circleIn/circleOut 生成纺锤形宽度曲线
         int sign = 1;
@@ -150,29 +147,22 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
             });
 
             // 建筑检测
-            try {
-                Vars.indexer.eachBlock(null, b.x, b.y, length + endLength,
-                        build -> build.team != b.team && build.health > 0,
-                        build -> {
-                            try {
-                                Vec2 nearest = arc.math.geom.Intersector.nearestSegmentPoint(b.x, b.y, ex, ey, build.x, build.y, Tmp.v2);
-                                float dst = b.dst(nearest);
-                                float cw = getWidthCollision(dst, w);
-                                if (cw > 0f && build.within(nearest.x, nearest.y, cw)) {
-                                    Tmp.r2.setCentered(build.x, build.y, build.block.size * Vars.tilesize).grow(w * 2f);
-                                    Vec2 hv = arc.math.geom.Geometry.raycastRect(b.x, b.y, ex, ey, Tmp.r2);
-                                    if (hv != null) {
-                                        hitBuildingAntiCheat(b, build);
-                                        if (hitCount[0] < 8) hit(b, hv.x, hv.y);
-                                        hitCount[0]++;
-                                    }
-                                }
-                            } catch (Throwable ignored) {
-                                // 防御: 第三方mod(如GroundFluidControl)可能在建筑被毁时崩溃
+            Vars.indexer.eachBlock(null, b.x, b.y, length + endLength,
+                    build -> build.team != b.team && build.health > 0,
+                    build -> {
+                        Vec2 nearest = arc.math.geom.Intersector.nearestSegmentPoint(b.x, b.y, ex, ey, build.x, build.y, Tmp.v2);
+                        float dst = b.dst(nearest);
+                        float cw = getWidthCollision(dst, w);
+                        if (cw > 0f && build.within(nearest.x, nearest.y, cw)) {
+                            Tmp.r2.setCentered(build.x, build.y, build.block.size * Vars.tilesize).grow(w * 2f);
+                            Vec2 hv = arc.math.geom.Geometry.raycastRect(b.x, b.y, ex, ey, Tmp.r2);
+                            if (hv != null) {
+                                hitBuildingAntiCheat(b, build);
+                                if (hitCount[0] < 8) hit(b, hv.x, hv.y);
+                                hitCount[0]++;
                             }
-                        });
-            } catch (Throwable ignored) {
-            }
+                        }
+                    });
         }
     }
 

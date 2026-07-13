@@ -26,7 +26,6 @@ public class ShootEffect {
     private static final Color END_COLOR = Color.valueOf("ff786e");
 
     private static final Rand rand = new Rand();
-    private static final Rand rand2 = new Rand();
 
     /**
      * Oppression 发射特效 (170tick, 5060 裁剪半径)
