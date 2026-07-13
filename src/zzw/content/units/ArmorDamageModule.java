@@ -1,8 +1,6 @@
 package zzw.content.units;
 
-import mindustry.content.Fx;
 import mindustry.entities.abilities.Ability;
-import mindustry.entities.abilities.ForceFieldAbility;
 import mindustry.entities.abilities.ShieldRegenFieldAbility;
 import mindustry.gen.Bullet;
 import mindustry.gen.Unit;

@@ -1,7 +1,6 @@
 package zzw.content.mechanics;
 
 import arc.Events;
-import arc.math.Mathf;
 import arc.struct.IntMap;
 import arc.struct.IntSet;
 import arc.struct.Seq;
@@ -10,7 +9,7 @@ import mindustry.gen.Building;
 
 /**
  * 机械组件基类 - 参考 Minecraft Create 模组的源驱动传播树模型
- * 
+ *
  * 核心设计 (参考 Create 的 KineticBlockEntity + RotationPropagator):
  * 1. 每个组件持有一个 source 指针, 指向驱动它的邻居 → 构成传播树
  * 2. 网络 ID = 源方块的 pos() → 天然去重

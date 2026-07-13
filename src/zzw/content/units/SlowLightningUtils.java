@@ -2,17 +2,12 @@ package zzw.content.units;
 
 import arc.func.Boolf;
 import arc.func.Cons;
-import arc.math.geom.Vec2;
 import arc.math.geom.Intersector;
-import arc.math.geom.Position;
-import arc.struct.Seq;
-import arc.util.Tmp;
+
 import mindustry.Vars;
 import mindustry.game.Team;
 import mindustry.gen.Building;
-import mindustry.gen.Bullet;
-import mindustry.gen.Healthc;
-import mindustry.gen.Hitboxc;
+
 import mindustry.gen.Unit;
 import mindustry.gen.Posc;
 import mindustry.world.Tile;

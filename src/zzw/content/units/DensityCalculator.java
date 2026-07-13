@@ -6,7 +6,6 @@ import arc.struct.Seq;
 import mindustry.Vars;
 import mindustry.entities.Units;
 import mindustry.game.Team;
-import mindustry.gen.Building;
 
 public class DensityCalculator {
     private static final float DENSITY_RADIUS = 150f;

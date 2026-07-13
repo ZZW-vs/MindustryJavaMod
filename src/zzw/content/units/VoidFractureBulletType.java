@@ -13,10 +13,7 @@ import mindustry.Vars;
 import mindustry.content.Fx;
 import mindustry.entities.Units;
 import mindustry.gen.Bullet;
-import mindustry.gen.Building;
 import mindustry.gen.Healthc;
-import mindustry.gen.Hitboxc;
-import mindustry.gen.Unit;
 import mindustry.graphics.Drawf;
 
 /**

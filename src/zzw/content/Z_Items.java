@@ -4,6 +4,8 @@ import arc.graphics.Color;
 import mindustry.type.Item;
 
 public class Z_Items {
+    //ProjectUnity物品
+    public static Item Stone;
     // 基础金属
     public static Item Iron, Gold, Andesite, Andesite_Alloy, Brass, Zinc;
     // 金属板材
@@ -14,6 +16,9 @@ public class Z_Items {
     public static Item Campfire_Fire;
 
     public static void load() {
+        //ProjectUnity物品
+        Stone = basic("stone", "3d4547");
+
         // 基础金属
         Iron = basic("iron", "cfcfcf");
         Gold = basic("gold", "f2df82");

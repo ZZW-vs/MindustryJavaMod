@@ -157,8 +157,10 @@ gradle-app.setting
 Thumbs.db
 android/libs/
 
+.feisuan/
 .trae/
 .vscode/
 /参考
-日志.txt
+日志*.txt
+问题.txt
 *.log

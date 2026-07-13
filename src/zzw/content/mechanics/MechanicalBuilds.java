@@ -10,7 +10,7 @@ import arc.scene.ui.layout.Table;
 /**
  * 机械组件实体类
  * 参考 Create 模组: 子类只关心行为, 网络逻辑由基类处理
- * 
+ *
  * 关键 API 变更:
  * - speed → 基类字段 (理论转速)
  * - getSpeed() → 实际转速 (过载时返回 0)

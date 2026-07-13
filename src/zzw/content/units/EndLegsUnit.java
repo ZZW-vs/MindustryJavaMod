@@ -1,7 +1,5 @@
 package zzw.content.units;
 
-import arc.math.Mathf;
-import arc.util.Time;
 import mindustry.gen.UnitEntity;
 
 /**

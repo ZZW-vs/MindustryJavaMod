@@ -2,7 +2,6 @@ package zzw.content.units;
 
 import arc.util.Time;
 import mindustry.entities.abilities.Ability;
-import mindustry.entities.Effect;
 import mindustry.content.Fx;
 import mindustry.gen.Unit;
 import mindustry.gen.Teamc;
