@@ -1173,6 +1173,9 @@ public class Z_Units {
                 reload = 30f;
                 inaccuracy = 15f;
                 rotateSpeed = 5f;
+                // ★ 连发3个 (参考压迫者 create-oppression-void-fracture 武器配置)
+                shoot.shots = 3;
+                shoot.shotDelay = 6f;
                 bullet = new VoidFractureBulletType(32f, 600f) {{
                     ratioDamage = 1f / 50f;
                     ratioStart = damage * 20f;

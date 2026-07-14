@@ -5,6 +5,8 @@ import zzw.content.units.effects.ChargeEffect;
 import zzw.content.units.effects.ShootEffect;
 import zzw.content.units.anticheat.AntiCheatBulletModule;
 import zzw.content.units.anticheat.ArmorDamageModule;
+import zzw.content.units.anticheat.AbilityDamageModule;
+import zzw.content.units.anticheat.ForceFieldDamageModule;
 
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
@@ -92,9 +94,11 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
         bleedDuration = 10f * 60f;
         pierceShields = true;
 
-        // PU132 三模块组合
+        // PU132 三模块组合 (原版 OppressionLaserBulletType L56-60)
         modules = new AntiCheatBulletModule[]{
-            new ArmorDamageModule(0.002f, 4f, 20f, 4f)
+            new ArmorDamageModule(0.002f, 4f, 20f, 4f),
+            new AbilityDamageModule(40f, 350f, 6f, 0.001f, 4f),
+            new ForceFieldDamageModule(8f, 20f, 220f, 6f, 1f / 40f)
         };
     }
 

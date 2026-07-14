@@ -1259,8 +1259,10 @@ public class SegmentWormEntity extends UnitEntity {
 
         // ★ 绘制段身影子 (PU132 WormDefaultUnit.drawShadow L220-227)
         // 段身不在 Groups.draw 中, 不会自动画影子, 需由头部统一绘制
-        // 影子在 ground 层 (低于飞行单位), 需在段身 drawBody 之前画
+        // ★ 关键: drawShadow 前必须设 Draw.z(Layer.darkness), 否则影子画在 flyingLayer
+        //   会盖在段身贴图之上 (v158 UnitType.draw L1495-1497 会自动设 z, 这里手动设)
         if (segments.length > 0) {
+            Draw.z(mindustry.graphics.Layer.darkness);
             for (int i = 0; i < segments.length; i++) {
                 SegmentUnitEntity seg = segments[i];
                 if (seg != null && seg.isAdded() && !seg.dead && seg.type != null) {

@@ -26,13 +26,13 @@ public class VoidPelletBulletType extends AntiCheatBulletTypeBase {
         lifetime = 90f;
         trailColor = Color.black;
         trailLength = 16;
-        trailWidth = 2f;
+        trailWidth = 3f;
         despawnEffect = Fx.hitLancer;
         hitEffect = Fx.hitLancer;
         homingPower = 0.01f;
         homingRange = 50f;
         homingDelay = 20f;
-        hitSize = 3f;
+        hitSize = 5f;
         keepVelocity = false;
         // ★ PU132 原版没有 drag, 移除之前误加的 drag=0.05f
     }
@@ -62,8 +62,12 @@ public class VoidPelletBulletType extends AntiCheatBulletTypeBase {
     @Override
     public void draw(Bullet b) {
         drawTrail(b);
+        // ★ 白色描边 (让黑色子弹在任何背景上可见, PU132 原版纯黑在暗色背景上看不见)
+        Draw.color(Color.white);
+        Fill.square(b.x(), b.y(), 4f, b.rotation() + 45f);
+        // 黑色核心
         Draw.color(Color.black);
-        Fill.square(b.x(), b.y(), 2f, b.rotation() + 45f);
+        Fill.square(b.x(), b.y(), 3f, b.rotation() + 45f);
     }
 
     @Override

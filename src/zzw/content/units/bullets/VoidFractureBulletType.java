@@ -227,14 +227,20 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
     @Override
     public void draw(Bullet b) {
         if (!(b.data() instanceof FractureData data)) return;
-        Draw.color(Color.black);
         if (b.fdata() <= 0f) {
             // ===== Phase 1: 小三角 (PU132 L192-195) =====
             float in = Mathf.clamp(b.time() / delay);
+            // ★ 白色描边 (让黑色子弹可见)
+            Draw.color(Color.white);
+            Drawf.tri(b.x(), b.y(), width * in + 1f, length + 1f, b.rotation());
+            Drawf.tri(b.x(), b.y(), width * in + 1f, length + 1f, b.rotation() + 180f);
+            // 黑色核心
+            Draw.color(Color.black);
             Drawf.tri(b.x(), b.y(), width * in, length, b.rotation());
             Drawf.tri(b.x(), b.y(), width * in, length, b.rotation() + 180f);
         } else {
             // ===== Phase 2: 激光束 (PU132 L196-211, 类似压迫者大招激光) =====
+            Draw.color(Color.black);
             Drawf.tri(b.x(), b.y(), width * b.fout(), length, b.rotation());
             Drawf.tri(b.x(), b.y(), width * b.fout(), length / 2f, b.rotation() + 180f);
             float ang = b.dst2(data.x, data.y) >= 0.0001f ? b.angleTo(data.x, data.y) : b.rotation() + 180f;
