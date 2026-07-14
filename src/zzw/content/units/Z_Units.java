@@ -6,6 +6,30 @@ import mindustry.graphics.Pal;
 import mindustry.type.UnitType;
 import mindustry.type.Weapon;
 
+import zzw.content.units.abilities.TimeStopAbility;
+import zzw.content.units.anticheat.AntiCheatBulletModule;
+import zzw.content.units.anticheat.ArmorDamageModule;
+import zzw.content.units.anticheat.ForceFieldDamageModule;
+import zzw.content.units.bullets.EndBasicBulletType;
+import zzw.content.units.bullets.EndContinuousLaserBulletType;
+import zzw.content.units.bullets.EndRailBulletType;
+import zzw.content.units.bullets.EndSweepLaser;
+import zzw.content.units.bullets.OppressionLaserBulletType;
+import zzw.content.units.bullets.SlowLightningBulletType;
+import zzw.content.units.bullets.TimeStopBulletType;
+import zzw.content.units.bullets.VoidAreaBulletType;
+import zzw.content.units.bullets.VoidFractureBulletType;
+import zzw.content.units.bullets.VoidPelletBulletType;
+import zzw.content.units.bullets.VoidPortalBulletType;
+import zzw.content.units.effects.ChargeEffect;
+import zzw.content.units.effects.HitEffect;
+import zzw.content.units.effects.WormDecal;
+import zzw.content.units.entities.EndLegsUnit;
+import zzw.content.units.entities.SegmentUnitEntity;
+import zzw.content.units.entities.SegmentWormEntity;
+import zzw.content.units.entities.SlowLightningEntity;
+import zzw.content.units.weapons.SweepWeapon;
+
 /**
  * 分段单位加载类
  *
@@ -134,7 +158,7 @@ public class Z_Units {
             constructor = SegmentWormEntity::create;
             // ★ 使用 WormAI (待机静止, 不自动朝 spawn 移动)
             // v154.3: defaultController 改名为 aiController
-            controller = unit -> new zzw.content.units.WormAI();
+            controller = unit -> new zzw.content.units.ai.WormAI();
 
             // ===== 头部武器: 双激光 (PU132 原配置) =====
             // PU132 UnityUnitTypes.java 第3024-3037行: 匿名武器, 无炮台贴图
@@ -274,7 +298,7 @@ public class Z_Units {
             constructor = SegmentWormEntity::create;
             // ★ 使用 WormAI (待机静止, 不自动朝 spawn 移动)
             // v154.3: defaultController 改名为 aiController
-            controller = unit -> new zzw.content.units.WormAI();
+            controller = unit -> new zzw.content.units.ai.WormAI();
 
             // ===== 头部武器: 12 发散 SapBullet (PU132 第3250-3267行) =====
             // 瘟疫激光: 12 发同时散射, SapBullet 自动回血
@@ -405,7 +429,7 @@ public class Z_Units {
             // ★ PU132: rotateSpeed=2.7f, angleLimit=25f
             rotateSpeed = 2.7f;
             constructor = SegmentWormEntity::create;
-            controller = unit -> new zzw.content.units.WormAI();
+            controller = unit -> new zzw.content.units.ai.WormAI();
 
             // ===== 头部武器: PointDrainLaser (PU132 第3309-3327行) =====
             // 吸血激光: 持续发射, 吸血 0.5%, 最大长度 160, 击退 -34 (拉向自己)
@@ -420,7 +444,7 @@ public class Z_Units {
                 continuous = true;
                 alternate = false;
                 minShootVelocity = 0.01f;
-                bullet = new zzw.content.units.PointDrainLaserBulletType(45f) {{
+                bullet = new zzw.content.units.bullets.PointDrainLaserBulletType(45f) {{
                     maxLength = 160f;
                     drainPercent = 0.5f;
                     width = 6f;
@@ -570,7 +594,7 @@ public class Z_Units {
             immunities.addAll(mindustry.Vars.content.getBy(mindustry.ctype.ContentType.status));
 
             constructor = SegmentWormEntity::create;
-            controller = unit -> new zzw.content.units.WormAI();
+            controller = unit -> new zzw.content.units.ai.WormAI();
 
             // 头部武器1: 主激光 (PU132 UnityBullets.endLaser, 完整移植)
             weapons.add(new Weapon("create-devourer-main-laser") {{
@@ -900,7 +924,7 @@ public class Z_Units {
             immunities.addAll(mindustry.Vars.content.getBy(mindustry.ctype.ContentType.status));
 
             constructor = SegmentWormEntity::create;
-            controller = unit -> new zzw.content.units.WormAI();
+            controller = unit -> new zzw.content.units.ai.WormAI();
             // range 用最大武器射程, 后续添加武器后更新
             range = 850f;
 
@@ -1102,7 +1126,7 @@ public class Z_Units {
             outlineColor = Color.valueOf("2e3142");
             constructor = EndLegsUnit::create;
             // ★ 使用 WormAI (v158 CommandAI 子类, 自动索敌, 不朝刷新点跑)
-            controller = unit -> new zzw.content.units.WormAI();
+            controller = unit -> new zzw.content.units.ai.WormAI();
 
             weapons.add(new Weapon() {{
                 x = 4.25f;
@@ -1139,7 +1163,7 @@ public class Z_Units {
             outlineColor = Color.valueOf("2e3142");
             constructor = EndLegsUnit::create;
             // ★ 使用 WormAI (v158 CommandAI 子类, 自动索敌, 不朝刷新点跑)
-            controller = unit -> new zzw.content.units.WormAI();
+            controller = unit -> new zzw.content.units.ai.WormAI();
 
             weapons.add(new Weapon("create-end-small-mount") {{
                 x = 8.5f;
@@ -1182,7 +1206,7 @@ public class Z_Units {
             outlineColor = Color.valueOf("2e3142");
             constructor = EndLegsUnit::create;
             // ★ 使用 WormAI (v158 CommandAI 子类, 自动索敌, 不朝刷新点跑)
-            controller = unit -> new zzw.content.units.WormAI();
+            controller = unit -> new zzw.content.units.ai.WormAI();
 
             // 时间停止能力 (PU132: duration=15*60, rechargeTime=10*60)
             abilities.add(new TimeStopAbility(15f * 60f, 10f * 60f));
