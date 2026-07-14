@@ -29,11 +29,11 @@ public class Z_Blocks {
         registerEventListeners();
     }
 
-    private static Wall wall(String name, ItemStack[] requirements, int size, int health) {
+    private static Wall wall(String name, ItemStack[] requirements, int size_, int health_) {
         return new Wall(name) {{
             requirements(Category.defense, requirements);
-            this.size = size;
-            this.health = health;
+            size = size_;
+            health = health_;
         }};
     }
 
@@ -64,11 +64,11 @@ public class Z_Blocks {
         }};
     }
 
-    private static Block decorative(String name, ItemStack[] requirements, int health) {
+    private static Block decorative(String name, ItemStack[] requirements, int health_) {
         return new Block(name) {{
             requirements(Category.effect, requirements);
             size = 1;
-            this.health = health;
+            health = health_;
             destructible = true;
             allowDiagonal = true;
             solid = true;

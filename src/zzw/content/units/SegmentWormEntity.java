@@ -890,16 +890,16 @@ public class SegmentWormEntity extends UnitEntity {
     /** 限制角度差 (PU132 Utils.clampedAngle 第200行)
      *  将 angle 限制在 relative ± limit 范围内
      *  用于段身朝向: 不能相对前一段转超过 angleLimit */
-    private static float clampedAngle(float angle, float relative, float limit) {
-        if (limit >= 180f) return angle;
-        if (limit <= 0f) return relative;
-        float dst = angleDistSigned(angle, relative);
-        if (Math.abs(dst) > limit) {
-            float val = dst > 0 ? dst - limit : dst + limit;
-            return (angle - val) % 360f;
-        }
-        return angle;
-    }
+    // private static float clampedAngle(float angle, float relative, float limit) {
+    //     if (limit >= 180f) return angle;
+    //     if (limit <= 0f) return relative;
+    //     float dst = angleDistSigned(angle, relative);
+    //     if (Math.abs(dst) > limit) {
+    //         float val = dst > 0 ? dst - limit : dst + limit;
+    //         return (angle - val) % 360f;
+    //     }
+    //     return angle;
+    // }
 
     /** 重写 remove(): 确保所有段身也被移除 (借鉴 PU132 WormDefaultUnit.remove L270-276)
      *  ★ 防秒杀: lastHealth > 0 时拒绝移除 (PU132 EndWormUnit.remove L72-85) */

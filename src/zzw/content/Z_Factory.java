@@ -21,7 +21,7 @@ public class Z_Factory {
     }
 
     private static FactoryBoost.BoostedGenericCrafter plateMaker(String name,
-            ItemStack[] requirements, mindustry.type.Item input, mindustry.type.Item output, int size, float craftTime) {
+            ItemStack[] requirements, mindustry.type.Item input, mindustry.type.Item output, int size_, float craftTime_) {
         return new FactoryBoost.BoostedGenericCrafter(name) {{
             buildType = BoostedGenericCrafterBuild::new;
             requirements(Category.crafting, requirements);
@@ -29,14 +29,14 @@ public class Z_Factory {
             craftEffect = Fx.pulverizeMedium;
             outputItem = new ItemStack(output, 2);
             consumeItem(input, 2);
-            this.size = size;
+            size = size_;
             hasItems = true;
-            this.craftTime = craftTime;
+            craftTime = craftTime_;
         }};
     }
 
     private static FactoryBoost.BoostedGenericCrafter largePlateMaker(String name,
-            ItemStack[] requirements, mindustry.type.Item input, mindustry.type.Item output, float craftTime) {
+            ItemStack[] requirements, mindustry.type.Item input, mindustry.type.Item output, float craftTime_) {
         return new FactoryBoost.BoostedGenericCrafter(name) {{
             buildType = BoostedGenericCrafterBuild::new;
             requirements(Category.crafting, requirements);
@@ -48,7 +48,7 @@ public class Z_Factory {
             consumePower(0.125f);
             size = 3;
             hasItems = true;
-            this.craftTime = craftTime;
+            craftTime = craftTime_;
         }};
     }
 

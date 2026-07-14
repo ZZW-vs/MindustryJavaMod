@@ -10,13 +10,13 @@ import mindustry.gen.UnitEntity;
  */
 public class EndLegsUnit extends UnitEntity {
     private final AntiCheatBase antiCheat = new AntiCheatBase();
-    private float lastMaxHealth = 0f;
+    // private float lastMaxHealth;
 
     @Override
     public void setType(mindustry.type.UnitType type) {
         super.setType(type);
         antiCheat.lastHealth = type.health;
-        lastMaxHealth = type.health;
+        // lastMaxHealth = type.health;
     }
 
     @Override

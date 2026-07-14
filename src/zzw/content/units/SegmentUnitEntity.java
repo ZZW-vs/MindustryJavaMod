@@ -88,7 +88,7 @@ public class SegmentUnitEntity extends UnitEntity {
             // ★ 段身武器: 参照 PU132 WormSegmentUnit.updateWeapon 重写索敌部分
             // 发射/冷却/旋转交给 v154.3 原版 Weapon.update() 处理
             if (mounts != null && mounts.length > 0) {
-                boolean can = canShoot();
+                // boolean can = canShoot();
 
                 // ★ PU132 弹幕同步机制 (WormAI.updateWeapons L48-63):
                 // 当头部被玩家控制且正在射击, 段身在 barrageRange 内时,
@@ -488,7 +488,7 @@ public class SegmentUnitEntity extends UnitEntity {
     }
 
     /** 调试标志 */
-    private static boolean debugDrawLogged = false;
+    // private static boolean debugDrawLogged = false;
 
     /**
      * 查找贴图: 先试 name, 找不到再试 prefixedName (带 mod 前缀)
