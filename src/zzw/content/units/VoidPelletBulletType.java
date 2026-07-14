@@ -4,15 +4,21 @@ import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
 import arc.math.Mathf;
-import arc.util.Tmp;
+import arc.util.Time;
 import mindustry.content.Fx;
 import mindustry.gen.Bullet;
 
 /**
- * 虚空弹丸 (移植自 PU132 VoidPelletBulletType)
+ * 虚空弹丸 (完全复刻 PU132 VoidPelletBulletType)
+ *
+ * PU132 原版逻辑:
  * - 黑色方块子弹, 软跟踪目标
- * - lifetime=90f
- * - homingPower=0.01f
+ * - init 时: 记录初始角度到 fdata, 然后 rotation 随机偏转±120°
+ * - update 时: 用 angleDistSigned(rotation, fdata) 计算带符号角度差, 平滑转向回初始角度
+ * - 当角度差<=0.06° 时停止转向 (fdata=-361f 标记完成)
+ *
+ * ★ 之前 bug: 用 Tmp.v1.trns + angleTo 计算角度差是错的 (算的是两点向量角度, 不是角度差)
+ *   正确做法: 直接 angleDistSigned(rotation, fdata)
  */
 public class VoidPelletBulletType extends AntiCheatBulletTypeBase {
     public VoidPelletBulletType(float speed, float damage) {
@@ -28,13 +34,13 @@ public class VoidPelletBulletType extends AntiCheatBulletTypeBase {
         homingDelay = 20f;
         hitSize = 3f;
         keepVelocity = false;
-        drag = 0.05f;
+        // ★ PU132 原版没有 drag, 移除之前误加的 drag=0.05f
     }
 
     @Override
     public void init(Bullet b) {
         super.init(b);
-        // 记录初始角度, 用于平滑转向
+        // 记录初始角度, 然后随机偏转±120° (PU132 L27-30)
         b.fdata(b.rotation());
         b.rotation(b.rotation() + Mathf.range(120f));
     }
@@ -42,13 +48,12 @@ public class VoidPelletBulletType extends AntiCheatBulletTypeBase {
     @Override
     public void update(Bullet b) {
         super.update(b);
-        // 平滑转向到目标方向 (用 vel.angle() vs 初始角度差)
+        // 平滑转向回初始角度 (PU132 L34-42)
+        // fdata=-361f 表示转向完成, 不再处理
         if (b.fdata() != -361f) {
-            Tmp.v1.trns(b.rotation(), 1f);
-            Tmp.v2.trns(b.fdata(), 1f);
-            float targetAngle = Tmp.v1.angleTo(Tmp.v2);
-            b.vel().rotate(-targetAngle * Mathf.clamp(0.2f * arc.util.Time.delta));
-            if (Math.abs(targetAngle) <= 0.06f) {
+            float ang = angleDistSigned(b.rotation(), b.fdata());
+            b.vel().rotate(-ang * Mathf.clamp(0.2f * Time.delta));
+            if (Math.abs(ang) <= 0.06f) {
                 b.fdata(-361f);
             }
         }
@@ -63,5 +68,17 @@ public class VoidPelletBulletType extends AntiCheatBulletTypeBase {
 
     @Override
     public void drawLight(Bullet b) {
+    }
+
+    /**
+     * 带符号角度差: 从 b 到 a 需要旋转的角度, 归一化到 [-180, 180]
+     * 正值=a 在 b 逆时针方向, 负值=a 在 b 顺时针方向
+     * (复刻 PU132 Utils.angleDistSigned)
+     */
+    private static float angleDistSigned(float a, float b) {
+        float d = (a - b) % 360f;
+        if (d > 180f) d -= 360f;
+        if (d < -180f) d += 360f;
+        return d;
     }
 }

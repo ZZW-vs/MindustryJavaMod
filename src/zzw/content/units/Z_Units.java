@@ -50,7 +50,7 @@ public class Z_Units {
 
         // —— 段身 UnitType (先创建, 头部要引用它) ——
         arcnelidiaSegment = new UnitType("arcnelidia-segment") {{
-            health = 1040;  // 800 * 1.3
+            health = 800;  // PU132 原版: 与头部一致 (段身血量由头部分布)
             speed = 0f;                 // 段身不需要自己移动 (由头部驱动)
             // ★ hitSize=19.75f (19.25 + 0.5, 用户要求增大 0.5)
             // 碰撞计算: 段间距22.7 > 半径9.875+9.875=19.75, 不重叠 (间隙2.95)
@@ -108,7 +108,7 @@ public class Z_Units {
         // —— 头部 Arcnelidia 飞行分段虫子 ——
         arcnelidia = new UnitType("arcnelidia") {{
             // ===== 基础属性 (PU132 原值) =====
-            health = 1160;  // 800 * 1.3 + 120
+            health = 800;  // PU132 原版
             speed = 4f;
             accel = 0.035f;
             rotateSpeed = 3.2f;
@@ -207,7 +207,7 @@ public class Z_Units {
 
         // —— 段身 UnitType ——
         toxobyteSegment = new UnitType("toxobyte-segment") {{
-            health = 320;  // 200 + 120
+            health = 200f;  // PU132 原版: 与头部一致
             speed = 0f;
             // ★ hitSize=14.2f (用户指定)
             hitSize = 14.2f;
@@ -252,7 +252,7 @@ public class Z_Units {
         // —— 头部 Toxobyte ——
         toxobyte = new UnitType("toxobyte") {{
             // ===== 基础属性 (PU132 UnityUnitTypes.java 第3231-3248行) =====
-            health = 280f;  // 200 + 80
+            health = 200f;  // PU132 原版
             speed = 3f;
             accel = 0.035f;
             rotateSpeed = 3f;       // PU132 未设, 用默认
@@ -331,7 +331,7 @@ public class Z_Units {
 
         // —— 段身 UnitType ——
         catenapedeSegment = new UnitType("catenapede-segment") {{
-            health = 680;  // 500 + 180
+            health = 750f;  // PU132 原版: 与头部一致
             speed = 0f;
             hitSize = 28f;
             armor = 5f;
@@ -386,7 +386,7 @@ public class Z_Units {
         // —— 头部 Catenapede ——
         catenapede = new UnitType("catenapede") {{
             // ===== 基础属性 (PU132 UnityUnitTypes.java 第3284-3306行) =====
-            health = 850f;  // 750 + 100
+            health = 750f;  // PU132 原版
             speed = 2.4f;
             accel = 0.06f;
             drag = 0.03f;
@@ -455,7 +455,7 @@ public class Z_Units {
 
         // ★ Devourer 段身 ★
         devourerSegment = new UnitType("devourer-segment") {{
-            health = 46000f;  // 25000 * 1.8 + 1000 (按头部+5万比例)
+            health = 1250000f;  // PU132 原版: 与头部一致
             speed = 0f;
             hitSize = 52f;  // 原 40f + 12 (用户要求加大12)
             armor = 8f;
@@ -550,7 +550,7 @@ public class Z_Units {
 
         // ★ Devourer 头部 ★
         devourer = new UnitType("devourer") {{
-            health = 2300000f;  // 1250000 * 1.8 + 50000
+            health = 1250000f;  // PU132 原版
             flying = true;
             speed = 5f;
             accel = 0.12f;
@@ -668,7 +668,7 @@ public class Z_Units {
         // —— 段身 UnitType ——
         oppressionSegment = new UnitType("oppression-segment") {{
             // PU132: 段身血量由头部 healthDistribution 分配, 这里设基础值
-            health = 25000f;  // 10000 * 2.5
+            health = 2500000f;  // PU132 原版: 与头部一致
             speed = 0f;
             // ★ hitSize=180 (用户指定)
             hitSize = 180f;
@@ -876,9 +876,9 @@ public class Z_Units {
         // —— 头部 Oppression ——
         oppression = new UnitType("oppression") {{
             // ===== 基础属性 (PU132 UnityUnitTypes.java 第4055-4095行) =====
-            health = 9375000f;  // 6250000 * 1.5
+            health = 2500000f;  // PU132 原版
             flying = true;
-            speed = 5.0f;  // 加快移动速度
+            speed = 4.5f;  // PU132 原版
             accel = 0.13f;
             drag = 0.12f;
             // PU132: hitSize=(114*2)-10=218f
@@ -955,6 +955,50 @@ public class Z_Units {
                     // PU132: pierceCap=3, pierce=pierceBuilding=true
                     pierce = true;
                     pierceCap = 3;
+                }};
+            }});
+
+            // ===== 阶段4: 头部大激光连发 (PU132 L4999-5051 VoidFractureBulletType, shots=3 连发3个) =====
+            // PU132 原版: EnergyChargeWeapon with shots=3, shotDelay=6f, reload=120f
+            // 简化: 用普通 Weapon 替代 EnergyChargeWidget (跳过 drawCharge 视觉, 保留核心 3 连发机制)
+            // PU132 有 6 个此武器分列身体两侧, 这里简化为 1 个 mirror=true (左右各1)
+            weapons.add(new Weapon("create-oppression-void-fracture") {{
+                x = 85f;
+                y = -50f;
+                shadow = 47f;
+                mirror = true;
+                alternate = true;
+                rotate = true;
+                rotateSpeed = 2f;
+                reload = 120f;
+                inaccuracy = 20f;
+                shootCone = 7f;
+                shootY = 0f;
+                velocityRnd = 0.1f;
+                // PU132 原版: shots=3, shotDelay=6f (3连发)
+                shoot.shots = 3;
+                shoot.shotDelay = 6f;
+
+                bullet = new VoidFractureBulletType(40f, 800f) {{
+                    speed = 5f;
+                    delay = 50f;
+                    lifetime = 60f;
+                    drag = 0.09f;
+                    nextLifetime = 13f;
+                    ratioDamage = 1f / 170f;
+                    ratioStart = 30000f;
+                    bleedDuration = 40f;
+                    length = 52f;
+                    width = 20f;
+                    widthTo = 8f;
+                    spikesRand = 16f;
+                    spikesDamage = 310f;
+                    targetingRange = 400f;
+                    maxTargets = 20;
+                    modules = new AntiCheatBulletModule[]{
+                        new ArmorDamageModule(50f, 50f, 2f),
+                        new ForceFieldDamageModule(2f, 20f, 220f, 7f, 1f / 50f, 2f * 60f)
+                    };
                 }};
             }});
         }};
@@ -1097,7 +1141,7 @@ public class Z_Units {
             // ★ 使用 WormAI (v158 CommandAI 子类, 自动索敌, 不朝刷新点跑)
             controller = unit -> new zzw.content.units.WormAI();
 
-            weapons.add(new Weapon() {{
+            weapons.add(new Weapon("create-end-small-mount") {{
                 x = 8.5f;
                 y = -4.5f;
                 mirror = true;
@@ -1143,7 +1187,7 @@ public class Z_Units {
             // 时间停止能力 (PU132: duration=15*60, rechargeTime=10*60)
             abilities.add(new TimeStopAbility(15f * 60f, 10f * 60f));
 
-            weapons.add(new Weapon() {{
+            weapons.add(new Weapon("create-end-point-defence") {{
                 x = 12f;
                 y = -7.5f;
                 reload = 12f;
