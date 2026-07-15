@@ -1671,7 +1671,7 @@ public class Z_Units {
                 rotate = true;
                 rotateSpeed = 5f;
                 shootCone = 30f;
-                shootSound = mindustry.gen.Sounds.missile;
+                shootSound = zzw.content.Z_Sounds.endMissile;  // ★ v158 无 Sounds.missile, 用自定义 endMissile
                 bullet = new mindustry.entities.bullet.MissileBulletType(3.8f, 9f) {{
                     width = 8f;
                     height = 8f;
@@ -1702,7 +1702,7 @@ public class Z_Units {
                 rotateSpeed = 5f;
                 shootCone = 30f;
                 flipSprite = true;
-                shootSound = mindustry.gen.Sounds.missile;
+                shootSound = zzw.content.Z_Sounds.endMissile;  // ★ v158 无 Sounds.missile, 用自定义 endMissile
                 bullet = new mindustry.entities.bullet.MissileBulletType(3.8f, 9f) {{
                     width = 8f;
                     height = 8f;
@@ -1734,7 +1734,7 @@ public class Z_Units {
                 rotateSpeed = 5f;
                 shootCone = 30f;
                 flipSprite = true;
-                shootSound = mindustry.gen.Sounds.missile;
+                shootSound = zzw.content.Z_Sounds.endMissile;  // ★ v158 无 Sounds.missile, 用自定义 endMissile
                 bullet = new mindustry.entities.bullet.MissileBulletType(3.8f, 9f) {{
                     width = 8f;
                     height = 8f;
@@ -1765,7 +1765,7 @@ public class Z_Units {
                 rotateSpeed = 5f;
                 shootCone = 30f;
                 flipSprite = true;
-                shootSound = mindustry.gen.Sounds.missile;
+                shootSound = zzw.content.Z_Sounds.endMissile;  // ★ v158 无 Sounds.missile, 用自定义 endMissile
                 bullet = new mindustry.entities.bullet.MissileBulletType(3.8f, 9f) {{
                     width = 8f;
                     height = 8f;
@@ -1857,7 +1857,7 @@ public class Z_Units {
                 rotate = true;
                 rotateSpeed = 3f;
                 shootCone = 30f;
-                shootSound = mindustry.gen.Sounds.missile;
+                shootSound = zzw.content.Z_Sounds.endMissile;  // ★ v158 无 Sounds.missile, 用自定义 endMissile
                 bullet = new mindustry.entities.bullet.MissileBulletType(4f, 200f) {{
                     lifetime = 4f * 60f;
                     homingPower = 0.08f;
