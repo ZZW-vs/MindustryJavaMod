@@ -70,6 +70,10 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
         despawnEffect = Fx.none;
         smokeEffect = Fx.none;
         hitEffect = Fx.hitLancer;  // PU132: HitFx.voidHit, v158 用 Fx.hitLancer 替代
+        // ★ 关键: 设置默认 lifetime 必须 > delay(30f), 否则子弹在 Phase 1 悬停阶段就消失,
+        //   永远不会进入 Phase 2 冲刺激光 (用户反馈"虚空容器没有激光"的根因)
+        //   oppression 在 Z_Units 显式设 lifetime=60f, voidVessel 未设 → 用默认值
+        lifetime = 60f;
     }
 
     @Override
