@@ -89,6 +89,9 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
                 if (!(e.data instanceof VoidFractureData data)) return;
                 float rot = Angles.angle(data.x, data.y, data.x2, data.y2);
 
+                // ★ 显式设置渲染层级, 确保余晖激光显示在飞行单位之上
+                Draw.z(Layer.flyingUnit + 1f);
+                Draw.blend();
                 Draw.color(Color.black);
                 for (int i = 0; i < 3; i++) {
                     float f = Mathf.lerp(data.b.width, data.b.widthTo, i / 2f);
@@ -97,7 +100,6 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
                     Draw.alpha(a);
                     Lines.stroke(f * e.fout());
                     Lines.line(data.x, data.y, data.x2, data.y2, false);
-                    // placeholder
                     Drawf.tri(data.x2, data.y2, f * 1.22f * e.fout(), f * 2f, rot);
                     Drawf.tri(data.x, data.y, f * 1.22f * e.fout(), f * 2f, rot + 180f);
                 }
@@ -112,7 +114,7 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
                         Fill.circle(x1, y1, ((data.b.widthTo + 1f) / 1.22f) * e.fout());
                     }
                 }
-            }).layer(Layer.effect + 0.03f);
+            }).layer(Layer.flyingUnit + 1f);
             // ★ v158: Effect 必须调用 init() 注册到 Effects, 否则 Effect.at() 不会渲染
             voidFractureEffect.init();
         }
@@ -347,39 +349,46 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
     /**
      * ★ 完全按 PU132 原版 draw (L189-213)
      * 纯黑色绘制, 三层激光束叠加
+     *
+     * ★ v158 适配:
+     *   - 显式设置 Draw.z(Layer.flyingUnit + 1f), 确保激光显示在飞行单位之上
+     *   (BulletComp.draw() 设的 Draw.z(type.layer) = Layer.effect+0.03f 可能被单位覆盖)
+     *   - 显式调用 Draw.blend() 重置混合模式
+     *   - P2 第一帧 pos==data 时跳过 Lines.line, 避免 length=0 导致 NaN 顶点
      */
     @Override
     public void draw(Bullet b) {
         if (!(b.data() instanceof FractureData data)) {
-            System.out.println("[VF] draw no-FractureData id=" + b.id);
             return;
         }
-        // 每帧打印 draw 调用 (调试用)
-        System.out.println("[VF] draw id=" + b.id + " fdata=" + b.fdata() + " t=" + b.time()
-            + " pos=(" + b.x() + "," + b.y() + ") data=(" + data.x + "," + data.y + ")"
-            + " fout=" + b.fout() + " lifetime=" + b.lifetime());
+        // ★ 显式设置渲染层级 (像 OppressionLaserBulletType 那样)
+        Draw.z(Layer.flyingUnit + 1f);
+        Draw.blend();
         Draw.color(Color.black);
         if (b.fdata() <= 0f) {
             // ===== Phase 1: 小三角 (PU132 L192-195) =====
-            // PU132 原版: float in = Mathf.clamp(b.time / delay);
-            // 两反向三角形拼成菱形, in 从 0→1 随时间增大
             float in = Mathf.clamp(b.time() / delay);
             Drawf.tri(b.x(), b.y(), width * in, length, b.rotation());
             Drawf.tri(b.x(), b.y(), width * in, length, b.rotation() + 180f);
         } else {
             // ===== Phase 2: 激光束 (PU132 L196-211) =====
-            Drawf.tri(b.x(), b.y(), width * b.fout(), length, b.rotation());
-            Drawf.tri(b.x(), b.y(), width * b.fout(), length / 2f, b.rotation() + 180f);
-            float ang = b.dst2(data.x, data.y) >= 0.0001f ? b.angleTo(data.x, data.y) : b.rotation() + 180f;
-            // 三层叠加的激光束 (PU132 原版)
-            for (int i = 0; i < 3; i++) {
-                float f = Mathf.lerp(width, widthTo, i / 2f);
-                float a = Mathf.lerp(0.25f, 1f, (i / 2f) * (i / 2f));
-                Draw.alpha(a);
-                Lines.stroke(f);
-                Lines.line(data.x, data.y, b.x(), b.y(), false);
-                Drawf.tri(b.x(), b.y(), f * 1.22f, f * 2f, ang + 180f);
-                Drawf.tri(data.x, data.y, f * 1.22f, f * 2f, ang);
+            float w = width * b.fout();
+            Drawf.tri(b.x(), b.y(), w, length, b.rotation());
+            Drawf.tri(b.x(), b.y(), w, length / 2f, b.rotation() + 180f);
+            // ★ P2 第一帧 pos==data 时, Lines.line 会因 length=0 产生 NaN 顶点, 跳过
+            float segLen2 = b.dst2(data.x, data.y);
+            float ang = segLen2 >= 0.0001f ? b.angleTo(data.x, data.y) : b.rotation() + 180f;
+            if (segLen2 >= 0.0001f) {
+                // 三层叠加的激光束 (PU132 原版)
+                for (int i = 0; i < 3; i++) {
+                    float f = Mathf.lerp(width, widthTo, i / 2f);
+                    float a = Mathf.lerp(0.25f, 1f, (i / 2f) * (i / 2f));
+                    Draw.alpha(a);
+                    Lines.stroke(f);
+                    Lines.line(data.x, data.y, b.x(), b.y(), false);
+                    Drawf.tri(b.x(), b.y(), f * 1.22f, f * 2f, ang + 180f);
+                    Drawf.tri(data.x, data.y, f * 1.22f, f * 2f, ang);
+                }
             }
         }
     }
