@@ -2093,8 +2093,7 @@ public class Z_Units {
                 rotationOffset = 35f;
                 segments = 17;
                 segmentLength = 37.25f;  // PU132 原版
-                // ★ 减小角度限制 (PU132 默认65, 改为30让鞭子更直, 像多节单位连接)
-                angleLimit = 30f;
+                // PU132 原版: 不设置angleLimit, 使用默认65f, 让鞭子能自然向外弯曲
                 firstSegmentAngleLimit = 20f;  // PU132 原版
                 // ★ 降低速度+增大drag让动态更慢更稳定
                 rotationSpeed = 1.5f;   // 3→1.5
@@ -2135,15 +2134,14 @@ public class Z_Units {
                 rotationOffset = 30f;
                 segments = 14;
                 segmentLength = 37.25f;
-                // ★ 减小角度限制 (PU132 默认65, 改为30让鞭子更直)
-                angleLimit = 30f;
+                // PU132 原版: 不设置angleLimit, 使用默认65f
                 firstSegmentAngleLimit = 18f;
                 swayOffset = 45f;
                 // ★ 降低速度+增大drag
                 rotationSpeed = 1.5f;
                 speed = 4f;
                 accel = 0.1f;
-                drag = 0.12f;
+                drag = 0.15f;
                 mirror = true;
                 top = true;
                 automatic = false;
@@ -2175,15 +2173,14 @@ public class Z_Units {
                 rotationOffset = 25f;
                 segments = 9;
                 segmentLength = 37.25f;
-                // ★ 减小角度限制 (PU132 默认65, 改为30让鞭子更直)
-                angleLimit = 30f;
+                // PU132 原版: 不设置angleLimit, 使用默认65f
                 firstSegmentAngleLimit = 16f;
                 swayOffset = 90f;
                 // ★ 降低速度+增大drag
                 rotationSpeed = 1.5f;
                 speed = 4f;
                 accel = 0.1f;
-                drag = 0.12f;
+                drag = 0.15f;
                 mirror = true;
                 top = true;
                 automatic = false;

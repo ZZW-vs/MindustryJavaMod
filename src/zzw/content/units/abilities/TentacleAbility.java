@@ -379,13 +379,12 @@ public class TentacleAbility extends Ability {
                 TentacleSeg seg = segs[s];
                 TextureRegion reg = (s == segs.length - 1 && tipRegion.found()) ? tipRegion : region;
                 if (reg == null || !reg.found()) continue;
-                // ★ 用 segmentLength 作为线段长度 (而非 reg.width * Draw.scl), 避免贴图宽度 < segmentLength 时空隙
-                tv.set(seg.x, seg.y).sub(prevX, prevY).setLength(segmentLength).add(prevX, prevY);
                 unit.type.applyColor(unit);
                 Lines.stroke(reg.height * Draw.scl * Mathf.sign(flipSprite != flip));
-                Lines.line(reg, prevX, prevY, tv.x, tv.y, false);
-                prevX = tv.x;
-                prevY = tv.y;
+                // ★ 直接连接实际段位置, 无强制长度, 确保节与节紧密相连无空隙
+                Lines.line(reg, prevX, prevY, seg.x, seg.y, false);
+                prevX = seg.x;
+                prevY = seg.y;
             }
         }
 
