@@ -1854,6 +1854,10 @@ public class Z_Units {
             legPairOffset = 1f;
             smallLegLength = 64f;   // PU132 小腿总长
             largeLegLength = 126f;  // PU132 大腿总长
+            // ★ 限制腿伸缩 (原版默认1.75伸缩太强)
+            legMaxLength = 1.1f;   // 最多伸长10%
+            legMinLength = 0.9f;   // 最短90%
+            legSpeed = 0.1f;
 
             hovering = true;
             allowLegStep = true;
@@ -1994,22 +1998,22 @@ public class Z_Units {
                 y = -13.5f;
                 rotationOffset = 40f;
                 segments = 15;
-                segmentLength = 44.5f;
+                segmentLength = 28f;  // ★ 缩短段间距 (原44.5太长)
                 angleLimit = 30f;
                 firstSegmentAngleLimit = 17f;
                 rotationSpeed = 2.5f;
                 speed = 6f;
                 accel = 0.2f;
+                drag = 0.1f;  // ★ 增加 drag 减少抖动
                 swayScl = 120f;
                 swayMag = 0.2f;
                 mirror = true;
                 top = true;
-                automatic = false;
-                // 发射爆破激光 (简化为 EndContinuousLaserBulletType)
+                automatic = true;  // ★ 自动寻敌发射
                 bullet = new EndContinuousLaserBulletType(250f);
                 reload = 3f * 60f;
                 range = 320f;
-                shootCone = 4f;
+                shootCone = 30f;  // ★ 放宽射击锥角 (原4f太严)
                 continuous = true;
                 bulletDuration = 20f;
             }});
@@ -2020,19 +2024,19 @@ public class Z_Units {
                 y = -41f;
                 rotationOffset = 35f;
                 segments = 17;
-                segmentLength = 37.25f;
+                segmentLength = 22f;  // ★ 缩短段间距 (原37.25太长)
                 firstSegmentAngleLimit = 20f;
                 rotationSpeed = 3f;
                 speed = 8f;
                 accel = 0.2f;
+                drag = 0.1f;
                 mirror = true;
                 top = true;
-                automatic = false;
-                // 发射连续激光 (endLaserSmall, damage=85)
+                automatic = true;  // ★ 自动寻敌发射
                 bullet = new EndContinuousLaserBulletType(85f);
                 reload = 4f * 60f;
                 range = 220f;
-                shootCone = 15f;
+                shootCone = 30f;
                 continuous = true;
                 bulletDuration = (int)(1.5f * 60f);
             }});
@@ -2043,10 +2047,11 @@ public class Z_Units {
                 y = -49f;
                 rotationOffset = 35f;
                 segments = 20;
-                segmentLength = 28f;
+                segmentLength = 18f;  // ★ 缩短段间距 (原28太长)
                 swayOffset = 120f;
                 swayMag = 0.2f;
                 swayScl = 120f;
+                drag = 0.1f;
                 rotationSpeed = 3f;
                 speed = 10f;
                 accel = 0.15f;
@@ -2421,95 +2426,10 @@ public class Z_Units {
                 }};
             }});
 
-            // ===== 触手武器 (简化为4个独立武器, 替代 PU132 TentacleType) =====
-            // ★ 4个触手武器共用同一 name "create-desolation-tentacle", 共用同一贴图
-            //   (v158 规则: 文件名不能带 -1/-2 后缀, 否则 atlas.find 找不到贴图)
-            // PU132 触手1: (139, -13.5), EndPointBlastLaserBulletType (250伤害, 320长度)
-            weapons.add(new Weapon("create-desolation-tentacle") {{
-                x = 139f; y = -13.5f;
-                reload = 3f * 60f;
-                rotate = true;
-                rotateSpeed = 2.5f;
-                shootCone = 30f;
-                shootSound = zzw.content.Z_Sounds.ravagerNightmareShoot;
-                bullet = new EndPointBlastLaserBulletType(250f) {{
-                    length = 320f;
-                    width = 17f;
-                    lifetime = 20f;
-                    widthReduction = 3f;
-                    damageRadius = 60f;
-                    auraDamage = 1000f;
-                    overDamage = 900000f;
-                    ratioDamage = 1f / 200f;
-                    ratioStart = 11000f;
-                    bleedDuration = 10f * 60f;
-                    hitEffect = mindustry.content.Fx.hitLancer;
-                    laserColors = new Color[]{Color.valueOf("f5303690"), Color.valueOf("f53036"),
-                                               Color.valueOf("ff786e"), Color.black};
-                }};
-            }});
-
-            // PU132 触手2-4: (122.75, -41), (111.5, -57.5), (95.25, -63), endLaserSmall
-            // 简化为 3 个 continuous 激光武器 (使用 LaserBulletType)
-            weapons.add(new Weapon("create-desolation-tentacle") {{
-                x = 122.75f; y = -41f;
-                reload = 4f * 60f;
-                rotate = true;
-                rotateSpeed = 3f;
-                shootCone = 30f;
-                continuous = true;
-                shootSound = zzw.content.Z_Sounds.devourerMainLaser;  // ★ v158 无 Sounds.laser, 用自定义 devourerMainLaser
-                bullet = new mindustry.entities.bullet.LaserBulletType(180f) {{
-                    length = 280f;
-                    width = 12f;
-                    lifetime = 1.5f * 60f;
-                    colors = new Color[]{Color.valueOf("f5303690"), Color.valueOf("f53036"),
-                                          Color.valueOf("ff786e"), Color.white};
-                    hitColor = Color.valueOf("f53036");
-                    hitEffect = mindustry.content.Fx.hitLancer;
-                    largeHit = true;
-                }};
-            }});
-
-            weapons.add(new Weapon("create-desolation-tentacle") {{
-                x = 111.5f; y = -57.5f;
-                reload = 4f * 60f;
-                rotate = true;
-                rotateSpeed = 3f;
-                shootCone = 30f;
-                continuous = true;
-                shootSound = zzw.content.Z_Sounds.devourerMainLaser;  // ★ v158 无 Sounds.laser, 用自定义 devourerMainLaser
-                bullet = new mindustry.entities.bullet.LaserBulletType(180f) {{
-                    length = 280f;
-                    width = 12f;
-                    lifetime = 1.5f * 60f;
-                    colors = new Color[]{Color.valueOf("f5303690"), Color.valueOf("f53036"),
-                                          Color.valueOf("ff786e"), Color.white};
-                    hitColor = Color.valueOf("f53036");
-                    hitEffect = mindustry.content.Fx.hitLancer;
-                    largeHit = true;
-                }};
-            }});
-
-            weapons.add(new Weapon("create-desolation-tentacle") {{
-                x = 95.25f; y = -63f;
-                reload = 4f * 60f;
-                rotate = true;
-                rotateSpeed = 3f;
-                shootCone = 30f;
-                continuous = true;
-                shootSound = zzw.content.Z_Sounds.devourerMainLaser;  // ★ v158 无 Sounds.laser, 用自定义 devourerMainLaser
-                bullet = new mindustry.entities.bullet.LaserBulletType(180f) {{
-                    length = 280f;
-                    width = 12f;
-                    lifetime = 1.5f * 60f;
-                    colors = new Color[]{Color.valueOf("f5303690"), Color.valueOf("f53036"),
-                                          Color.valueOf("ff786e"), Color.white};
-                    hitColor = Color.valueOf("f53036");
-                    hitEffect = mindustry.content.Fx.hitLancer;
-                    largeHit = true;
-                }};
-            }});
+            // ===== 触手武器已移至 abilities (TentacleAbility), 不再作为 Weapon =====
+            // ★ 原触手武器已删除, 改用 TentacleAbility 实现 (在上方 abilities 段)
+            //   原因: Weapon 会显示炮台贴图 (误用触手贴图), 且无法实现触手分段动画
+            //   TentacleAbility 自主渲染分段, 支持激光发射和碰撞伤害
         }};
     }
 }
