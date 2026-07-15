@@ -25,8 +25,12 @@ public class DesolationBulletType extends AntiCheatBulletTypeBase {
     public float widthTo = 230f;
     public float fadeInTime = 40f;
     public float fadeOutTime = 20f;
+    // ★ 偏红透明渐变 (去掉白色, 改为红色半透明渐变)
     public Color[] colors = {
-        new Color(0xf5303660), new Color(0xf53036ff), new Color(0xff786eff), Color.white
+        new Color(0xf5303640),   // 红更透明 (外层)
+        new Color(0xf5303680),   // 红半透明
+        new Color(0xf53036ff),   // 红不透明
+        new Color(0xff786eff)    // 橙红 (最内层)
     };
 
     public DesolationBulletType(float speed, float damage) {

@@ -225,7 +225,8 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
         float inout = fw * fow;
         float width = this.width * inout + Mathf.absin(Time.time, 5f, 2f * inout);
         float sin = Mathf.absin(Time.time, 3f, 0.35f);
-        Color col = Tmp.c1.set(SCAR_COLOR).mul(1f + sin);
+        // ★ 红白闪烁: 颜色在红色和白色之间切换, 产生闪烁感
+        Color col = Tmp.c1.set(SCAR_COLOR).lerp(Color.white, sin);
 
         // ===== 层1: 纺锤主体 (24梯形) =====
         Draw.color(col);

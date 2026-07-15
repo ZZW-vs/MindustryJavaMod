@@ -91,7 +91,7 @@ public class Z_Units {
 
         // —— 段身 UnitType (先创建, 头部要引用它) ——
         arcnelidiaSegment = new UnitType("arcnelidia-segment") {{
-            health = 800;  // PU132 原版: 与头部一致 (段身血量由头部分布)
+            health = 1600;  // ★ 提高段身血量 (头部800×2), 避免段身太脆
             speed = 0f;                 // 段身不需要自己移动 (由头部驱动)
             // ★ hitSize=19.75f (19.25 + 0.5, 用户要求增大 0.5)
             // 碰撞计算: 段间距22.7 > 半径9.875+9.875=19.75, 不重叠 (间隙2.95)
@@ -248,7 +248,7 @@ public class Z_Units {
 
         // —— 段身 UnitType ——
         toxobyteSegment = new UnitType("toxobyte-segment") {{
-            health = 200f;  // PU132 原版: 与头部一致
+            health = 400f;  // ★ 提高段身血量 (头部200×2), 避免段身太脆
             speed = 0f;
             // ★ hitSize=14.2f (用户指定)
             hitSize = 14.2f;
@@ -372,7 +372,7 @@ public class Z_Units {
 
         // —— 段身 UnitType ——
         catenapedeSegment = new UnitType("catenapede-segment") {{
-            health = 750f;  // PU132 原版: 与头部一致
+            health = 1500f;  // ★ 提高段身血量 (头部750×2), 避免段身太脆
             speed = 0f;
             hitSize = 28f;
             armor = 5f;
@@ -496,10 +496,10 @@ public class Z_Units {
 
         // ★ Devourer 段身 ★
         devourerSegment = new UnitType("devourer-segment") {{
-            health = 1250000f;  // PU132 原版: 与头部一致
+            health = 2500000f;  // ★ 提高段身血量 (头部1250000×2), 避免段身太脆
             speed = 0f;
             hitSize = 52f;  // 原 40f + 12 (用户要求加大12)
-            armor = 8f;
+            armor = 16f;  // ★ 提高护甲与头部一致 (原8f)
             flying = true;
             rotateSpeed = 1f;
             faceTarget = false;
@@ -718,11 +718,11 @@ public class Z_Units {
         // —— 段身 UnitType ——
         oppressionSegment = new UnitType("oppression-segment") {{
             // PU132: 段身血量由头部 healthDistribution 分配, 这里设基础值
-            health = 2500000f;  // PU132 原版: 与头部一致
+            health = 5000000f;  // ★ 提高段身血量 (头部2500000×2), 避免段身太脆
             speed = 0f;
             // ★ hitSize=180 (用户指定)
             hitSize = 180f;
-            armor = 10f;
+            armor = 30f;  // ★ 提高护甲与头部一致 (原10f)
             flying = true;
             rotateSpeed = 1f;
             faceTarget = false;
@@ -1259,10 +1259,8 @@ public class Z_Units {
                 continuous = false;
                 rotate = false;
                 shootCone = 360f;
-                reload = 18f * 60f;  // 18秒总周期 (6秒3连发 + 12秒组间隔)
+                reload = 20f * 60f;  // 20秒CD
                 shoot.firstShotDelay = ChargeEffect.oppressionCharge.lifetime;  // 4秒充能
-                shoot.shots = 3;
-                shoot.shotDelay = 3f * 60f;  // 3秒间隔
                 parentizeEffects = true;
 
                 bullet = new OppressionLaserBulletType() {{
@@ -1842,14 +1840,15 @@ public class Z_Units {
             //   小腿组: 3条定义×2镜像=6条, baseLength=endLength=32, total=64, legTrns=0.8
             //   大腿组: 2条定义×2镜像=4条, baseLength=55, endLength=71, total=126, legTrns=0.7
             // v158 重写: legCount=10 (前6条小腿, 后4条大腿), drawLegs 用不同贴图区分
-            // legLength=90 (折中值, 小腿64和大腿126的平均), 视觉上小腿稍长/大腿稍短
+            // legLength=95 折中值, 渲染时小腿缩放到64, 大腿缩放到126
             legCount = 10;
             legGroupSize = 2;
-            legLength = 90f;  // 折中值 (64+126)/2≈95, 取90略偏向小腿
+            legLength = 95f;  // 折中值 (64+126)/2≈95
             legBaseOffset = 11.25f;  // PU132 大腿腿根偏移
             legMoveSpace = 0.85f;
             legPairOffset = 1f;
-            smallLegCount = 6;  // 前6条用小腿贴图
+            smallLegLength = 64f;   // PU132 小腿总长
+            largeLegLength = 126f;  // PU132 大腿总长
 
             hovering = true;
             allowLegStep = true;
