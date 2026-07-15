@@ -122,12 +122,18 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
     public void init(Bullet b) {
         super.init(b);
         b.data(new FractureData());
+        System.out.println("[VF] init id=" + b.id + " pos=(" + b.x() + "," + b.y() + ") rot=" + b.rotation()
+            + " team=" + b.team + " vel=(" + b.vel().x + "," + b.vel().y + ")"
+            + " lifetime=" + b.lifetime() + " data=" + (b.data() == null ? "null" : b.data().getClass().getSimpleName()));
     }
 
     @Override
     public void update(Bullet b) {
         super.update(b);
-        if (!(b.data() instanceof FractureData data)) return;
+        if (!(b.data() instanceof FractureData data)) {
+            System.out.println("[VF] update no-FractureData id=" + b.id + " data=" + (b.data() == null ? "null" : b.data().getClass().getName()));
+            return;
+        }
 
         try {
             if (b.fdata() <= 0f) {
@@ -139,16 +145,26 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
                 if (data.target != null) {
                     b.rotation(Mathf.slerpDelta(b.rotation(), b.angleTo(data.target), 0.1f));
                 }
+                // 每 10 帧打印一次 Phase 1 状态 (调试用)
+                if (((int) b.time()) % 10 == 0 && ((int) b.time()) > 0) {
+                    System.out.println("[VF] P1 id=" + b.id + " t=" + b.time() + " pos=(" + b.x() + "," + b.y()
+                        + ") vel=(" + b.vel().x + "," + b.vel().y + ")"
+                        + " target=" + (data.target == null ? "null" : "ok"));
+                }
                 // 到时间进入 Phase 2
                 if (b.time() >= delay) {
+                    System.out.println("[VF] >>> P2 START id=" + b.id + " pos=(" + b.x() + "," + b.y()
+                        + ") rot=" + b.rotation() + " vel_before=(" + b.vel().x + "," + b.vel().y + ")");
                     b.time(0f);
                     b.lifetime(nextLifetime);
                     b.fdata(1f);
-                    // ★ v150/v158: BulletComp.update() 用 type.drag 衰减 vel, b.drag(0f) 无效
-                    //   Phase 2 每帧在 super.update 后重置 vel 为 trueSpeed (见下方 Phase 2 分支)
+                    // ★ v158: BulletComp.update() 用 type.drag 衰减 vel, Bullet 无 drag 字段
+                    //   不能用 b.drag(0f), 改为在 Phase 2 每帧重置 vel 克服衰减
                     b.vel().trns(b.rotation(), trueSpeed);
                     data.x = b.x();
                     data.y = b.y();
+                    System.out.println("[VF]     P2 setup done vel_after=(" + b.vel().x + "," + b.vel().y
+                        + ") data.xy=(" + data.x + "," + data.y + ")");
                     // ★ PU132 L99: activeSound.at(b.x, b.y, Mathf.random(0.9f, 1.1f))
                     if (activeSound != null) {
                         activeSound.at(b.x(), b.y(), Mathf.random(0.9f, 1.1f));
@@ -156,13 +172,18 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
                 }
             } else {
                 // ===== Phase 2: 冲刺穿透 (PU132 L101-122) =====
-                // ★ 关键: type.drag=0.11 会持续衰减 vel, 每帧重置 vel 保持冲刺速度
+                // ★ v158: type.drag 会每帧衰减 vel, 需每帧重置 vel 维持冲刺速度
                 b.vel().trns(b.rotation(), trueSpeed);
+                // 每帧打印 Phase 2 状态 (调试用)
+                System.out.println("[VF] P2 id=" + b.id + " t=" + b.time() + " pos=(" + b.x() + "," + b.y()
+                    + ") last=(" + b.lastX() + "," + b.lastY() + ") vel=(" + b.vel().x + "," + b.vel().y
+                    + ") dist_from_data=" + Mathf.dst(b.x(), b.y(), data.x, data.y));
                 collideLineRawEnemySimple(b, b.lastX(), b.lastY(), b.x(), b.y(), data);
             }
         } catch (Throwable t) {
-            // 防崩溃: 出错时跳过本帧 update
+            // 防崩溃: 出错时打印异常栈
             System.out.println("[VoidFracture] update error: " + t);
+            t.printStackTrace();
         }
     }
 
@@ -255,6 +276,9 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
         super.removed(b);
         // ===== Phase 2 结束: 生成 spikes + 播放 voidFractureEffect (PU132 L141-186) =====
         try {
+            System.out.println("[VF] removed id=" + b.id + " pos=(" + b.x() + "," + b.y()
+                + ") fdata=" + b.fdata() + " hit=" + b.hit()
+                + " data=" + (b.data() == null ? "null" : b.data().getClass().getSimpleName()));
             if (b.fdata() >= 1f && b.data() instanceof FractureData data) {
                 VoidFractureData d = new VoidFractureData();
                 d.x = data.x;
@@ -262,6 +286,8 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
                 d.x2 = b.x();
                 d.y2 = b.y();
                 d.b = this;
+                System.out.println("[VF]     removed d.x=" + d.x + " d.y=" + d.y + " d.x2=" + d.x2 + " d.y2=" + d.y2
+                    + " laser_len=" + Mathf.dst(d.x, d.y, d.x2, d.y2));
 
                 if (!b.hit()) {
                     spawnSpikes(b, data, d);
@@ -272,9 +298,11 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
                 }
                 // ★ PU132: 播放 voidFractureEffect (30tick 三层激光+spikes 特效)
                 voidFractureEffect.at((d.x + d.x2) / 2f, (d.y + d.y2) / 2f, 0f, d);
+                System.out.println("[VF]     voidFractureEffect.at called, spikes=" + d.spikes.size / 4);
             }
         } catch (Throwable t) {
             System.out.println("[VoidFracture] removed error: " + t);
+            t.printStackTrace();
         }
     }
 
@@ -322,7 +350,14 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
      */
     @Override
     public void draw(Bullet b) {
-        if (!(b.data() instanceof FractureData data)) return;
+        if (!(b.data() instanceof FractureData data)) {
+            System.out.println("[VF] draw no-FractureData id=" + b.id);
+            return;
+        }
+        // 每帧打印 draw 调用 (调试用)
+        System.out.println("[VF] draw id=" + b.id + " fdata=" + b.fdata() + " t=" + b.time()
+            + " pos=(" + b.x() + "," + b.y() + ") data=(" + data.x + "," + data.y + ")"
+            + " fout=" + b.fout() + " lifetime=" + b.lifetime());
         Draw.color(Color.black);
         if (b.fdata() <= 0f) {
             // ===== Phase 1: 小三角 (PU132 L192-195) =====
