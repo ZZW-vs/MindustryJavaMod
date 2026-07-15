@@ -9,6 +9,7 @@ import arc.math.Mathf;
 import arc.math.geom.Vec2;
 import arc.util.Tmp;
 import arc.util.Time;
+import arc.util.Log;
 import mindustry.Vars;
 import mindustry.gen.Unit;
 import mindustry.gen.UnitEntity;
@@ -200,8 +201,6 @@ public class SegmentWormEntity extends UnitEntity {
     public int maxSegments = 0;
     /** 当前再生计时器 (累加 Time.delta, 达到 regenTime 后重置) */
     protected float repairTime = 0f;
-    /** 调试计数器: 每 60 tick 打一次再生进度 */
-    protected float debugRegenLogTimer = 0f;
     /** 是否启用轻微晃动 (arcnelidia=true 轻微晃动, toxobyte=false 完全静止)
      *  借鉴 v154.3 UnitComp.wobble(), 但振幅更小 (0.02f vs 原版 0.05f) */
     public boolean wobbleEnabled = false;
@@ -455,15 +454,8 @@ public class SegmentWormEntity extends UnitEntity {
                     barrageRange = cfg.barrageRange;
                     createSegments(cfg.count, cfg.segmentType);
                     segmentsCreated = true;
-                    System.out.println("[头部] 段身创建: " + cfg.count + "节 间距=" + cfg.spacing
-                        + " 转角=" + angleLimit + " 关节强度=" + jointStrength
-                        + " 力传播=" + segmentCast + " 平滑=" + anglePhysicsSmooth
-                        + " 防漂移=" + preventDrifting
-                        + " 再生=" + (regenTime > 0 ? "开" : "关") + " 晃动=" + (wobbleEnabled ? "开" : "关")
-                        + " 分裂=" + (splittable ? "开" : "关") + " 合并=" + (chainable ? "开" : "关"));
                 } catch (Throwable t) {
-                    System.out.println("[头部] 段身创建失败: " + t);
-                    t.printStackTrace();
+                    Log.err("[头部] 段身创建失败", t);
                     segmentsCreated = true;
                 }
             } else if (defaultSegmentType != null) {
@@ -473,8 +465,7 @@ public class SegmentWormEntity extends UnitEntity {
                     createSegments(defaultSegmentCount, defaultSegmentType);
                     segmentsCreated = true;
                 } catch (Throwable t) {
-                    System.out.println("[头部] 旧路径创建失败: " + t);
-                    t.printStackTrace();
+                    Log.err("[头部] 旧路径创建失败", t);
                     segmentsCreated = true;
                 }
             }
@@ -519,21 +510,12 @@ public class SegmentWormEntity extends UnitEntity {
         // ★ 再生 (PU132 WormDefaultUnit.update L81-94, regenTime > 0 时启用)
         if (regenAvailable()) {
             repairTime += arc.util.Time.delta;
-            // 调试: 每 10 秒打一次再生进度
-            debugRegenLogTimer += arc.util.Time.delta;
-            if (debugRegenLogTimer >= 600f) {
-                debugRegenLogTimer = 0f;
-                System.out.println("[再生] 进度: " + segments.length + "/" + maxSegments
-                    + " 计时=" + String.format("%.0f%%", repairTime / regenTime * 100));
-            }
             if (repairTime >= regenTime) {
                 // 扣血 + 长出新段
                 float damage = (health / segments.length) / 2f;
                 damage(damage);
                 addSegment();
                 repairTime = 0f;
-                System.out.println("[再生] 新段: " + segments.length + "/" + maxSegments
-                    + " 扣血=" + (int)damage + " 剩余=" + (int)health);
             }
         }
 
@@ -984,10 +966,8 @@ public class SegmentWormEntity extends UnitEntity {
                 }
                 // 播放分裂音效
                 if (splitSound != null) splitSound.at(this);
-                System.out.println("[分裂] 中间段#" + deadIdx + "死亡, 后半段" + tailLen + "节成为新虫子");
             } catch (Throwable t) {
-                System.out.println("[分裂] 创建新头部失败: " + t);
-                t.printStackTrace();
+                Log.err("[分裂] 创建新头部失败", t);
             }
         } else if (splittable && splitSound != null) {
             // 尾部段身死亡, 播放分裂音效
@@ -1038,8 +1018,6 @@ public class SegmentWormEntity extends UnitEntity {
         segPositions = newPos;
         segVelocities = newVel;
         segRotations = newRot;
-        System.out.println("[头部] 段身死亡: #" + deadIdx + " 剩余=" + segments.length
-            + (splittable && deadIdx < segments.length + 1 ? " 已分裂" : ""));
     }
 
     /**
@@ -1118,7 +1096,6 @@ public class SegmentWormEntity extends UnitEntity {
 
         // 播放合并音效
         if (chainSound != null) chainSound.at(this);
-        System.out.println("[合并] " + type.name + " 吸收对方" + otherLen + "节, 总段数=" + newLen);
     }
 
     /** 创建段身 (在 add() 时调用一次) */
@@ -1200,15 +1177,8 @@ public class SegmentWormEntity extends UnitEntity {
                 try {
                     createSegments(cfg.count, cfg.segmentType);
                     segmentsCreated = true;
-                    System.out.println("[头部] 启动: " + type.name + " 段身=" + cfg.count + "节"
-                        + " 转角=" + angleLimit + " 关节强度=" + jointStrength
-                        + " 力传播=" + segmentCast + " 平滑=" + anglePhysicsSmooth
-                        + " 防漂移=" + preventDrifting
-                        + " 再生=" + (regenTime > 0 ? "开" : "关") + " 晃动=" + (wobbleEnabled ? "开" : "关")
-                        + " 分裂=" + (splittable ? "开" : "关") + " 合并=" + (chainable ? "开" : "关"));
                 } catch (Throwable t) {
-                    System.out.println("[头部] 段身创建失败: " + t);
-                    t.printStackTrace();
+                    Log.err("[头部] 段身创建失败", t);
                     segmentsCreated = true;
                 }
             } else if (defaultSegmentType != null) {
@@ -1217,8 +1187,7 @@ public class SegmentWormEntity extends UnitEntity {
                     createSegments(defaultSegmentCount, defaultSegmentType);
                     segmentsCreated = true;
                 } catch (Throwable t) {
-                    System.out.println("[头部] 旧路径创建失败: " + t);
-                    t.printStackTrace();
+                    Log.err("[头部] 旧路径创建失败", t);
                     segmentsCreated = true;
                 }
             }

@@ -679,7 +679,7 @@ public class Z_Units {
             SegmentWormEntity.splitSound = mindustry.gen.Sounds.door;
             SegmentWormEntity.chainSound = mindustry.gen.Sounds.door;
         } catch (Throwable t) {
-            System.out.println("[Z_Units] 音效初始化失败: " + t);
+            arc.util.Log.err("[Z_Units] 音效初始化失败", t);
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -946,6 +946,16 @@ public class Z_Units {
                 shootY = 47.25f;
                 mirror = false;
                 continuous = true;
+                // ★ 必须 rotate=true: oppression 是 omniMovement=false + circleTarget=true 单位,
+                //   WormAI.attack() 只调用 moveAt 不改 unit.rotation, 单位不主动朝向目标。
+                //   v158 Weapon 发射条件检查 Angles.within(rotate?mount.rotation:unit.rotation, targetRotation, shootCone)
+                //   rotate=false 时检查 unit.rotation, 单位 rotation 不朝目标 → shootCone(5°)永不满足
+                //   → shoot() 不调用 → firstShotDelay 路径不走 → chargeEffect 不播放 → 完全不放激光
+                //   rotate=true 让 mount.rotation 独立朝向目标, 绕过单位 rotation 限制
+                //   (PU132 原版没有此问题: OppressionComp 重写 rotateMove, EndComp 系统强制 rotation 朝向)
+                rotate = true;
+                rotateSpeed = 1f;  // 主激光缓慢转向 (PU132 风格)
+                shootCone = 30f;   // 放宽到 30°, 避免边缘对不准不开火
                 reload = 25f * 60f;
                 shoot.firstShotDelay = ChargeEffect.oppressionCharge.lifetime;
                 // ★ 蓄力特效跟随单位移动和旋转
@@ -1280,6 +1290,5 @@ public class Z_Units {
                 bullet = new TimeStopBulletType(6f, 510f);
             }});
         }};
-        System.out.println("[Z_Units] load done, configs=" + SegmentWormEntity.configs.keySet());
     }
 }

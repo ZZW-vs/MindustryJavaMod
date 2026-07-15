@@ -51,9 +51,6 @@ public class SegmentUnitEntity extends UnitEntity {
      *  toxobyte 头部 → "toxobyte-" */
     public String texturePrefix = "arcnelidia-";
 
-    /** 调试标志: update 状态只打印一次 */
-    private static boolean debugUpdateLogged = false;
-
     @Override
     public void update() {
         // ★ 不调用 super.update() 的移动/AI 部分 ★
@@ -62,14 +59,6 @@ public class SegmentUnitEntity extends UnitEntity {
         // ★ 关键: 段身 vel 必须每帧清零, 否则 physics=true 会让段身推动头部移动
         // (arcnelidia 段身没武器, 之前不进武器循环导致 vel 残留, 推动头部"待机自己向前走")
         vel.setZero();
-
-        // 调试: 只打一次, 确认段身 update 在跑
-        if (!debugUpdateLogged) {
-            debugUpdateLogged = true;
-            System.out.println("[段身] 启动: #" + segmentIndex
-                + " 头部=" + (head == null ? "无" : "正常")
-                + " 武器=" + (mounts == null ? 0 : mounts.length));
-        }
 
         // 更新状态效果时间 (让 buff 仍然生效)
         if (statuses.size > 0) {
@@ -269,7 +258,6 @@ public class SegmentUnitEntity extends UnitEntity {
         } else if (head != null && head.isAdded()) {
             // Player controller: 转给头部 (用 head.controller(next) 设置头部 controller)
             head.controller(next);
-            System.out.println("[段身] 控制转移: #" + segmentIndex + " → 头部");
         }
     }
 

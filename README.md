@@ -79,8 +79,9 @@
 
 #### 压迫者 (oppression)
 - 终极 Boss 级单位，8 个武器系统（2 头部 + 6 段身）
-- **大招机制**：开大招期间（充能 + 射击）移动和旋转速度降至 12%（非完全锁定）
-- **充能前摇特效**：5 阶段粒子效果（菱形辐射 → 尖刺菱形 → 方块粒子 → 短线段 → 主线）
+- **大招机制**：开大招期间（充能 + 射击）移动和旋转速度降至 7.5%（非完全锁定）
+- **红色主激光**：OppressionLaserBulletType 7 层渲染（纺锤主体 + 末端虚空 + 尖刺边缘 + 散落粒子 + 白色闪光线 + 黑红菱形 + 内部线段 + 闪电），damage=9000、length=2150、width=140、lifetime=8*60
+- **充能前摇特效**：5 阶段粒子效果（菱形辐射 → 尖刺菱形 → 方块粒子 → 短线段 → 主线），lifetime=4*60
 - **VoidPortal 黑色菱形技能**：菱形区域伤害 + 虚空触手拉拽敌人，渲染在最上层可盖住空中单位
 - **扫射激光 + 黑色圆形虚空区域**：EndSweepLaser 扫射命中时生成 VoidArea 黑色圆形，持续范围伤害
 - **慢闪电**：完整移植 PU132 SlowLightning 三件套（Entity + Type + Node）
@@ -88,6 +89,22 @@
 - 段身碰撞箱 hitSize=180f，大招期间 freezeOnUlt=true
 - 液压杆装饰：每节段身都绘制到父段的液压杆（WormDecal 延迟加载）
 - 技能数量上限：非大招技能同时最多 8 个存在
+
+### End 阵营飞行单位 (PU132 移植)
+
+#### 虚空容器 (voidVessel)
+- End 阵营飞行单位，两阶段攻击子弹 VoidFractureBulletType
+- **Phase 1（悬停段）**：初速度 4.3f 配合 drag=0.11f 在 30 帧内衰减到 ~0.13 实现悬停跟踪目标
+- **Phase 2（冲刺段）**：直线冲刺穿透，黑色激光束效果，trueSpeed 入参控制冲刺速度
+- **冲刺结束**：播放 voidFractureEffect 30tick 三层激光余晖 + spikes 散射伤害
+- 渲染层级 Layer.flyingUnit + 1f，显式调用 Draw.blend() 重置混合模式避免黑色不可见
+
+#### 谜团 (enigma)
+- End 阵营飞行单位（PU132 移植）
+
+#### 克罗诺斯 (chronos)
+- End 阵营飞行单位，时间停止能力
+- **TimeStopAbility**：用 Time.delta 模拟全局时间停止，updating 标志防递归，maxIterations=60 防卡死
 
 ### 机械网络系统 (Betamindy 风格)
 - 全局注册表 + 源驱动 BFS 传播转速和应力
@@ -108,9 +125,9 @@
 
 ## 兼容性
 
-- 最低游戏版本：145
-- 推荐游戏版本：154.3 / 158.1（多节单位系统同时兼容 v150-v158）
-- v158 兼容：反射适配 ammo/useAmmo 字段移除，支持 v154.3 和 v158.1 双版本运行
+- 最低游戏版本：154
+- 推荐游戏版本：158.1（多节单位系统主要针对 v158 适配）
+- v158 兼容：反射适配 ammo/useAmmo 字段移除，Bullet.drag() 方法移除改用每帧 vel 重置，bloom 混合模式陷阱通过显式 Draw.blend() 修复
 
 ## 开发信息
 
@@ -127,7 +144,13 @@
 
 ## 更新日志
 
-### v1.2 (开发中)
+### v1.4.1
+- **修复压迫者红色大激光无法释放**：主激光武器缺少 `rotate=true`，导致 omniMovement=false + circleTarget=true 单位因 unit.rotation 不朝向目标而 shootCone(5°) 永不满足，shoot() 不被调用 → firstShotDelay 蓄力路径不走 → 完全放不出激光。添加 rotate=true + shootCone=30f，让 mount.rotation 独立朝向目标
+- **修复虚空容器黑色激光不可见**：v158 bloom 在 Layer.effect+0.02f 处 apply 后保持 additive 混合模式，黑色像素在 additive 模式下完全不可见。在 draw() 和 voidFractureEffect 中显式调用 Draw.blend() 重置为 alpha 混合
+- **修复 v158 Bullet.drag() NoSuchMethodError**：v158.1 移除了 Bullet 的 drag() 方法和 drag 字段，Phase 2 冲刺改为每帧重置 b.vel().trns(rotation, trueSpeed) 克服 type.drag 衰减
+- 清理所有调试日志（System.out.println），catch 块改用 arc.util.Log.err 正确记录错误
+
+### v1.2
 - 移植 PU132 多节单位系统（arcnelidia / toxobyte / catenapede / devourer / oppression）
 - 完整实现 WormComp 速度传播 + 约束修正算法
 - 移植 VoidPortal 虚空门户技能（菱形区域伤害 + 触手拉拽）

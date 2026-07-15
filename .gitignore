@@ -161,6 +161,7 @@ android/libs/
 .trae/
 .vscode/
 /参考
+/mindustry
 日志*.txt
 任务.txt
 *.log

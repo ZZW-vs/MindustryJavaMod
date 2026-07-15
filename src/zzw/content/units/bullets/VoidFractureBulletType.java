@@ -124,68 +124,44 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
     public void init(Bullet b) {
         super.init(b);
         b.data(new FractureData());
-        System.out.println("[VF] init id=" + b.id + " pos=(" + b.x() + "," + b.y() + ") rot=" + b.rotation()
-            + " team=" + b.team + " vel=(" + b.vel().x + "," + b.vel().y + ")"
-            + " lifetime=" + b.lifetime() + " data=" + (b.data() == null ? "null" : b.data().getClass().getSimpleName()));
     }
 
     @Override
     public void update(Bullet b) {
         super.update(b);
         if (!(b.data() instanceof FractureData data)) {
-            System.out.println("[VF] update no-FractureData id=" + b.id + " data=" + (b.data() == null ? "null" : b.data().getClass().getName()));
             return;
         }
 
-        try {
-            if (b.fdata() <= 0f) {
-                // ===== Phase 1: 悬停跟踪 (PU132 L62-100) =====
-                if (data.target != null && !data.target.isValid()) data.target = null;
-                if (data.target == null && b.timer(1, 5f)) {
-                    searchTarget(b, data);
-                }
-                if (data.target != null) {
-                    b.rotation(Mathf.slerpDelta(b.rotation(), b.angleTo(data.target), 0.1f));
-                }
-                // 每 10 帧打印一次 Phase 1 状态 (调试用)
-                if (((int) b.time()) % 10 == 0 && ((int) b.time()) > 0) {
-                    System.out.println("[VF] P1 id=" + b.id + " t=" + b.time() + " pos=(" + b.x() + "," + b.y()
-                        + ") vel=(" + b.vel().x + "," + b.vel().y + ")"
-                        + " target=" + (data.target == null ? "null" : "ok"));
-                }
-                // 到时间进入 Phase 2
-                if (b.time() >= delay) {
-                    System.out.println("[VF] >>> P2 START id=" + b.id + " pos=(" + b.x() + "," + b.y()
-                        + ") rot=" + b.rotation() + " vel_before=(" + b.vel().x + "," + b.vel().y + ")");
-                    b.time(0f);
-                    b.lifetime(nextLifetime);
-                    b.fdata(1f);
-                    // ★ v158: BulletComp.update() 用 type.drag 衰减 vel, Bullet 无 drag 字段
-                    //   不能用 b.drag(0f), 改为在 Phase 2 每帧重置 vel 克服衰减
-                    b.vel().trns(b.rotation(), trueSpeed);
-                    data.x = b.x();
-                    data.y = b.y();
-                    System.out.println("[VF]     P2 setup done vel_after=(" + b.vel().x + "," + b.vel().y
-                        + ") data.xy=(" + data.x + "," + data.y + ")");
-                    // ★ PU132 L99: activeSound.at(b.x, b.y, Mathf.random(0.9f, 1.1f))
-                    if (activeSound != null) {
-                        activeSound.at(b.x(), b.y(), Mathf.random(0.9f, 1.1f));
-                    }
-                }
-            } else {
-                // ===== Phase 2: 冲刺穿透 (PU132 L101-122) =====
-                // ★ v158: type.drag 会每帧衰减 vel, 需每帧重置 vel 维持冲刺速度
-                b.vel().trns(b.rotation(), trueSpeed);
-                // 每帧打印 Phase 2 状态 (调试用)
-                System.out.println("[VF] P2 id=" + b.id + " t=" + b.time() + " pos=(" + b.x() + "," + b.y()
-                    + ") last=(" + b.lastX() + "," + b.lastY() + ") vel=(" + b.vel().x + "," + b.vel().y
-                    + ") dist_from_data=" + Mathf.dst(b.x(), b.y(), data.x, data.y));
-                collideLineRawEnemySimple(b, b.lastX(), b.lastY(), b.x(), b.y(), data);
+        if (b.fdata() <= 0f) {
+            // ===== Phase 1: 悬停跟踪 (PU132 L62-100) =====
+            if (data.target != null && !data.target.isValid()) data.target = null;
+            if (data.target == null && b.timer(1, 5f)) {
+                searchTarget(b, data);
             }
-        } catch (Throwable t) {
-            // 防崩溃: 出错时打印异常栈
-            System.out.println("[VoidFracture] update error: " + t);
-            t.printStackTrace();
+            if (data.target != null) {
+                b.rotation(Mathf.slerpDelta(b.rotation(), b.angleTo(data.target), 0.1f));
+            }
+            // 到时间进入 Phase 2
+            if (b.time() >= delay) {
+                b.time(0f);
+                b.lifetime(nextLifetime);
+                b.fdata(1f);
+                // ★ v158: BulletComp.update() 用 type.drag 衰减 vel, Bullet 无 drag 字段
+                //   不能用 b.drag(0f), 改为在 Phase 2 每帧重置 vel 克服衰减
+                b.vel().trns(b.rotation(), trueSpeed);
+                data.x = b.x();
+                data.y = b.y();
+                // ★ PU132 L99: activeSound.at(b.x, b.y, Mathf.random(0.9f, 1.1f))
+                if (activeSound != null) {
+                    activeSound.at(b.x(), b.y(), Mathf.random(0.9f, 1.1f));
+                }
+            }
+        } else {
+            // ===== Phase 2: 冲刺穿透 (PU132 L101-122) =====
+            // ★ v158: type.drag 会每帧衰减 vel, 需每帧重置 vel 维持冲刺速度
+            b.vel().trns(b.rotation(), trueSpeed);
+            collideLineRawEnemySimple(b, b.lastX(), b.lastY(), b.x(), b.y(), data);
         }
     }
 
@@ -277,34 +253,23 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
     public void removed(Bullet b) {
         super.removed(b);
         // ===== Phase 2 结束: 生成 spikes + 播放 voidFractureEffect (PU132 L141-186) =====
-        try {
-            System.out.println("[VF] removed id=" + b.id + " pos=(" + b.x() + "," + b.y()
-                + ") fdata=" + b.fdata() + " hit=" + b.hit()
-                + " data=" + (b.data() == null ? "null" : b.data().getClass().getSimpleName()));
-            if (b.fdata() >= 1f && b.data() instanceof FractureData data) {
-                VoidFractureData d = new VoidFractureData();
-                d.x = data.x;
-                d.y = data.y;
-                d.x2 = b.x();
-                d.y2 = b.y();
-                d.b = this;
-                System.out.println("[VF]     removed d.x=" + d.x + " d.y=" + d.y + " d.x2=" + d.x2 + " d.y2=" + d.y2
-                    + " laser_len=" + Mathf.dst(d.x, d.y, d.x2, d.y2));
+        if (b.fdata() >= 1f && b.data() instanceof FractureData data) {
+            VoidFractureData d = new VoidFractureData();
+            d.x = data.x;
+            d.y = data.y;
+            d.x2 = b.x();
+            d.y2 = b.y();
+            d.b = this;
 
-                if (!b.hit()) {
-                    spawnSpikes(b, data, d);
-                }
-                // ★ PU132 L182: spikesSound.at((d.x + d.x2)/2, (d.y + d.y2)/2, Mathf.random(0.9f, 1.1f))
-                if (!d.spikes.isEmpty() && spikesSound != null) {
-                    spikesSound.at((d.x + d.x2) / 2f, (d.y + d.y2) / 2f, Mathf.random(0.9f, 1.1f));
-                }
-                // ★ PU132: 播放 voidFractureEffect (30tick 三层激光+spikes 特效)
-                voidFractureEffect.at((d.x + d.x2) / 2f, (d.y + d.y2) / 2f, 0f, d);
-                System.out.println("[VF]     voidFractureEffect.at called, spikes=" + d.spikes.size / 4);
+            if (!b.hit()) {
+                spawnSpikes(b, data, d);
             }
-        } catch (Throwable t) {
-            System.out.println("[VoidFracture] removed error: " + t);
-            t.printStackTrace();
+            // ★ PU132 L182: spikesSound.at((d.x + d.x2)/2, (d.y + d.y2)/2, Mathf.random(0.9f, 1.1f))
+            if (!d.spikes.isEmpty() && spikesSound != null) {
+                spikesSound.at((d.x + d.x2) / 2f, (d.y + d.y2) / 2f, Mathf.random(0.9f, 1.1f));
+            }
+            // ★ PU132: 播放 voidFractureEffect (30tick 三层激光+spikes 特效)
+            voidFractureEffect.at((d.x + d.x2) / 2f, (d.y + d.y2) / 2f, 0f, d);
         }
     }
 
