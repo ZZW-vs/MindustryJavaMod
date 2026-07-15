@@ -101,52 +101,58 @@ public class TriLegUnitType extends UnitType {
                 Draw.rect(footRegion, leg.base.x, leg.base.y, position.angleTo(leg.base));
             }
 
-            // ★ 计算中间关节 (PU132 TriJointInverseKinematics 算法)
-            // joint 到 base 的方向和距离
-            float dx = leg.base.x - leg.joint.x;
-            float dy = leg.base.y - leg.joint.y;
-            float len = Mathf.len(dx, dy);
-            float angle = Mathf.angle(dx, dy);
+            // ★ PU132 TriJointInverseKinematics 算法 (完整移植)
+            // 三节腿每段长度 = legLength/3, 总长 = legLength
+            // 两个中间关节 joint1, joint2 在 position→base 连线上, 加垂直偏移
+            float segLen = legLength / 3f;  // 每段长度 (固定值)
+            float totalLen = position.dst(leg.base);  // 腿根到脚的实际距离
+            totalLen = Math.min(totalLen, 3f * segLen);  // limit 到最大伸直长度
 
-            // 每段长度 (三段平分)
-            float segLen = len / 2f;
+            float angle = position.angleTo(leg.base);
 
-            // PU132 IK: 垂直偏移基于腿伸长程度
-            // offset = Interp.sineOut.apply(cosDeg((len - segLen) / (segLen * 2) * 90)) * segLen * sign(side)
-            float lenRatio = (len - segLen) / (segLen * 2f);
+            // PU132 IK: offset = sineOut(cosDeg((totalLen - segLen)/(segLen*2) * 90)) * segLen * sign(side)
+            // 腿伸直时(totalLen=3*segLen): lenRatio=1, cosDeg(90)=0, offset=0 (直腿)
+            // 腿收缩时(totalLen<3*segLen): offset>0 (弯曲)
+            float lenRatio = (totalLen - segLen) / (segLen * 2f);
             float offset = Interp.sineOut.apply(Mathf.cosDeg(Mathf.mod(lenRatio * 90f, 360f))) * segLen * flips;
 
-            // 垂直方向 (joint-base 的垂直)
+            // 垂直方向
             float perpX = -Mathf.sinDeg(angle);
             float perpY = Mathf.cosDeg(angle);
 
-            // 中间关节 = joint 和 base 的中点 + 垂直偏移
-            float midX = (leg.joint.x + leg.base.x) / 2f + perpX * offset;
-            float midY = (leg.joint.y + leg.base.y) / 2f + perpY * offset;
+            // 中点 = position + direction*(totalLen/2) + perp*offset
+            float midDist = totalLen / 2f;
+            float midX = position.x + Mathf.cosDeg(angle) * midDist + perpX * offset;
+            float midY = position.y + Mathf.sinDeg(angle) * midDist + perpY * offset;
 
             // ★ 摆动偏移: 基于时间和腿索引, 让中段有动画
             float swing = Mathf.sin(Time.time * swingSpeed + i * 0.7f) * swingAmplitude * Mathf.slope(leg.stage);
             midX += perpX * swing;
             midY += perpY * swing;
 
+            // 两个中间关节: 在中点 ± segLen/2 沿腿方向
+            float j1x = midX - Mathf.cosDeg(angle) * (segLen / 2f);
+            float j1y = midY - Mathf.sinDeg(angle) * (segLen / 2f);
+            float j2x = midX + Mathf.cosDeg(angle) * (segLen / 2f);
+            float j2y = midY + Mathf.sinDeg(angle) * (segLen / 2f);
+
             // ===== 渲染三段 =====
-            // 段1: position → joint (小腿, legRegion)
+            // 段1: position → joint1 (用 legRegion)
             Lines.stroke(legRegion.height * legRegion.scl() * flips);
-            Lines.line(legRegion, position.x, position.y, leg.joint.x, leg.joint.y, false);
+            Lines.line(legRegion, position.x, position.y, j1x, j1y, false);
 
-            // 段2: joint → middle (中段, legMiddleRegion)
+            // 段2: joint1 → joint2 (中段, legMiddleRegion)
             Lines.stroke(legMiddleRegion.height * legMiddleRegion.scl() * flips);
-            Lines.line(legMiddleRegion, leg.joint.x, leg.joint.y, midX, midY, false);
+            Lines.line(legMiddleRegion, j1x, j1y, j2x, j2y, false);
 
-            // 段3: middle → base (大腿, legBaseRegion + legExtension)
+            // 段3: joint2 → base (大腿, legBaseRegion)
             Lines.stroke(legBaseRegion.height * legRegion.scl() * flips);
-            Lines.line(legBaseRegion, midX + Tmp.v1.x * 0.5f, midY + Tmp.v1.y * 0.5f, leg.base.x, leg.base.y, false);
+            Lines.line(legBaseRegion, j2x, j2y, leg.base.x, leg.base.y, false);
 
             // 关节贴图
             if (jointRegion.found()) {
-                Draw.rect(jointRegion, leg.joint.x, leg.joint.y);
-                // 中间关节也画关节贴图 (可选)
-                Draw.rect(jointRegion, midX, midY);
+                Draw.rect(jointRegion, j1x, j1y);
+                Draw.rect(jointRegion, j2x, j2y);
             }
         }
 

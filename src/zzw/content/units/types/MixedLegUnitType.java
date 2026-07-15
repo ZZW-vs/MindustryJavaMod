@@ -174,8 +174,13 @@ public class MixedLegUnitType extends UnitType {
         Draw.reset();
     }
 
-    /** 判断第 i 条腿是否为小腿 */
+    /** 判断第 i 条腿是否为小腿 (左右对称分布: 每侧3小腿+2大腿) */
     private boolean isSmallLeg(int i) {
-        return i < smallLegCount;
+        // legCount=10, 左侧 i<5, 右侧 i>=5
+        // 镜像到左侧: pos = i < half ? i : (legCount - 1 - i)
+        // 小腿在 pos 0,1,3; 大腿在 pos 2,4
+        int half = legCount / 2;
+        int pos = i < half ? i : (legCount - 1 - i);
+        return pos == 0 || pos == 1 || pos == 3;
     }
 }
