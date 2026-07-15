@@ -1409,6 +1409,7 @@ public class Z_Units {
 
             allowLegStep = true;
             hovering = true;
+            shadowElevation = 3f;  // ★ PU132 visualElevation=3f, v158 用 shadowElevation 控制腿的视觉高度
             groundLayer = mindustry.graphics.Layer.legUnit + 6f;
             legCount = 8;
             legGroupSize = 4;
@@ -1424,11 +1425,12 @@ public class Z_Units {
             legSplashDamage = 1400f;
             outlineColor = Color.valueOf("1a1a2e");
             range = 500f;
-            constructor = mindustry.gen.UnitEntity::create;
+            constructor = mindustry.gen.LegsUnit::create;
             controller = unit -> new mindustry.ai.types.GroundAI();
 
             // ===== 武器1: 噩梦激光 (PU132 ravager-nightmare) =====
             // PU132 第4535-4546行: bottomWeapon, x=80.25, reload=6*60, shootSound=ravagerNightmareShoot
+            // top=false 等价于 PU132 的 bottomWeapons.add(this), 武器画在 body 下方
             weapons.add(new Weapon("create-ravager-nightmare") {{
                 x = 80.25f;
                 y = -7.75f;
@@ -1438,6 +1440,7 @@ public class Z_Units {
                 alternate = true;
                 rotate = false;
                 shootCone = 360f;
+                top = false;
                 shootSound = zzw.content.Z_Sounds.ravagerNightmareShoot;
                 bullet = new EndPointBlastLaserBulletType(1210f) {{
                     length = 460f;
@@ -1466,7 +1469,8 @@ public class Z_Units {
 
             // ===== 武器2: 炮弹1 (PU132 ravager-artillery) =====
             // PU132 第4547-4559行: x=44.25, y=-31.75, rotate=true, reload=2*50, shots=5
-            weapons.add(new Weapon("create-ravager-artillery-1") {{
+            // 两个炮弹武器共用同 name "ravager-artillery", 共用同一贴图 (PU132 原版设计)
+            weapons.add(new Weapon("create-ravager-artillery") {{
                 shootY = 11f;
                 shoot.shots = 5;
                 inaccuracy = 10f;
@@ -1496,7 +1500,8 @@ public class Z_Units {
 
             // ===== 武器3: 炮弹2 (PU132 ravager-artillery) =====
             // PU132 第4560-4572行: x=51.25, y=-4.25, rotate=true, reload=2.25*50, shots=5
-            weapons.add(new Weapon("create-ravager-artillery-2") {{
+            // 两个炮弹武器共用同 name "ravager-artillery", 共用同一贴图 (PU132 原版设计)
+            weapons.add(new Weapon("create-ravager-artillery") {{
                 shootY = 11f;
                 shoot.shots = 5;
                 inaccuracy = 10f;
@@ -1526,7 +1531,8 @@ public class Z_Units {
 
             // ===== 武器4: 小型炮台1 (PU132 ravager-small-turret) =====
             // PU132 第4573-4584行: x=34.5, y=53.75, rotate=true, reload=7
-            weapons.add(new Weapon("create-ravager-small-turret-1") {{
+            // 两个小型炮台共用同 name "ravager-small-turret", 共用同一贴图 (PU132 原版设计)
+            weapons.add(new Weapon("create-ravager-small-turret") {{
                 shootY = 7f;
                 inaccuracy = 2f;
                 shadow = 9.25f * 2f;
@@ -1563,7 +1569,8 @@ public class Z_Units {
 
             // ===== 武器5: 小型炮台2 (PU132 ravager-small-turret) =====
             // PU132 第4585-4597行: x=50.75, y=24.25, rotate=true, reload=7
-            weapons.add(new Weapon("create-ravager-small-turret-2") {{
+            // 两个小型炮台共用同 name "ravager-small-turret", 共用同一贴图 (PU132 原版设计)
+            weapons.add(new Weapon("create-ravager-small-turret") {{
                 shootY = 7f;
                 inaccuracy = 2f;
                 shadow = 9.25f * 2f;

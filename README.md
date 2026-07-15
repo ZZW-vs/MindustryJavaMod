@@ -161,6 +161,11 @@
 
 ## 更新日志
 
+### v1.4.3
+- **修复掠夺者（ravager）腿不显示**：constructor 错误使用了 `UnitEntity::create`（飞行单位 entity，不实现 Legsc 接口），导致 `UnitType.drawLegs()` 因 `unit instanceof Legsc` 为 false 而不被调用。改为 `LegsUnit::create`（腿单位 entity），现在 8 条腿正常显示
+- **修复掠夺者炮台贴图不显示（有影子无贴图）**：两个炮弹武器错误命名为 `create-ravager-artillery-1` 和 `-2`，两个小型炮台错误命名为 `create-ravager-small-turret-1` 和 `-2`，但贴图文件只有 `ravager-artillery.png` 和 `ravager-small-turret.png`（atlas key 为 `create-ravager-artillery` / `create-ravager-small-turret`），Weapon.load() 用 name 查找 atlas 找不到 → region.found()=false → 只画 shadow 圆形阴影不画炮台。改回 PU132 原版设计：两个炮弹武器共用 name `create-ravager-artillery`，两个小型炮台共用 name `create-ravager-small-turret`，共用同一贴图
+- **噩梦激光武器 top=false**：等价于 PU132 的 `bottomWeapons.add(this)`，让武器画在 body 下方（先画武器再画 body），看起来更像嵌入式炮台
+
 ### v1.4.2
 - **修复压迫者/噬界虫大激光方向不固定**：改用 rotate=false + shootCone=360f，continuous 武器激光方向=unit.rotation+baseRotation（固定），shootCone=360f 绕过 Angles.within 检查确保任何角度都能发射（之前用 rotate=true 会导致 mount.rotation 跟随目标旋转，激光方向不固定）
 - **给虚空容器添加红色大激光武器**：OppressionLaserBulletType（和压迫者一样的红色大激光），rotate=false + shootCone=360f 固定方向
