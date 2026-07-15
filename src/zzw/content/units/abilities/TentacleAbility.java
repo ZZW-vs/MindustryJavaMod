@@ -45,7 +45,8 @@ public class TentacleAbility extends Ability {
     public float speed = 8f;
     public float accel = 0.2f;
     public float drag = 0.06f;
-    public float swayScl = 110f, swayMag = 0.6f, swayOffset = 0f, swaySegmentOffset = 1.5f;
+    // ★ 减小摆动幅度 (默认0.6太大导致波浪线, 0.15让鞭子更硬更稳定)
+    public float swayScl = 110f, swayMag = 0.15f, swayOffset = 0f, swaySegmentOffset = 1.5f;
     public boolean mirror = true;
     public boolean top = true;
     public boolean flipSprite = false;

@@ -2039,6 +2039,7 @@ public class Z_Units {
             //   #4 apocalypse-tentacle:  9段37.25长, 同#2, swayOffset=90
 
             // 触手#1: desolation-tentacle (大鞭子, 爆破激光点射)
+            // PU132 原版: laserColors = {scarColorAlpha, scarColor, endColor, black} 外围红→内层黑
             abilities.add(new zzw.content.units.abilities.TentacleAbility("create-desolation-tentacle") {{
                 x = 139f;
                 y = -13.5f;
@@ -2047,16 +2048,37 @@ public class Z_Units {
                 segmentLength = 44.5f;  // PU132 原版
                 angleLimit = 30f;       // PU132 原版
                 firstSegmentAngleLimit = 17f;  // PU132 原版
-                rotationSpeed = 2.5f;
-                speed = 6f;
-                accel = 0.2f;
-                drag = 0.06f;  // PU132 默认
+                // ★ 降低移动速度+增大drag让动态更慢更稳定丝滑
+                rotationSpeed = 1.5f;   // 2.5→1.5 减慢旋转追踪
+                speed = 3f;             // 6→3 减慢末端移动
+                accel = 0.1f;           // 0.2→0.1 减小加速度
+                drag = 0.12f;           // 0.06→0.12 增大阻力让动态更稳定
                 swayScl = 120f;
-                swayMag = 0.2f;
+                swayMag = 0.1f;         // 0.2→0.1 减小摆动 (更硬)
                 mirror = true;
                 top = true;
                 automatic = false;  // PU132 原版
-                bullet = new EndPointBlastLaserBulletType(250f);
+                bullet = new EndPointBlastLaserBulletType(250f) {{
+                    // ★ PU132 原版完整参数
+                    length = 320f;
+                    width = 17f;
+                    lifetime = 20f;
+                    widthReduction = 3f;
+                    auraWidthReduction = 4f;  // EndPointBlastLaserBulletType 有此字段
+                    damageRadius = 60f;
+                    auraDamage = 1000f;
+                    overDamage = 900000f;
+                    ratioDamage = 1f / 200f;
+                    ratioStart = 11000f;
+                    bleedDuration = 10f * 60f;
+                    // ★ PU132 原版颜色: 外围红→内层黑 (scarColorAlpha, scarColor, endColor, black)
+                    laserColors = new Color[]{
+                        Color.valueOf("f5303690"),  // scarColorAlpha (半透明红)
+                        Color.valueOf("f53036"),    // scarColor (红)
+                        Color.valueOf("ff786e"),    // endColor (浅红)
+                        Color.black                 // 黑色核心
+                    };
+                }};
                 reload = 3f * 60f;
                 range = 320f;  // PU132: bullet.range()
                 shootCone = 4f;  // PU132 原版 (精确瞄准)
@@ -2064,6 +2086,7 @@ public class Z_Units {
             }});
 
             // 触手#2: apocalypse-tentacle (小鞭子, 连续激光)
+            // PU132 endLaserSmall: colors = {scarColorAlpha, scarColor, endColor, white} 红色细激光
             abilities.add(new zzw.content.units.abilities.TentacleAbility("create-apocalypse-tentacle") {{
                 x = 122.75f;
                 y = -41f;
@@ -2073,14 +2096,31 @@ public class Z_Units {
                 // ★ 减小角度限制 (PU132 默认65, 改为30让鞭子更直, 像多节单位连接)
                 angleLimit = 30f;
                 firstSegmentAngleLimit = 20f;  // PU132 原版
-                rotationSpeed = 3f;
-                speed = 8f;  // PU132: 4f * 2f
-                accel = 0.2f;
-                drag = 0.06f;
+                // ★ 降低速度+增大drag让动态更慢更稳定
+                rotationSpeed = 1.5f;   // 3→1.5
+                speed = 4f;             // 8→4
+                accel = 0.1f;           // 0.2→0.1
+                drag = 0.12f;           // 0.06→0.12
                 mirror = true;
                 top = true;
                 automatic = false;
-                bullet = new EndContinuousLaserBulletType(85f);
+                bullet = new EndContinuousLaserBulletType(85f) {{
+                    // ★ PU132 endLaserSmall 完整配置
+                    lifetime = 2f * 60f;
+                    length = 230f;
+                    // strokes 缩小到 0.4 倍 (细激光)
+                    strokes = new float[]{0.8f, 0.6f, 0.4f, 0.12f};
+                    overDamage = 800000f;
+                    ratioDamage = 1f / 40f;
+                    ratioStart = 1000000f;
+                    // ★ PU132 原版颜色: 红色细激光 (scarColorAlpha, scarColor, endColor, white)
+                    colors = new Color[]{
+                        Color.valueOf("f5303690"),  // scarColorAlpha (半透明红)
+                        Color.valueOf("f53036"),    // scarColor (红)
+                        Color.valueOf("ff786e"),    // endColor (浅红)
+                        Color.white                 // 白色核心
+                    };
+                }};
                 reload = 4f * 60f;
                 range = 220f;
                 shootCone = 15f;  // PU132 默认
@@ -2099,14 +2139,28 @@ public class Z_Units {
                 angleLimit = 30f;
                 firstSegmentAngleLimit = 18f;
                 swayOffset = 45f;
-                rotationSpeed = 3f;
-                speed = 8f;
-                accel = 0.2f;
-                drag = 0.06f;
+                // ★ 降低速度+增大drag
+                rotationSpeed = 1.5f;
+                speed = 4f;
+                accel = 0.1f;
+                drag = 0.12f;
                 mirror = true;
                 top = true;
                 automatic = false;
-                bullet = new EndContinuousLaserBulletType(85f);
+                bullet = new EndContinuousLaserBulletType(85f) {{
+                    lifetime = 2f * 60f;
+                    length = 230f;
+                    strokes = new float[]{0.8f, 0.6f, 0.4f, 0.12f};
+                    overDamage = 800000f;
+                    ratioDamage = 1f / 40f;
+                    ratioStart = 1000000f;
+                    colors = new Color[]{
+                        Color.valueOf("f5303690"),  // scarColorAlpha
+                        Color.valueOf("f53036"),    // scarColor
+                        Color.valueOf("ff786e"),    // endColor
+                        Color.white
+                    };
+                }};
                 reload = 4f * 60f;
                 range = 220f;
                 shootCone = 15f;
@@ -2125,14 +2179,28 @@ public class Z_Units {
                 angleLimit = 30f;
                 firstSegmentAngleLimit = 16f;
                 swayOffset = 90f;
-                rotationSpeed = 3f;
-                speed = 8f;
-                accel = 0.2f;
-                drag = 0.06f;
+                // ★ 降低速度+增大drag
+                rotationSpeed = 1.5f;
+                speed = 4f;
+                accel = 0.1f;
+                drag = 0.12f;
                 mirror = true;
                 top = true;
                 automatic = false;
-                bullet = new EndContinuousLaserBulletType(85f);
+                bullet = new EndContinuousLaserBulletType(85f) {{
+                    lifetime = 2f * 60f;
+                    length = 230f;
+                    strokes = new float[]{0.8f, 0.6f, 0.4f, 0.12f};
+                    overDamage = 800000f;
+                    ratioDamage = 1f / 40f;
+                    ratioStart = 1000000f;
+                    colors = new Color[]{
+                        Color.valueOf("f5303690"),  // scarColorAlpha
+                        Color.valueOf("f53036"),    // scarColor
+                        Color.valueOf("ff786e"),    // endColor
+                        Color.white
+                    };
+                }};
                 reload = 4f * 60f;
                 range = 220f;
                 shootCone = 15f;

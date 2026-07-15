@@ -32,6 +32,8 @@ public class EndPointBlastLaserBulletType extends AntiCheatBulletTypeBase {
     public float width = 12f;
     /** 每层颜色宽度递减 */
     public float widthReduction = 2f;
+    /** 光环效果宽度递减 (PU132 auraWidthReduction) */
+    public float auraWidthReduction = 3f;
     /** 多层颜色渲染 */
     public Color[] laserColors = {Color.white};
 

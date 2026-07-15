@@ -56,6 +56,24 @@ public class CustomLegsAbility extends Ability {
         for (LegGroupData gd : groupData) {
             gd.update(unit, unit.type.legSpeed);
         }
+
+        // ★ 同步 CustomLegsAbility 腿位置到原生腿系统 (unit.legs())
+        // 这样脚步声/碰撞/水波纹基于 CustomLegsAbility 的位置, 而非原生腿系统
+        if (unit instanceof mindustry.gen.Legsc legUnit) {
+            mindustry.entities.Leg[] nativeLegs = legUnit.legs();
+            int nativeIdx = 0;
+            for (LegGroupData gd : groupData) {
+                for (LegData leg : gd.legs) {
+                    if (nativeIdx < nativeLegs.length) {
+                        nativeLegs[nativeIdx].base.set(leg.foot);
+                        nativeLegs[nativeIdx].joint.set(leg.jointX, leg.jointY);
+                        nativeLegs[nativeIdx].moving = leg.moving;
+                        nativeLegs[nativeIdx].stage = leg.stage;
+                        nativeIdx++;
+                    }
+                }
+            }
+        }
     }
 
     /** Ability.draw 为空操作, 腿渲染由 UnitType.drawLegs() 调用 drawLegs() 完成 (确保在 body 之前) */
