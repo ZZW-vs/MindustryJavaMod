@@ -2052,9 +2052,9 @@ public class Z_Units {
                 rotationSpeed = 1.5f;   // 2.5→1.5 减慢旋转追踪
                 speed = 3f;             // 6→3 减慢末端移动
                 accel = 0.1f;           // 0.2→0.1 减小加速度
-                drag = 0.12f;           // 0.06→0.12 增大阻力让动态更稳定
+                drag = 0.15f;           // 0.06→0.15 增大阻力让动态更稳定
                 swayScl = 120f;
-                swayMag = 0.1f;         // 0.2→0.1 减小摆动 (更硬)
+                swayMag = 0.08f;        // 减小摆动 (更硬)
                 mirror = true;
                 top = true;
                 automatic = false;  // PU132 原版
@@ -2100,7 +2100,7 @@ public class Z_Units {
                 rotationSpeed = 1.5f;   // 3→1.5
                 speed = 4f;             // 8→4
                 accel = 0.1f;           // 0.2→0.1
-                drag = 0.12f;           // 0.06→0.12
+                drag = 0.15f;           // 0.06→0.15
                 mirror = true;
                 top = true;
                 automatic = false;

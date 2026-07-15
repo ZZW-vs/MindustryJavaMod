@@ -45,8 +45,8 @@ public class TentacleAbility extends Ability {
     public float speed = 8f;
     public float accel = 0.2f;
     public float drag = 0.06f;
-    // ★ 减小摆动幅度 (默认0.6太大导致波浪线, 0.15让鞭子更硬更稳定)
-    public float swayScl = 110f, swayMag = 0.15f, swayOffset = 0f, swaySegmentOffset = 1.5f;
+    // ★ 减小摆动幅度 (默认0.6太大导致波浪线, 0.08让鞭子更硬更稳定)
+    public float swayScl = 110f, swayMag = 0.08f, swayOffset = 0f, swaySegmentOffset = 1.5f;
     public boolean mirror = true;
     public boolean top = true;
     public boolean flipSprite = false;
@@ -120,17 +120,20 @@ public class TentacleAbility extends Ability {
                 updateMovement(t, segs, sideSign, rootPos);
             }
 
-            // ===== 第一遍: 末端→根部, 速度积分 + drag + 摆动 + child同步 =====
+            // ===== 第一遍: 末端→根部, 速度积分 + drag + 摆动 + child 同步 =====
             for (int s = segs.length - 1; s >= 0; s--) {
                 TentacleSeg seg = segs[s];
                 seg.updateLastPosition();
 
-                // 速度 clamp + 积分位置
-                tv.set(seg.vx, seg.vy).limit(speed);
-                seg.vx = tv.x;
-                seg.vy = tv.y;
-                seg.x += seg.vx * Time.delta;
-                seg.y += seg.vy * Time.delta;
+                // ★ attacking 时末端段(s=last)不积分速度, 因为 updateMovement 已设置位置
+                // 只对非末端段或非attacking状态积分速度, 避免末端位置跳变导致抽搐
+                if (!(attacking[t] && s == segs.length - 1)) {
+                    tv.set(seg.vx, seg.vy).limit(speed);
+                    seg.vx = tv.x;
+                    seg.vy = tv.y;
+                    seg.x += seg.vx * Time.delta;
+                    seg.y += seg.vy * Time.delta;
+                }
 
                 // drag 衰减
                 seg.vx *= 1f - (drag * Time.delta);
@@ -376,7 +379,8 @@ public class TentacleAbility extends Ability {
                 TentacleSeg seg = segs[s];
                 TextureRegion reg = (s == segs.length - 1 && tipRegion.found()) ? tipRegion : region;
                 if (reg == null || !reg.found()) continue;
-                tv.set(seg.x, seg.y).sub(prevX, prevY).setLength(reg.width * Draw.scl).add(prevX, prevY);
+                // ★ 用 segmentLength 作为线段长度 (而非 reg.width * Draw.scl), 避免贴图宽度 < segmentLength 时空隙
+                tv.set(seg.x, seg.y).sub(prevX, prevY).setLength(segmentLength).add(prevX, prevY);
                 unit.type.applyColor(unit);
                 Lines.stroke(reg.height * Draw.scl * Mathf.sign(flipSprite != flip));
                 Lines.line(reg, prevX, prevY, tv.x, tv.y, false);

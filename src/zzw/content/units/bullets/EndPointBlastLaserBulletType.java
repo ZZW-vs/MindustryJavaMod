@@ -143,7 +143,9 @@ public class EndPointBlastLaserBulletType extends AntiCheatBulletTypeBase {
 
     @Override
     public void draw(Bullet b) {
-        // ★ v158 bloom 适配: 重置混合模式为 alpha 混合
+        // ★ v158 bloom 适配: 设置 Draw.z 在 bloom apply(110.02) 之后, 避免被 bloom additive 叠加导致黑色不可见
+        float oldZ = Draw.z();
+        Draw.z(mindustry.graphics.Layer.flyingUnit + 1f);
         Draw.blend();
         float realLength = b.fdata();
         float f = Mathf.curve(b.fin(), 0f, 0.2f);
@@ -165,6 +167,8 @@ public class EndPointBlastLaserBulletType extends AntiCheatBulletTypeBase {
         if (baseLen > 0) {
             Drawf.light(b.x(), b.y(), width * 1.4f * b.fout(), laserColors[0], 0.5f);
         }
+        Draw.blend();
+        Draw.z(oldZ);
     }
 
     @Override
