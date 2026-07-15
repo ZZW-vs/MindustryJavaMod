@@ -990,7 +990,8 @@ public class Z_Units {
                 x = 85f;
                 y = -50f;
                 shadow = 47f;
-                mirror = true;
+                // ★ PU132 原版: mirror = false (单边武器, 不是双边镜像)
+                mirror = false;
                 alternate = true;
                 rotate = true;
                 rotateSpeed = 2f;
@@ -1002,6 +1003,8 @@ public class Z_Units {
                 // PU132 原版: shots=3, shotDelay=6f (3连发)
                 shoot.shots = 3;
                 shoot.shotDelay = 6f;
+                // ★ PU132 原版: shootSound = UnitySounds.spaceFracture
+                shootSound = zzw.content.Z_Sounds.spaceFracture;
 
                 bullet = new VoidFractureBulletType(40f, 800f) {{
                     speed = 5f;
@@ -1019,6 +1022,9 @@ public class Z_Units {
                     spikesDamage = 310f;
                     targetingRange = 400f;
                     maxTargets = 20;
+                    // ★ PU132 原版: activeSound, spikesSound
+                    activeSound = zzw.content.Z_Sounds.fractureShoot;
+                    spikesSound = zzw.content.Z_Sounds.spaceFracture;
                     modules = new AntiCheatBulletModule[]{
                         new ArmorDamageModule(50f, 50f, 2f),
                         new ForceFieldDamageModule(2f, 20f, 220f, 7f, 1f / 50f, 2f * 60f)
@@ -1115,6 +1121,8 @@ public class Z_Units {
             speed = 4f;
             drag = 0.4f;
             accel = 0.5f;
+            // ★ PU132 原版: boostMultiplier = 0.5f
+            boostMultiplier = 0.5f;
             flying = true;
             lowAltitude = true;
             hitSize = 12f;
@@ -1173,11 +1181,16 @@ public class Z_Units {
                 reload = 30f;
                 inaccuracy = 15f;
                 rotateSpeed = 5f;
+                // ★ PU132 原版: shootSound = UnitySounds.spaceFracture
+                shootSound = zzw.content.Z_Sounds.spaceFracture;
                 // ★ PU132 原版 voidVessel 只有1个普通武器, 不是连发3发
                 // 大激光效果由 VoidFractureBulletType 的 Phase 2 冲刺阶段绘制
                 bullet = new VoidFractureBulletType(32f, 600f) {{
                     ratioDamage = 1f / 50f;
                     ratioStart = damage * 20f;
+                    // ★ PU132 原版: activeSound, spikesSound
+                    activeSound = zzw.content.Z_Sounds.fractureShoot;
+                    spikesSound = zzw.content.Z_Sounds.spaceFracture;
                     modules = new AntiCheatBulletModule[]{
                         new ArmorDamageModule(1f, 2f, 0f)
                     };
@@ -1211,7 +1224,10 @@ public class Z_Units {
             controller = unit -> new zzw.content.units.ai.WormAI();
 
             // 时间停止能力 (PU132: duration=15*60, rechargeTime=10*60)
-            abilities.add(new TimeStopAbility(15f * 60f, 10f * 60f));
+            abilities.add(new TimeStopAbility(15f * 60f, 10f * 60f) {{
+                // ★ PU132 原版: timeStopSound = UnitySounds.stopTime
+                timeStopSound = zzw.content.Z_Sounds.stopTime;
+            }});
 
             weapons.add(new Weapon("create-end-point-defence") {{
                 x = 12f;

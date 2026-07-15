@@ -10,6 +10,7 @@ import zzw.content.blocks.Z_Blocks;
 import zzw.content.Z_Items;
 import zzw.content.Z_Factory;
 import zzw.content.Z_Mine;
+import zzw.content.Z_Sounds;
 import zzw.content.mechanics.Z_Mechanics;
 import zzw.content.units.Z_Units;
 
@@ -26,6 +27,9 @@ public class TestMod extends Mod{
 
     @Override
     public void loadContent(){
+        // ★ 加载自定义音效 (必须在单位之前, 单位武器会引用)
+        Z_Sounds.load();
+
         // 加载自定义物品（基础资源）
         Z_Items.load();
 

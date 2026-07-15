@@ -11,6 +11,7 @@ import arc.math.geom.Vec2;
 import arc.struct.FloatSeq;
 import arc.struct.IntSet;
 import arc.util.Tmp;
+import arc.audio.Sound;
 import mindustry.Vars;
 import mindustry.content.Fx;
 import mindustry.entities.Effect;
@@ -48,6 +49,10 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
     public float spikesRange = 100f;
     public float spikesDamage = 200f;
     public float spikesRand = 8f;
+    /** ★ PU132 原版: activeSound = UnitySounds.fractureShoot (Phase 2 冲刺启动时播放) */
+    public Sound activeSound;
+    /** ★ PU132 原版: spikesSound = UnitySounds.spaceFracture (spikes 命中时播放) */
+    public Sound spikesSound;
 
     /** ★ PU132: layer = Layer.effect + 0.03f (渲染层级在 effect 之上) */
     private static Effect voidFractureEffect;
@@ -137,6 +142,10 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
                     b.vel().trns(b.rotation(), trueSpeed);
                     data.x = b.x();
                     data.y = b.y();
+                    // ★ PU132 L99: activeSound.at(b.x, b.y, Mathf.random(0.9f, 1.1f))
+                    if (activeSound != null) {
+                        activeSound.at(b.x(), b.y(), Mathf.random(0.9f, 1.1f));
+                    }
                 }
             } else {
                 // ===== Phase 2: 冲刺穿透 (PU132 L101-122) =====
@@ -247,6 +256,10 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
 
                 if (!b.hit()) {
                     spawnSpikes(b, data, d);
+                }
+                // ★ PU132 L182: spikesSound.at((d.x + d.x2)/2, (d.y + d.y2)/2, Mathf.random(0.9f, 1.1f))
+                if (!d.spikes.isEmpty() && spikesSound != null) {
+                    spikesSound.at((d.x + d.x2) / 2f, (d.y + d.y2) / 2f, Mathf.random(0.9f, 1.1f));
                 }
                 // ★ PU132: 播放 voidFractureEffect (30tick 三层激光+spikes 特效)
                 voidFractureEffect.at((d.x + d.x2) / 2f, (d.y + d.y2) / 2f, 0f, d);

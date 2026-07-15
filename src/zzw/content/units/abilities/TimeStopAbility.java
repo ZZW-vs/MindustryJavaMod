@@ -1,11 +1,13 @@
 package zzw.content.units.abilities;
 
 import arc.util.Time;
+import arc.math.Mathf;
 import mindustry.entities.abilities.Ability;
 import mindustry.content.Fx;
 import mindustry.gen.Unit;
 import mindustry.gen.Teamc;
 import mindustry.entities.Units;
+import arc.audio.Sound;
 
 /**
  * 时间停止能力 (移植自 PU132 TimeStopAbility, 简化版)
@@ -32,6 +34,9 @@ public class TimeStopAbility extends Ability {
     public float range = 300f;
     /** 最大模拟迭代次数 (防止卡死, 60次=3秒模拟时间) */
     public int maxIterations = 60;
+
+    /** ★ PU132 原版: timeStopSound = UnitySounds.stopTime */
+    public Sound timeStopSound;
 
     /** 当前充能计时器 */
     protected float timer = 0f;
@@ -66,6 +71,11 @@ public class TimeStopAbility extends Ability {
      */
     protected void trigger(Unit unit) {
         timer = 0f;
+
+        // ★ PU132 原版: timeStopSound.at(unit.x, unit.y)
+        if (timeStopSound != null) {
+            timeStopSound.at(unit.x, unit.y, Mathf.random(0.9f, 1.1f));
+        }
 
         // 视觉特效 (v158 无 nuclearShockwave, 用 shockwave 替代)
         Fx.shockwave.at(unit.x, unit.y, unit.hitSize);
