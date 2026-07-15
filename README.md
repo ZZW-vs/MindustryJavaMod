@@ -106,6 +106,23 @@
 - End 阵营飞行单位，时间停止能力
 - **TimeStopAbility**：用 Time.delta 模拟全局时间停止，updating 标志防递归，maxIterations=60 防卡死
 
+#### 视界虫 (opticaecus)
+- End 阵营飞行单位（PU132 移植），60000 血，速度 1.8
+- **武器1：红色激光**（LaserBulletType，1400 伤害，长度 390，宽度 30，4 秒冷却）
+- **武器2：导弹发射器**（doeg-launcher，10 连发，每发 170 伤害 + 320 范围伤害，追踪 + 蛇形飞行）
+- PU132 原版有隐身能力（InvisibleUnitType），v158 简化为普通 UnitType（隐身机制依赖 Invisiblec 组件，v158 无原生支持）
+- 具备防作弊系统（无敌帧 + 单次上限 + 抗性递增）
+
+#### 掠夺者 (ravager)
+- End 阵营地面单位（8 腿），1650000 血，速度 0.65，护甲 15（PU132 移植）
+- **武器1：噩梦激光**（EndPointBlastLaserBulletType，1210 伤害，长度 460，宽度 26.1）
+  - 直线碰撞检测 + 阻挡点范围爆炸（damageRadius=110，auraDamage=9000），6 秒冷却
+  - 三模块防作弊：护甲削弱 + 能力削弱 + 力场削弱
+- **武器2,3：炮弹**（ArtilleryBulletType，5 连发，每发 130 伤害 + 325 范围伤害，闪电效果）
+- **武器4,5：小型炮台**（EndBasicBulletType 导弹，330 伤害 + 220 范围伤害，追踪 + 蛇形飞行）
+- 8 腿行走（legCount=8, legGroupSize=4, legLength=140），每腿落地造成 1400 范围伤害
+- 免疫所有状态效果
+
 ### 机械网络系统 (Betamindy 风格)
 - 全局注册表 + 源驱动 BFS 传播转速和应力
 - 所有机械组件继承 MechanicalComponentBuild
@@ -143,6 +160,15 @@
 欢迎提交问题报告和功能请求！如果您想贡献代码，请先创建一个分支并提交Pull Request。
 
 ## 更新日志
+
+### v1.4.2
+- **修复压迫者/噬界虫大激光方向不固定**：改用 rotate=false + shootCone=360f，continuous 武器激光方向=unit.rotation+baseRotation（固定），shootCone=360f 绕过 Angles.within 检查确保任何角度都能发射（之前用 rotate=true 会导致 mount.rotation 跟随目标旋转，激光方向不固定）
+- **给虚空容器添加红色大激光武器**：OppressionLaserBulletType（和压迫者一样的红色大激光），rotate=false + shootCone=360f 固定方向
+- **移植视界虫（opticaecus）**：End 阵营飞行单位，60000 血，装备红色激光（LaserBulletType，1400 伤害）+ 导弹发射器（MissileBulletType，10 连发），PU132 原版有隐身能力（InvisibleUnitType），v158 简化为普通 UnitType
+- **移植掠夺者（ravager）**：End 阵营地面单位（8 腿），1650000 血，装备噩梦激光（EndPointBlastLaserBulletType，直线碰撞+范围爆炸）+ 两门炮弹 + 两座小型炮台，免疫所有状态效果
+- **新增 EndPointBlastLaserBulletType 子弹类型**：激光直线碰撞检测 + 阻挡点范围爆炸，多层颜色叠加渲染，三模块防作弊
+- 新增 ravager-nightmare-shoot、end-basic-large、end-missile、end-basic-small、end-basic、devourer-main-laser 音效
+- 新增 opticaecus、ravager、doeg-launcher、doeg-destroyer、doeg-small-laser、ravager-nightmare、ravager-artillery、ravager-small-turret 贴图资源
 
 ### v1.4.1
 - **修复压迫者红色大激光无法释放**：主激光武器缺少 `rotate=true`，导致 omniMovement=false + circleTarget=true 单位因 unit.rotation 不朝向目标而 shootCone(5°) 永不满足，shoot() 不被调用 → firstShotDelay 蓄力路径不走 → 完全放不出激光。添加 rotate=true + shootCone=30f，让 mount.rotation 独立朝向目标

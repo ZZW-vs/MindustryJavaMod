@@ -16,6 +16,7 @@ import zzw.content.units.anticheat.ArmorDamageModule;
 import zzw.content.units.anticheat.ForceFieldDamageModule;
 import zzw.content.units.bullets.EndBasicBulletType;
 import zzw.content.units.bullets.EndContinuousLaserBulletType;
+import zzw.content.units.bullets.EndPointBlastLaserBulletType;
 import zzw.content.units.bullets.EndRailBulletType;
 import zzw.content.units.bullets.EndSweepLaser;
 import zzw.content.units.bullets.OppressionLaserBulletType;
@@ -66,7 +67,9 @@ public class Z_Units {
         oppressionSegment,     // 段身
         enigma,                // PU132 谜团 (End 阵营飞行单位)
         voidVessel,            // PU132 虚空容器 (End 阵营飞行单位)
-        chronos;               // PU132 克罗诺斯 (End 阵营飞行单位, 时间停止)
+        chronos,               // PU132 克罗诺斯 (End 阵营飞行单位, 时间停止)
+        opticaecus,            // PU132 视界虫 (End 阵营飞行单位, 隐身+激光+导弹)
+        ravager;               // PU132 掠夺者 (End 阵营地面单位, 8腿+噩梦激光)
 
     public static void load() {
         // ★ 关键: 注册自定义 Entity 到 EntityMapping.idMap, 否则 v154.3 的 UnitType.init() 会失败 ★
@@ -611,6 +614,10 @@ public class Z_Units {
                 continuous = true;
                 shake = 4f;
                 shoot.firstShotDelay = 41f;
+                // ★ 大激光方向固定: rotate=false → 激光方向=unit.rotation+baseRotation (固定)
+                //   shootCone=360f 确保任何角度都能发射 (与 oppression 主激光一致)
+                rotate = false;
+                shootCone = 360f;
 
                 bullet = new EndContinuousLaserBulletType(2650f) {{  // 2400 + 250
                     length = 340f;
@@ -946,16 +953,13 @@ public class Z_Units {
                 shootY = 47.25f;
                 mirror = false;
                 continuous = true;
-                // ★ 必须 rotate=true: oppression 是 omniMovement=false + circleTarget=true 单位,
-                //   WormAI.attack() 只调用 moveAt 不改 unit.rotation, 单位不主动朝向目标。
-                //   v158 Weapon 发射条件检查 Angles.within(rotate?mount.rotation:unit.rotation, targetRotation, shootCone)
-                //   rotate=false 时检查 unit.rotation, 单位 rotation 不朝目标 → shootCone(5°)永不满足
-                //   → shoot() 不调用 → firstShotDelay 路径不走 → chargeEffect 不播放 → 完全不放激光
-                //   rotate=true 让 mount.rotation 独立朝向目标, 绕过单位 rotation 限制
-                //   (PU132 原版没有此问题: OppressionComp 重写 rotateMove, EndComp 系统强制 rotation 朝向)
-                rotate = true;
-                rotateSpeed = 1f;  // 主激光缓慢转向 (PU132 风格)
-                shootCone = 30f;   // 放宽到 30°, 避免边缘对不准不开火
+                // ★ 大激光方向固定: rotate=false → mount.rotation=baseRotation(固定)
+                //   continuous 武器激光方向 = unit.rotation + baseRotation
+                //   oppression 是 omniMovement=false, WormAI.attack() 只 moveAt 不改 rotation
+                //   → unit.rotation 不变 → 激光方向固定
+                //   shootCone=360f 确保任何角度都能发射 (绕过 shootCone 检查)
+                rotate = false;
+                shootCone = 360f;
                 reload = 25f * 60f;
                 shoot.firstShotDelay = ChargeEffect.oppressionCharge.lifetime;
                 // ★ 蓄力特效跟随单位移动和旋转
@@ -1223,6 +1227,24 @@ public class Z_Units {
             // ★ 使用 WormAI (继承 FlyingAI, 完全按 PU132 原版自动索敌+攻击)
             controller = unit -> new zzw.content.units.ai.WormAI();
 
+            // ===== 大激光武器 (和压迫者一样的 OppressionLaserBulletType) =====
+            weapons.add(new Weapon() {{
+                x = 0f;
+                y = 0f;
+                shootY = 8f;
+                mirror = false;
+                continuous = true;
+                // ★ 大激光方向固定: rotate=false → 激光方向=unit.rotation+baseRotation (固定)
+                //   shootCone=360f 确保任何角度都能发射
+                rotate = false;
+                shootCone = 360f;
+                reload = 20f * 60f;
+                shoot.firstShotDelay = ChargeEffect.oppressionCharge.lifetime;
+                parentizeEffects = true;
+
+                bullet = new OppressionLaserBulletType();
+            }});
+
             weapons.add(new Weapon("create-end-small-mount") {{
                 x = 8.5f;
                 y = -4.5f;
@@ -1231,16 +1253,11 @@ public class Z_Units {
                 reload = 30f;
                 inaccuracy = 15f;
                 rotateSpeed = 5f;
-                // ★ shootCone: v158 默认 5f 太窄, 武器难以对准目标开火, 设 30f
                 shootCone = 30f;
-                // ★ PU132 原版: shootSound = UnitySounds.spaceFracture
                 shootSound = zzw.content.Z_Sounds.spaceFracture;
-                // ★ PU132 原版 voidVessel 只有1个普通武器, 不是连发3发
-                // 大激光效果由 VoidFractureBulletType 的 Phase 2 冲刺阶段绘制
                 bullet = new VoidFractureBulletType(32f, 600f) {{
                     ratioDamage = 1f / 50f;
                     ratioStart = damage * 20f;
-                    // ★ PU132 原版: activeSound, spikesSound
                     activeSound = zzw.content.Z_Sounds.fractureShoot;
                     spikesSound = zzw.content.Z_Sounds.spaceFracture;
                     modules = new AntiCheatBulletModule[]{
@@ -1288,6 +1305,297 @@ public class Z_Units {
                 rotate = true;
                 rotateSpeed = 5f;
                 bullet = new TimeStopBulletType(6f, 510f);
+            }});
+        }};
+
+        // ═══════════════════════════════════════════════════════════
+        //  Opticaecus (PU132 视界虫)
+        //  - End 阵营飞行单位, 60000 血, 速度 1.8
+        //  - 武器1: 红色激光 (LaserBulletType, 1400 伤害, 长度 390)
+        //  - 武器2: 导弹发射器 (MissileBulletType, 10连发, 170 伤害, 追踪+蛇形)
+        //  - 防作弊: 简化版 (无敌帧+单次上限+抗性递增)
+        //  - ★ PU132 原版有隐身能力 (InvisibleUnitType), v158 简化为普通 UnitType
+        //    (隐身机制依赖 Invisiblec 组件, v158 无原生支持)
+        // ═══════════════════════════════════════════════════════════
+        opticaecus = new UnitType("opticaecus") {{
+            health = 60000f;
+            speed = 1.8f;
+            drag = 0.02f;
+            hitSize = 60.5f;
+            engineOffset = 38f;
+            engineSize = 6f;
+            flying = true;
+            lowAltitude = true;
+            circleTarget = false;
+            armor = 12f;
+            rotateSpeed = 3f;
+            range = 400f;
+            outlineColor = Color.valueOf("1a1a2e");
+            constructor = EndLegsUnit::create;
+            controller = unit -> new zzw.content.units.ai.WormAI();
+
+            // ===== 武器1: 头部红色激光 (PU132 LaserBulletType, 1400 伤害) =====
+            // PU132 第3867-3883行: rotate=false, mirror=false, reload=4*60
+            weapons.add(new Weapon() {{
+                mirror = false;
+                rotate = false;
+                shootCone = 360f;  // 固定方向, 任意角度都能发射
+                x = 0f;
+                y = 11.25f;
+                shootY = 0f;
+                reload = 4f * 60f;
+                shootSound = zzw.content.Z_Sounds.devourerMainLaser;
+
+                bullet = new mindustry.entities.bullet.LaserBulletType(1400f) {{
+                    colors = new Color[]{Color.valueOf("f5303690"), Color.valueOf("f53036"), Color.valueOf("ff786e"), Color.white};
+                    hitColor = Color.valueOf("f53036");
+                    width = 30f;
+                    length = 390f;
+                    largeHit = true;
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                }};
+            }});
+
+            // ===== 武器2: 导弹发射器 (PU132 doeg-launcher, 10连发) =====
+            // PU132 第3884-3907行: x=24.75, mirror=true, rotate=true, reload=1.2*60, shots=10
+            weapons.add(new Weapon("create-doeg-launcher") {{
+                x = 24.75f;
+                mirror = true;
+                rotate = true;
+                rotateSpeed = 5f;
+                shootCone = 30f;
+                reload = 1.2f * 60f;
+                inaccuracy = 20f;
+                shoot.shots = 10;
+                shoot.shotDelay = 2f;
+                shootSound = zzw.content.Z_Sounds.endMissile;
+
+                bullet = new mindustry.entities.bullet.MissileBulletType(6f, 170f) {{
+                    lifetime = 55f;
+                    frontColor = Color.valueOf("ff786e");
+                    backColor = trailColor = lightColor = Color.valueOf("f53036");
+                    shrinkY = 0.1f;
+                    splashDamage = 320f;
+                    splashDamageRadius = 45f;
+                    weaveScale = 15f;
+                    weaveMag = 2f;
+                    width *= 1.6f;
+                    height *= 2.1f;
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                }};
+            }});
+        }};
+
+        // ═══════════════════════════════════════════════════════════
+        //  Ravager (PU132 掠夺者)
+        //  - End 阵营地面单位 (8腿), 1650000 血, 速度 0.65
+        //  - 武器1: 噩梦激光 (EndPointBlastLaserBulletType, 1210 伤害, 长度 460, 宽度 26.1)
+        //         - 直线碰撞 + 阻挡点范围爆炸 (damageRadius=110, auraDamage=9000)
+        //  - 武器2,3: 炮弹 (ArtilleryBulletType, 130 伤害, 5连发, 闪电+破片)
+        //  - 武器4,5: 小型炮台 (EndBasicBulletType 导弹, 330 伤害, 追踪+蛇形)
+        //  - 防作弊: 简化版 (无敌帧+单次上限+抗性递增)
+        //  - 8腿地面单位 (legCount=8, legGroupSize=4, legLength=140)
+        //  - 免疫所有状态效果
+        // ═══════════════════════════════════════════════════════════
+        ravager = new UnitType("ravager") {{
+            health = 1650000f;
+            speed = 0.65f;
+            drag = 0.16f;
+            armor = 15f;
+            hitSize = 138f;
+            rotateSpeed = 1.1f;
+
+            immunities.addAll(mindustry.Vars.content.getBy(mindustry.ctype.ContentType.status));
+
+            allowLegStep = true;
+            hovering = true;
+            groundLayer = mindustry.graphics.Layer.legUnit + 6f;
+            legCount = 8;
+            legGroupSize = 4;
+            legPairOffset = 2f;
+            legMoveSpace = 0.5f;
+            legLength = 140f;
+            legExtension = -15f;
+            legBaseOffset = 50f;
+            legSpeed = 0.15f;
+            rippleScale = 7f;
+
+            legSplashRange = 90f;
+            legSplashDamage = 1400f;
+            outlineColor = Color.valueOf("1a1a2e");
+            range = 500f;
+            constructor = mindustry.gen.UnitEntity::create;
+            controller = unit -> new mindustry.ai.types.GroundAI();
+
+            // ===== 武器1: 噩梦激光 (PU132 ravager-nightmare) =====
+            // PU132 第4535-4546行: bottomWeapon, x=80.25, reload=6*60, shootSound=ravagerNightmareShoot
+            weapons.add(new Weapon("create-ravager-nightmare") {{
+                x = 80.25f;
+                y = -7.75f;
+                shootY = 75f;
+                reload = 6f * 60f;
+                recoil = 8f;
+                alternate = true;
+                rotate = false;
+                shootCone = 360f;
+                shootSound = zzw.content.Z_Sounds.ravagerNightmareShoot;
+                bullet = new EndPointBlastLaserBulletType(1210f) {{
+                    length = 460f;
+                    width = 26.1f;
+                    lifetime = 25f;
+                    widthReduction = 6f;
+                    damageRadius = 110f;
+                    auraDamage = 9000f;
+
+                    overDamage = 500000f;
+                    ratioDamage = 1f / 30f;
+                    ratioStart = 12000f;
+                    bleedDuration = 10f * 60f;
+
+                    hitEffect = mindustry.content.Fx.hitLancer;
+
+                    laserColors = new Color[]{Color.valueOf("f5303690"), Color.valueOf("f53036"), Color.valueOf("ff786e"), Color.black};
+
+                    modules = new zzw.content.units.anticheat.AntiCheatBulletModule[]{
+                        new zzw.content.units.anticheat.ArmorDamageModule(1f / 15f, 5f, 70f, 8f),
+                        new zzw.content.units.anticheat.AbilityDamageModule(50f, 400f, 4f, 1f / 25f, 5f),
+                        new zzw.content.units.anticheat.ForceFieldDamageModule(10f, 30f, 230f, 8f, 1f / 40f)
+                    };
+                }};
+            }});
+
+            // ===== 武器2: 炮弹1 (PU132 ravager-artillery) =====
+            // PU132 第4547-4559行: x=44.25, y=-31.75, rotate=true, reload=2*50, shots=5
+            weapons.add(new Weapon("create-ravager-artillery-1") {{
+                shootY = 11f;
+                shoot.shots = 5;
+                inaccuracy = 10f;
+                shadow = 13.25f * 2f;
+                y = -31.75f;
+                x = 44.25f;
+                rotate = true;
+                rotateSpeed = 2f;
+                shootCone = 30f;
+                velocityRnd = 0.2f;
+                reload = 2f * 50f;
+                shootSound = zzw.content.Z_Sounds.endBasicLarge;
+                bullet = new mindustry.entities.bullet.ArtilleryBulletType(4f, 130f) {{
+                    lifetime = 110f;
+                    splashDamage = 325f;
+                    splashDamageRadius = 140f;
+                    width = 21f;
+                    height = 21f;
+                    backColor = lightColor = trailColor = Color.valueOf("f53036");
+                    frontColor = lightningColor = Color.valueOf("ff786e");
+                    lightning = 5;
+                    lightningLength = 10;
+                    lightningLengthRand = 5;
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                }};
+            }});
+
+            // ===== 武器3: 炮弹2 (PU132 ravager-artillery) =====
+            // PU132 第4560-4572行: x=51.25, y=-4.25, rotate=true, reload=2.25*50, shots=5
+            weapons.add(new Weapon("create-ravager-artillery-2") {{
+                shootY = 11f;
+                shoot.shots = 5;
+                inaccuracy = 10f;
+                shadow = 13.25f * 2f;
+                y = -4.25f;
+                x = 51.25f;
+                rotate = true;
+                rotateSpeed = 2f;
+                shootCone = 30f;
+                velocityRnd = 0.2f;
+                reload = 2.25f * 50f;
+                shootSound = zzw.content.Z_Sounds.endBasicLarge;
+                bullet = new mindustry.entities.bullet.ArtilleryBulletType(4f, 130f) {{
+                    lifetime = 110f;
+                    splashDamage = 325f;
+                    splashDamageRadius = 140f;
+                    width = 21f;
+                    height = 21f;
+                    backColor = lightColor = trailColor = Color.valueOf("f53036");
+                    frontColor = lightningColor = Color.valueOf("ff786e");
+                    lightning = 5;
+                    lightningLength = 10;
+                    lightningLengthRand = 5;
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                }};
+            }});
+
+            // ===== 武器4: 小型炮台1 (PU132 ravager-small-turret) =====
+            // PU132 第4573-4584行: x=34.5, y=53.75, rotate=true, reload=7
+            weapons.add(new Weapon("create-ravager-small-turret-1") {{
+                shootY = 7f;
+                inaccuracy = 2f;
+                shadow = 9.25f * 2f;
+                y = 53.75f;
+                x = 34.5f;
+                rotate = true;
+                rotateSpeed = 5f;
+                shootCone = 30f;
+                xRand = 2f;
+                reload = 7f;
+                shootSound = zzw.content.Z_Sounds.endMissile;
+                bullet = new EndBasicBulletType(4f, 330f, "missile") {{
+                    lifetime = 60f;
+                    width = 12f;
+                    height = 12f;
+                    shrinkY = 0f;
+                    drag = -0.013f;
+                    splashDamageRadius = 45f;
+                    splashDamage = 220f;
+                    homingPower = 0.08f;
+                    trailChance = 0.2f;
+                    weaveScale = 6f;
+                    weaveMag = 1f;
+
+                    overDamage = 900000f;
+                    ratioDamage = 1f / 150f;
+                    ratioStart = 2000f;
+
+                    backColor = lightColor = Color.valueOf("f53036");
+                    frontColor = Color.valueOf("ff786e");
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                }};
+            }});
+
+            // ===== 武器5: 小型炮台2 (PU132 ravager-small-turret) =====
+            // PU132 第4585-4597行: x=50.75, y=24.25, rotate=true, reload=7
+            weapons.add(new Weapon("create-ravager-small-turret-2") {{
+                shootY = 7f;
+                inaccuracy = 2f;
+                shadow = 9.25f * 2f;
+                y = 24.25f;
+                x = 50.75f;
+                rotate = true;
+                rotateSpeed = 5f;
+                shootCone = 30f;
+                xRand = 2f;
+                reload = 7f;
+                shootSound = zzw.content.Z_Sounds.endMissile;
+                bullet = new EndBasicBulletType(4f, 330f, "missile") {{
+                    lifetime = 60f;
+                    width = 12f;
+                    height = 12f;
+                    shrinkY = 0f;
+                    drag = -0.013f;
+                    splashDamageRadius = 45f;
+                    splashDamage = 220f;
+                    homingPower = 0.08f;
+                    trailChance = 0.2f;
+                    weaveScale = 6f;
+                    weaveMag = 1f;
+
+                    overDamage = 900000f;
+                    ratioDamage = 1f / 150f;
+                    ratioStart = 2000f;
+
+                    backColor = lightColor = Color.valueOf("f53036");
+                    frontColor = Color.valueOf("ff786e");
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                }};
             }});
         }};
     }
