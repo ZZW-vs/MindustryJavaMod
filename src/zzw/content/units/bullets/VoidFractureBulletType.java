@@ -58,7 +58,7 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
     private static Effect voidFractureEffect;
 
     public VoidFractureBulletType(float speed, float damage) {
-        super(4.3f, damage);
+        super(speed, damage);
         drag = 0.11f;
         trueSpeed = speed;
         collides = false;
@@ -70,9 +70,7 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
         despawnEffect = Fx.none;
         smokeEffect = Fx.none;
         hitEffect = Fx.hitLancer;  // PU132: HitFx.voidHit, v158 用 Fx.hitLancer 替代
-        // ★ 关键: 设置默认 lifetime 必须 > delay(30f), 否则子弹在 Phase 1 悬停阶段就消失,
-        //   永远不会进入 Phase 2 冲刺激光 (用户反馈"虚空容器没有激光"的根因)
-        //   oppression 在 Z_Units 显式设 lifetime=60f, voidVessel 未设 → 用默认值
+        // ★ 关键: lifetime 必须 > delay, 否则子弹在 Phase 1 悬停阶段就消失
         lifetime = 60f;
     }
 
@@ -96,6 +94,7 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
                     Draw.alpha(a);
                     Lines.stroke(f * e.fout());
                     Lines.line(data.x, data.y, data.x2, data.y2, false);
+                    // placeholder
                     Drawf.tri(data.x2, data.y2, f * 1.22f * e.fout(), f * 2f, rot);
                     Drawf.tri(data.x, data.y, f * 1.22f * e.fout(), f * 2f, rot + 180f);
                 }
@@ -142,7 +141,8 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
                     b.time(0f);
                     b.lifetime(nextLifetime);
                     b.fdata(1f);
-                    b.drag(0f);
+                    // ★ v150/v158: BulletComp.update() 用 type.drag 衰减 vel, b.drag(0f) 无效
+                    //   Phase 2 每帧在 super.update 后重置 vel 为 trueSpeed (见下方 Phase 2 分支)
                     b.vel().trns(b.rotation(), trueSpeed);
                     data.x = b.x();
                     data.y = b.y();
@@ -153,6 +153,8 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
                 }
             } else {
                 // ===== Phase 2: 冲刺穿透 (PU132 L101-122) =====
+                // ★ 关键: type.drag=0.11 会持续衰减 vel, 每帧重置 vel 保持冲刺速度
+                b.vel().trns(b.rotation(), trueSpeed);
                 collideLineRawEnemySimple(b, b.lastX(), b.lastY(), b.x(), b.y(), data);
             }
         } catch (Throwable t) {
@@ -321,7 +323,8 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
         Draw.color(Color.black);
         if (b.fdata() <= 0f) {
             // ===== Phase 1: 小三角 (PU132 L192-195) =====
-            float in = Mathf.clamp(b.time() / delay);
+            // ★ 修复: 初始 clamp 到 0.3f 确保起步可见 (原版 in=0 时宽度=0 完全不可见)
+            float in = Mathf.clamp(b.time() / delay, 0.3f, 1f);
             Drawf.tri(b.x(), b.y(), width * in, length, b.rotation());
             Drawf.tri(b.x(), b.y(), width * in, length, b.rotation() + 180f);
         } else {
