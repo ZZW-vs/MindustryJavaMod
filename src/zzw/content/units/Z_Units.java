@@ -1639,7 +1639,7 @@ public class Z_Units {
         //  - ★ 简化: PU132 用 TriJointLegsc 自定义腿组件, v158 用原生腿系统 (legCount=8)
         //  - ★ 简化: PU132 ShrapnelBulletType (碎片子弹), v158 用 SapBulletType (吸血子弹) 替代
         // ═══════════════════════════════════════════════════════════
-        exowalker = new zzw.content.units.types.TriLegUnitType("exowalker") {{
+        exowalker = new UnitType("exowalker") {{
             health = 6000f;
             speed = 0.7f;
             drag = 0.1f;
@@ -1977,28 +1977,80 @@ public class Z_Units {
             controller = unit -> new mindustry.ai.types.GroundAI();
 
             // ===== 身后鞭子触手 (移植 PU132 NewTentacle, 简化为 Ability) =====
-            // PU132: 4条触手 (mirror后8条), 位于身后, 可发射激光
-            // 简化: 2条触手 (mirror后4条), 发射 endLaserSmall 连续激光
+            // PU132: 4条触手定义 (mirror后8条)
+            //   1条 desolation-tentacle (粗, 15段44.5长, EndPointBlastLaserBulletType)
+            //   3条 apocalypse-tentacle (粗, 9-17段37.25长, endLaserSmall 连续激光)
+            //   apocalypse 还有 2条 small-tentacle (细, 20-23段28长, 碰撞伤害)
+            // 简化: 2条粗鞭子 + 2条细鞭子 (各 mirror 后 4+4 条)
+
+            // 粗鞭子1: desolation-tentacle (发射爆破激光)
             abilities.add(new zzw.content.units.abilities.TentacleAbility("create-desolation-tentacle") {{
-                x = 95f;       // 触手根 X (相对单位中心, 身后)
-                y = -50f;      // 触手根 Y (偏左)
-                rotationOffset = 30f;    // 旋转偏移 (相对单位朝向)
-                segments = 12;
-                segmentLength = 37.25f;
+                x = 139f;       // PU132 原值
+                y = -13.5f;
+                rotationOffset = 40f;
+                segments = 15;
+                segmentLength = 44.5f;
                 angleLimit = 30f;
                 firstSegmentAngleLimit = 17f;
-                rotationSpeed = 3f;
+                rotationSpeed = 2.5f;
+                speed = 6f;
+                accel = 0.2f;
                 swayScl = 120f;
                 swayMag = 0.2f;
                 mirror = true;
                 top = true;
-                // 发射连续激光 (PU132 endLaserSmall, damage=85)
+                automatic = false;
+                // 发射爆破激光 (简化为 EndContinuousLaserBulletType)
+                bullet = new EndContinuousLaserBulletType(250f);
+                reload = 3f * 60f;
+                range = 320f;
+                shootCone = 4f;
+                continuous = true;
+                bulletDuration = 20f;
+            }});
+
+            // 粗鞭子2: apocalypse-tentacle (发射连续激光)
+            abilities.add(new zzw.content.units.abilities.TentacleAbility("create-apocalypse-tentacle") {{
+                x = 122.75f;
+                y = -41f;
+                rotationOffset = 35f;
+                segments = 17;
+                segmentLength = 37.25f;
+                firstSegmentAngleLimit = 20f;
+                rotationSpeed = 3f;
+                speed = 8f;
+                accel = 0.2f;
+                mirror = true;
+                top = true;
+                automatic = false;
+                // 发射连续激光 (endLaserSmall, damage=85)
                 bullet = new EndContinuousLaserBulletType(85f);
                 reload = 4f * 60f;
                 range = 220f;
                 shootCone = 15f;
                 continuous = true;
                 bulletDuration = (int)(1.5f * 60f);
+            }});
+
+            // 细鞭子: apocalypse-small-tentacle (碰撞伤害, 无子弹)
+            abilities.add(new zzw.content.units.abilities.TentacleAbility("create-apocalypse-small-tentacle") {{
+                x = 104.25f;
+                y = -49f;
+                rotationOffset = 35f;
+                segments = 20;
+                segmentLength = 28f;
+                swayOffset = 120f;
+                swayMag = 0.2f;
+                swayScl = 120f;
+                rotationSpeed = 3f;
+                speed = 10f;
+                accel = 0.15f;
+                mirror = true;
+                top = true;
+                automatic = true;
+                bullet = null;
+                tentacleDamage = 430f;
+                range = 200f;
             }});
 
             // ===== 主炮: desolation-main (EnergyChargeWeapon, 蓄力+DesolationBulletType) =====
