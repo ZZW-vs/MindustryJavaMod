@@ -23,6 +23,8 @@ import arc.util.Time;
 import mindustry.Vars;
 import mindustry.entities.Units;
 import mindustry.gen.Bullet;
+import mindustry.gen.Groups;
+import mindustry.gen.Unit;
 import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
 
@@ -106,7 +108,8 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
     public void init() {
         super.init();
         drawSize = length * 2f;
-        range = length / 3f;
+        // ★ range 只在未设置时用默认值, 允许子类/外部覆盖 (voidVessel 需要较小 range)
+        if (range <= 0f) range = length / 3f;
     }
 
     @Override
@@ -117,10 +120,28 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
         if (b.owner instanceof mindustry.gen.Rotc) {
             ShootEffect.oppressionShoot.at(b.x, b.y, ((mindustry.gen.Rotc) b.owner).rotation(), b.owner);
         }
+        // ★ 激光跟随单位: 新激光创建时, 将同 owner 的旧激光标记为"脱节" (不再跟随)
+        // 实现: 用 b.data 存储 follow 标志, 新激光设 true, 旧激光设 false
+        if (b.owner instanceof Unit) {
+            Unit owner = (Unit) b.owner;
+            Groups.bullet.each(bul -> bul != b
+                && bul.owner == owner
+                && bul.type instanceof OppressionLaserBulletType,
+                bul -> bul.data = false  // 旧激光脱节
+            );
+        }
+        b.data = true;  // 新激光跟随
     }
 
     @Override
     public void update(Bullet b) {
+        // ★ 激光跟随单位: 如果 b.data == true (当前活动激光), 同步位置和旋转到 owner
+        if (b.data == Boolean.TRUE && b.owner instanceof Unit) {
+            Unit u = (Unit) b.owner;
+            b.set(u.x, u.y);
+            b.rotation(u.rotation);
+        }
+
         if (b.timer(1, 5f)) {
             float fw = b.time < fadeInTime ? Interp.pow2Out.apply(b.time / fadeInTime) : 1f;
             float fow = Mathf.clamp((b.lifetime - b.time) / 120f);

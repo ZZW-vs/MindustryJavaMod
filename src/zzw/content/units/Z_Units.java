@@ -1242,30 +1242,34 @@ public class Z_Units {
             controller = unit -> new zzw.content.units.ai.WormAI();
 
             // ===== 大激光武器 (和压迫者一样的 OppressionLaserBulletType, 3连发) =====
-            // ★ 用户需求: 连发3个大激光, 每个激光间隔3秒, 发完后10秒冷却, 循环
-            //   - 激光 lifetime=10秒 (OppressionLaserBulletType 默认)
-            //   - 3次连发, 每次间隔13秒 (10秒激光+3秒间隔)
-            //   - 4秒充能 (首次发射前) + 3*10秒激光 + 2*3秒间隔 + 10秒冷却 = 50秒总周期
-            //   - reload=50*60=3000f, shotDelay=13*60=780f, firstShotDelay=4*60=240f, shots=3
-            //   - 时间线: t=240(激光1) → t=1020(激光2) → t=1800(激光3) → t=2400(激光3结束) → t=3000(reload结束, 10秒冷却)
+            // ★ 用户需求:
+            //   - 3发为一组, 组内每发间隔3秒, 组间隔12秒
+            //   - 激光跟随单位移动, 新激光发射时旧激光脱节
+            //   - 不会自动发射, 目标进入小黑色激光攻击范围时才发射
+            //   - 玩家操控时按正常方式发射
+            // 时间线: t=0(激光1) → t=3s(激光2) → t=6s(激光3) → t=18s(下一组)
+            //   - shots=3, shotDelay=3*60=180, reload=18*60=1080
+            //   - 组间隔 = 18 - 6 = 12秒 ✓
+            //   - bullet.range=300 限制索敌范围 (小激光射程)
             weapons.add(new Weapon() {{
                 x = 0f;
                 y = 0f;
                 shootY = 8f;
                 mirror = false;
-                // ★ 改为非 continuous 模式, 用 shots/shotDelay 实现3连发
                 continuous = false;
-                // ★ 大激光方向固定: rotate=false → 激光方向=unit.rotation+baseRotation (固定)
-                //   shootCone=360f 确保任何角度都能发射
                 rotate = false;
                 shootCone = 360f;
-                reload = 50f * 60f;  // 50秒总周期 (4充能+30激光+6间隔+10冷却)
+                reload = 18f * 60f;  // 18秒总周期 (6秒3连发 + 12秒组间隔)
                 shoot.firstShotDelay = ChargeEffect.oppressionCharge.lifetime;  // 4秒充能
                 shoot.shots = 3;
-                shoot.shotDelay = 13f * 60f;  // 13秒 (10秒激光+3秒间隔)
+                shoot.shotDelay = 3f * 60f;  // 3秒间隔
                 parentizeEffects = true;
 
-                bullet = new OppressionLaserBulletType();
+                bullet = new OppressionLaserBulletType() {{
+                    // ★ 限制大激光索敌范围为小激光射程 (300f)
+                    //   AI 只在目标进入小激光范围时才触发大激光
+                    range = 300f;
+                }};
             }});
 
             weapons.add(new Weapon("create-end-small-mount") {{
