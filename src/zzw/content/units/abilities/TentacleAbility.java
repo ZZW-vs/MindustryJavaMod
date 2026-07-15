@@ -278,16 +278,15 @@ public class TentacleAbility extends Ability {
         return Tmp.v1.trns(unit.rotation - 90f, x * sideSign, y).add(unit);
     }
 
-    /** 角度限制: 将 ang 限制在 baseAng ± limit 范围内 */
+    /** 角度限制: 将 ang 限制在 baseAng ± limit 范围内 (正确判断方向, 避免抽搐) */
     private float clampedAngle(float ang, float baseAng, float limit) {
-        float diff = Angles.angleDist(baseAng, ang);
-        // 判断方向: ang 在 baseAng 顺时针还是逆时针
-        float cross = Mathf.sinDeg(baseAng) * (ang - baseAng);
-        float signed = cross > 0 ? diff : -diff;
-        if (Math.abs(signed) > limit) {
-            signed = Mathf.sign(signed) * limit;
+        // 归一化角度差到 -180..180, 正确判断顺/逆时针
+        float delta = ang - baseAng;
+        delta = ((delta % 360f) + 540f) % 360f - 180f;  // -180..180
+        if (Math.abs(delta) > limit) {
+            delta = Mathf.clamp(delta, -limit, limit);
         }
-        return baseAng + signed;
+        return baseAng + delta;
     }
 
     private static class TentacleSeg {

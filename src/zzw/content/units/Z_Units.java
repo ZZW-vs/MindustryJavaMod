@@ -1654,6 +1654,11 @@ public class Z_Units {
             legBaseOffset = 9f;
             legMoveSpace = 0.9f;
             legPairOffset = 1.5f;
+            // ★ 限制腿伸缩: legMaxLength=1f 不伸缩 (原版默认1.75会伸缩很强)
+            // 腿只靠关节弯曲带动, 符合用户要求
+            legMaxLength = 1.05f;  // 轻微允许伸缩 (5%), 避免完全僵硬
+            legMinLength = 0.85f;  // 最短长度 (避免腿缩太短)
+            legSpeed = 0.1f;      // 腿移动速度 (lerp 系数, 原版0.1)
 
             hovering = true;
             allowLegStep = true;
