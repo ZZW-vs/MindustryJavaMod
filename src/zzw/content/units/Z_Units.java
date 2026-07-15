@@ -1829,7 +1829,7 @@ public class Z_Units {
         //  - 1武器: toxo-launcher (8连发追踪导弹, 命中后产生火焰)
         //  - ★ 简化: PU132 ShootingBulletType (追踪+持续射击), v158 用 MissileBulletType + fragBullet 火焰弹
         // ═══════════════════════════════════════════════════════════
-        toxoswarmer = new UnitType("toxoswarmer") {{
+        toxoswarmer = new zzw.content.units.types.MixedLegUnitType("toxoswarmer") {{
             health = 7000f;
             speed = 1.1f;
             drag = 0.1f;
@@ -1837,16 +1837,19 @@ public class Z_Units {
             rotateSpeed = 3f;
             armor = 4f;
 
-            // ===== 腿配置 (v158 原生腿系统, 5条腿) =====
-            // PU132 原版: 3条细腿(small, baseLength=endLength=32) + 2条粗腿(large, baseLength=55, endLength=71)
-            // v158 不支持混合腿型, 简化为5条腿用 small 腿贴图 (toxoswarmer-leg/leg-base/foot/joint)
-            // 腿长用 small 腿的 32f (baseLength+endLength 之和, PU132 small 腿 total=64, 取一半=32)
-            legCount = 5;
+            // ===== 混合腿型配置 (6小腿+4大腿, 重写原版定义) =====
+            // PU132 原版: 2组 CLegType.createGroup
+            //   小腿组: 3条定义×2镜像=6条, baseLength=endLength=32, total=64, legTrns=0.8
+            //   大腿组: 2条定义×2镜像=4条, baseLength=55, endLength=71, total=126, legTrns=0.7
+            // v158 重写: legCount=10 (前6条小腿, 后4条大腿), drawLegs 用不同贴图区分
+            // legLength=90 (折中值, 小腿64和大腿126的平均), 视觉上小腿稍长/大腿稍短
+            legCount = 10;
             legGroupSize = 2;
-            legLength = 64f;  // PU132 small 腿 baseLength+endLength=64
-            legBaseOffset = 11.25f;
+            legLength = 90f;  // 折中值 (64+126)/2≈95, 取90略偏向小腿
+            legBaseOffset = 11.25f;  // PU132 大腿腿根偏移
             legMoveSpace = 0.85f;
             legPairOffset = 1f;
+            smallLegCount = 6;  // 前6条用小腿贴图
 
             hovering = true;
             allowLegStep = true;
@@ -1940,6 +1943,7 @@ public class Z_Units {
             // ===== 腿配置 (模仿 FlameOut DespondencyUnitType + PU132 原值) =====
             // PU132: legTrns=0.3, legLength=672*(1-(0.3*0.85*0.5))=585.6, legExtension=-48, legMoveSpace=0.2, legBaseOffset=61.25
             // Despondency: lockLegBase=true, legForwardScl=0.75, legLengthScl=0.9, baseLegStraightness=1f, legStraightness=0.01f, legStraightLength=4f
+            // ★ legBaseOffset 从 PU132 原值 61.25 减小到 25f, 缩小左右腿间距, 让腿在单位贴图下方而非外面
             lockLegBase = true;          // 腿基座锁定单位旋转 (Despondency 关键参数)
             legForwardScl = 0.75f;        // 腿向前移动幅度 (Despondency 原值)
             legLength = 585.6f;           // PU132: 672*(1-(0.3*0.85*0.5))
@@ -1948,7 +1952,7 @@ public class Z_Units {
             legGroupSize = 2;
             legPairOffset = 1f;
             legMoveSpace = 0.2f;           // PU132 原值
-            legBaseOffset = 61.25f;        // PU132 原值
+            legBaseOffset = 25f;           // ★ 减小腿根部偏移, 缩小左右间距 (PU132原值61.25太大)
             legLengthScl = 0.9f;           // Despondency 原值
             baseLegStraightness = 1f;      // Despondency 原值
             legStraightness = 0.01f;       // Despondency 原值

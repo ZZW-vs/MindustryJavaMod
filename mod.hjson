@@ -14,7 +14,7 @@ main: "zzw.TestMod"
 description: "一个为Mindustry添加了基础金属加工系统与多节Boss单位的Java模组，灵感来源于Minecraft的Create模组与PU132。包含机械传动网络、金属加工设备、方块合并系统，以及完整移植自PU132的多节虫子Boss（电弧虫/毒雾虫/吸血虫/噬界虫/压迫者）和End阵营单位（虚空容器/谜团/克罗诺斯/盲视者/掠夺者/荒芜者），以及Plague阵营单位（外径行者/瘟疫蜂群），附带防作弊、时间停止等高级机制。"
 
 #the mod version
-version: 1.5.0
+version: 1.5.1
 
 #the minimum game build required to run this mod
 minGameVersion: 154
