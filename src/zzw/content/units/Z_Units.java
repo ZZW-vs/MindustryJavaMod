@@ -3,6 +3,7 @@ package zzw.content.units;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
+import arc.graphics.g2d.TextureRegion;
 import arc.math.Angles;
 import arc.util.Time;
 import mindustry.entities.bullet.LaserBulletType;
@@ -1636,7 +1637,7 @@ public class Z_Units {
         //  - ★ 简化: PU132 用 TriJointLegsc 自定义腿组件, v158 用原生腿系统 (legCount=8)
         //  - ★ 简化: PU132 ShrapnelBulletType (碎片子弹), v158 用 SapBulletType (吸血子弹) 替代
         // ═══════════════════════════════════════════════════════════
-        exowalker = new UnitType("exowalker") {{
+        exowalker = new zzw.content.units.types.TriLegUnitType("exowalker") {{
             health = 6000f;
             speed = 0.7f;
             drag = 0.1f;
@@ -1832,10 +1833,13 @@ public class Z_Units {
             rotateSpeed = 3f;
             armor = 4f;
 
-            // ===== 腿配置 (v158 原生腿系统, 6条腿) =====
-            legCount = 6;
-            legGroupSize = 3;
-            legLength = 55f;  // PU132 large leg: 55+71=126, 平均后用 90
+            // ===== 腿配置 (v158 原生腿系统, 5条腿) =====
+            // PU132 原版: 3条细腿(small, baseLength=endLength=32) + 2条粗腿(large, baseLength=55, endLength=71)
+            // v158 不支持混合腿型, 简化为5条腿用 small 腿贴图 (toxoswarmer-leg/leg-base/foot/joint)
+            // 腿长用 small 腿的 32f (baseLength+endLength 之和, PU132 small 腿 total=64, 取一半=32)
+            legCount = 5;
+            legGroupSize = 2;
+            legLength = 64f;  // PU132 small 腿 baseLength+endLength=64
             legBaseOffset = 11.25f;
             legMoveSpace = 0.85f;
             legPairOffset = 1f;
@@ -1921,7 +1925,7 @@ public class Z_Units {
         //  - ★ 简化: PU132 clnW 克隆16个武器, v158 直接列出 (前8后8对称)
         //  - 防作弊: EndLegsUnit (简化版, invincibilityArray=4)
         // ═══════════════════════════════════════════════════════════
-        desolation = new UnitType("desolation") {{
+        desolation = new zzw.content.units.types.DesolationUnitType("desolation") {{
             health = 307300f;
             speed = 0.7f;
             drag = 0.16f;
@@ -1929,15 +1933,22 @@ public class Z_Units {
             hitSize = 257f;
             rotateSpeed = 0.9f;
 
-            // ===== 腿配置 (PU132 原值, 8 条腿) =====
-            // ★ v158 无 legTrns 字段 (PU132 已用 legLength 公式吸收 0.3 系数)
-            legLength = 672f * (1f - (0.3f * 0.85f * 0.5f));
-            legExtension = -48f;
+            // ===== 腿配置 (模仿 FlameOut DespondencyUnitType + PU132 原值) =====
+            // PU132: legTrns=0.3, legLength=672*(1-(0.3*0.85*0.5))=585.6, legExtension=-48, legMoveSpace=0.2, legBaseOffset=61.25
+            // Despondency: lockLegBase=true, legForwardScl=0.75, legLengthScl=0.9, baseLegStraightness=1f, legStraightness=0.01f, legStraightLength=4f
+            lockLegBase = true;          // 腿基座锁定单位旋转 (Despondency 关键参数)
+            legForwardScl = 0.75f;        // 腿向前移动幅度 (Despondency 原值)
+            legLength = 585.6f;           // PU132: 672*(1-(0.3*0.85*0.5))
+            legExtension = -48f;          // PU132 原值 (负值=缩短)
             legCount = 8;
             legGroupSize = 2;
             legPairOffset = 1f;
-            legMoveSpace = 0.2f;
-            legBaseOffset = 61.25f;
+            legMoveSpace = 0.2f;           // PU132 原值
+            legBaseOffset = 61.25f;        // PU132 原值
+            legLengthScl = 0.9f;           // Despondency 原值
+            baseLegStraightness = 1f;      // Despondency 原值
+            legStraightness = 0.01f;       // Despondency 原值
+            legStraightLength = 4f;        // Despondency 原值
             rippleScale = 12f;
 
             legSplashRange = 120f;
@@ -1994,16 +2005,28 @@ public class Z_Units {
                     float wx = arc.math.Angles.trnsx(r, x, y) + unit.x;
                     float wy = arc.math.Angles.trnsy(r, x, y) + unit.y;
 
+                    // ★ PU132 原版: 4阶段渐变绘制 heatRegion 贴图, 配合 Additive 混合
+                    // (替代之前的 Fill.circle 圆形特效, 改为贴合单位贴图的 heat 贴图)
+                    TextureRegion heatRegion = mindustry.Vars.headless ? null :
+                        arc.Core.atlas.find("create-desolation-main-heat");
                     Draw.color(Color.valueOf("f53036"));  // scarColor
                     Draw.blend(arc.graphics.Blending.additive);
                     for (int i = 0; i < 4; i++) {
                         float in = arc.math.Mathf.curve(charge, i / 4f, (i + 1f) / 4f);
                         if (in > 0.0001f) {
                             Draw.alpha(in);
-                            // 用简化 Fill.circle 替代 PU132 heatRegion 贴图
-                            Fill.circle(wx + arc.math.Mathf.range(12f - (in * 11.3f)),
-                                       wy + arc.math.Mathf.range(12f - (in * 11.3f)),
-                                       20f * in);
+                            if (heatRegion != null && heatRegion.found()) {
+                                // PU132 原版: 用 heatRegion 贴图绘制 (贴合单位前方)
+                                Draw.rect(heatRegion,
+                                    wx + arc.math.Mathf.range(12f - (in * 11.3f)),
+                                    wy + arc.math.Mathf.range(12f - (in * 11.3f)),
+                                    r);
+                            } else {
+                                // 无贴图时退化为 Fill.circle
+                                Fill.circle(wx + arc.math.Mathf.range(12f - (in * 11.3f)),
+                                           wy + arc.math.Mathf.range(12f - (in * 11.3f)),
+                                           20f * in);
+                            }
                         }
                     }
                     Draw.blend();
@@ -2011,50 +2034,52 @@ public class Z_Units {
                 };
             }});
 
-            // ===== 点防1: end-point-defence (右侧, 7连发) =====
-            // PU132 MultiTargetPointDefenceWeapon, v158 简化为普通 Weapon (子弹快速发射)
+            // ===== 点防1: end-point-defence (右侧) =====
+            // PU132 MultiTargetPointDefenceWeapon (自动锁定敌方子弹, 用 beamEffect 光束)
+            // v158 简化为普通 Weapon, 单发瞬时命中 (speed=0, lifetime=5)
+            // ★ 降低密度: reload=60 (1秒), shots=1 (单发), 原 PU132 reload=15/shots=7 太密集
             weapons.add(new Weapon("create-end-point-defence") {{
                 x = 96.75f;
                 y = 9f;
-                reload = 15f;
-                shoot.shots = 7;
+                reload = 60f;
                 shootCone = 20f;
                 rotate = true;
                 rotateSpeed = 15f;
                 mirror = false;
                 alternate = false;
-                shootSound = zzw.content.Z_Sounds.endBasicSmall;  // ★ v158 无 Sounds.laser, 用自定义 endBasicSmall
-                bullet = new EndBasicBulletType(5f, 220f) {{
-                    lifetime = 70f;
+                shootSound = zzw.content.Z_Sounds.endBasicSmall;
+                bullet = new EndBasicBulletType(0f, 220f) {{
+                    lifetime = 5f;
                     width = 4f;
                     height = 6f;
-                    speed = 12f;
-                    backColor = lightColor = Color.valueOf("f53036");  // scarColor
-                    frontColor = Color.black;
+                    speed = 0f;  // 瞬时命中 (模拟光束)
+                    backColor = lightColor = Color.valueOf("f53036");
+                    frontColor = Color.valueOf("f53036");
                     hitEffect = mindustry.content.Fx.hitLancer;
+                    shootEffect = mindustry.content.Fx.pointBeam;
                 }};
             }});
 
-            // ===== 点防2: end-point-defence (右侧偏后, 5连发) =====
+            // ===== 点防2: end-point-defence (右侧偏后) =====
             weapons.add(new Weapon("create-end-point-defence") {{
                 x = 82f;
                 y = 20.5f;
-                reload = 10f;
-                shoot.shots = 5;
+                reload = 60f;
                 shootCone = 20f;
                 rotate = true;
                 rotateSpeed = 15f;
                 mirror = false;
                 alternate = false;
-                shootSound = zzw.content.Z_Sounds.endBasicSmall;  // ★ v158 无 Sounds.laser, 用自定义 endBasicSmall
-                bullet = new EndBasicBulletType(5f, 220f) {{
-                    lifetime = 70f;
+                shootSound = zzw.content.Z_Sounds.endBasicSmall;
+                bullet = new EndBasicBulletType(0f, 220f) {{
+                    lifetime = 5f;
                     width = 4f;
                     height = 6f;
-                    speed = 12f;
+                    speed = 0f;
                     backColor = lightColor = Color.valueOf("f53036");
-                    frontColor = Color.black;
+                    frontColor = Color.valueOf("f53036");
                     hitEffect = mindustry.content.Fx.hitLancer;
+                    shootEffect = mindustry.content.Fx.pointBeam;
                 }};
             }});
 
