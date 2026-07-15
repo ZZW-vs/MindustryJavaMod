@@ -110,6 +110,7 @@ public class TentacleAbility extends Ability {
 
             // ===== 第一遍: 末端→根部, 摆动 + 速度衰减 =====
             // ★ 非攻击时不主动移动位置, 只加摆动旋转
+            // ★ 末端在 attacking 时不摆动 (保持朝向目标)
             for (int s = segs.length - 1; s >= 0; s--) {
                 TentacleSeg seg = segs[s];
                 seg.updateLastPosition();
@@ -119,27 +120,39 @@ public class TentacleAbility extends Ability {
                 seg.vy *= 1f - (drag * Time.delta);
 
                 // 摆动 (非攻击时摆动强, 攻击时摆动弱)
-                if (swayScls[t] >= 0.0001f) {
-                    float sin = swayScls[t] * Mathf.sin(Time.time + swayOffset + (s * swaySegmentOffset), swayScl, swayMag) * Mathf.sign(flipSprite != flip);
+                // ★ 末端 attacking 时跳过摆动, 保持朝向目标
+                // ★ 摆动索引从末端开始 (末端=0), 波浪从末端向根部传播 (与 PU132 一致)
+                if (!(s == segs.length - 1 && attacking[t]) && swayScls[t] >= 0.0001f) {
+                    int swayIdx = segs.length - 1 - s;
+                    float sin = swayScls[t] * Mathf.sin(Time.time + swayOffset + (swayIdx * swaySegmentOffset), swayScl, swayMag) * Mathf.sign(flipSprite != flip);
                     seg.rotation += sin;
                 }
             }
 
             // ===== 第二遍: 根部→末端, 角度约束 + 位置硬约束 =====
             // ★ 位置完全由角度约束决定, 不用速度直接改位置 (避免抽搐)
+            // ★ 末端在 attacking 时不修改 rotation (保持 updateWeapon 设置的目标朝向)
             for (int s = 0; s < segs.length; s++) {
                 TentacleSeg seg = segs[s];
                 if (s == 0) {
+                    // 根段: 约束到 unit
                     float parentAng = unit.rotation + rotationOffset * sideSign + 180f;
                     float ang = rootPos.angleTo(seg.x, seg.y);
                     seg.rotation = clampedAngle(ang, parentAng, firstSegmentAngleLimit);
                     tv.trns(seg.rotation, segmentLength).add(rootPos.getX(), rootPos.getY());
                 } else {
                     TentacleSeg prev = segs[s - 1];
-                    float childAng = prev.rotation;
-                    float ang = prev.angleToSeg(seg);
-                    seg.rotation = clampedAngle(ang, childAng, angleLimit);
-                    tv.trns(seg.rotation, segmentLength).add(prev.x, prev.y);
+                    if (s == segs.length - 1 && attacking[t]) {
+                        // ★ 末端 attacking 时: 不修改 rotation, 只修改位置
+                        // end.rotation 已由 updateWeapon 设置朝向目标, 保持直线指向目标
+                        tv.trns(seg.rotation, segmentLength).add(prev.x, prev.y);
+                    } else {
+                        // 中间段或非攻击末端: 角度约束 + 位置约束
+                        float childAng = prev.rotation;
+                        float ang = prev.angleToSeg(seg);
+                        seg.rotation = clampedAngle(ang, childAng, angleLimit);
+                        tv.trns(seg.rotation, segmentLength).add(prev.x, prev.y);
+                    }
                 }
                 seg.x = tv.x;
                 seg.y = tv.y;
@@ -184,20 +197,22 @@ public class TentacleAbility extends Ability {
 
         boolean isAttacking = target != null || (player && unit.isShooting());
 
-        if (isAttacking && bullet != null) {
-            // 末端旋转朝向目标
+        if (isAttacking) {
+            // ★ 末端旋转朝向目标 (无论有无 bullet, 包括碰撞伤害型触手)
             float ang = Angles.angle(ex, ey, tx, ty);
             end.rotation = Angles.moveToward(end.rotation, ang, rotationSpeed);
 
             // 开火条件: reload 满 + 朝向在 shootCone 内
-            reloadTimers[t] += Time.delta * unit.reloadMultiplier;
-            if (reloadTimers[t] >= reload && Angles.within(end.rotation, ang, shootCone)) {
-                Bullet b = bullet.create(unit, unit.team, ex, ey, end.rotation);
-                if (continuous) {
-                    if (bulletDuration > 0) b.lifetime = bulletDuration;
-                    bullets[t] = b;
+            if (bullet != null) {
+                reloadTimers[t] += Time.delta * unit.reloadMultiplier;
+                if (reloadTimers[t] >= reload && Angles.within(end.rotation, ang, shootCone)) {
+                    Bullet b = bullet.create(unit, unit.team, ex, ey, end.rotation);
+                    if (continuous) {
+                        if (bulletDuration > 0) b.lifetime = bulletDuration;
+                        bullets[t] = b;
+                    }
+                    reloadTimers[t] = 0f;
                 }
-                reloadTimers[t] = 0f;
             }
         }
 

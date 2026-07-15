@@ -88,12 +88,9 @@ public class MixedLegUnitType extends UnitType {
             boolean small = isSmallLeg(i);
             TextureRegion foot = small ? smallFootRegion : largeFootRegion;
             if (foot.found()) {
-                // ★ 大腿不缩放, 小腿缩放到 64
-                Vec2 pos = unit.legOffset(Tmp.v3, i).add(unit);
-                float scl = small ? (smallLegLength / legLength) : 1f;
-                Tmp.v2.set(leg.base).sub(pos.x, pos.y).scl(scl).add(pos.x, pos.y);
+                // ★ 不缩放位置, 所有腿用 v158 原生 IK 位置 (基于 legLength), 保证运动与贴图同步
                 float ssize = foot.width * foot.scl() * 1.5f;
-                Drawf.shadow(Tmp.v2.x, Tmp.v2.y, ssize, invDrown);
+                Drawf.shadow(leg.base.x, leg.base.y, ssize, invDrown);
             }
         }
 
@@ -122,11 +119,10 @@ public class MixedLegUnitType extends UnitType {
 
             Vec2 position = unit.legOffset(legOffsetTmp, i).add(unit);
 
-            // ★ 大腿不缩放 (用 legLength 原值), 小腿缩放到 64
-            // 原版大腿通过 IK 关节转动伸缩, v158 简化为固定长度避免过度延伸
-            float scl = small ? (smallLegLength / legLength) : 1f;
-            scaledBase.set(leg.base).sub(position.x, position.y).scl(scl).add(position.x, position.y);
-            scaledJoint.set(leg.joint).sub(position.x, position.y).scl(scl).add(position.x, position.y);
+            // ★ 不缩放位置, 所有腿用 v158 原生 IK 位置 (基于 legLength), 保证运动与贴图同步
+            // 小腿/大腿仅用不同贴图区分 (粗细不同), 长度统一为 legLength
+            scaledBase.set(leg.base);
+            scaledJoint.set(leg.joint);
 
             Tmp.v1.set(scaledBase).sub(scaledJoint).inv().setLength(legExtension);
 
