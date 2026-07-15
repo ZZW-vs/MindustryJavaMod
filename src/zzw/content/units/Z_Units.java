@@ -11,6 +11,7 @@ import mindustry.graphics.Pal;
 import mindustry.type.UnitType;
 import mindustry.type.Weapon;
 
+import zzw.content.units.abilities.CustomLegsAbility;
 import zzw.content.units.abilities.TimeStopAbility;
 import zzw.content.units.anticheat.AntiCheatBulletModule;
 import zzw.content.units.anticheat.ArmorDamageModule;
@@ -1840,23 +1841,19 @@ public class Z_Units {
             rotateSpeed = 3f;
             armor = 4f;
 
-            // ===== 混合腿型配置 (6小腿+4大腿, 重写原版定义) =====
-            // PU132 原版: 2组 CLegType.createGroup
-            //   小腿组: 3条定义×2镜像=6条, baseLength=endLength=32, total=64, legTrns=0.8
-            //   大腿组: 2条定义×2镜像=4条, baseLength=55, endLength=71, total=126, legTrns=0.7
-            // v158 重写: legCount=10 (前6条小腿, 后4条大腿), drawLegs 用不同贴图区分
-            // legLength=95 折中值, 渲染时小腿缩放到64, 大腿缩放到126
+            // ===== 腿配置 (原生腿用于碰撞/移动, CustomLegsAbility 用于渲染) =====
+            // PU132 原版: 2组 CLegType.createGroup (CLegComp 系统)
+            //   小腿组: 3条×2镜像=6条, baseLength=endLength=32, legTrns=0.8
+            //   大腿组: 2条×2镜像=4条, baseLength=55, endLength=71, legTrns=0.7
+            // v158: 保留原生腿 (legCount=10) 用于碰撞, drawLegs 委托 CustomLegsAbility
             legCount = 10;
             legGroupSize = 2;
-            legLength = 95f;  // 折中值 (64+126)/2≈95
-            legBaseOffset = 11.25f;  // PU132 大腿腿根偏移
+            legLength = 95f;  // 原生腿长度 (仅碰撞, 不渲染)
+            legBaseOffset = 11.25f;
             legMoveSpace = 0.85f;
             legPairOffset = 1f;
-            smallLegLength = 64f;   // PU132 小腿总长
-            largeLegLength = 126f;  // PU132 大腿总长
-            // ★ 限制腿伸缩 (原版默认1.75伸缩太强)
-            legMaxLength = 1.1f;   // 最多伸长10%
-            legMinLength = 0.9f;   // 最短90%
+            legMaxLength = 1.1f;
+            legMinLength = 0.9f;
             legSpeed = 0.1f;
 
             hovering = true;
@@ -1867,6 +1864,55 @@ public class Z_Units {
 
             constructor = mindustry.gen.LegsUnit::create;
             controller = unit -> new mindustry.ai.types.GroundAI();
+
+            // ===== CustomLegsAbility: PU132 CLegGroup 完整移植 =====
+            abilities.add(new zzw.content.units.abilities.CustomLegsAbility() {{
+                // 小腿组 (PU132: 3条×2镜像=6条)
+                legGroups.add(new CustomLegsAbility.LegGroupType("create-toxoswarmer-base",
+                    new CustomLegsAbility.LegType("create-toxoswarmer-leg-small") {{
+                        x = 6.25f; y = 10.75f;
+                        targetX = 31f; targetY = 53.5f;
+                        baseLength = endLength = 32f;
+                        legTrns = 0.8f;
+                    }},
+                    new CustomLegsAbility.LegType("create-toxoswarmer-leg-small") {{
+                        x = 12.5f; y = 0f;
+                        targetX = 61.75f; targetY = 0f;
+                        baseLength = endLength = 32f;
+                        legTrns = 0.8f;
+                    }},
+                    new CustomLegsAbility.LegType("create-toxoswarmer-leg-small") {{
+                        x = 6.25f; y = -10.75f;
+                        targetX = 31f; targetY = -53.5f;
+                        baseLength = endLength = 32f;
+                        legTrns = 0.8f;
+                        flipped = true;
+                    }}
+                ) {{
+                    baseRotateSpeed = 4f;
+                    moveSpacing = 0.8f;
+                }});
+
+                // 大腿组 (PU132: 2条×2镜像=4条)
+                legGroups.add(new CustomLegsAbility.LegGroupType("create-toxoswarmer-base",
+                    new CustomLegsAbility.LegType("create-toxoswarmer-leg-large") {{
+                        x = 11.25f; y = 11.25f;
+                        targetX = 77.5f; targetY = 77.5f;
+                        baseLength = 55f; endLength = 71f;
+                        legTrns = 0.7f;
+                    }},
+                    new CustomLegsAbility.LegType("create-toxoswarmer-leg-large") {{
+                        x = 11.25f; y = -11.25f;
+                        targetX = 77.5f; targetY = -77.5f;
+                        baseLength = 55f; endLength = 71f;
+                        legTrns = 0.7f;
+                        flipped = true;
+                    }}
+                ) {{
+                    baseRotateSpeed = 1f;
+                    moveSpacing = 0.9f;
+                }});
+            }});
 
             // ===== 武器: toxo-launcher (8连发追踪导弹+火焰) =====
             // PU132: ShootingBulletType (追踪+持续射击 FlameBulletType)
@@ -1985,82 +2031,113 @@ public class Z_Units {
             constructor = EndGroundUnit::create;
             controller = unit -> new mindustry.ai.types.GroundAI();
 
-            // ===== 身后鞭子触手 (移植 PU132 NewTentacle, 简化为 Ability) =====
-            // PU132: 4条触手定义 (mirror后8条)
-            //   1条 desolation-tentacle (粗, 15段44.5长, EndPointBlastLaserBulletType)
-            //   3条 apocalypse-tentacle (粗, 9-17段37.25长, endLaserSmall 连续激光)
-            //   apocalypse 还有 2条 small-tentacle (细, 20-23段28长, 碰撞伤害)
-            // 简化: 2条粗鞭子 + 2条细鞭子 (各 mirror 后 4+4 条)
+            // ===== 身后鞭子触手 (完整移植 PU132 NewTentacle, 4条×mirror=8条) =====
+            // PU132 desolation: 4条触手定义 (mirror后8条)
+            //   #1 desolation-tentacle: 15段44.5长, EndPointBlastLaserBulletType(250f), 点射
+            //   #2 apocalypse-tentacle: 17段37.25长, EndContinuousLaserBulletType(85f), 持续
+            //   #3 apocalypse-tentacle: 14段37.25长, 同#2, swayOffset=45
+            //   #4 apocalypse-tentacle:  9段37.25长, 同#2, swayOffset=90
 
-            // 粗鞭子1: desolation-tentacle (发射爆破激光)
+            // 触手#1: desolation-tentacle (大鞭子, 爆破激光点射)
             abilities.add(new zzw.content.units.abilities.TentacleAbility("create-desolation-tentacle") {{
-                x = 139f;       // PU132 原值
+                x = 139f;
                 y = -13.5f;
                 rotationOffset = 40f;
                 segments = 15;
-                segmentLength = 28f;  // ★ 缩短段间距 (原44.5太长)
-                angleLimit = 30f;
-                firstSegmentAngleLimit = 17f;
+                segmentLength = 44.5f;  // PU132 原版
+                angleLimit = 30f;       // PU132 原版
+                firstSegmentAngleLimit = 17f;  // PU132 原版
                 rotationSpeed = 2.5f;
                 speed = 6f;
                 accel = 0.2f;
-                drag = 0.1f;  // ★ 增加 drag 减少抖动
+                drag = 0.06f;  // PU132 默认
                 swayScl = 120f;
                 swayMag = 0.2f;
                 mirror = true;
                 top = true;
-                automatic = true;  // ★ 自动寻敌发射
-                bullet = new EndContinuousLaserBulletType(250f);
+                automatic = false;  // PU132 原版
+                bullet = new EndPointBlastLaserBulletType(250f);
                 reload = 3f * 60f;
-                range = 320f;
-                shootCone = 30f;  // ★ 放宽射击锥角 (原4f太严)
-                continuous = true;
-                bulletDuration = 20f;
+                range = 320f;  // PU132: bullet.range()
+                shootCone = 4f;  // PU132 原版 (精确瞄准)
+                continuous = false;  // 点射模式
             }});
 
-            // 粗鞭子2: apocalypse-tentacle (发射连续激光)
+            // 触手#2: apocalypse-tentacle (小鞭子, 连续激光)
             abilities.add(new zzw.content.units.abilities.TentacleAbility("create-apocalypse-tentacle") {{
                 x = 122.75f;
                 y = -41f;
                 rotationOffset = 35f;
                 segments = 17;
-                segmentLength = 22f;  // ★ 缩短段间距 (原37.25太长)
-                firstSegmentAngleLimit = 20f;
+                segmentLength = 37.25f;  // PU132 原版
+                // ★ 减小角度限制 (PU132 默认65, 改为30让鞭子更直, 像多节单位连接)
+                angleLimit = 30f;
+                firstSegmentAngleLimit = 20f;  // PU132 原版
                 rotationSpeed = 3f;
-                speed = 8f;
+                speed = 8f;  // PU132: 4f * 2f
                 accel = 0.2f;
-                drag = 0.1f;
+                drag = 0.06f;
                 mirror = true;
                 top = true;
-                automatic = true;  // ★ 自动寻敌发射
+                automatic = false;
                 bullet = new EndContinuousLaserBulletType(85f);
                 reload = 4f * 60f;
                 range = 220f;
-                shootCone = 30f;
+                shootCone = 15f;  // PU132 默认
                 continuous = true;
-                bulletDuration = (int)(1.5f * 60f);
+                bulletDuration = 1.5f * 60f;  // PU132: 90f
             }});
 
-            // 细鞭子: apocalypse-small-tentacle (碰撞伤害, 无子弹)
-            abilities.add(new zzw.content.units.abilities.TentacleAbility("create-apocalypse-small-tentacle") {{
-                x = 104.25f;
-                y = -49f;
-                rotationOffset = 35f;
-                segments = 20;
-                segmentLength = 18f;  // ★ 缩短段间距 (原28太长)
-                swayOffset = 120f;
-                swayMag = 0.2f;
-                swayScl = 120f;
-                drag = 0.1f;
+            // 触手#3: apocalypse-tentacle (小鞭子, 连续激光, swayOffset=45)
+            abilities.add(new zzw.content.units.abilities.TentacleAbility("create-apocalypse-tentacle") {{
+                x = 111.5f;
+                y = -57.5f;
+                rotationOffset = 30f;
+                segments = 14;
+                segmentLength = 37.25f;
+                // ★ 减小角度限制 (PU132 默认65, 改为30让鞭子更直)
+                angleLimit = 30f;
+                firstSegmentAngleLimit = 18f;
+                swayOffset = 45f;
                 rotationSpeed = 3f;
-                speed = 10f;
-                accel = 0.15f;
+                speed = 8f;
+                accel = 0.2f;
+                drag = 0.06f;
                 mirror = true;
                 top = true;
-                automatic = true;
-                bullet = null;
-                tentacleDamage = 430f;
-                range = 200f;
+                automatic = false;
+                bullet = new EndContinuousLaserBulletType(85f);
+                reload = 4f * 60f;
+                range = 220f;
+                shootCone = 15f;
+                continuous = true;
+                bulletDuration = 1.5f * 60f;
+            }});
+
+            // 触手#4: apocalypse-tentacle (小鞭子, 连续激光, swayOffset=90)
+            abilities.add(new zzw.content.units.abilities.TentacleAbility("create-apocalypse-tentacle") {{
+                x = 95.25f;
+                y = -63f;
+                rotationOffset = 25f;
+                segments = 9;
+                segmentLength = 37.25f;
+                // ★ 减小角度限制 (PU132 默认65, 改为30让鞭子更直)
+                angleLimit = 30f;
+                firstSegmentAngleLimit = 16f;
+                swayOffset = 90f;
+                rotationSpeed = 3f;
+                speed = 8f;
+                accel = 0.2f;
+                drag = 0.06f;
+                mirror = true;
+                top = true;
+                automatic = false;
+                bullet = new EndContinuousLaserBulletType(85f);
+                reload = 4f * 60f;
+                range = 220f;
+                shootCone = 15f;
+                continuous = true;
+                bulletDuration = 1.5f * 60f;
             }});
 
             // ===== 主炮: desolation-main (EnergyChargeWeapon, 蓄力+DesolationBulletType) =====

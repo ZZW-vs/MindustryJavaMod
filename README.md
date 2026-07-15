@@ -132,11 +132,11 @@
 - 不具备防作弊系统（仅 End 系列单位具备）
 
 #### 瘟疫蜂群 (toxoswarmer)
-- Plague 阵营地面单位（6 腿），7000 血，速度 1.1，护甲 4（PU132 移植）
+- Plague 阵营地面单位（10 腿），7000 血，速度 1.1，护甲 4（PU132 移植）
 - **武器1：8 连发追踪导弹**（toxo-launcher / MissileBulletType，200 伤害 + 30 范围伤害，蛇形飞行 4 秒持续）
   - 命中后分裂 2 个火焰弹（fragBullet FireBulletType，15 伤害 + 燃烧状态 4 秒）
-- 6 腿行走，瘟疫色（#a3f080）涂装
-- 不具备防作弊系统（仅 End 系列单位具备）
+- ★ v1.5.1 起：腿系统改用 `CustomLegsAbility`（完整移植 PU132 CLegGroup），2 组腿（小腿组 6 条 + 大腿组 4 条），由 `MixedLegUnitType.drawLegs()` 委托渲染
+- 瘟疫色（#a3f080）涂装，不具备防作弊系统（仅 End 系列单位具备）
 
 #### 荒芜者 (desolation)
 - End 阵营终极地面单位（8 腿），307300 血，速度 0.7，护甲 35（PU132 移植）
@@ -144,8 +144,9 @@
 - **武器2,3：点防激光**（end-point-defence，7 连发 / 5 连发，220 伤害，15tick 冷却）
 - **武器4-7：四门副炮**（end-mount，3 连发，260 伤害，fragBullet 虚空碎裂弹）
 - **武器8,9：两门闪电炮**（end-mount-2，2 连发，380 伤害 + 220 范围 + 80 闪电伤害，穿透 3 目标）
-- **武器10：触手1**（EndPointBlastLaserBulletType，250 伤害 + 1000 范围伤害，3 秒冷却）
-- **武器11-13：触手2-4**（LaserBulletType 连续激光，180 伤害，4 秒冷却）
+- **武器10：触手1**（desolation-tentacle，15 段 44.5 长，EndPointBlastLaserBulletType 250 伤害 + 1000 范围伤害，3 秒冷却，点射模式）
+- **武器11-13：触手2-4**（apocalypse-tentacle，17/14/9 段 37.25 长，EndContinuousLaserBulletType 85 伤害，4 秒冷却，连续激光 1.5 秒持续）
+- ★ v1.5.1 起：4 条触手×mirror=8 条，完整移植 PU132 NewTentacle（含两阶段 IK + 角度限制 + stab 伤害），角度限制从 65° 减至 30° 让鞭子更直
 - 8 腿行走，每腿落地造成 1700 范围伤害
 - 免疫所有状态效果
 - ★ v1.5.0 起：constructor 改用 `EndGroundUnit::create`（extends LegsUnit），同时具备防作弊系统和正常显示腿

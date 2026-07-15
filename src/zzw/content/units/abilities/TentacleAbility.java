@@ -18,16 +18,15 @@ import mindustry.gen.*;
 import mindustry.type.UnitType;
 
 /**
- * 鞭子触手 Ability (移植自 PU132 NewTentacle)
+ * 鞭子触手 Ability (完整移植 PU132 NewTentacle)
  *
- * 简化为 Ability, 在 UnitType.abilities 中添加即可
- * 参考: PU132 NewTentacle.java, TentacleType.java
- *
- * 平滑机制:
- * 1. 非攻击时只摆动, 不主动移动末端 (避免抽搐)
- * 2. drag 速度衰减
- * 3. 双向链表两遍更新 (末端→根部 摆动, 根部→末端 角度约束+位置硬约束)
- * 4. 角度限制 (angleLimit/firstSegmentAngleLimit)
+ * 机制:
+ * 1. updateMovement: attacking 时末端主动追踪目标
+ *    - 有bullet: 远程分支, 末端追踪目标位置
+ *    - 无bullet: stab刺击分支, stab=true冲刺/stab=false蓄力两阶段循环
+ * 2. 第一遍 (末端→根部): 速度积分位置 + drag衰减 + 摆动 + child同步
+ * 3. 第二遍 (根部→末端): 位置约束 + 角度限制 (clampedAngle)
+ * 4. updateWeapon: 目标选择 + 射击 + stab伤害判定
  */
 public class TentacleAbility extends Ability {
     private static final Vec2 tv = new Vec2(), tv2 = new Vec2();
@@ -61,12 +60,19 @@ public class TentacleAbility extends Ability {
     public boolean automatic = false;
     public float tentacleDamage = -1f;
 
-    // 运行时数据
+    // 运行时数据 (每条触手一组)
     private transient Seq<TentacleSeg[]> tentacles;
     private transient float[] reloadTimers;
     private transient Bullet[] bullets;
     private transient float[] swayScls;
     private transient boolean[] attacking;
+    private transient boolean[] stab;
+    private transient float[] attackTimes;
+    private transient float[] stabTimes;
+    private transient float[] retargets;
+    private transient Vec2[] stabStarts;     // (alx, aly) stab射线起点
+    private transient Teamc[] targets;
+    private transient float[] targetXs, targetYs;
     private transient boolean inited = false;
 
     public TentacleAbility(String regionName) {
@@ -98,7 +104,7 @@ public class TentacleAbility extends Ability {
             Position rootPos = getRootPos(unit, sideSign);
             TentacleSeg end = segs[segs.length - 1];
 
-            // ===== 武器逻辑 (确定 attacking 状态 + 末端追踪) =====
+            // ===== 武器逻辑 (确定 attacking 状态 + 目标 + 射击) =====
             attacking[t] = updateWeapon(unit, t, segs, sideSign, rootPos);
 
             // swayScl 平滑过渡
@@ -108,30 +114,55 @@ public class TentacleAbility extends Ability {
                 swayScls[t] = Mathf.lerpDelta(swayScls[t], 0f, 0.04f);
             }
 
-            // ===== 第一遍: 末端→根部, 摆动 + 速度衰减 =====
-            // ★ 非攻击时不主动移动位置, 只加摆动旋转
-            // ★ 末端在 attacking 时不摆动 (保持朝向目标)
+            // ===== 末端追踪 (attacking 时主动移动末端) =====
+            if (attacking[t]) {
+                updateMovement(t, segs, sideSign, rootPos);
+            }
+
+            // ===== 第一遍: 末端→根部, 速度积分 + drag + 摆动 + child同步 =====
             for (int s = segs.length - 1; s >= 0; s--) {
                 TentacleSeg seg = segs[s];
                 seg.updateLastPosition();
 
-                // drag 衰减速度
+                // 速度 clamp + 积分位置
+                tv.set(seg.vx, seg.vy).limit(speed);
+                seg.vx = tv.x;
+                seg.vy = tv.y;
+                seg.x += seg.vx * Time.delta;
+                seg.y += seg.vy * Time.delta;
+
+                // drag 衰减
                 seg.vx *= 1f - (drag * Time.delta);
                 seg.vy *= 1f - (drag * Time.delta);
 
-                // 摆动 (非攻击时摆动强, 攻击时摆动弱)
-                // ★ 末端 attacking 时跳过摆动, 保持朝向目标
-                // ★ 摆动索引从末端开始 (末端=0), 波浪从末端向根部传播 (与 PU132 一致)
-                if (!(s == segs.length - 1 && attacking[t]) && swayScls[t] >= 0.0001f) {
+                // 摆动
+                if (swayScls[t] >= 0.0001f) {
                     int swayIdx = segs.length - 1 - s;
                     float sin = swayScls[t] * Mathf.sin(Time.time + swayOffset + (swayIdx * swaySegmentOffset), swayScl, swayMag) * Mathf.sign(flipSprite != flip);
                     seg.rotation += sin;
                 }
+
+                // child 同步: 让更靠近根部的段朝向 cur, 位置 = cur 后方端点
+                if (s > 0) {
+                    TentacleSeg child = segs[s - 1];
+                    // child 前方端点 (沿 child.rotation+180 走 segmentLength)
+                    float cx = Angles.trnsx(child.rotation + 180f, segmentLength) + child.x;
+                    float cy = Angles.trnsy(child.rotation + 180f, segmentLength) + child.y;
+                    // cur 后方端点 (沿 cur.rotation+180 走 segmentLength)
+                    float sx = Angles.trnsx(seg.rotation + 180f, segmentLength) + seg.x;
+                    float sy = Angles.trnsy(seg.rotation + 180f, segmentLength) + seg.y;
+
+                    child.rotation = Angles.angle(cx, cy, sx, sy);
+                    // 角度限制: 如果角度差超过 angleLimit, 调整 child.rotation
+                    float ang = angleDistSigned(seg.rotation, child.rotation, angleLimit);
+                    child.rotation += ang;
+
+                    child.x = sx;
+                    child.y = sy;
+                }
             }
 
-            // ===== 第二遍: 根部→末端, 角度约束 + 位置硬约束 =====
-            // ★ 位置完全由角度约束决定, 不用速度直接改位置 (避免抽搐)
-            // ★ 末端在 attacking 时不修改 rotation (保持 updateWeapon 设置的目标朝向)
+            // ===== 第二遍: 根部→末端, 位置约束 + 角度限制 =====
             for (int s = 0; s < segs.length; s++) {
                 TentacleSeg seg = segs[s];
                 if (s == 0) {
@@ -141,18 +172,12 @@ public class TentacleAbility extends Ability {
                     seg.rotation = clampedAngle(ang, parentAng, firstSegmentAngleLimit);
                     tv.trns(seg.rotation, segmentLength).add(rootPos.getX(), rootPos.getY());
                 } else {
+                    // 非根段: 约束到前一段
                     TentacleSeg prev = segs[s - 1];
-                    if (s == segs.length - 1 && attacking[t]) {
-                        // ★ 末端 attacking 时: 不修改 rotation, 只修改位置
-                        // end.rotation 已由 updateWeapon 设置朝向目标, 保持直线指向目标
-                        tv.trns(seg.rotation, segmentLength).add(prev.x, prev.y);
-                    } else {
-                        // 中间段或非攻击末端: 角度约束 + 位置约束
-                        float childAng = prev.rotation;
-                        float ang = prev.angleToSeg(seg);
-                        seg.rotation = clampedAngle(ang, childAng, angleLimit);
-                        tv.trns(seg.rotation, segmentLength).add(prev.x, prev.y);
-                    }
+                    float childAng = prev.rotation;
+                    float ang = prev.angleToSeg(seg);
+                    seg.rotation = clampedAngle(ang, childAng, angleLimit);
+                    tv.trns(seg.rotation, segmentLength).add(prev.x, prev.y);
                 }
                 seg.x = tv.x;
                 seg.y = tv.y;
@@ -171,58 +196,160 @@ public class TentacleAbility extends Ability {
         }
     }
 
-    /** 武器逻辑, 返回是否正在攻击 */
+    /** 末端追踪目标 (attacking 时调用) */
+    void updateMovement(int t, TentacleSeg[] segs, float sideSign, Position rootPos) {
+        TentacleSeg end = segs[segs.length - 1];
+        float tx = targetXs[t], ty = targetYs[t];
+        // prevPos = 前一段位置 (end 的 child)
+        float prevX = segs.length > 1 ? segs[segs.length - 2].x : rootPos.getX();
+        float prevY = segs.length > 1 ? segs[segs.length - 2].y : rootPos.getY();
+
+        end.updateLastPosition();
+
+        if (bullet != null) {
+            // ===== 有bullet分支: 远程追踪 =====
+            // 虚拟目标点 = 从target退range/3的点 (让触手不要顶到目标脸上)
+            tv2.set(end.x, end.y).sub(tx, ty).setLength(range / 3f).add(tx, ty);
+            if (!tv2.isNaN()) {
+                tv.set(tv2).sub(end.x, end.y).scl(1f / 40f).limit(speed);
+                float ang = Angles.angle(end.x, end.y, tx, ty);
+                end.rotation = Angles.moveToward(end.rotation, ang, rotationSpeed);
+                float scl = Mathf.clamp((90f - Angles.angleDist(end.rotation, ang)) / 90f, 0.7f, 1f);
+
+                // 位置 = prevPos + trns(end.rotation, segmentLength)
+                tv2.trns(end.rotation, segmentLength).add(prevX, prevY);
+                end.x = tv2.x;
+                end.y = tv2.y;
+
+                // 速度累加
+                end.vx += tv.x * scl * accel;
+                end.vy += tv.y * scl * accel;
+            }
+        } else {
+            // ===== 无bullet分支: stab刺击 =====
+            // 外推目标点 (让触手伸得更远)
+            tv.set(tx, ty).sub(rootPos.getX(), rootPos.getY()).scl(2f).add(rootPos.getX(), rootPos.getY());
+            float vx = tv.x, vy = tv.y;
+            float ang = Angles.angle(end.x, end.y, vx, vy);
+            float scl = Mathf.clamp(Math.abs(90f - Angles.angleDist(end.rotation, ang)) / 90f, 0.7f, 1f);
+
+            if (stab[t]) {
+                // stab=true: 末端高速冲向目标
+                tv.set(vx, vy).sub(end.x, end.y).limit(speed);
+                end.rotation = Angles.moveToward(end.rotation, ang, rotationSpeed);
+                tv2.trns(end.rotation, segmentLength).add(prevX, prevY);
+                end.x = tv2.x;
+                end.y = tv2.y;
+                end.vx += tv.x * scl * accel;
+                end.vy += tv.y * scl * accel;
+
+                attackTimes[t] += Time.delta;
+                if (attackTimes[t] >= 80f) {
+                    attackTimes[t] = 0f;
+                    stab[t] = false;
+                }
+            } else {
+                // stab=false: 蓄力阶段, 末端在目标附近徘徊
+                stabStarts[t].set(end.x, end.y);
+                tv2.set(tx, ty).sub(rootPos.getX(), rootPos.getY()).setLength(range / 5f).add(rootPos.getX(), rootPos.getY());
+                if (!tv2.isNaN()) {
+                    tv.set(tv2).sub(end.x, end.y).scl(1f / 25f).limit(speed);
+                    end.rotation = Angles.moveToward(end.rotation, ang, rotationSpeed);
+                    tv2.trns(end.rotation, segmentLength).add(prevX, prevY);
+                    end.x = tv2.x;
+                    end.y = tv2.y;
+                    end.vx += tv.x * scl * accel;
+                    end.vy += tv.y * scl * accel;
+                }
+
+                attackTimes[t] += Time.delta;
+                if (attackTimes[t] >= 80f) {
+                    targets[t] = null;
+                    attackTimes[t] = 0f;
+                    stab[t] = true;
+                }
+            }
+        }
+    }
+
+    /** 武器逻辑: 目标选择 + 射击 + stab伤害, 返回是否正在攻击 */
     boolean updateWeapon(Unit unit, int t, TentacleSeg[] segs, float sideSign, Position rootPos) {
         TentacleSeg end = segs[segs.length - 1];
         float ex = end.x, ey = end.y;
         boolean player = unit.isPlayer();
 
-        // 寻找目标
-        Teamc target = null;
-        float tx = ex, ty = ey;
+        // ===== 目标选择 =====
         if (automatic || !player) {
-            if (target == null) {
-                target = Units.closestTarget(unit.team, ex, ey, range,
-                    u -> u.isValid() && u.team != unit.team,
-                    b -> b.team != unit.team);
+            if (targets[t] == null && (retargets[t] += Time.delta) >= 20f) {
+                float rootRange = (segments * segmentLength) + (bullet != null ? bullet.range * 0.75f : 0f);
+                targets[t] = Units.closestTarget(unit.team, ex, ey, range,
+                    u -> u.isValid() && u.team != unit.team && rootPos.within(u, rootRange),
+                    b -> b.team != unit.team && rootPos.within(b, rootRange));
+                retargets[t] = 0f;
             }
-            if (target != null) {
-                tx = target.getX();
-                ty = target.getY();
+            if (targets[t] != null) {
+                targetXs[t] = targets[t].getX();
+                targetYs[t] = targets[t].getY();
             }
         } else if (unit.isShooting()) {
-            tx = unit.aimX();
-            ty = unit.aimY();
+            targetXs[t] = unit.aimX();
+            targetYs[t] = unit.aimY();
         }
 
-        boolean isAttacking = target != null || (player && unit.isShooting());
-
-        if (isAttacking) {
-            // ★ 末端旋转朝向目标 (无论有无 bullet, 包括碰撞伤害型触手)
-            float ang = Angles.angle(ex, ey, tx, ty);
-            end.rotation = Angles.moveToward(end.rotation, ang, rotationSpeed);
-
-            // 开火条件: reload 满 + 朝向在 shootCone 内
-            if (bullet != null) {
-                reloadTimers[t] += Time.delta * unit.reloadMultiplier;
-                if (reloadTimers[t] >= reload && Angles.within(end.rotation, ang, shootCone)) {
-                    Bullet b = bullet.create(unit, unit.team, ex, ey, end.rotation);
-                    if (continuous) {
-                        if (bulletDuration > 0) b.lifetime = bulletDuration;
-                        bullets[t] = b;
-                    }
-                    reloadTimers[t] = 0f;
-                }
+        // 目标失效检查
+        if (targets[t] != null) {
+            float rootRange = (segments * segmentLength) + (bullet != null ? bullet.range * 0.75f : 0f);
+            if (Units.invalidateTarget(targets[t], unit.team, rootPos.getX(), rootPos.getY(), rootRange) || (player && !automatic)) {
+                targets[t] = null;
             }
         }
 
-        // 碰撞伤害 (无子弹触手)
-        if (tentacleDamage > 0 && isAttacking) {
-            Units.nearby(unit.team, ex, ey, 5f, other -> {
-                if (other.team != unit.team && other.isValid()) {
-                    other.damage(tentacleDamage * Time.delta);
+        boolean isAttacking = targets[t] != null || (player && unit.isShooting());
+
+        // ===== 射击 =====
+        if (bullets[t] == null && bullet != null) reloadTimers[t] += Time.delta * unit.reloadMultiplier;
+
+        if (isAttacking && bullet != null && reloadTimers[t] >= reload
+            && Angles.within(end.rotation, Angles.angle(ex, ey, targetXs[t], targetYs[t]), shootCone)) {
+            Bullet b = bullet.create(unit, unit.team, ex, ey, end.rotation);
+            if (continuous) {
+                if (bulletDuration > 0) b.lifetime = bulletDuration;
+                bullets[t] = b;
+            }
+            reloadTimers[t] = 0f;
+        }
+
+        // continuous 子弹同步
+        if (continuous) {
+            if (bullets[t] != null && (bullets[t].type != bullet || !bullets[t].isAdded())) bullets[t] = null;
+            if (bullets[t] != null) {
+                bullets[t].set(end.x, end.y);
+                bullets[t].rotation(end.rotation);
+            }
+        }
+
+        // ===== stab 伤害判定 (无bullet触手) =====
+        if (bullets[t] == null && isAttacking && tentacleDamage > 0 && end.len() > 0.2f) {
+            if (stab[t]) {
+                stabTimes[t] += Time.delta;
+                if (stabTimes[t] >= 5f) {
+                    // 沿 (stabStart -> end) 射线检测伤害
+                    float sx = stabStarts[t].x, sy = stabStarts[t].y;
+                    Units.nearby(unit.team, sx, sy, Math.abs(ex - sx) + Math.abs(ey - sy) + 10f, other -> {
+                        if (other.team != unit.team && other.isValid()) {
+                            // 简化: 检测单位到线段的距离
+                            float dist = pointToLineDist(other.x, other.y, sx, sy, ex, ey);
+                            if (dist < 5f) {
+                                other.damage(tentacleDamage);
+                            }
+                        }
+                    });
+                    stabStarts[t].set(end.x, end.y);
+                    stabTimes[t] = 0f;
                 }
-            });
+            } else {
+                stabStarts[t].set(end.x, end.y);
+            }
         }
 
         return isAttacking;
@@ -268,7 +395,19 @@ public class TentacleAbility extends Ability {
         bullets = new Bullet[count];
         swayScls = new float[count];
         attacking = new boolean[count];
-        for (int i = 0; i < count; i++) swayScls[i] = 1f;
+        stab = new boolean[count];
+        attackTimes = new float[count];
+        stabTimes = new float[count];
+        retargets = new float[count];
+        stabStarts = new Vec2[count];
+        targets = new Teamc[count];
+        targetXs = new float[count];
+        targetYs = new float[count];
+        for (int i = 0; i < count; i++) {
+            swayScls[i] = 1f;
+            stab[i] = true;
+            stabStarts[i] = new Vec2();
+        }
 
         for (int t = 0; t < count; t++) {
             float sideSign = t == 0 ? 1f : -1f;
@@ -292,14 +431,45 @@ public class TentacleAbility extends Ability {
         return Tmp.v1.trns(unit.rotation - 90f, x * sideSign, y).add(unit);
     }
 
-    /** 角度限制: 将 ang 限制在 baseAng ± limit 范围内 */
-    private float clampedAngle(float ang, float baseAng, float limit) {
-        float delta = ang - baseAng;
-        delta = ((delta % 360f) + 540f) % 360f - 180f;
-        if (Math.abs(delta) > limit) {
-            delta = Mathf.clamp(delta, -limit, limit);
+    // ===== PU132 角度工具方法 =====
+
+    /** 有符号角度差 (-180..180) */
+    private static float angleDistSigned(float a, float b) {
+        a = ((a % 360f) + 360f) % 360f;
+        b = ((b % 360f) + 360f) % 360f;
+        float d = Math.abs(a - b) % 360f;
+        int sign = (a - b >= 0f && a - b <= 180f) || (a - b <= -180f && a - b >= -360f) ? 1 : -1;
+        return (d > 180f ? 360f - d : d) * sign;
+    }
+
+    /** 带起始区的有符号角度差: 超过 start 才返回超出部分 */
+    private static float angleDistSigned(float a, float b, float start) {
+        float dst = angleDistSigned(a, b);
+        if (Math.abs(dst) > start) {
+            return dst > 0 ? dst - start : dst + start;
         }
-        return baseAng + delta;
+        return 0f;
+    }
+
+    /** PU132 clampedAngle: 将 angle 限制在 relative ± limit 范围内 */
+    private static float clampedAngle(float angle, float relative, float limit) {
+        if (limit >= 180f) return angle;
+        if (limit <= 0f) return relative;
+        float dst = angleDistSigned(angle, relative);
+        if (Math.abs(dst) > limit) {
+            float val = dst > 0 ? dst - limit : dst + limit;
+            return (angle - val) % 360f;
+        }
+        return angle;
+    }
+
+    /** 点到线段距离 */
+    private static float pointToLineDist(float px, float py, float x1, float y1, float x2, float y2) {
+        float dx = x2 - x1, dy = y2 - y1;
+        float len2 = dx * dx + dy * dy;
+        if (len2 < 0.0001f) return Mathf.dst(px, py, x1, y1);
+        float t = Mathf.clamp(((px - x1) * dx + (py - y1) * dy) / len2, 0f, 1f);
+        return Mathf.dst(px, py, x1 + dx * t, y1 + dy * t);
     }
 
     private static class TentacleSeg {
