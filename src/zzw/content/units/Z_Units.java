@@ -13,7 +13,9 @@ import mindustry.type.Weapon;
 import zzw.content.units.abilities.TimeStopAbility;
 import zzw.content.units.anticheat.AntiCheatBulletModule;
 import zzw.content.units.anticheat.ArmorDamageModule;
+import zzw.content.units.anticheat.AbilityDamageModule;
 import zzw.content.units.anticheat.ForceFieldDamageModule;
+import zzw.content.units.bullets.DesolationBulletType;
 import zzw.content.units.bullets.EndBasicBulletType;
 import zzw.content.units.bullets.EndContinuousLaserBulletType;
 import zzw.content.units.bullets.EndPointBlastLaserBulletType;
@@ -30,6 +32,7 @@ import zzw.content.units.effects.ChargeEffect;
 import zzw.content.units.effects.HitEffect;
 import zzw.content.units.effects.WormDecal;
 import zzw.content.units.entities.EndLegsUnit;
+import zzw.content.units.entities.EndGroundUnit;
 import zzw.content.units.entities.SegmentUnitEntity;
 import zzw.content.units.entities.SegmentWormEntity;
 import zzw.content.units.entities.SlowLightningEntity;
@@ -68,8 +71,11 @@ public class Z_Units {
         enigma,                // PU132 谜团 (End 阵营飞行单位)
         voidVessel,            // PU132 虚空容器 (End 阵营飞行单位)
         chronos,               // PU132 克罗诺斯 (End 阵营飞行单位, 时间停止)
-        opticaecus,            // PU132 视界虫 (End 阵营飞行单位, 隐身+激光+导弹)
-        ravager;               // PU132 掠夺者 (End 阵营地面单位, 8腿+噩梦激光)
+        opticaecus,            // PU132 盲视者 (End 阵营飞行单位, 隐身+激光+导弹)
+        ravager,               // PU132 掠夺者 (End 阵营地面单位, 8腿+噩梦激光)
+        exowalker,             // PU132 exowalker (Plague 阵营地面单位, 8腿+瘟疫导弹+吸血激光)
+        toxoswarmer,           // PU132 toxoswarmer (Plague 阵营地面单位, 6腿+火焰导弹)
+        desolation;            // PU132 desolation (End 阵营地面单位, 8腿+触手+蓄力主炮)
 
     public static void load() {
         // ★ 关键: 注册自定义 Entity 到 EntityMapping.idMap, 否则 v154.3 的 UnitType.init() 会失败 ★
@@ -77,6 +83,8 @@ public class Z_Units {
         // (模仿 PU132 的 UnityEntityMapping.register)
         ZEntityRegister.register(SegmentWormEntity.class, SegmentWormEntity::new);
         ZEntityRegister.register(SegmentUnitEntity.class, SegmentUnitEntity::new);
+        // ★ 注册 EndGroundUnit (End 阵营腿单位防作弊类, extends LegsUnit)
+        ZEntityRegister.register(EndGroundUnit.class, EndGroundUnit::new);
         // ★ 注册 SlowLightningEntity (慢闪电 Entity, 实现 Drawc 接口)
         SlowLightningEntity.register();
 
@@ -1227,19 +1235,28 @@ public class Z_Units {
             // ★ 使用 WormAI (继承 FlyingAI, 完全按 PU132 原版自动索敌+攻击)
             controller = unit -> new zzw.content.units.ai.WormAI();
 
-            // ===== 大激光武器 (和压迫者一样的 OppressionLaserBulletType) =====
+            // ===== 大激光武器 (和压迫者一样的 OppressionLaserBulletType, 3连发) =====
+            // ★ 用户需求: 连发3个大激光, 每个激光间隔3秒, 发完后10秒冷却, 循环
+            //   - 激光 lifetime=10秒 (OppressionLaserBulletType 默认)
+            //   - 3次连发, 每次间隔13秒 (10秒激光+3秒间隔)
+            //   - 4秒充能 (首次发射前) + 3*10秒激光 + 2*3秒间隔 + 10秒冷却 = 50秒总周期
+            //   - reload=50*60=3000f, shotDelay=13*60=780f, firstShotDelay=4*60=240f, shots=3
+            //   - 时间线: t=240(激光1) → t=1020(激光2) → t=1800(激光3) → t=2400(激光3结束) → t=3000(reload结束, 10秒冷却)
             weapons.add(new Weapon() {{
                 x = 0f;
                 y = 0f;
                 shootY = 8f;
                 mirror = false;
-                continuous = true;
+                // ★ 改为非 continuous 模式, 用 shots/shotDelay 实现3连发
+                continuous = false;
                 // ★ 大激光方向固定: rotate=false → 激光方向=unit.rotation+baseRotation (固定)
                 //   shootCone=360f 确保任何角度都能发射
                 rotate = false;
                 shootCone = 360f;
-                reload = 20f * 60f;
-                shoot.firstShotDelay = ChargeEffect.oppressionCharge.lifetime;
+                reload = 50f * 60f;  // 50秒总周期 (4充能+30激光+6间隔+10冷却)
+                shoot.firstShotDelay = ChargeEffect.oppressionCharge.lifetime;  // 4秒充能
+                shoot.shots = 3;
+                shoot.shotDelay = 13f * 60f;  // 13秒 (10秒激光+3秒间隔)
                 parentizeEffects = true;
 
                 bullet = new OppressionLaserBulletType();
@@ -1309,7 +1326,7 @@ public class Z_Units {
         }};
 
         // ═══════════════════════════════════════════════════════════
-        //  Opticaecus (PU132 视界虫)
+        //  Opticaecus (PU132 盲视者, 原译"视界虫"已更正: 是飞行单位非多节虫)
         //  - End 阵营飞行单位, 60000 血, 速度 1.8
         //  - 武器1: 红色激光 (LaserBulletType, 1400 伤害, 长度 390)
         //  - 武器2: 导弹发射器 (MissileBulletType, 10连发, 170 伤害, 追踪+蛇形)
@@ -1425,7 +1442,8 @@ public class Z_Units {
             legSplashDamage = 1400f;
             outlineColor = Color.valueOf("1a1a2e");
             range = 500f;
-            constructor = mindustry.gen.LegsUnit::create;
+            // ★ ravager (End 阵营): 用 EndGroundUnit (extends LegsUnit), 有防作弊系统且能正常显示腿
+            constructor = EndGroundUnit::create;
             controller = unit -> new mindustry.ai.types.GroundAI();
 
             // ===== 武器1: 噩梦激光 (PU132 ravager-nightmare) =====
@@ -1602,6 +1620,775 @@ public class Z_Units {
                     backColor = lightColor = Color.valueOf("f53036");
                     frontColor = Color.valueOf("ff786e");
                     hitEffect = mindustry.content.Fx.hitLancer;
+                }};
+            }});
+        }};
+
+        // ═══════════════════════════════════════════════════════════
+        //  Exowalker (PU132 exowalker, Plague 阵营地面单位)
+        //  - 8腿, 6000 血, 速度 0.7
+        //  - 5武器: 4×plagueSmallMount (瘟疫导弹) + 1×drain-laser (吸血激光)
+        //  - ★ 简化: PU132 用 TriJointLegsc 自定义腿组件, v158 用原生腿系统 (legCount=8)
+        //  - ★ 简化: PU132 ShrapnelBulletType (碎片子弹), v158 用 SapBulletType (吸血子弹) 替代
+        // ═══════════════════════════════════════════════════════════
+        exowalker = new UnitType("exowalker") {{
+            health = 6000f;
+            speed = 0.7f;
+            drag = 0.1f;
+            hitSize = 33f;
+            rotateSpeed = 2f;
+            armor = 4f;
+
+            // ===== 腿配置 (PU132 原值, v158 原生腿系统) =====
+            legCount = 8;
+            legGroupSize = 4;
+            legLength = 120f;
+            legBaseOffset = 9f;
+            legMoveSpace = 0.9f;
+            legPairOffset = 1.5f;
+
+            hovering = true;
+            allowLegStep = true;
+            shadowElevation = 0.7f;  // ★ PU132 visualElevation=0.7f, v158 用 shadowElevation
+            groundLayer = mindustry.graphics.Layer.legUnit + 0.01f;
+            outlineColor = Color.valueOf("2e3142");  // PU132 UnityPal.darkerOutline
+
+            constructor = mindustry.gen.LegsUnit::create;
+            controller = unit -> new mindustry.ai.types.GroundAI();
+
+            // ===== 武器1-2: small-plague-launcher (前两个, 共用同一 name+贴图) =====
+            // PU132 plagueSmallMount 模板: shootY=4.75, reload=1.5*60, shots=4, inaccuracy=15
+            // bullet: MissileBulletType (3.8f, 9f), 4连发, 17 范围伤害, 蛇形飞行
+            weapons.add(new Weapon("create-small-plague-launcher") {{
+                x = 9.5f;
+                y = 8f;
+                shootY = 4.75f;
+                reload = 1.5f * 60f;
+                shoot.shots = 4;
+                inaccuracy = 15f;
+                mirror = false;
+                alternate = true;
+                rotate = true;
+                rotateSpeed = 5f;
+                shootCone = 30f;
+                shootSound = mindustry.gen.Sounds.missile;
+                bullet = new mindustry.entities.bullet.MissileBulletType(3.8f, 9f) {{
+                    width = 8f;
+                    height = 8f;
+                    lifetime = 45f;
+                    backColor = hitColor = lightColor = trailColor = Color.valueOf("54de3b");  // plagueDark
+                    frontColor = Color.valueOf("a3f080");  // plague
+                    shrinkY = 0f;
+                    drag = -0.01f;
+                    splashDamage = 17f;
+                    splashDamageRadius = 30f;
+                    weaveScale = 8f;
+                    weaveMag = 2f;
+                    hitEffect = mindustry.content.Fx.blastExplosion;
+                    despawnEffect = mindustry.content.Fx.blastExplosion;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-small-plague-launcher") {{
+                x = -9.5f;
+                y = 8f;
+                shootY = 4.75f;
+                reload = 1.5f * 60f;
+                shoot.shots = 4;
+                inaccuracy = 15f;
+                mirror = false;
+                alternate = true;
+                rotate = true;
+                rotateSpeed = 5f;
+                shootCone = 30f;
+                flipSprite = true;
+                shootSound = mindustry.gen.Sounds.missile;
+                bullet = new mindustry.entities.bullet.MissileBulletType(3.8f, 9f) {{
+                    width = 8f;
+                    height = 8f;
+                    lifetime = 45f;
+                    backColor = hitColor = lightColor = trailColor = Color.valueOf("54de3b");
+                    frontColor = Color.valueOf("a3f080");
+                    shrinkY = 0f;
+                    drag = -0.01f;
+                    splashDamage = 17f;
+                    splashDamageRadius = 30f;
+                    weaveScale = 8f;
+                    weaveMag = 2f;
+                    hitEffect = mindustry.content.Fx.blastExplosion;
+                    despawnEffect = mindustry.content.Fx.blastExplosion;
+                }};
+            }});
+
+            // ===== 武器3-4: small-plague-launcher-flipped (后两个, 共用 flipped 贴图) =====
+            weapons.add(new Weapon("create-small-plague-launcher-flipped") {{
+                x = 12.25f;
+                y = -12.25f;
+                shootY = 4.75f;
+                reload = 1.5f * 60f;
+                shoot.shots = 4;
+                inaccuracy = 15f;
+                mirror = false;
+                alternate = true;
+                rotate = true;
+                rotateSpeed = 5f;
+                shootCone = 30f;
+                flipSprite = true;
+                shootSound = mindustry.gen.Sounds.missile;
+                bullet = new mindustry.entities.bullet.MissileBulletType(3.8f, 9f) {{
+                    width = 8f;
+                    height = 8f;
+                    lifetime = 45f;
+                    backColor = hitColor = lightColor = trailColor = Color.valueOf("54de3b");
+                    frontColor = Color.valueOf("a3f080");
+                    shrinkY = 0f;
+                    drag = -0.01f;
+                    splashDamage = 17f;
+                    splashDamageRadius = 30f;
+                    weaveScale = 8f;
+                    weaveMag = 2f;
+                    hitEffect = mindustry.content.Fx.blastExplosion;
+                    despawnEffect = mindustry.content.Fx.blastExplosion;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-small-plague-launcher-flipped") {{
+                x = -12.25f;
+                y = -12.25f;
+                shootY = 4.75f;
+                reload = 1.5f * 60f;
+                shoot.shots = 4;
+                inaccuracy = 15f;
+                mirror = false;
+                alternate = true;
+                rotate = true;
+                rotateSpeed = 5f;
+                shootCone = 30f;
+                flipSprite = true;
+                shootSound = mindustry.gen.Sounds.missile;
+                bullet = new mindustry.entities.bullet.MissileBulletType(3.8f, 9f) {{
+                    width = 8f;
+                    height = 8f;
+                    lifetime = 45f;
+                    backColor = hitColor = lightColor = trailColor = Color.valueOf("54de3b");
+                    frontColor = Color.valueOf("a3f080");
+                    shrinkY = 0f;
+                    drag = -0.01f;
+                    splashDamage = 17f;
+                    splashDamageRadius = 30f;
+                    weaveScale = 8f;
+                    weaveMag = 2f;
+                    hitEffect = mindustry.content.Fx.blastExplosion;
+                    despawnEffect = mindustry.content.Fx.blastExplosion;
+                }};
+            }});
+
+            // ===== 武器5: drain-laser (吸血激光) =====
+            // PU132: ShrapnelBulletType (碎片子弹), v158 简化为 SapBulletType (吸血子弹)
+            // SapBulletType 自动回血, 类似于 PU132 的 drain 效果
+            weapons.add(new Weapon("create-drain-laser") {{
+                x = 16f;
+                y = -2.25f;
+                shootY = 6.25f;
+                mirror = true;
+                rotate = true;
+                rotateSpeed = 5f;
+                shootCone = 30f;
+                shoot.shots = 3;
+                shoot.shotDelay = 17.5f;  // ★ v158 用 shotDelay 替代 PU132 burstSpacing
+                reload = 1.5f * 60f;
+                shootSound = mindustry.gen.Sounds.laser;
+                bullet = new mindustry.entities.bullet.SapBulletType() {{
+                    sapStrength = 0.4f;  // 吸血强度
+                    length = 80f;
+                    damage = 43f;
+                    color = Color.valueOf("a3f080");  // plague (SapBulletType 用 color 字段)
+                    lightColor = Color.valueOf("a3f080");
+                    width = 4f;
+                    lifetime = 20f;
+                    hitEffect = mindustry.content.Fx.sapExplosion;  // ★ v158 无 Fx.sap, 用 sapExplosion
+                    despawnEffect = mindustry.content.Fx.none;
+                }};
+            }});
+        }};
+
+        // ═══════════════════════════════════════════════════════════
+        //  Toxoswarmer (PU132 toxoswarmer, Plague 阵营地面单位)
+        //  - 6腿 (PU132 用 CLegType 5条腿, v158 简化为 legCount=6 偶数对称)
+        //  - 7000 血, 速度 1.1
+        //  - 1武器: toxo-launcher (8连发追踪导弹, 命中后产生火焰)
+        //  - ★ 简化: PU132 ShootingBulletType (追踪+持续射击), v158 用 MissileBulletType + fragBullet 火焰弹
+        // ═══════════════════════════════════════════════════════════
+        toxoswarmer = new UnitType("toxoswarmer") {{
+            health = 7000f;
+            speed = 1.1f;
+            drag = 0.1f;
+            hitSize = 22.25f;
+            rotateSpeed = 3f;
+            armor = 4f;
+
+            // ===== 腿配置 (v158 原生腿系统, 6条腿) =====
+            legCount = 6;
+            legGroupSize = 3;
+            legLength = 55f;  // PU132 large leg: 55+71=126, 平均后用 90
+            legBaseOffset = 11.25f;
+            legMoveSpace = 0.85f;
+            legPairOffset = 1f;
+
+            hovering = true;
+            allowLegStep = true;
+            shadowElevation = 0.7f;
+            groundLayer = mindustry.graphics.Layer.legUnit + 0.01f;
+            outlineColor = Color.valueOf("2e3142");
+
+            constructor = mindustry.gen.LegsUnit::create;
+            controller = unit -> new mindustry.ai.types.GroundAI();
+
+            // ===== 武器: toxo-launcher (8连发追踪导弹+火焰) =====
+            // PU132: ShootingBulletType (追踪+持续射击 FlameBulletType)
+            // v158 简化: MissileBulletType + fragBullet (火焰弹), 到达后分裂出火焰
+            weapons.add(new Weapon("create-toxo-launcher") {{
+                x = 17f;
+                y = -8.25f;
+                reload = 3f * 60f;
+                shoot.shots = 8;
+                shoot.shotDelay = 2f;
+                inaccuracy = 16f;
+                rotate = true;
+                rotateSpeed = 3f;
+                shootCone = 30f;
+                shootSound = mindustry.gen.Sounds.missile;
+                bullet = new mindustry.entities.bullet.MissileBulletType(4f, 200f) {{
+                    lifetime = 4f * 60f;
+                    homingPower = 0.08f;
+                    weaveScale = 12f;
+                    weaveMag = 2f;
+                    width = 9f;
+                    height = 9f;
+                    trailColor = lightColor = lightningColor = Color.valueOf("54de3b");  // plagueDark
+                    backColor = Color.valueOf("54de3b");
+                    frontColor = Color.valueOf("a3f080");  // plague
+                    shrinkY = 0f;
+                    drag = -0.01f;
+
+                    splashDamage = 30f;
+                    splashDamageRadius = 35f;
+
+                    // 闪电效果 (PU132: lightning=3, length=3, damage=15)
+                    lightning = 3;
+                    lightningLength = 3;
+                    lightningDamage = 15f;
+                    lightningColor = Color.valueOf("54de3b");
+
+                    hitEffect = mindustry.content.Fx.blastExplosion;
+                    despawnEffect = mindustry.content.Fx.blastExplosion;
+
+                    // ★ 简化: PU132 ShootingBulletType 到达后 shoot FlameBulletType
+                    //   v158 用 fragBullet 模拟: 子弹命中后分裂出 2 个火焰弹
+                    fragBullets = 2;
+                    fragVelocityMax = 1.2f;
+                    fragVelocityMin = 0.5f;
+                    fragRandomSpread = 120f;  // ★ v158 用 fragRandomSpread 替代 PU132 fragCone
+                    fragBullet = new mindustry.entities.bullet.FireBulletType() {{
+                        damage = 15f;
+                        lifetime = 20f;
+                        pierce = true;
+                        collidesAir = true;
+                        knockback = 0.001f;
+                        splashDamage = 4f;
+                        splashDamageRadius = 25f;
+                        status = mindustry.content.StatusEffects.burning;
+                        statusDuration = 60f * 4f;
+                        frontColor = Color.valueOf("a3f080");  // plague
+                        lightColor = Color.valueOf("a3f080");
+                    }};
+                }};
+            }});
+        }};
+
+        // ═══════════════════════════════════════════════════════════
+        //  Desolation (PU132 desolation, End 阵营地面单位)
+        //  - 8腿, 307300 血, 速度 0.7, 护甲 35, 全状态免疫
+        //  - 主炮: EnergyChargeWeapon (DesolationBulletType, 蓄力+三防作弊模块)
+        //  - 副武器: end-mount (3连发, fragBullet VoidFracture), end-mount-2 (2连发, 闪电+穿透)
+        //  - 点防: end-point-defence (2座, 多目标防御激光)
+        //  - ★ 简化: PU132 4个触手 TentacleType, v158 简化为 4 个独立武器 (无触手动画)
+        //  - ★ 简化: PU132 clnW 克隆16个武器, v158 直接列出 (前8后8对称)
+        //  - 防作弊: EndLegsUnit (简化版, invincibilityArray=4)
+        // ═══════════════════════════════════════════════════════════
+        desolation = new UnitType("desolation") {{
+            health = 307300f;
+            speed = 0.7f;
+            drag = 0.16f;
+            armor = 35f;
+            hitSize = 257f;
+            rotateSpeed = 0.9f;
+
+            // ===== 腿配置 (PU132 原值, 8 条腿) =====
+            // ★ v158 无 legTrns 字段 (PU132 已用 legLength 公式吸收 0.3 系数)
+            legLength = 672f * (1f - (0.3f * 0.85f * 0.5f));
+            legExtension = -48f;
+            legCount = 8;
+            legGroupSize = 2;
+            legPairOffset = 1f;
+            legMoveSpace = 0.2f;
+            legBaseOffset = 61.25f;
+            rippleScale = 12f;
+
+            legSplashRange = 120f;
+            legSplashDamage = 1700f;
+
+            aimDst = hitSize / 2f;
+
+            // 全状态免疫
+            immunities.addAll(mindustry.Vars.content.getBy(mindustry.ctype.ContentType.status));
+
+            hovering = true;
+            allowLegStep = true;
+            shadowElevation = 8f;  // PU132 visualElevation=8f
+            groundLayer = mindustry.graphics.Layer.flyingUnitLow + 1f;
+            outlineColor = Color.valueOf("2e3142");  // PU132 UnityPal.darkerOutline
+
+            // ★ desolation (End 阵营 8 腿单位): 用 EndGroundUnit (extends LegsUnit), 有防作弊系统且能正常显示腿
+            constructor = EndGroundUnit::create;
+            controller = unit -> new mindustry.ai.types.GroundAI();
+
+            // ===== 主炮: desolation-main (EnergyChargeWeapon, 蓄力+DesolationBulletType) =====
+            // PU132: x=0, y=80, reload=15*60, bullet lifetime=8*60
+            // DesolationBulletType: 2500伤害, 比例伤害, 三防作弊模块
+            weapons.add(new EnergyChargeWeapon("create-desolation-main") {{
+                drawRegion = false;
+                mirror = false;
+                x = 0f;
+                y = 80f;
+                shootY = 36.5f;
+                reload = 15f * 60f;
+                shootCone = 360f;
+                rotate = false;
+                shootSound = zzw.content.Z_Sounds.ravagerNightmareShoot;
+
+                bullet = new DesolationBulletType(1.75f, 2500f) {{
+                    lifetime = 8f * 60f;
+                    overDamage = 900000f;
+                    overDamagePower = 3f;
+                    overDamageScl = 3500f;
+                    ratioDamage = 1f / 50f;
+                    ratioStart = 200000f;
+                    bleedDuration = 10f * 60f;
+
+                    modules = new AntiCheatBulletModule[]{
+                        new ArmorDamageModule(1f / 30f, 15f, 30f, 5f),
+                        new AbilityDamageModule(50f, 10f * 60f, 10f, 1f / 60f, 15f),
+                        new ForceFieldDamageModule(5f, 15f, 200f, 7f, 1f / 40f, 5f * 60f)
+                    };
+                }};
+
+                // 充能特效 (PU132 drawCharge: 4阶段热图渐入, 红色)
+                drawCharge = (unit, mount, charge) -> {
+                    float r = unit.rotation - 90f;
+                    float wx = arc.math.Angles.trnsx(r, x, y) + unit.x;
+                    float wy = arc.math.Angles.trnsy(r, x, y) + unit.y;
+
+                    Draw.color(Color.valueOf("f53036"));  // scarColor
+                    Draw.blend(arc.graphics.Blending.additive);
+                    for (int i = 0; i < 4; i++) {
+                        float in = arc.math.Mathf.curve(charge, i / 4f, (i + 1f) / 4f);
+                        if (in > 0.0001f) {
+                            Draw.alpha(in);
+                            // 用简化 Fill.circle 替代 PU132 heatRegion 贴图
+                            Fill.circle(wx + arc.math.Mathf.range(12f - (in * 11.3f)),
+                                       wy + arc.math.Mathf.range(12f - (in * 11.3f)),
+                                       20f * in);
+                        }
+                    }
+                    Draw.blend();
+                    Draw.color();
+                };
+            }});
+
+            // ===== 点防1: end-point-defence (右侧, 7连发) =====
+            // PU132 MultiTargetPointDefenceWeapon, v158 简化为普通 Weapon (子弹快速发射)
+            weapons.add(new Weapon("create-end-point-defence") {{
+                x = 96.75f;
+                y = 9f;
+                reload = 15f;
+                shoot.shots = 7;
+                shootCone = 20f;
+                rotate = true;
+                rotateSpeed = 15f;
+                mirror = false;
+                alternate = false;
+                shootSound = mindustry.gen.Sounds.laser;
+                bullet = new EndBasicBulletType(5f, 220f) {{
+                    lifetime = 70f;
+                    width = 4f;
+                    height = 6f;
+                    speed = 12f;
+                    backColor = lightColor = Color.valueOf("f53036");  // scarColor
+                    frontColor = Color.black;
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                }};
+            }});
+
+            // ===== 点防2: end-point-defence (右侧偏后, 5连发) =====
+            weapons.add(new Weapon("create-end-point-defence") {{
+                x = 82f;
+                y = 20.5f;
+                reload = 10f;
+                shoot.shots = 5;
+                shootCone = 20f;
+                rotate = true;
+                rotateSpeed = 15f;
+                mirror = false;
+                alternate = false;
+                shootSound = mindustry.gen.Sounds.laser;
+                bullet = new EndBasicBulletType(5f, 220f) {{
+                    lifetime = 70f;
+                    width = 4f;
+                    height = 6f;
+                    speed = 12f;
+                    backColor = lightColor = Color.valueOf("f53036");
+                    frontColor = Color.black;
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                }};
+            }});
+
+            // ===== 副武器 w: end-mount (3连发, fragBullet VoidFracture) =====
+            // PU132 8个 clnW(w) 武器 (4前4后, 对称), v158 简化为 4 个 (前4个, 后4个对称用 mirror)
+            // 实际位置: (62.25, 6.75), (57, -16.25), (52, -39), (46.75, -61.75) + 镜像
+            weapons.add(new Weapon("create-end-mount") {{
+                x = 62.25f; y = 6.75f;
+                mirror = true;
+                shootY = 9f;
+                reload = 35f;
+                inaccuracy = 5f;
+                shoot.shots = 3;
+                shoot.shotDelay = 5f;
+                rotate = true;
+                rotateSpeed = 15f;
+                alternate = true;
+                shootCone = 30f;
+                shootSound = zzw.content.Z_Sounds.endBasicLarge;
+                bullet = new EndBasicBulletType(5f, 260f) {{
+                    lifetime = 70f;
+                    width = 19f;
+                    height = 27f;
+                    backColor = lightColor = Color.valueOf("f53036");  // scarColor
+                    frontColor = Color.black;
+                    trailChance = 0.4f;
+                    hitEffect = mindustry.content.Fx.hitLancer;
+
+                    overDamage = 2200000f;
+                    ratioDamage = 1f / 170f;
+                    ratioStart = 4000f;
+
+                    // fragBullet: VoidFractureBulletType (简化版, 无贴图依赖)
+                    fragBullets = 3;
+                    fragVelocityMax = 1.2f;
+                    fragVelocityMin = 0.5f;
+                    fragRandomSpread = 120f;  // ★ v158 用 fragRandomSpread 替代 PU132 fragCone
+                    fragBullet = new VoidFractureBulletType(15f, 100f) {{
+                        width = 9.5f;
+                        maxTargets = 5;
+                        spikesRange = 90f;
+                        spikesDamage = 50f;
+                        overDamage = 1800000f;
+                        ratioDamage = 1f / 50f;
+                        ratioStart = 50000f;
+                        modules = new AntiCheatBulletModule[]{
+                            new ArmorDamageModule(1f, 20f, 2f)
+                        };
+                    }};
+                }};
+            }});
+
+            weapons.add(new Weapon("create-end-mount") {{
+                x = 57f; y = -16.25f;
+                mirror = true;
+                flipSprite = true;
+                shootY = 9f;
+                reload = 35f;
+                inaccuracy = 5f;
+                shoot.shots = 3;
+                shoot.shotDelay = 5f;
+                rotate = true;
+                rotateSpeed = 15f;
+                alternate = true;
+                shootCone = 30f;
+                shootSound = zzw.content.Z_Sounds.endBasicLarge;
+                bullet = new EndBasicBulletType(5f, 260f) {{
+                    lifetime = 70f;
+                    width = 19f;
+                    height = 27f;
+                    backColor = lightColor = Color.valueOf("f53036");
+                    frontColor = Color.black;
+                    trailChance = 0.4f;
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                    overDamage = 2200000f;
+                    ratioDamage = 1f / 170f;
+                    ratioStart = 4000f;
+                    fragBullets = 3;
+                    fragVelocityMax = 1.2f;
+                    fragVelocityMin = 0.5f;
+                    fragRandomSpread = 120f;  // ★ v158 用 fragRandomSpread 替代 PU132 fragCone
+                    fragBullet = new VoidFractureBulletType(15f, 100f) {{
+                        width = 9.5f;
+                        maxTargets = 5;
+                        spikesRange = 90f;
+                        spikesDamage = 50f;
+                        overDamage = 1800000f;
+                        ratioDamage = 1f / 50f;
+                        ratioStart = 50000f;
+                        modules = new AntiCheatBulletModule[]{
+                            new ArmorDamageModule(1f, 20f, 2f)
+                        };
+                    }};
+                }};
+            }});
+
+            weapons.add(new Weapon("create-end-mount") {{
+                x = 52f; y = -39f;
+                mirror = true;
+                flipSprite = true;
+                shootY = 9f;
+                reload = 35f;
+                inaccuracy = 5f;
+                shoot.shots = 3;
+                shoot.shotDelay = 5f;
+                rotate = true;
+                rotateSpeed = 15f;
+                alternate = true;
+                shootCone = 30f;
+                shootSound = zzw.content.Z_Sounds.endBasicLarge;
+                bullet = new EndBasicBulletType(5f, 260f) {{
+                    lifetime = 70f;
+                    width = 19f;
+                    height = 27f;
+                    backColor = lightColor = Color.valueOf("f53036");
+                    frontColor = Color.black;
+                    trailChance = 0.4f;
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                    overDamage = 2200000f;
+                    ratioDamage = 1f / 170f;
+                    ratioStart = 4000f;
+                    fragBullets = 3;
+                    fragVelocityMax = 1.2f;
+                    fragVelocityMin = 0.5f;
+                    fragRandomSpread = 120f;  // ★ v158 用 fragRandomSpread 替代 PU132 fragCone
+                    fragBullet = new VoidFractureBulletType(15f, 100f) {{
+                        width = 9.5f;
+                        maxTargets = 5;
+                        spikesRange = 90f;
+                        spikesDamage = 50f;
+                        overDamage = 1800000f;
+                        ratioDamage = 1f / 50f;
+                        ratioStart = 50000f;
+                        modules = new AntiCheatBulletModule[]{
+                            new ArmorDamageModule(1f, 20f, 2f)
+                        };
+                    }};
+                }};
+            }});
+
+            weapons.add(new Weapon("create-end-mount") {{
+                x = 46.75f; y = -61.75f;
+                mirror = true;
+                flipSprite = true;
+                shootY = 9f;
+                reload = 35f;
+                inaccuracy = 5f;
+                shoot.shots = 3;
+                shoot.shotDelay = 5f;
+                rotate = true;
+                rotateSpeed = 15f;
+                alternate = true;
+                shootCone = 30f;
+                shootSound = zzw.content.Z_Sounds.endBasicLarge;
+                bullet = new EndBasicBulletType(5f, 260f) {{
+                    lifetime = 70f;
+                    width = 19f;
+                    height = 27f;
+                    backColor = lightColor = Color.valueOf("f53036");
+                    frontColor = Color.black;
+                    trailChance = 0.4f;
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                    overDamage = 2200000f;
+                    ratioDamage = 1f / 170f;
+                    ratioStart = 4000f;
+                    fragBullets = 3;
+                    fragVelocityMax = 1.2f;
+                    fragVelocityMin = 0.5f;
+                    fragRandomSpread = 120f;  // ★ v158 用 fragRandomSpread 替代 PU132 fragCone
+                    fragBullet = new VoidFractureBulletType(15f, 100f) {{
+                        width = 9.5f;
+                        maxTargets = 5;
+                        spikesRange = 90f;
+                        spikesDamage = 50f;
+                        overDamage = 1800000f;
+                        ratioDamage = 1f / 50f;
+                        ratioStart = 50000f;
+                        modules = new AntiCheatBulletModule[]{
+                            new ArmorDamageModule(1f, 20f, 2f)
+                        };
+                    }};
+                }};
+            }});
+
+            // ===== 副武器 w2: end-mount-2 (2连发, 闪电+穿透) =====
+            // PU132 4个 clnW(w2) 武器 (前2后2对称), v158 简化为 2 个 (前2个, 镜像对称)
+            // 位置: (100.75, -13), (79, -23.5) + 镜像
+            weapons.add(new Weapon("create-end-mount-2") {{
+                x = 100.75f; y = -13f;
+                mirror = true;
+                shootY = 12f;
+                reload = 100f;
+                rotate = true;
+                rotateSpeed = 5f;
+                alternate = true;
+                shootCone = 30f;
+                shoot.shots = 2;
+                shoot.shotDelay = 5f;
+                shootSound = zzw.content.Z_Sounds.endBasicLarge;
+                bullet = new EndBasicBulletType(7f, 380f, "shell") {{
+                    lifetime = 95f;
+                    pierceShields = pierce = pierceBuilding = true;
+                    pierceCap = 3;
+                    shrinkY = 0f;
+                    backColor = lightningColor = lightColor = Color.valueOf("f53036");
+                    frontColor = Color.valueOf("ff786e");  // endColor
+                    lightning = 3;
+                    lightningLength = 8;
+                    lightningLengthRand = 4;
+                    lightningDamage = 80f;
+                    splashDamage = 220f;
+                    splashDamageRadius = 80f;
+                    width = 15f;
+                    height = 21f;
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                    shootEffect = mindustry.content.Fx.shootBig;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-end-mount-2") {{
+                x = 79f; y = -23.5f;
+                mirror = true;
+                flipSprite = true;
+                shootY = 12f;
+                reload = 100f;
+                rotate = true;
+                rotateSpeed = 5f;
+                alternate = true;
+                shootCone = 30f;
+                shoot.shots = 2;
+                shoot.shotDelay = 5f;
+                shootSound = zzw.content.Z_Sounds.endBasicLarge;
+                bullet = new EndBasicBulletType(7f, 380f, "shell") {{
+                    lifetime = 95f;
+                    pierceShields = pierce = pierceBuilding = true;
+                    pierceCap = 3;
+                    shrinkY = 0f;
+                    backColor = lightningColor = lightColor = Color.valueOf("f53036");
+                    frontColor = Color.valueOf("ff786e");
+                    lightning = 3;
+                    lightningLength = 8;
+                    lightningLengthRand = 4;
+                    lightningDamage = 80f;
+                    splashDamage = 220f;
+                    splashDamageRadius = 80f;
+                    width = 15f;
+                    height = 21f;
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                    shootEffect = mindustry.content.Fx.shootBig;
+                }};
+            }});
+
+            // ===== 触手武器 (简化为4个独立武器, 替代 PU132 TentacleType) =====
+            // ★ 4个触手武器共用同一 name "create-desolation-tentacle", 共用同一贴图
+            //   (v158 规则: 文件名不能带 -1/-2 后缀, 否则 atlas.find 找不到贴图)
+            // PU132 触手1: (139, -13.5), EndPointBlastLaserBulletType (250伤害, 320长度)
+            weapons.add(new Weapon("create-desolation-tentacle") {{
+                x = 139f; y = -13.5f;
+                reload = 3f * 60f;
+                rotate = true;
+                rotateSpeed = 2.5f;
+                shootCone = 30f;
+                shootSound = zzw.content.Z_Sounds.ravagerNightmareShoot;
+                bullet = new EndPointBlastLaserBulletType(250f) {{
+                    length = 320f;
+                    width = 17f;
+                    lifetime = 20f;
+                    widthReduction = 3f;
+                    damageRadius = 60f;
+                    auraDamage = 1000f;
+                    overDamage = 900000f;
+                    ratioDamage = 1f / 200f;
+                    ratioStart = 11000f;
+                    bleedDuration = 10f * 60f;
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                    laserColors = new Color[]{Color.valueOf("f5303690"), Color.valueOf("f53036"),
+                                               Color.valueOf("ff786e"), Color.black};
+                }};
+            }});
+
+            // PU132 触手2-4: (122.75, -41), (111.5, -57.5), (95.25, -63), endLaserSmall
+            // 简化为 3 个 continuous 激光武器 (使用 LaserBulletType)
+            weapons.add(new Weapon("create-desolation-tentacle") {{
+                x = 122.75f; y = -41f;
+                reload = 4f * 60f;
+                rotate = true;
+                rotateSpeed = 3f;
+                shootCone = 30f;
+                continuous = true;
+                shootSound = mindustry.gen.Sounds.laser;
+                bullet = new mindustry.entities.bullet.LaserBulletType(180f) {{
+                    length = 280f;
+                    width = 12f;
+                    lifetime = 1.5f * 60f;
+                    colors = new Color[]{Color.valueOf("f5303690"), Color.valueOf("f53036"),
+                                          Color.valueOf("ff786e"), Color.white};
+                    hitColor = Color.valueOf("f53036");
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                    largeHit = true;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-desolation-tentacle") {{
+                x = 111.5f; y = -57.5f;
+                reload = 4f * 60f;
+                rotate = true;
+                rotateSpeed = 3f;
+                shootCone = 30f;
+                continuous = true;
+                shootSound = mindustry.gen.Sounds.laser;
+                bullet = new mindustry.entities.bullet.LaserBulletType(180f) {{
+                    length = 280f;
+                    width = 12f;
+                    lifetime = 1.5f * 60f;
+                    colors = new Color[]{Color.valueOf("f5303690"), Color.valueOf("f53036"),
+                                          Color.valueOf("ff786e"), Color.white};
+                    hitColor = Color.valueOf("f53036");
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                    largeHit = true;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-desolation-tentacle") {{
+                x = 95.25f; y = -63f;
+                reload = 4f * 60f;
+                rotate = true;
+                rotateSpeed = 3f;
+                shootCone = 30f;
+                continuous = true;
+                shootSound = mindustry.gen.Sounds.laser;
+                bullet = new mindustry.entities.bullet.LaserBulletType(180f) {{
+                    length = 280f;
+                    width = 12f;
+                    lifetime = 1.5f * 60f;
+                    colors = new Color[]{Color.valueOf("f5303690"), Color.valueOf("f53036"),
+                                          Color.valueOf("ff786e"), Color.white};
+                    hitColor = Color.valueOf("f53036");
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                    largeHit = true;
                 }};
             }});
         }};

@@ -1,23 +1,25 @@
 package zzw.content.units.entities;
 
+import zzw.content.units.ZEntityRegister;
+
 import arc.math.Interp;
 import arc.math.Mathf;
 import arc.util.Time;
 import mindustry.Vars;
 import mindustry.entities.units.WeaponMount;
-import mindustry.gen.UnitEntity;
+import mindustry.gen.LegsUnit;
 
 /**
- * End 阵营飞行单位 (简化版防作弊, 完全用原版方法实现)
+ * End 阵营腿单位 (简化版防作弊, 完全用原版方法实现)
  *
- * ★ 仅用于 End 阵营飞行单位 (flying=true, 无腿):
- *   - enigma, voidVessel, chronos, opticaecus
- *   - 对于 End 阵营腿单位 (ravager/desolation), 请用 EndGroundUnit (extends LegsUnit)
+ * ★ 与 EndLegsUnit 区别: 本类 extends LegsUnit (而非 UnitEntity)
+ *   - EndLegsUnit extends UnitEntity: 用于 End 阵营飞行单位 (enigma/voidVessel/chronos/opticaecus)
+ *   - EndGroundUnit extends LegsUnit: 用于 End 阵营腿单位 (ravager/desolation)
  *
- * 替代 PU132 的 AntiCheatVariables 9参数系统 + EndComp @EntityComponent mixin
- * 直接在 EndLegsUnit 中内嵌简化版防作弊逻辑, 参数按 PU132 voidVessel/chronos 配置硬编码
+ * 之所以分两个类: v158 腿单位(UnitType with legCount) 必须用 LegsUnit 作为 constructor,
+ * 否则 UnitType.drawLegs() 中 `unit instanceof Legsc` 为 false 导致不画腿.
  *
- * 防作弊机制 (完全照搬 PU132 EndComp 核心, 简化参数配置):
+ * 防作弊机制 (与 EndLegsUnit 完全一致, 仅父类不同):
  * 1. 多槽位无敌帧 (invFrames[]): 每次受伤占用一个槽位, 轮询使用
  * 2. 抗性累积 (resist): 高伤害累积抗性, 减少后续伤害
  * 3. 伤害曲线衰减 (Pow(2)): 超过 damageThreshold 的伤害按曲线衰减
@@ -36,7 +38,7 @@ import mindustry.gen.UnitEntity;
  *   invincibilityDuration = 15f
  *   invincibilityArray    = 4
  */
-public class EndLegsUnit extends UnitEntity {
+public class EndGroundUnit extends LegsUnit {
     private static final Interp curveType = new Interp.Pow(2);
 
     // 防作弊运行时数据
@@ -48,8 +50,15 @@ public class EndLegsUnit extends UnitEntity {
     private float invTimer = 0f;
     private float resist, resistMax, resistTime;
 
-    public static EndLegsUnit create() {
-        return new EndLegsUnit();
+    /** 工厂方法 (UnitType.constructor 用) */
+    public static EndGroundUnit create() {
+        return new EndGroundUnit();
+    }
+
+    /** 返回注册的 classId (绕过 v154.3 的 checkEntityMapping 检查) */
+    @Override
+    public int classId() {
+        return ZEntityRegister.classId(EndGroundUnit.class);
     }
 
     @Override

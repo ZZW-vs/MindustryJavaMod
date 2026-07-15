@@ -33,12 +33,17 @@ public class WormAI extends FlyingAI{
         // PU132: 有目标时移动+攻击
         if(target != null && unit.hasWeapons()){
             if(!unit.type.circleTarget){
-                // 非盘旋模式 (arcnelidia): 冲向目标
-                moveTo(target, unit.range() * 0.8f);
+                // 非盘旋模式 (arcnelidia): 冲向目标近距离
+                // ★ 修复: 之前用 unit.range()*0.8f 停止距离太大 (如210*0.8=168f), 单位在远处就停了
+                //   改用 30f 固定近距离, 让单位冲到目标面前
+                moveTo(target, 30f);
                 unit.lookAt(target);
             }else{
                 // 盘旋模式 (toxobyte/catenapede/devourer/oppression): 围绕目标转圈
-                attack(120f);
+                // ★ 修复: 之前用自定义 attack() + moveAt, 不如 v158 原生 circleAttack + movePref 可靠
+                //   circleAttack 用 movePref, 对 omniMovement=false 单位有正确处理
+                // ★ v158 无 circleTargetRadius 字段, 固定用 120f (PU132 默认盘旋半径)
+                circleAttack(120f);
             }
         }
         // PU132: 无目标且无记仇时朝 spawner 移动 (wave 模式)
@@ -48,23 +53,6 @@ public class WormAI extends FlyingAI{
         rotateTime = Math.max(0f, rotateTime - Time.delta);
         if(time <= 0f) score = 0f;
         time = Math.max(0f, time - Time.delta);
-    }
-
-    /**
-     * PU132: 盘旋攻击
-     * - 保持当前速度向前
-     * - 朝向与目标方向差 > 100° 且距离 > circleLength 时平滑转向
-     * - 转完后 rotateTime = 40f 冷却
-     * ★ v158 FlyingAI 无此方法, 是 WormAI 自定义的 (PU132 继承自 v132 FlyingAI 有此方法)
-     */
-    protected void attack(float circleLength){
-        vec.trns(unit.rotation, unit.speed());
-        float diff = Angles.angleDist(unit.rotation, unit.angleTo(target));
-        if((diff > 100f && !unit.within(target, circleLength)) || rotateTime > 0f){
-            vec.setAngle(Mathf.slerpDelta(vec.angle(), unit.angleTo(target), 0.2f));
-            if(rotateTime <= 0f) rotateTime = 40f;
-        }
-        unit.moveAt(vec);
     }
 
     /**

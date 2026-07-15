@@ -106,7 +106,7 @@
 - End 阵营飞行单位，时间停止能力
 - **TimeStopAbility**：用 Time.delta 模拟全局时间停止，updating 标志防递归，maxIterations=60 防卡死
 
-#### 视界虫 (opticaecus)
+#### 盲视者 (opticaecus)
 - End 阵营飞行单位（PU132 移植），60000 血，速度 1.8
 - **武器1：红色激光**（LaserBulletType，1400 伤害，长度 390，宽度 30，4 秒冷却）
 - **武器2：导弹发射器**（doeg-launcher，10 连发，每发 170 伤害 + 320 范围伤害，追踪 + 蛇形飞行）
@@ -122,6 +122,39 @@
 - **武器4,5：小型炮台**（EndBasicBulletType 导弹，330 伤害 + 220 范围伤害，追踪 + 蛇形飞行）
 - 8 腿行走（legCount=8, legGroupSize=4, legLength=140），每腿落地造成 1400 范围伤害
 - 免疫所有状态效果
+- ★ v1.5.0 起：constructor 改用 `EndGroundUnit::create`（extends LegsUnit），同时具备防作弊系统和正常显示腿
+
+#### 外径行者 (exowalker)
+- Plague 阵营地面单位（8 腿），6000 血，速度 0.7，护甲 4（PU132 移植）
+- **武器1-4：瘟疫导弹发射器**（small-plague-launcher，4 连发，9 伤害 + 17 范围伤害，蛇形追踪，1.5 秒冷却）
+- **武器5：吸血激光**（drain-laser / SapBulletType，43 伤害，长度 80，吸血 0.4%，3 连发间隔 17.5tick）
+- 8 腿行走，瘟疫色（#a3f080）涂装
+- 不具备防作弊系统（仅 End 系列单位具备）
+
+#### 瘟疫蜂群 (toxoswarmer)
+- Plague 阵营地面单位（6 腿），7000 血，速度 1.1，护甲 4（PU132 移植）
+- **武器1：8 连发追踪导弹**（toxo-launcher / MissileBulletType，200 伤害 + 30 范围伤害，蛇形飞行 4 秒持续）
+  - 命中后分裂 2 个火焰弹（fragBullet FireBulletType，15 伤害 + 燃烧状态 4 秒）
+- 6 腿行走，瘟疫色（#a3f080）涂装
+- 不具备防作弊系统（仅 End 系列单位具备）
+
+#### 荒芜者 (desolation)
+- End 阵营终极地面单位（8 腿），307300 血，速度 0.7，护甲 35（PU132 移植）
+- **武器1：蓄力主炮**（EnergyChargeWeapon / DesolationBulletType，2500 伤害 + 三防作弊模块，15 秒冷却 + 8 秒持续，蓄力 4 阶段红色特效）
+- **武器2,3：点防激光**（end-point-defence，7 连发 / 5 连发，220 伤害，15tick 冷却）
+- **武器4-7：四门副炮**（end-mount，3 连发，260 伤害，fragBullet 虚空碎裂弹）
+- **武器8,9：两门闪电炮**（end-mount-2，2 连发，380 伤害 + 220 范围 + 80 闪电伤害，穿透 3 目标）
+- **武器10：触手1**（EndPointBlastLaserBulletType，250 伤害 + 1000 范围伤害，3 秒冷却）
+- **武器11-13：触手2-4**（LaserBulletType 连续激光，180 伤害，4 秒冷却）
+- 8 腿行走，每腿落地造成 1700 范围伤害
+- 免疫所有状态效果
+- ★ v1.5.0 起：constructor 改用 `EndGroundUnit::create`（extends LegsUnit），同时具备防作弊系统和正常显示腿
+
+### 防作弊系统架构 (v1.5.0 重构)
+- **EndLegsUnit extends UnitEntity**：仅用于 End 阵营飞行单位（enigma/voidVessel/chronos/opticaecus），无腿
+- **EndGroundUnit extends LegsUnit**：用于 End 阵营腿单位（ravager/desolation），有腿且实现 Legsc 接口
+- **Plague 阵营单位**（exowalker/toxoswarmer）：使用 `LegsUnit::create`，无防作弊系统
+- 防作弊机制：多槽位无敌帧 + 抗性累积 + 伤害曲线衰减 + 单次上限 + 怒气系统 + 死亡拒绝
 
 ### 机械网络系统 (Betamindy 风格)
 - 全局注册表 + 源驱动 BFS 传播转速和应力
@@ -160,6 +193,20 @@
 欢迎提交问题报告和功能请求！如果您想贡献代码，请先创建一个分支并提交Pull Request。
 
 ## 更新日志
+
+### v1.5.0
+- **移植外径行者（exowalker）**：Plague 阵营地面单位（8 腿），6000 血，5 武器（4 瘟疫导弹发射器 + 1 吸血激光 SapBulletType）
+- **移植瘟疫蜂群（toxoswarmer）**：Plague 阵营地面单位（6 腿），7000 血，1 武器（8 连发追踪导弹 + fragBullet 火焰弹）
+- **移植荒芜者（desolation）**：End 阵营终极地面单位（8 腿），307300 血，多武器系统（蓄力主炮 + 点防激光 + 副炮 + 闪电炮 + 4 触手）
+- **防作弊系统架构重构**：
+  - 新增 `EndGroundUnit extends LegsUnit` 类，用于 End 阵营腿单位（ravager/desolation）
+  - 原有 `EndLegsUnit extends UnitEntity` 仅用于 End 阵营飞行单位（enigma/voidVessel/chronos/opticaecus）
+  - ravager constructor 从 `LegsUnit::create` 改为 `EndGroundUnit::create`（之前无防作弊系统）
+  - desolation constructor 从 `EndLegsUnit::create` 改为 `EndGroundUnit::create`（之前腿不显示）
+  - Plague 阵营单位（exowalker/toxoswarmer）使用 `LegsUnit::create`，无防作弊系统（仅 End 系列具备）
+- **修复虚空容器激光连发机制**：3 连发大激光，每发间隔 3 秒，3 发后 10 秒冷却（reload=50 秒总周期）
+- **视界虫更名**：原"视界虫"改为"盲视者"（飞行单位非多节，不应叫虫）
+- **修复编译错误**：fragCone→fragRandomSpread（v158 字段名变更），legTrns 删除（v158 无此字段），shoot.burstSpacing→shoot.shotDelay，Fx.sap→Fx.sapExplosion，SapBulletType 用 color 字段而非 frontColor/backColor
 
 ### v1.4.3
 - **修复掠夺者（ravager）腿不显示**：constructor 错误使用了 `UnitEntity::create`（飞行单位 entity，不实现 Legsc 接口），导致 `UnitType.drawLegs()` 因 `unit instanceof Legsc` 为 false 而不被调用。改为 `LegsUnit::create`（腿单位 entity），现在 8 条腿正常显示
