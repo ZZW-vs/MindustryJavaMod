@@ -58,7 +58,10 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
     private static Effect voidFractureEffect;
 
     public VoidFractureBulletType(float speed, float damage) {
-        super(speed, damage);
+        // ★ PU132 原版设计: super(4.3f, damage) 是有意的
+        //   4.3f 是 Phase 1 悬停段初速度, 配合 drag=0.11f 在 30 帧内衰减到 ~0.13 实现悬停
+        //   trueSpeed(=入参 speed) 是 Phase 2 冲刺速度, 在 update 中显式设置
+        super(4.3f, damage);
         drag = 0.11f;
         trueSpeed = speed;
         collides = false;
@@ -323,8 +326,9 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
         Draw.color(Color.black);
         if (b.fdata() <= 0f) {
             // ===== Phase 1: 小三角 (PU132 L192-195) =====
-            // ★ 修复: 初始 clamp 到 0.3f 确保起步可见 (原版 in=0 时宽度=0 完全不可见)
-            float in = Mathf.clamp(b.time() / delay, 0.3f, 1f);
+            // PU132 原版: float in = Mathf.clamp(b.time / delay);
+            // 两反向三角形拼成菱形, in 从 0→1 随时间增大
+            float in = Mathf.clamp(b.time() / delay);
             Drawf.tri(b.x(), b.y(), width * in, length, b.rotation());
             Drawf.tri(b.x(), b.y(), width * in, length, b.rotation() + 180f);
         } else {

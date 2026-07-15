@@ -1221,6 +1221,8 @@ public class Z_Units {
                 reload = 30f;
                 inaccuracy = 15f;
                 rotateSpeed = 5f;
+                // ★ shootCone: v158 默认 5f 太窄, 武器难以对准目标开火, 设 30f
+                shootCone = 30f;
                 // ★ PU132 原版: shootSound = UnitySounds.spaceFracture
                 shootSound = zzw.content.Z_Sounds.spaceFracture;
                 // ★ PU132 原版 voidVessel 只有1个普通武器, 不是连发3发
