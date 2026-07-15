@@ -102,6 +102,8 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
                     }
                 }
             }).layer(Layer.effect + 0.03f);
+            // ★ v158: Effect 必须调用 init() 注册到 Effects, 否则 Effect.at() 不会渲染
+            voidFractureEffect.init();
         }
     }
 

@@ -7,6 +7,7 @@ import arc.math.Mathf;
 import arc.util.Time;
 import mindustry.content.Fx;
 import mindustry.gen.Bullet;
+import mindustry.graphics.Layer;
 
 /**
  * 虚空弹丸 (完全复刻 PU132 VoidPelletBulletType)
@@ -33,6 +34,9 @@ public class VoidPelletBulletType extends AntiCheatBulletTypeBase {
         homingDelay = 20f;
         hitSize = 3f;
         keepVelocity = false;
+        // ★ v158 兼容: 默认 layer=Layer.bullet(65f) 在飞行单位(75f)之下会被盖住
+        //   设置 layer=Layer.flyingUnit+1f 确保黑色子弹在单位之上渲染可见
+        layer = Layer.flyingUnit + 1f;
         // ★ PU132 原版没有 drag
     }
 

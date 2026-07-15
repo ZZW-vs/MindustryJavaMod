@@ -1125,7 +1125,7 @@ public class Z_Units {
             range = 200f;
             outlineColor = Color.valueOf("2e3142");
             constructor = EndLegsUnit::create;
-            // ★ 使用 WormAI (v158 CommandAI 子类, 自动索敌, 不朝刷新点跑)
+            // ★ 使用 WormAI (继承 FlyingAI, 完全按 PU132 原版自动索敌+攻击)
             controller = unit -> new zzw.content.units.ai.WormAI();
 
             weapons.add(new Weapon() {{
@@ -1162,7 +1162,7 @@ public class Z_Units {
             range = 300f;
             outlineColor = Color.valueOf("2e3142");
             constructor = EndLegsUnit::create;
-            // ★ 使用 WormAI (v158 CommandAI 子类, 自动索敌, 不朝刷新点跑)
+            // ★ 使用 WormAI (继承 FlyingAI, 完全按 PU132 原版自动索敌+攻击)
             controller = unit -> new zzw.content.units.ai.WormAI();
 
             weapons.add(new Weapon("create-end-small-mount") {{
@@ -1207,7 +1207,7 @@ public class Z_Units {
             range = 510f;
             outlineColor = Color.valueOf("2e3142");
             constructor = EndLegsUnit::create;
-            // ★ 使用 WormAI (v158 CommandAI 子类, 自动索敌, 不朝刷新点跑)
+            // ★ 使用 WormAI (继承 FlyingAI, 完全按 PU132 原版自动索敌+攻击)
             controller = unit -> new zzw.content.units.ai.WormAI();
 
             // 时间停止能力 (PU132: duration=15*60, rechargeTime=10*60)
