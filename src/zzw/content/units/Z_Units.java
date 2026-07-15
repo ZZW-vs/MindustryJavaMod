@@ -690,11 +690,16 @@ public class Z_Units {
         SegmentWormEntity.configs.get(devourer.name).damageMultiplier = 0.9f;
 
         // ★ 初始化分裂/合并音效 (PU132 默认 Sounds.door)
+        // ★ v158 可能移除了 Sounds.door 字段, 用反射安全获取
         try {
-            SegmentWormEntity.splitSound = mindustry.gen.Sounds.door;
-            SegmentWormEntity.chainSound = mindustry.gen.Sounds.door;
+            arc.audio.Sound doorSound = (arc.audio.Sound) mindustry.gen.Sounds.class.getField("door").get(null);
+            SegmentWormEntity.splitSound = doorSound;
+            SegmentWormEntity.chainSound = doorSound;
         } catch (Throwable t) {
-            arc.util.Log.err("[Z_Units] 音效初始化失败", t);
+            // v158 无 Sounds.door, 用自定义音效替代
+            SegmentWormEntity.splitSound = zzw.content.Z_Sounds.endBasic;
+            SegmentWormEntity.chainSound = zzw.content.Z_Sounds.endBasic;
+            arc.util.Log.info("[Z_Units] Sounds.door 不存在, 用 endBasic 替代分裂音效");
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -1797,7 +1802,7 @@ public class Z_Units {
                 shoot.shots = 3;
                 shoot.shotDelay = 17.5f;  // ★ v158 用 shotDelay 替代 PU132 burstSpacing
                 reload = 1.5f * 60f;
-                shootSound = mindustry.gen.Sounds.laser;
+                shootSound = zzw.content.Z_Sounds.devourerMainLaser;  // ★ v158 无 Sounds.laser, 用自定义 devourerMainLaser
                 bullet = new mindustry.entities.bullet.SapBulletType() {{
                     sapStrength = 0.4f;  // 吸血强度
                     length = 80f;
@@ -2018,7 +2023,7 @@ public class Z_Units {
                 rotateSpeed = 15f;
                 mirror = false;
                 alternate = false;
-                shootSound = mindustry.gen.Sounds.laser;
+                shootSound = zzw.content.Z_Sounds.endBasicSmall;  // ★ v158 无 Sounds.laser, 用自定义 endBasicSmall
                 bullet = new EndBasicBulletType(5f, 220f) {{
                     lifetime = 70f;
                     width = 4f;
@@ -2041,7 +2046,7 @@ public class Z_Units {
                 rotateSpeed = 15f;
                 mirror = false;
                 alternate = false;
-                shootSound = mindustry.gen.Sounds.laser;
+                shootSound = zzw.content.Z_Sounds.endBasicSmall;  // ★ v158 无 Sounds.laser, 用自定义 endBasicSmall
                 bullet = new EndBasicBulletType(5f, 220f) {{
                     lifetime = 70f;
                     width = 4f;
@@ -2339,7 +2344,7 @@ public class Z_Units {
                 rotateSpeed = 3f;
                 shootCone = 30f;
                 continuous = true;
-                shootSound = mindustry.gen.Sounds.laser;
+                shootSound = zzw.content.Z_Sounds.devourerMainLaser;  // ★ v158 无 Sounds.laser, 用自定义 devourerMainLaser
                 bullet = new mindustry.entities.bullet.LaserBulletType(180f) {{
                     length = 280f;
                     width = 12f;
@@ -2359,7 +2364,7 @@ public class Z_Units {
                 rotateSpeed = 3f;
                 shootCone = 30f;
                 continuous = true;
-                shootSound = mindustry.gen.Sounds.laser;
+                shootSound = zzw.content.Z_Sounds.devourerMainLaser;  // ★ v158 无 Sounds.laser, 用自定义 devourerMainLaser
                 bullet = new mindustry.entities.bullet.LaserBulletType(180f) {{
                     length = 280f;
                     width = 12f;
@@ -2379,7 +2384,7 @@ public class Z_Units {
                 rotateSpeed = 3f;
                 shootCone = 30f;
                 continuous = true;
-                shootSound = mindustry.gen.Sounds.laser;
+                shootSound = zzw.content.Z_Sounds.devourerMainLaser;  // ★ v158 无 Sounds.laser, 用自定义 devourerMainLaser
                 bullet = new mindustry.entities.bullet.LaserBulletType(180f) {{
                     length = 280f;
                     width = 12f;
