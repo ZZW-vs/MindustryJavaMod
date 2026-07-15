@@ -1173,9 +1173,8 @@ public class Z_Units {
                 reload = 30f;
                 inaccuracy = 15f;
                 rotateSpeed = 5f;
-                // ★ 连发3个 (参考压迫者 create-oppression-void-fracture 武器配置)
-                shoot.shots = 3;
-                shoot.shotDelay = 6f;
+                // ★ PU132 原版 voidVessel 只有1个普通武器, 不是连发3发
+                // 大激光效果由 VoidFractureBulletType 的 Phase 2 冲刺阶段绘制
                 bullet = new VoidFractureBulletType(32f, 600f) {{
                     ratioDamage = 1f / 50f;
                     ratioStart = damage * 20f;

@@ -17,8 +17,7 @@ import mindustry.gen.Bullet;
  * - update 时: 用 angleDistSigned(rotation, fdata) 计算带符号角度差, 平滑转向回初始角度
  * - 当角度差<=0.06° 时停止转向 (fdata=-361f 标记完成)
  *
- * ★ 之前 bug: 用 Tmp.v1.trns + angleTo 计算角度差是错的 (算的是两点向量角度, 不是角度差)
- *   正确做法: 直接 angleDistSigned(rotation, fdata)
+ * ★ 完全按 PU132 原版, 纯黑色绘制, 不加描边
  */
 public class VoidPelletBulletType extends AntiCheatBulletTypeBase {
     public VoidPelletBulletType(float speed, float damage) {
@@ -26,15 +25,15 @@ public class VoidPelletBulletType extends AntiCheatBulletTypeBase {
         lifetime = 90f;
         trailColor = Color.black;
         trailLength = 16;
-        trailWidth = 3f;
-        despawnEffect = Fx.hitLancer;
-        hitEffect = Fx.hitLancer;
+        trailWidth = 2f;
+        despawnEffect = Fx.hitLancer;  // PU132: HitFx.voidHit, v158 用 Fx.hitLancer 替代
+        hitEffect = Fx.hitLancer;     // PU132: HitFx.voidHit, v158 用 Fx.hitLancer 替代
         homingPower = 0.01f;
         homingRange = 50f;
         homingDelay = 20f;
-        hitSize = 5f;
+        hitSize = 3f;
         keepVelocity = false;
-        // ★ PU132 原版没有 drag, 移除之前误加的 drag=0.05f
+        // ★ PU132 原版没有 drag
     }
 
     @Override
@@ -59,15 +58,15 @@ public class VoidPelletBulletType extends AntiCheatBulletTypeBase {
         }
     }
 
+    /**
+     * ★ 完全按 PU132 原版 draw (L46-50)
+     * 纯黑色方块
+     */
     @Override
     public void draw(Bullet b) {
         drawTrail(b);
-        // ★ 白色描边 (让黑色子弹在任何背景上可见, PU132 原版纯黑在暗色背景上看不见)
-        Draw.color(Color.white);
-        Fill.square(b.x(), b.y(), 4f, b.rotation() + 45f);
-        // 黑色核心
         Draw.color(Color.black);
-        Fill.square(b.x(), b.y(), 3f, b.rotation() + 45f);
+        Fill.square(b.x(), b.y(), 2f, b.rotation() + 45f);
     }
 
     @Override
@@ -76,7 +75,6 @@ public class VoidPelletBulletType extends AntiCheatBulletTypeBase {
 
     /**
      * 带符号角度差: 从 b 到 a 需要旋转的角度, 归一化到 [-180, 180]
-     * 正值=a 在 b 逆时针方向, 负值=a 在 b 顺时针方向
      * (复刻 PU132 Utils.angleDistSigned)
      */
     private static float angleDistSigned(float a, float b) {

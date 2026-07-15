@@ -2,15 +2,18 @@ package zzw.content.units.bullets;
 
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
+import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
 import arc.math.Angles;
 import arc.math.Mathf;
 import arc.math.geom.Intersector;
 import arc.math.geom.Vec2;
+import arc.struct.FloatSeq;
 import arc.struct.IntSet;
 import arc.util.Tmp;
 import mindustry.Vars;
 import mindustry.content.Fx;
+import mindustry.entities.Effect;
 import mindustry.entities.Units;
 import mindustry.gen.Bullet;
 import mindustry.gen.Building;
@@ -18,6 +21,7 @@ import mindustry.gen.Healthc;
 import mindustry.gen.Hitboxc;
 import mindustry.gen.Unit;
 import mindustry.graphics.Drawf;
+import mindustry.graphics.Layer;
 
 /**
  * 虚空碎裂弹 (完全复刻 PU132 VoidFractureBulletType)
@@ -25,12 +29,12 @@ import mindustry.graphics.Drawf;
  * PU132 原版两阶段状态机:
  * - Phase 1 (delay=30 tick): 悬停跟踪目标, 黑色小三角
  * - Phase 2 (nextLifetime=10 tick): 直线冲刺穿透, 黑色激光束效果 (类似压迫者大招激光)
- * - 冲刺结束时: 沿路径生成 spikes 伤害
+ * - 冲刺结束 (removed): 播放 voidFractureEffect 特效 (30tick 三层激光+spikes)
  *
  * 关键: bullet.fdata 控制阶段 (<=0=Phase1, >0=Phase2)
  *       bullet.data = FractureData (存储目标、起点、collided集合)
  *
- * ★ 防崩溃: 所有关键逻辑用 try-catch 包裹, 出错时只跳过不崩溃
+ * ★ 完全按 PU132 原版, 纯黑色绘制, 不加描边
  */
 public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
     public float length = 28f;
@@ -45,6 +49,9 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
     public float spikesDamage = 200f;
     public float spikesRand = 8f;
 
+    /** ★ PU132: layer = Layer.effect + 0.03f (渲染层级在 effect 之上) */
+    private static Effect voidFractureEffect;
+
     public VoidFractureBulletType(float speed, float damage) {
         super(4.3f, damage);
         drag = 0.11f;
@@ -52,11 +59,12 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
         collides = false;
         collidesTiles = false;
         keepVelocity = false;
+        // ★ PU132 原版: layer = Layer.effect + 0.03f
+        layer = Layer.effect + 0.03f;
         pierce = true;
         despawnEffect = Fx.none;
         smokeEffect = Fx.none;
-        hitEffect = Fx.hitLancer;
-        lifetime = 60f;
+        hitEffect = Fx.hitLancer;  // PU132: HitFx.voidHit, v158 用 Fx.hitLancer 替代
     }
 
     @Override
@@ -65,6 +73,36 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
         // v158: range 是字段, 直接设置 (PU132 原版 range() = trueSpeed * nextLifetime)
         range = trueSpeed * nextLifetime;
         drawSize = (range * 2f) + 30f;
+        // 初始化 voidFractureEffect (PU132 SpecialFx.voidFractureEffect)
+        if (voidFractureEffect == null) {
+            voidFractureEffect = new Effect(30f, 700f, e -> {
+                if (!(e.data instanceof VoidFractureData data)) return;
+                float rot = Angles.angle(data.x, data.y, data.x2, data.y2);
+
+                Draw.color(Color.black);
+                for (int i = 0; i < 3; i++) {
+                    float f = Mathf.lerp(data.b.width, data.b.widthTo, i / 2f);
+                    float a = Mathf.lerp(0.25f, 1f, (i / 2f) * (i / 2f));
+
+                    Draw.alpha(a);
+                    Lines.stroke(f * e.fout());
+                    Lines.line(data.x, data.y, data.x2, data.y2, false);
+                    Drawf.tri(data.x2, data.y2, f * 1.22f * e.fout(), f * 2f, rot);
+                    Drawf.tri(data.x, data.y, f * 1.22f * e.fout(), f * 2f, rot + 180f);
+                }
+
+                FloatSeq s = data.spikes;
+                if (!s.isEmpty()) {
+                    for (int i = 0; i < data.spikes.size; i += 4) {
+                        float x1 = s.get(i), y1 = s.get(i + 1), x2 = s.get(i + 2), y2 = s.get(i + 3);
+                        Drawf.tri(x1, y1, (data.b.widthTo + 1f) * e.fout(),
+                            Mathf.dst(x1, y1, x2, y2) * 2f * Mathf.curve(e.fin(), 0f, 0.2f),
+                            Angles.angle(x1, y1, x2, y2));
+                        Fill.circle(x1, y1, ((data.b.widthTo + 1f) / 1.22f) * e.fout());
+                    }
+                }
+            }).layer(Layer.effect + 0.03f);
+        }
     }
 
     @Override
@@ -174,13 +212,42 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
         });
     }
 
+    /**
+     * ★ PU132 原版 hitEntity (L127-138)
+     * 对 Healthc 造成 max(damage, maxHealth*ratioDamage) 伤害
+     */
+    @Override
+    public void hitEntity(Bullet b, Hitboxc entity, float health) {
+        if (entity instanceof Healthc h) {
+            h.damage(Math.max(b.damage, h.maxHealth() * ratioDamage));
+        }
+
+        if (entity instanceof Unit unit) {
+            Tmp.v3.set(unit).sub(b).nor().scl(knockback * 80f);
+            if (impact) Tmp.v3.setAngle(b.rotation() + (knockback < 0 ? 180f : 0f));
+            unit.impulse(Tmp.v3);
+            unit.apply(status, statusDuration);
+        }
+    }
+
     @Override
     public void removed(Bullet b) {
         super.removed(b);
-        // ===== Phase 2 结束: 生成 spikes (PU132 L141-186) =====
+        // ===== Phase 2 结束: 生成 spikes + 播放 voidFractureEffect (PU132 L141-186) =====
         try {
             if (b.fdata() >= 1f && b.data() instanceof FractureData data) {
-                spawnSpikes(b, data);
+                VoidFractureData d = new VoidFractureData();
+                d.x = data.x;
+                d.y = data.y;
+                d.x2 = b.x();
+                d.y2 = b.y();
+                d.b = this;
+
+                if (!b.hit()) {
+                    spawnSpikes(b, data, d);
+                }
+                // ★ PU132: 播放 voidFractureEffect (30tick 三层激光+spikes 特效)
+                voidFractureEffect.at((d.x + d.x2) / 2f, (d.y + d.y2) / 2f, 0f, d);
             }
         } catch (Throwable t) {
             System.out.println("[VoidFracture] removed error: " + t);
@@ -190,14 +257,12 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
     /**
      * 沿冲刺路径生成 spikes 伤害 (PU132 L153-184)
      */
-    protected void spawnSpikes(Bullet b, FractureData data) {
-        if (b.hit()) return;
+    protected void spawnSpikes(Bullet b, FractureData data, VoidFractureData d) {
         int[] count = {0};
         // 线段中心点和半径
         float cx = (data.x + b.x()) * 0.5f;
         float cy = (data.y + b.y()) * 0.5f;
-        float segLen = Mathf.len(b.x() - data.x, b.y() - data.y);
-        float radius = segLen * 0.5f + spikesRange;
+        float radius = Mathf.len(b.x() - data.x, b.y() - data.y) * 0.5f + spikesRange;
         // 单位
         Units.nearbyEnemies(b.team, cx, cy, radius, u -> {
             if (count[0] >= maxTargets) return;
@@ -210,6 +275,8 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
             u.damagePierce(spikesDamage);
             u.apply(status, statusDuration);
             hitEffect.at(v.x, v.y, v.angleTo(u));
+            // 记录到 spikes 序列 (用于 voidFractureEffect 绘制)
+            d.spikes.add(v.x, v.y, u.x(), u.y());
         });
         // 建筑
         Vars.indexer.allBuildings(cx, cy, radius, build -> {
@@ -221,30 +288,29 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
             count[0]++;
             build.damagePierce(spikesDamage);
             hitEffect.at(v.x, v.y, v.angleTo(build));
+            d.spikes.add(v.x, v.y, build.x(), build.y());
         });
     }
 
+    /**
+     * ★ 完全按 PU132 原版 draw (L189-213)
+     * 纯黑色绘制, 三层激光束叠加
+     */
     @Override
     public void draw(Bullet b) {
         if (!(b.data() instanceof FractureData data)) return;
+        Draw.color(Color.black);
         if (b.fdata() <= 0f) {
             // ===== Phase 1: 小三角 (PU132 L192-195) =====
             float in = Mathf.clamp(b.time() / delay);
-            // ★ 白色描边 (让黑色子弹可见)
-            Draw.color(Color.white);
-            Drawf.tri(b.x(), b.y(), width * in + 1f, length + 1f, b.rotation());
-            Drawf.tri(b.x(), b.y(), width * in + 1f, length + 1f, b.rotation() + 180f);
-            // 黑色核心
-            Draw.color(Color.black);
             Drawf.tri(b.x(), b.y(), width * in, length, b.rotation());
             Drawf.tri(b.x(), b.y(), width * in, length, b.rotation() + 180f);
         } else {
-            // ===== Phase 2: 激光束 (PU132 L196-211, 类似压迫者大招激光) =====
-            Draw.color(Color.black);
+            // ===== Phase 2: 激光束 (PU132 L196-211) =====
             Drawf.tri(b.x(), b.y(), width * b.fout(), length, b.rotation());
             Drawf.tri(b.x(), b.y(), width * b.fout(), length / 2f, b.rotation() + 180f);
             float ang = b.dst2(data.x, data.y) >= 0.0001f ? b.angleTo(data.x, data.y) : b.rotation() + 180f;
-            // 三层叠加的激光束 (类似压迫者大招的 3 层颜色)
+            // 三层叠加的激光束 (PU132 原版)
             for (int i = 0; i < 3; i++) {
                 float f = Mathf.lerp(width, widthTo, i / 2f);
                 float a = Mathf.lerp(0.25f, 1f, (i / 2f) * (i / 2f));
@@ -255,7 +321,6 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
                 Drawf.tri(data.x, data.y, f * 1.22f, f * 2f, ang);
             }
         }
-        Draw.reset();
     }
 
     @Override
@@ -272,5 +337,15 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
         public Healthc target;
         public float x, y;
         public IntSet collided = new IntSet();
+    }
+
+    /**
+     * VoidFractureData (PU132 SpecialFx.VoidFractureData L185-189)
+     * 用于 removed() 时传递给 voidFractureEffect 绘制
+     */
+    public static class VoidFractureData {
+        public float x, y, x2, y2;
+        public VoidFractureBulletType b;
+        public FloatSeq spikes = new FloatSeq();
     }
 }
