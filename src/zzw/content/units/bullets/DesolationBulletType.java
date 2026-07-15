@@ -25,12 +25,14 @@ public class DesolationBulletType extends AntiCheatBulletTypeBase {
     public float widthTo = 230f;
     public float fadeInTime = 40f;
     public float fadeOutTime = 20f;
-    // ★ 偏红透明渐变 (去掉白色, 改为红色半透明渐变)
+    // ★ PU132 原版颜色 (从外到内: 透明红→猩红→浅红→白)
+    public float startingScl = 1.4f;   // 第一层缩放
+    public float scaleReduction = 0.8f; // 每层缩放系数
     public Color[] colors = {
-        new Color(0xf5303640),   // 红更透明 (外层)
-        new Color(0xf5303680),   // 红半透明
-        new Color(0xf53036ff),   // 红不透明
-        new Color(0xff786eff)    // 橙红 (最内层)
+        new Color(0xf5303690),   // 半透明猩红 (外层, alpha=0x90)
+        new Color(0xf53036ff),   // 猩红不透明
+        new Color(0xff786eff),   // 浅红/粉红
+        Color.white              // 白色 (最内层)
     };
 
     public DesolationBulletType(float speed, float damage) {
@@ -117,14 +119,18 @@ public class DesolationBulletType extends AntiCheatBulletTypeBase {
         float out = Mathf.clamp(b.time > b.lifetime - fadeOutTime ? 1f - (b.time - (lifetime - fadeOutTime)) / fadeOutTime : 1f);
         Tmp.v1.trns(b.rotation(), length / 2f);
 
+        float scl = startingScl;
         for (Color c : colors) {
             Draw.color(c);
+            // ★ PU132 原版抖动: 每层颜色每帧生成 ±2 像素随机偏移
+            float rx = Mathf.range(2f), ry = Mathf.range(2f);
             for (int s : Mathf.signs) {
-                Tmp.v2.trns(b.rotation() - 90f, width * in * s * out, -(length / 2f) * 1.75f).add(b);
-                float x1 = b.x() + Tmp.v1.x, x2 = b.x() - Tmp.v1.x,
-                    y1 = b.y() + Tmp.v1.y, y2 = b.y() - Tmp.v1.y;
-                Fill.tri(x1, y1, x2, y2, Tmp.v2.x, Tmp.v2.y);
+                Tmp.v2.trns(b.rotation() - 90f, width * in * s * out, -(length / 2f) * 1.75f);
+                float x1 = b.x() + (Tmp.v1.x * scl), x2 = b.x() - Tmp.v1.x, x3 = b.x() + (Tmp.v2.x * scl),
+                    y1 = b.y() + (Tmp.v1.y * scl), y2 = b.y() - Tmp.v1.y, y3 = b.y() + (Tmp.v2.y * scl);
+                Fill.tri(x1 + rx, y1 + ry, x2 + rx, y2 + ry, x3 + rx, y3 + ry);
             }
+            scl *= scaleReduction;
         }
         Draw.reset();
     }

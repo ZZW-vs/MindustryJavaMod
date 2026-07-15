@@ -37,7 +37,8 @@ public class TriLegUnitType extends UnitType {
 
     // 摆动参数
     public float swingSpeed = 0.04f;    // 摆动速度
-    public float swingAmplitude = 3f;    // 摆动幅度
+    public float swingAmplitude = 1.5f;  // 摆动幅度 (降低, 避免过度晃动)
+    public float bendFactor = 0.5f;      // 弯曲系数 (降低, 让腿更硬)
 
     public TriLegUnitType(String name) {
         super(name);
@@ -101,20 +102,21 @@ public class TriLegUnitType extends UnitType {
                 Draw.rect(footRegion, leg.base.x, leg.base.y, position.angleTo(leg.base));
             }
 
-            // ★ PU132 TriJointInverseKinematics 算法 (完整移植)
+            // ★ PU132 TriJointInverseKinematics 算法 (简化版, 降低弯曲度让腿更硬)
             // 三节腿每段长度 = legLength/3, 总长 = legLength
-            // 两个中间关节 joint1, joint2 在 position→base 连线上, 加垂直偏移
             float segLen = legLength / 3f;  // 每段长度 (固定值)
             float totalLen = position.dst(leg.base);  // 腿根到脚的实际距离
             totalLen = Math.min(totalLen, 3f * segLen);  // limit 到最大伸直长度
 
             float angle = position.angleTo(leg.base);
 
-            // PU132 IK: offset = sineOut(cosDeg((totalLen - segLen)/(segLen*2) * 90)) * segLen * sign(side)
+            // PU132 IK: offset = sineOut(cosDeg(lenRatio * 90)) * segLen * sign(side)
+            // lenRatio = (totalLen - segLen) / (segLen * 2)
             // 腿伸直时(totalLen=3*segLen): lenRatio=1, cosDeg(90)=0, offset=0 (直腿)
             // 腿收缩时(totalLen<3*segLen): offset>0 (弯曲)
+            // ★ 用 bendFactor 降低 offset, 让腿更硬 (原版 segLen, 改为 segLen*bendFactor)
             float lenRatio = (totalLen - segLen) / (segLen * 2f);
-            float offset = Interp.sineOut.apply(Mathf.cosDeg(Mathf.mod(lenRatio * 90f, 360f))) * segLen * flips;
+            float offset = Interp.sineOut.apply(Mathf.cosDeg(Mathf.mod(lenRatio * 90f, 360f))) * segLen * bendFactor * flips;
 
             // 垂直方向
             float perpX = -Mathf.sinDeg(angle);
@@ -125,7 +127,7 @@ public class TriLegUnitType extends UnitType {
             float midX = position.x + Mathf.cosDeg(angle) * midDist + perpX * offset;
             float midY = position.y + Mathf.sinDeg(angle) * midDist + perpY * offset;
 
-            // ★ 摆动偏移: 基于时间和腿索引, 让中段有动画
+            // ★ 摆动偏移: 基于时间和腿索引, 让中段有动画 (所有腿都摆动, 包括前腿)
             float swing = Mathf.sin(Time.time * swingSpeed + i * 0.7f) * swingAmplitude * Mathf.slope(leg.stage);
             midX += perpX * swing;
             midY += perpY * swing;

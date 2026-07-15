@@ -88,10 +88,9 @@ public class MixedLegUnitType extends UnitType {
             boolean small = isSmallLeg(i);
             TextureRegion foot = small ? smallFootRegion : largeFootRegion;
             if (foot.found()) {
-                // ★ 阴影画在缩放后的脚位置
+                // ★ 大腿不缩放, 小腿缩放到 64
                 Vec2 pos = unit.legOffset(Tmp.v3, i).add(unit);
-                float targetLen = small ? smallLegLength : largeLegLength;
-                float scl = targetLen / legLength;
+                float scl = small ? (smallLegLength / legLength) : 1f;
                 Tmp.v2.set(leg.base).sub(pos.x, pos.y).scl(scl).add(pos.x, pos.y);
                 float ssize = foot.width * foot.scl() * 1.5f;
                 Drawf.shadow(Tmp.v2.x, Tmp.v2.y, ssize, invDrown);
@@ -123,9 +122,9 @@ public class MixedLegUnitType extends UnitType {
 
             Vec2 position = unit.legOffset(legOffsetTmp, i).add(unit);
 
-            // ★ 计算缩放后的腿位置 (小腿缩短, 大腿延长)
-            float targetLen = small ? smallLegLength : largeLegLength;
-            float scl = targetLen / legLength;
+            // ★ 大腿不缩放 (用 legLength 原值), 小腿缩放到 64
+            // 原版大腿通过 IK 关节转动伸缩, v158 简化为固定长度避免过度延伸
+            float scl = small ? (smallLegLength / legLength) : 1f;
             scaledBase.set(leg.base).sub(position.x, position.y).scl(scl).add(position.x, position.y);
             scaledJoint.set(leg.joint).sub(position.x, position.y).scl(scl).add(position.x, position.y);
 

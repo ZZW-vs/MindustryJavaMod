@@ -1976,6 +1976,31 @@ public class Z_Units {
             constructor = EndGroundUnit::create;
             controller = unit -> new mindustry.ai.types.GroundAI();
 
+            // ===== 身后鞭子触手 (移植 PU132 NewTentacle, 简化为 Ability) =====
+            // PU132: 4条触手 (mirror后8条), 位于身后, 可发射激光
+            // 简化: 2条触手 (mirror后4条), 发射 endLaserSmall 连续激光
+            abilities.add(new zzw.content.units.abilities.TentacleAbility("create-desolation-tentacle") {{
+                x = 95f;       // 触手根 X (相对单位中心, 身后)
+                y = -50f;      // 触手根 Y (偏左)
+                rotationOffset = 30f;    // 旋转偏移 (相对单位朝向)
+                segments = 12;
+                segmentLength = 37.25f;
+                angleLimit = 30f;
+                firstSegmentAngleLimit = 17f;
+                rotationSpeed = 3f;
+                swayScl = 120f;
+                swayMag = 0.2f;
+                mirror = true;
+                top = true;
+                // 发射连续激光 (PU132 endLaserSmall, damage=85)
+                bullet = new EndContinuousLaserBulletType(85f);
+                reload = 4f * 60f;
+                range = 220f;
+                shootCone = 15f;
+                continuous = true;
+                bulletDuration = (int)(1.5f * 60f);
+            }});
+
             // ===== 主炮: desolation-main (EnergyChargeWeapon, 蓄力+DesolationBulletType) =====
             // PU132: x=0, y=80, reload=15*60, bullet lifetime=8*60
             // DesolationBulletType: 2500伤害, 比例伤害, 三防作弊模块
