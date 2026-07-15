@@ -1,6 +1,10 @@
 package zzw.content.units;
 
 import arc.graphics.Color;
+import arc.graphics.g2d.Draw;
+import arc.graphics.g2d.Fill;
+import arc.math.Angles;
+import arc.util.Time;
 import mindustry.entities.bullet.LaserBulletType;
 import mindustry.graphics.Pal;
 import mindustry.type.UnitType;
@@ -28,6 +32,7 @@ import zzw.content.units.entities.EndLegsUnit;
 import zzw.content.units.entities.SegmentUnitEntity;
 import zzw.content.units.entities.SegmentWormEntity;
 import zzw.content.units.entities.SlowLightningEntity;
+import zzw.content.units.weapons.EnergyChargeWeapon;
 import zzw.content.units.weapons.SweepWeapon;
 
 /**
@@ -983,10 +988,10 @@ public class Z_Units {
             }});
 
             // ===== 阶段4: 头部大激光连发 (PU132 L4999-5051 VoidFractureBulletType, shots=3 连发3个) =====
-            // PU132 原版: EnergyChargeWeapon with shots=3, shotDelay=6f, reload=120f
-            // 简化: 用普通 Weapon 替代 EnergyChargeWidget (跳过 drawCharge 视觉, 保留核心 3 连发机制)
-            // PU132 有 6 个此武器分列身体两侧, 这里简化为 1 个 mirror=true (左右各1)
-            weapons.add(new Weapon("create-oppression-void-fracture") {{
+            // PU132 原版: EnergyChargeWeapon with shots=3, shotDelay=6f, reload=120f, drawCharge=黑色发光圆+尖刺
+            // 简化版 EnergyChargeWeapon: shoot/update 走 v158 原生 Weapon, 只重写 draw() 补 drawCharge 蓄力视觉
+            // PU132 有 6 个此武器分列身体两侧, 这里简化为 1 个 (mirror=false 单边)
+            weapons.add(new EnergyChargeWeapon("create-oppression-void-fracture") {{
                 x = 85f;
                 y = -50f;
                 shadow = 47f;
@@ -1005,6 +1010,41 @@ public class Z_Units {
                 shoot.shotDelay = 6f;
                 // ★ PU132 原版: shootSound = UnitySounds.spaceFracture
                 shootSound = zzw.content.Z_Sounds.spaceFracture;
+
+                // ★ PU132 原版 drawCharge (UnityUnitTypes.java L5014-5023): 黑色发光圆+尖刺
+                // 简化版: 用 v158 原版 Fill.circle + Fill.tri 替代 UnityDrawf.shiningCircle
+                //   PU132 参数: radius=3.5f*charge, spikes=6, spikeHeight=3f*charge
+                drawCharge = (unit, mount, charge) -> {
+                    if (charge <= 0.001f) return;
+                    mindustry.type.Weapon w = mount.weapon;
+                    float rotation = unit.rotation - 90f;
+                    float wx = unit.x + Angles.trnsx(rotation, w.x, w.y);
+                    float wy = unit.y + Angles.trnsy(rotation, w.x, w.y);
+                    float radius = 3.5f * charge;
+                    float spikeHeight = 3f * charge;
+                    Draw.color(Color.black);
+                    // 中心实心圆 (PU132 shiningCircle 第一步)
+                    Fill.circle(wx, wy, radius);
+                    // 6个旋转尖刺 (PU132 shiningCircle 第二步, 简化为三角形)
+                    if (spikeHeight > 0.01f) {
+                        int spikes = 6;
+                        float baseAngle = Time.time * 3f;
+                        for (int i = 0; i < spikes; i++) {
+                            float a = baseAngle + i * (360f / spikes);
+                            float x1 = wx + Angles.trnsx(a, radius);
+                            float y1 = wy + Angles.trnsy(a, radius);
+                            float x2 = wx + Angles.trnsx(a, radius + spikeHeight);
+                            float y2 = wy + Angles.trnsy(a, radius + spikeHeight);
+                            float x3 = wx + Angles.trnsx(a + 8f, radius);
+                            float y3 = wy + Angles.trnsy(a + 8f, radius);
+                            Fill.tri(x1, y1, x2, y2, x3, y3);
+                            float x4 = wx + Angles.trnsx(a - 8f, radius);
+                            float y4 = wy + Angles.trnsy(a - 8f, radius);
+                            Fill.tri(x1, y1, x2, y2, x4, y4);
+                        }
+                    }
+                    Draw.color();
+                };
 
                 bullet = new VoidFractureBulletType(40f, 800f) {{
                     speed = 5f;

@@ -10,20 +10,18 @@ import mindustry.entities.Units;
 import arc.audio.Sound;
 
 /**
- * 时间停止能力 (移植自 PU132 TimeStopAbility, 简化版)
+ * 时间停止能力 (简化版, 完全用原版方法实现)
  *
- * PU132 原版:
- * - 玩家触发: 加入全局 TimeStop 系统, 冻结所有其他实体
- * - AI 触发: 快速模拟单位更新 (Time.delta=3f, 循环调用 unit.update())
+ * 替代 PU132 TimeStopAbility + 全局 TimeStop 系统
+ * 用 Time.delta 模拟替代 PU132 的全局 delta provider 切换机制
  *
- * 简化版:
+ * 简化版机制:
  * - 自动触发: 当附近有敌方目标且充能完成时
- * - 效果: 快速模拟单位更新 (让单位在瞬间行动多次)
- * - 视觉: 冲击波特效
+ * - 效果: 快速模拟单位更新 (设 Time.delta=3f, 循环调用 unit.update(), 让单位在瞬间行动多次)
+ * - 视觉: 冲击波特效 + 音效
  *
- * ★ 修复卡死: PU132 有 update 标志防止递归 (unit.update() → ability.update() → trigger() → unit.update()...)
- *   简化版缺少此保护, 300次迭代 × 递归 = 游戏卡死
- *   修复: 1) adding updating 标志防止递归 2) 限制迭代次数 (60次=3秒模拟时间)
+ * ★ 递归保护: updating 标志防止 unit.update() → ability.update() → trigger() → unit.update() 递归
+ *   限制迭代次数 (60次=3秒模拟时间), 避免卡死
  */
 public class TimeStopAbility extends Ability {
     /** 持续时间 (ticks) */
