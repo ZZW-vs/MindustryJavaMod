@@ -33,11 +33,14 @@ import zzw.content.units.bullets.VoidPortalBulletType;
 import zzw.content.units.effects.ChargeEffect;
 import zzw.content.units.effects.HitEffect;
 import zzw.content.units.effects.WormDecal;
+import zzw.content.units.entities.CopterUnitEntity;
 import zzw.content.units.entities.EndLegsUnit;
 import zzw.content.units.entities.EndGroundUnit;
 import zzw.content.units.entities.SegmentUnitEntity;
 import zzw.content.units.entities.SegmentWormEntity;
 import zzw.content.units.entities.SlowLightningEntity;
+import zzw.content.units.rotor.Rotor;
+import zzw.content.units.types.CopterUnitType;
 import zzw.content.units.weapons.EnergyChargeWeapon;
 import zzw.content.units.weapons.SweepWeapon;
 
@@ -89,7 +92,7 @@ public class Z_Units {
         aphelion,              // T7 Flying (加速激光+闪电炮弹)
         sedec,                 // T6 Payload (力场+修复+治疗锥)
         trigintaduo,           // T7 Payload (治疗锥+核弹)
-        // —— PU_V8 mantodea 直升机系列 (T1-T6, 简化为普通飞行单位, 无旋翼) ——
+        // —— PU_V8 mantodea 直升机系列 (T1-T6, 带旋翼动画) ——
         caelifera,             // T1 直升机 (机枪+导弹)
         schistocerca,          // T2 直升机 (双机枪+燃烧弹)
         anthophila,            // T3 直升机 (机枪+闪电)
@@ -111,6 +114,8 @@ public class Z_Units {
         ZEntityRegister.register(SegmentUnitEntity.class, SegmentUnitEntity::new);
         // ★ 注册 EndGroundUnit (End 阵营腿单位防作弊类, extends LegsUnit)
         ZEntityRegister.register(EndGroundUnit.class, EndGroundUnit::new);
+        // ★ 注册 CopterUnitEntity (直升机单位, extends UnitEntity, 带旋翼渲染)
+        ZEntityRegister.register(CopterUnitEntity.class, CopterUnitEntity::create);
         // ★ 注册 SlowLightningEntity (慢闪电 Entity, 实现 Drawc 接口)
         SlowLightningEntity.register();
 
@@ -3438,7 +3443,7 @@ public class Z_Units {
         // ═══════════════════════════════════════════════════════════
 
         // ===== caelifera (T1, 机枪+导弹) =====
-        caelifera = new UnitType("caelifera") {{
+        caelifera = new CopterUnitType("caelifera") {{
             speed = 5f;
             drag = 0.08f;
             accel = 0.04f;
@@ -3448,7 +3453,7 @@ public class Z_Units {
             hitSize = 12f;
             range = 140f;
             outlineColor = Color.valueOf("2e3142");
-            constructor = mindustry.gen.UnitEntity::create;
+            constructor = CopterUnitEntity::create;
 
             weapons.add(new Weapon("create-caelifera-gun") {{
                 top = false;
@@ -3479,10 +3484,15 @@ public class Z_Units {
                     drag = -0.01f;
                 }};
             }});
+
+            rotors.add(new Rotor(name + "-rotor"){{
+                x = 0f;
+                y = 6f;
+            }});
         }};
 
         // ===== schistocerca (T2, 双机枪+燃烧弹) =====
-        schistocerca = new UnitType("schistocerca") {{
+        schistocerca = new CopterUnitType("schistocerca") {{
             speed = 4.5f;
             drag = 0.07f;
             accel = 0.03f;
@@ -3493,7 +3503,7 @@ public class Z_Units {
             range = 165f;
             rotateSpeed = 4.6f;
             outlineColor = Color.valueOf("2e3142");
-            constructor = mindustry.gen.UnitEntity::create;
+            constructor = CopterUnitEntity::create;
 
             weapons.add(new Weapon("create-schistocerca-gun") {{
                 top = false;
@@ -3542,10 +3552,22 @@ public class Z_Units {
                     statusDuration = 60f;
                 }};
             }});
+
+            for(int i : arc.math.Mathf.signs){
+                rotors.add(new Rotor(name + "-rotor"){{
+                    x = 0f;
+                    y = 6.5f;
+                    bladeCount = 3;
+                    ghostAlpha = 0.4f;
+                    shadowAlpha = 0.2f;
+                    shadeSpeed = 3f * i;
+                    speed = 29f * i;
+                }});
+            }
         }};
 
         // ===== anthophila (T3, 机枪+闪电) =====
-        anthophila = new UnitType("anthophila") {{
+        anthophila = new CopterUnitType("anthophila") {{
             speed = 4f;
             drag = 0.07f;
             accel = 0.03f;
@@ -3556,7 +3578,7 @@ public class Z_Units {
             range = 165f;
             rotateSpeed = 3.8f;
             outlineColor = Color.valueOf("2e3142");
-            constructor = mindustry.gen.UnitEntity::create;
+            constructor = CopterUnitEntity::create;
 
             weapons.add(new Weapon("create-anthophila-gun") {{
                 x = 4.25f;
@@ -3586,10 +3608,29 @@ public class Z_Units {
                     lightningColor = mindustry.graphics.Pal.surge;
                 }};
             }});
+
+            for(int i : arc.math.Mathf.signs){
+                rotors.add(new Rotor(name + "-rotor2"){{
+                    x = 0f;
+                    y = -13f;
+                    bladeCount = 2;
+                    ghostAlpha = 0.4f;
+                    shadowAlpha = 0.2f;
+                    shadeSpeed = 3f * i;
+                    speed = 29f * i;
+                }});
+            }
+
+            rotors.add(new Rotor(name + "-rotor1"){{
+                mirror = true;
+                x = 13f;
+                y = 3f;
+                bladeCount = 3;
+            }});
         }};
 
         // ===== vespula (T4, 大机枪+钍弹+激光) =====
-        vespula = new UnitType("vespula") {{
+        vespula = new CopterUnitType("vespula") {{
             speed = 3.5f;
             drag = 0.07f;
             accel = 0.03f;
@@ -3600,7 +3641,7 @@ public class Z_Units {
             range = 200f;
             rotateSpeed = 3f;
             outlineColor = Color.valueOf("2e3142");
-            constructor = mindustry.gen.UnitEntity::create;
+            constructor = CopterUnitEntity::create;
 
             weapons.add(new Weapon("create-vespula-gun-big") {{
                 x = 10f;
@@ -3655,10 +3696,22 @@ public class Z_Units {
                     hitColor = mindustry.graphics.Pal.surge;
                 }};
             }});
+
+            for(int i : arc.math.Mathf.signs){
+                rotors.add(new Rotor(name + "-rotor"){{
+                    mirror = true;
+                    x = 15f;
+                    y = 6.75f;
+                    speed = 29f * i;
+                    ghostAlpha = 0.4f;
+                    shadowAlpha = 0.2f;
+                    shadeSpeed = 3f * i;
+                }});
+            }
         }};
 
         // ===== lepidoptera (T5, 机枪+导弹+榴弹) =====
-        lepidoptera = new UnitType("lepidoptera") {{
+        lepidoptera = new CopterUnitType("lepidoptera") {{
             speed = 3f;
             drag = 0.07f;
             accel = 0.03f;
@@ -3669,7 +3722,7 @@ public class Z_Units {
             range = 220f;
             rotateSpeed = 2.5f;
             outlineColor = Color.valueOf("2e3142");
-            constructor = mindustry.gen.UnitEntity::create;
+            constructor = CopterUnitEntity::create;
 
             weapons.add(new Weapon("create-lepidoptera-gun") {{
                 x = 8f;
@@ -3723,10 +3776,32 @@ public class Z_Units {
                     hitColor = mindustry.graphics.Pal.bulletYellow;
                 }};
             }});
+
+            for(int i : arc.math.Mathf.signs){
+                rotors.add(new Rotor(name + "-rotor1"){{
+                    mirror = true;
+                    x = 22.5f;
+                    y = 21.25f;
+                    bladeCount = 3;
+                    speed = 19f * i;
+                    ghostAlpha = 0.4f;
+                    shadowAlpha = 0.2f;
+                    shadeSpeed = 3f * i;
+                }}, new Rotor(name + "-rotor2"){{
+                    mirror = true;
+                    x = 17.25f;
+                    y = 1f;
+                    bladeCount = 2;
+                    speed = 23f * i;
+                    ghostAlpha = 0.4f;
+                    shadowAlpha = 0.2f;
+                    shadeSpeed = 4f * i;
+                }});
+            }
         }};
 
         // ===== mantodea (T6, 双联防空炮) =====
-        mantodea = new UnitType("mantodea") {{
+        mantodea = new CopterUnitType("mantodea") {{
             speed = 5f;
             drag = 0.07f;
             accel = 0.03f;
@@ -3737,7 +3812,7 @@ public class Z_Units {
             range = 260f;
             rotateSpeed = 2f;
             outlineColor = Color.valueOf("2e3142");
-            constructor = mindustry.gen.UnitEntity::create;
+            constructor = CopterUnitEntity::create;
 
             weapons.add(new Weapon("create-mantodea-flak") {{
                 x = 14f;
@@ -3779,6 +3854,34 @@ public class Z_Units {
                     collidesAir = true;
                     collidesGround = false;
                 }};
+            }});
+
+            for(int i : arc.math.Mathf.signs){
+                rotors.add(new Rotor(name + "-rotor2"){{
+                    y = -31.25f;
+                    bladeCount = 4;
+                    speed = 19f * i;
+                    ghostAlpha = 0.4f;
+                    shadowAlpha = 0.2f;
+                    shadeSpeed = 4f * i;
+                }}, new Rotor(name + "-rotor3"){{
+                    mirror = true;
+                    x = 28.5f;
+                    y = -11.75f;
+                    bladeCount = 3;
+                    speed = 23f * i;
+                    ghostAlpha = 0.4f;
+                    shadowAlpha = 0.2f;
+                    shadeSpeed = 3f * i;
+                }});
+            }
+
+            rotors.add(new Rotor(name + "-rotor1"){{
+                y = 9.25f;
+                bladeCount = 3;
+                speed = 29f;
+                shadeSpeed = 5f;
+                bladeFade = 0.8f;
             }});
         }};
 

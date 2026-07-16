@@ -56,8 +56,8 @@ public class Z_Blocks {
         createDefenseBlocks();
         createConveyors();
         createDecorativeBlocks();
-        createPUWalls();
         createPUFloors();
+        createPUWalls();
         registerEventListeners();
     }
 
