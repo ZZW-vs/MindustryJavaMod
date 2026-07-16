@@ -11,7 +11,6 @@ import mindustry.game.Team;
 import mindustry.gen.Bullet;
 import mindustry.graphics.Layer;
 import mindustry.content.Fx;
-import mindustry.entities.Effect;
 import mindustry.world.Tile;
 import mindustry.world.blocks.distribution.Conveyor;
 import mindustry.world.blocks.distribution.Conveyor.ConveyorBuild;

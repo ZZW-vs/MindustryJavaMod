@@ -1,6 +1,5 @@
 package zzw.content.exp;
 
-import arc.graphics.g2d.TextureRegion;
 import mindustry.gen.Building;
 import mindustry.world.Block;
 

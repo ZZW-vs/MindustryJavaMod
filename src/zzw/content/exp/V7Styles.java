@@ -6,9 +6,6 @@ import arc.scene.ui.TextButton;
 import mindustry.ui.Fonts;
 import mindustry.ui.Styles;
 
-import static mindustry.gen.Tex.flatDownBase;
-import static mindustry.gen.Tex.pane;
-
 /**
  * PU_V8 V7Styles (移植, UI按钮样式)
  * 参考: PU_V8 main/src/unity/v8/V7Styles.java

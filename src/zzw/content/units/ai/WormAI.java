@@ -1,12 +1,9 @@
 package zzw.content.units.ai;
 
-import arc.math.*;
 import arc.math.geom.*;
 import arc.util.*;
 import mindustry.*;
 import mindustry.ai.types.*;
-import mindustry.gen.*;
-import mindustry.world.meta.*;
 
 /**
  * 虫子单位专用 AI (完全复刻 PU132 WormAI, 继承 FlyingAI)
