@@ -169,6 +169,9 @@ public class TentacleAbility extends Ability {
             // ===== 第二遍: 根部→末端, 位置约束 + 角度限制 =====
             for (int s = 0; s < segs.length; s++) {
                 TentacleSeg seg = segs[s];
+                // ★ attacking 时末端段保留 updateMovement 设置的 rotation (面向目标),
+                // 不被 clampedAngle 覆盖, 否则末端会朝向单位后方
+                boolean skipRotOverride = attacking[t] && s == segs.length - 1;
                 if (s == 0) {
                     // 根段: 约束到 unit
                     float parentAng = unit.rotation + rotationOffset * sideSign + 180f;
@@ -180,7 +183,10 @@ public class TentacleAbility extends Ability {
                     TentacleSeg prev = segs[s - 1];
                     float childAng = prev.rotation;
                     float ang = prev.angleToSeg(seg);
-                    seg.rotation = clampedAngle(ang, childAng, angleLimit);
+                    if (!skipRotOverride) {
+                        seg.rotation = clampedAngle(ang, childAng, angleLimit);
+                    }
+                    // 即使保留rotation, 仍需基于prev重新计算位置, 保持段间距正确
                     tv.trns(seg.rotation, segmentLength).add(prev.x, prev.y);
                 }
                 seg.x = tv.x;

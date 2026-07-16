@@ -11,6 +11,7 @@ import zzw.content.Z_Items;
 import zzw.content.Z_Factory;
 import zzw.content.Z_Mine;
 import zzw.content.Z_Sounds;
+import zzw.content.exp.Z_Exp;
 import zzw.content.mechanics.Z_Mechanics;
 import zzw.content.units.Z_Units;
 
@@ -44,6 +45,9 @@ public class TestMod extends Mod{
 
         // 加载自定义方块（可能需要物品和工厂）
         Z_Blocks.load();
+
+        // 加载经验系统（需要物品）
+        Z_Exp.load();
 
         // 加载自定义单位 (需要物品, 方块, 用于工厂配方)
         Z_Units.load();
