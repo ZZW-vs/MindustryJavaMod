@@ -70,18 +70,8 @@ public class CopterUnitType extends UnitType {
 
     @Override
     public Unit create(Team team) {
-        Unit unit = super.create(team);
-        // 初始化旋翼挂载 (PU_V8 CopterComp.add L29-39)
-        if (unit instanceof CopterUnitEntity copter) {
-            copter.rotors = new RotorMount[rotors.size];
-            for (int i = 0; i < copter.rotors.length; i++) {
-                Rotor rotor = rotors.get(i);
-                copter.rotors[i] = new RotorMount(rotor);
-                copter.rotors[i].rotorRot = rotor.rotOffset;
-                copter.rotors[i].rotorShadeRot = rotor.rotOffset;
-            }
-        }
-        return unit;
+        // rotors 在 CopterUnitEntity.add() 中初始化, 无需在此重复
+        return super.create(team);
     }
 
     @Override
