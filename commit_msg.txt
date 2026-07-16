@@ -1,0 +1,14 @@
+移植fin/blue单位及PU液体/墙体汉化/cherub/malakhim/seraphim/TriJointLeg
+
+- fin: 鳍级战列舰(海军), 导弹+迫击炮(MortarWeapon)
+- blue: 蓝鲸级旗舰(海军), 主炮+导弹井(GuidedMissileWeapon)+点防(PointDefenceMultiBarrelWeapon)+电磁炮
+- 新增 GuidedMissileBulletType/GuidedMissileWeapon (制导导弹系统)
+- 新增 MortarWeapon/MortarBulletType (迫击炮倾角动画)
+- 新增 PointDefenceMultiBarrelWeapon/AntiBulletFlakBulletType (反导点防)
+- 新增 Z_Liquids (PU lava液体)
+- 新增 TriJointLeg/TriJointInverseKinematics/TriJointLegsAbility (三节腿系统, exowalker)
+- 新增 NewHealerAI (cherub/malakhim/seraphim治疗机AI)
+- 墙体汉化及贴图回退(shielded-wall-large/fractal-laser-turret)
+- 修复AI controller字段错误(19处改为aiController)
+- 修复cygnus炮台对称性/aphelion子弹紫色等视觉问题
+- v158兼容性修复: Sounds.artillery改shootArtillery, Boolf路径, UnitSpawnAbility路径, handleBullet方法签名, fragCone改fragRandomSpread等

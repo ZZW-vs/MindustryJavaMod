@@ -9,6 +9,7 @@ import mindustry.ui.dialogs.BaseDialog;
 import zzw.content.blocks.Z_Blocks;
 import zzw.content.Z_Items;
 import zzw.content.Z_Factory;
+import zzw.content.Z_Liquids;
 import zzw.content.Z_Mine;
 import zzw.content.Z_Sounds;
 import zzw.content.exp.Z_Exp;
@@ -33,6 +34,9 @@ public class TestMod extends Mod{
 
         // 加载自定义物品（基础资源）
         Z_Items.load();
+
+        // 加载自定义液体（需要物品之前或并行）
+        Z_Liquids.load();
 
         // 加载矿物（需要物品）
         Z_Mine.load();

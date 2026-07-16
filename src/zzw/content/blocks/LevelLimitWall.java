@@ -56,6 +56,11 @@ public class LevelLimitWall extends ExpLimitWall {
     @Override
     public void load() {
         super.load();
+        // 大型变体贴图不存在时回退到基础贴图 (如 shielded-wall-large 缺失时用 shielded-wall)
+        if (!region.found()) {
+            String baseName = name.replace("-large", "");
+            region = atlas.find(baseName);
+        }
         edgeRegion = atlas.find(name + "-under");
         edgeMaxRegion = atlas.find(name + "-under-max", name + "-under");
         int n = 1;

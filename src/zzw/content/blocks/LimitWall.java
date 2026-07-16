@@ -1,12 +1,17 @@
 package zzw.content.blocks;
 
+import arc.Core;
 import arc.util.Time;
 import mindustry.world.blocks.defense.Wall;
+import mindustry.world.meta.Stat;
+
+import static arc.Core.bundle;
 
 /**
  * LimitWall (移植自 PU_V8 unity.world.blocks.defense.LimitWall)
  * - maxDamage: 单次伤害上限, 超过会被截断
  * - blinkFrame: 闪烁帧免伤 (每隔 blinkFrame 帧完全免伤一次)
+ * - setStats: 在方块信息UI中显示 maxDamage 和 blinkFrame 属性
  */
 public class LimitWall extends Wall {
     /** 单次受到伤害的最大值, 超过会被截断 (0=不限制) */
@@ -18,6 +23,13 @@ public class LimitWall extends Wall {
 
     public LimitWall(String name) {
         super(name);
+    }
+
+    @Override
+    public void setStats() {
+        super.setStats();
+        if (maxDamage > 0f) stats.add(Stat.abilities, "@", bundle.format("stat.unity.maxdamage", maxDamage));
+        if (blinkFrame > 0f) stats.add(Stat.abilities, "@", bundle.format("stat.unity.blinkframe", blinkFrame));
     }
 
     public class LimitWallBuild extends WallBuild {

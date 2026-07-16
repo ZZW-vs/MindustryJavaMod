@@ -1,0 +1,42 @@
+package zzw.content.units.bullets;
+
+import arc.math.Interp;
+import arc.math.Mathf;
+import arc.math.geom.Rect;
+import arc.util.Tmp;
+import mindustry.entities.bullet.FlakBulletType;
+import mindustry.gen.Bullet;
+import mindustry.gen.Groups;
+
+/**
+ * 反导高射炮子弹 (移植自 PU_V8 unity.entities.bullet.physical.AntiBulletFlakBulletType)
+ * - 命中时减速范围内敌方子弹并减少其伤害
+ * - 伤害归零时移除子弹
+ */
+public class AntiBulletFlakBulletType extends FlakBulletType {
+    public float bulletDamage = 5f;
+    public float bulletSlowDownScl = 0.5f;
+    public float bulletRadius = 40f;
+    public Interp interp = Interp.pow3;
+
+    public AntiBulletFlakBulletType(float speed, float damage) {
+        super(speed, damage);
+        collidesGround = true;
+        despawnHit = true;
+        shrinkY = 0.2f;
+    }
+
+    @Override
+    public void hit(Bullet b, float x, float y) {
+        super.hit(b, x, y);
+        Rect r1 = Tmp.r1.setSize(bulletRadius * 2f).setCenter(b.x, b.y);
+        Groups.bullet.intersect(r1.x, r1.y, r1.width, r1.height, bl -> {
+            if (b.team != bl.team && bl.type.hittable && b.within(bl, bulletRadius)) {
+                float in = interp.apply(Mathf.clamp((bulletRadius - b.dst(bl)) / bulletRadius));
+                bl.vel.scl(Mathf.lerp(1f, bulletSlowDownScl, in));
+                bl.damage -= bulletDamage * in;
+                if (bl.damage <= 0f) bl.remove();
+            }
+        });
+    }
+}

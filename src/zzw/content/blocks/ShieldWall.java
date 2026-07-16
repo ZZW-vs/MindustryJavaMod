@@ -80,7 +80,13 @@ public class ShieldWall extends LevelLimitWall {
     @Override
     public void load() {
         super.load();
-        topRegion = atlas.find(name + "-top");
+        // 大型盾墙贴图不存在时回退到普通盾墙贴图
+        TextureRegion baseTop = atlas.find(name + "-top");
+        if (!baseTop.found()) {
+            topRegion = atlas.find("create-shielded-wall-top");
+        } else {
+            topRegion = baseTop;
+        }
     }
 
     @Override
