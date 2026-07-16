@@ -444,8 +444,8 @@ public class Z_Units {
             wobble = false;
 
             // ===== 段身武器: plagueMissile (PU132 第3329-3345行) =====
-            // 双武器交替发射瘟疫导弹
-            weapons.add(new Weapon("create-catenapede-segment-missile") {{
+            // 双武器交替发射瘟疫导弹 (PU132 用 unity-small-plague-launcher 共享贴图)
+            weapons.add(new Weapon("create-small-plague-launcher") {{
                 y = -8f;
                 x = 14.75f;
                 rotate = true;
@@ -462,7 +462,7 @@ public class Z_Units {
                     despawnEffect = mindustry.content.Fx.blastExplosion;
                 }};
             }});
-            weapons.add(new Weapon("create-catenapede-segment-missile-2") {{
+            weapons.add(new Weapon("create-small-plague-launcher") {{
                 y = -12.5f;
                 x = 7.25f;
                 rotate = true;
@@ -507,7 +507,8 @@ public class Z_Units {
 
             // ===== 头部武器: PointDrainLaser (PU132 第3309-3327行) =====
             // 吸血激光: 持续发射, 吸血 0.5%, 最大长度 160, 击退 -34 (拉向自己)
-            weapons.add(new Weapon("create-catenapede-drain-laser") {{
+            // PU132 用 unity-drain-laser 共享 drain-laser.png
+            weapons.add(new Weapon("create-drain-laser") {{
                 y = -9f;
                 x = 14f;
                 shootY = 6.75f;
@@ -552,7 +553,8 @@ public class Z_Units {
         // End 阵营超级虫子, 60段, 全免疫, 头部激光+段身多种武器
 
         // ★ Devourer 段身 ★
-        devourerSegment = new UnitType("devourer-segment") {{
+        // ★ 单位名必须用 "devourer-of-eldrich-gods-segment" 与 PU132 原版贴图文件名匹配
+        devourerSegment = new UnitType("devourer-of-eldrich-gods-segment") {{
             health = 2500000f;  // ★ 提高段身血量 (头部1250000×2), 避免段身太脆
             speed = 0f;
             hitSize = 52f;  // 原 40f + 12 (用户要求加大12)
@@ -568,8 +570,8 @@ public class Z_Units {
             physics = false;
             hittable = true;
 
-            // 段身武器1: 导弹发射器 (PU132 unity-doeg-launcher, 8连发)
-            weapons.add(new Weapon("create-devourer-segment-missile") {{
+            // 段身武器1: 导弹发射器 (PU132 unity-doeg-launcher, 8连发, 共享 doeg-launcher.png)
+            weapons.add(new Weapon("create-doeg-launcher") {{
                 x = 19f;
                 y = 0f;
                 shootY = 8f;
@@ -599,8 +601,8 @@ public class Z_Units {
                 }};
             }});
 
-            // 段身武器2: 毁灭者 (PU132 unity-doeg-destroyer, 6连发)
-            weapons.add(new Weapon("create-devourer-segment-destroyer") {{
+            // 段身武器2: 毁灭者 (PU132 unity-doeg-destroyer, 6连发, 共享 doeg-destroyer.png)
+            weapons.add(new Weapon("create-doeg-destroyer") {{
                 mirror = true;
                 ignoreRotation = true;
                 rotate = true;
@@ -624,8 +626,8 @@ public class Z_Units {
                 }};
             }});
 
-            // 段身武器3: 小型激光 (PU132 unity-doeg-small-laser)
-            weapons.add(new Weapon("create-devourer-segment-small-laser") {{
+            // 段身武器3: 小型激光 (PU132 unity-doeg-small-laser, 共享 doeg-small-laser.png)
+            weapons.add(new Weapon("create-doeg-small-laser") {{
                 mirror = true;
                 alternate = false;
                 rotate = true;
@@ -647,7 +649,8 @@ public class Z_Units {
         }};
 
         // ★ Devourer 头部 ★
-        devourer = new UnitType("devourer") {{
+        // ★ 单位名必须用 "devourer-of-eldrich-gods" 与 PU132 原版贴图文件名匹配
+        devourer = new UnitType("devourer-of-eldrich-gods") {{
             health = 1250000f;  // PU132 原版
             flying = true;
             speed = 5f;
@@ -708,8 +711,8 @@ public class Z_Units {
                 }};
             }});
 
-            // 头部武器2: 毁灭者 (PU132 EndBasicBulletType, 6连发)
-            weapons.add(new Weapon("create-devourer-destroyer") {{
+            // 头部武器2: 毁灭者 (PU132 unity-doeg-destroyer, 6连发, 共享 doeg-destroyer.png)
+            weapons.add(new Weapon("create-doeg-destroyer") {{
                 x = 19.25f;
                 y = -22.75f;
                 shootY = 12f;
@@ -800,8 +803,8 @@ public class Z_Units {
             // —— 段身武器组1: soul-destroyer + destroyer-2 ——
             // soul-destroyer: 轨道穿透激光 (PU132 EndRailBulletType, 完整移植)
             // PU132 第4129-4162行: damage=15000, length=850, pierceDamageFactor=0.001
-            // ★ 贴图名称是 oppression-soul-destroyer.png, 不带 create- 前缀
-            weapons.add(new Weapon("oppression-soul-destroyer") {{
+            // ★ Weapon name 需带 create- 前缀匹配 atlas key (文件名 oppression-soul-destroyer.png → atlas key create-oppression-soul-destroyer)
+            weapons.add(new Weapon("create-oppression-soul-destroyer") {{
                 mirror = false;
                 x = 0f;
                 y = 72f;
@@ -829,7 +832,7 @@ public class Z_Units {
 
             // destroyer-2: 连续激光 (PU132 EndContinuousLaserBulletType, 550伤害)
             // PU132 第4163-4191行: damage=550, length=370, strokes*0.7
-            weapons.add(new Weapon("oppression-destroyer-2") {{
+            weapons.add(new Weapon("create-oppression-destroyer-2") {{
                 x = 98f;
                 y = -26.25f;
                 shootY = 22f;
@@ -859,7 +862,7 @@ public class Z_Units {
             // —— 段身武器组2: oppressor + destroyer-3 ——
             // oppressor: 扫射激光 (PU132 SweepWeapon + EndSweepLaser, 完整移植)
             // PU132 第4194-4224行: damage=7000, length=850, width=25, lifetime=130
-            weapons.add(new SweepWeapon("oppression-oppressor") {{
+            weapons.add(new SweepWeapon("create-oppression-oppressor") {{
                 mirror = false;
                 x = 0f;
                 y = 72f;
@@ -935,7 +938,7 @@ public class Z_Units {
             // —— 段身武器组3: void + destroyer-4 ——
             // void: 虚空门户 (PU132 VoidPortalBulletType, 完整移植触手+区域伤害)
             // PU132 第4249-4270行: damage=1300, length=800, bleedDuration=180
-            weapons.add(new Weapon("oppression-void") {{
+            weapons.add(new Weapon("create-oppression-void") {{
                 mirror = false;
                 x = 0f;
                 y = 72f;
@@ -963,7 +966,7 @@ public class Z_Units {
             // destroyer-4: 快闪电 (PU132 SlowLightningBulletType 移植, 高伤害短持续)
             // PU132 第4272-4289行: damage=120, 5发, inaccuracy=15, range=870
             // ★ 快闪电优化: 伤害×6.67, 持续时间大幅缩短, 节点间距增大, 分裂减少
-            weapons.add(new Weapon("oppression-destroyer-4") {{
+            weapons.add(new Weapon("create-oppression-destroyer-4") {{
                 x = 98f;
                 y = -26.25f;
                 shootY = 17.5f;
@@ -1076,7 +1079,7 @@ public class Z_Units {
             // PU132 原版: EnergyChargeWeapon with shots=3, shotDelay=6f, reload=120f, drawCharge=黑色发光圆+尖刺
             // 简化版 EnergyChargeWeapon: shoot/update 走 v158 原生 Weapon, 只重写 draw() 补 drawCharge 蓄力视觉
             // PU132 有 6 个此武器分列身体两侧, 这里简化为 1 个 (mirror=false 单边)
-            weapons.add(new EnergyChargeWeapon("create-oppression-void-fracture") {{
+            weapons.add(new EnergyChargeWeapon("create-oppression-void") {{
                 x = 85f;
                 y = -50f;
                 shadow = 47f;
@@ -3195,7 +3198,7 @@ public class Z_Units {
             }});
 
             // 武器3: 磁轨炮 (SlowRailBulletType → RailBulletType)
-            weapons.add(new Weapon("create-theraphosidae-cannon") {{
+            weapons.add(new Weapon("create-theraphosidae-railgun") {{
                 mirror = false;
                 x = 0f;
                 y = -18f;
@@ -3747,7 +3750,7 @@ public class Z_Units {
                 }};
             }});
 
-            weapons.add(new Weapon("create-vespula-mount") {{
+            weapons.add(new Weapon("create-vespula-gun") {{
                 x = 8f;
                 y = -4f;
                 shootY = 5f;
@@ -3765,7 +3768,7 @@ public class Z_Units {
                 }};
             }});
 
-            weapons.add(new Weapon("create-vespula-laser") {{
+            weapons.add(new Weapon("create-vespula-laser-gun") {{
                 x = 6f;
                 y = -10f;
                 shootY = 4f;
@@ -3903,7 +3906,7 @@ public class Z_Units {
             outlineColor = Color.valueOf("2e3142");
             constructor = CopterUnitEntity::create;
 
-            weapons.add(new Weapon("create-mantodea-flak") {{
+            weapons.add(new Weapon("create-mantodea-gun") {{
                 x = 14f;
                 y = 6f;
                 shootY = 8f;
@@ -3924,7 +3927,7 @@ public class Z_Units {
                 }};
             }});
 
-            weapons.add(new Weapon("create-mantodea-flak") {{
+            weapons.add(new Weapon("create-mantodea-gun") {{
                 x = 10f;
                 y = -10f;
                 shootY = 8f;
@@ -4073,7 +4076,7 @@ public class Z_Units {
             range = 250f;
 
             // 武器1: 双侧EMP发射器
-            weapons.add(new Weapon("create-emission-launcher") {{
+            weapons.add(new Weapon("create-emp-launcher") {{
                 rotate = true;
                 mirror = true;
                 x = 11.75f;
@@ -4137,7 +4140,7 @@ public class Z_Units {
             range = 280f;
 
             // 4个小EMP炮台 (CloneableSetWeapon → vanilla Weapon)
-            weapons.add(new Weapon("create-waveform-small-mount") {{
+            weapons.add(new Weapon("create-emp-small-mount") {{
                 x = 15.75f;
                 y = 4f;
                 shootY = 3f;
@@ -4162,7 +4165,7 @@ public class Z_Units {
                 }};
             }});
 
-            weapons.add(new Weapon("create-waveform-small-mount") {{
+            weapons.add(new Weapon("create-emp-small-mount") {{
                 x = 15.75f;
                 y = -15.25f;
                 shootY = 3f;
@@ -4189,7 +4192,7 @@ public class Z_Units {
             }});
 
             // 大型EMP发射器
-            weapons.add(new Weapon("create-waveform-launcher") {{
+            weapons.add(new Weapon("create-emp-launcher") {{
                 x = 10f;
                 y = -8.5f;
                 reload = 4f * 60f;
@@ -4232,7 +4235,7 @@ public class Z_Units {
 
             // 10个小EMP炮台 (CloneableSetWeapon → vanilla Weapon, 手动展开)
             // 前2座
-            weapons.add(new Weapon("create-ultraviolet-mount") {{
+            weapons.add(new Weapon("create-emp-small-launcher") {{
                 x = 13.25f; y = 20.25f;
                 shootY = 3f;
                 reload = 30f;
@@ -4257,7 +4260,7 @@ public class Z_Units {
             }});
 
             // 中4座
-            weapons.add(new Weapon("create-ultraviolet-mount") {{
+            weapons.add(new Weapon("create-emp-small-launcher") {{
                 x = 19.75f; y = 12f;
                 shootY = 3f;
                 reload = 30f;
@@ -4281,7 +4284,7 @@ public class Z_Units {
                 }};
             }});
 
-            weapons.add(new Weapon("create-ultraviolet-mount") {{
+            weapons.add(new Weapon("create-emp-small-launcher") {{
                 x = 25.25f; y = 0f;
                 shootY = 3f;
                 reload = 30f;
@@ -4306,7 +4309,7 @@ public class Z_Units {
             }});
 
             // 后4座
-            weapons.add(new Weapon("create-ultraviolet-mount") {{
+            weapons.add(new Weapon("create-emp-small-launcher") {{
                 x = 22.75f; y = -12f;
                 shootY = 3f;
                 reload = 30f;
@@ -4331,7 +4334,7 @@ public class Z_Units {
                 }};
             }});
 
-            weapons.add(new Weapon("create-ultraviolet-mount") {{
+            weapons.add(new Weapon("create-emp-small-launcher") {{
                 x = 16f; y = -19.5f;
                 shootY = 3f;
                 reload = 30f;
@@ -4357,7 +4360,7 @@ public class Z_Units {
             }});
 
             // 大型EMP发射器
-            weapons.add(new Weapon("create-ultraviolet-large-launcher") {{
+            weapons.add(new Weapon("create-emp-large-launcher") {{
                 x = 0f;
                 y = -15f;
                 reload = 5f * 60f;

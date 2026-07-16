@@ -105,59 +105,44 @@ public class TentacleAbility extends Ability {
             Position rootPos = getRootPos(unit, sideSign);
             TentacleSeg end = segs[segs.length - 1];
 
-            // ===== 武器逻辑 (确定 attacking 状态 + 目标 + 射击) =====
-            attacking[t] = updateWeapon(unit, t, segs, sideSign, rootPos);
-
-            // swayScl 平滑过渡
+            // ===== PU_V8 NewTentacle.update() 流程 =====
+            // 1. swayScl 过渡 + updateMovement (如果 attacking, 用上一帧的 attacking 状态)
             if (!attacking[t]) {
                 swayScls[t] = Mathf.lerpDelta(swayScls[t], 1f, 0.04f);
             } else {
                 swayScls[t] = Mathf.lerpDelta(swayScls[t], 0f, 0.04f);
-            }
-
-            // ===== 末端追踪 (attacking 时主动移动末端) =====
-            if (attacking[t]) {
                 updateMovement(t, segs, sideSign, rootPos);
             }
 
-            // ===== 第一遍: 末端→根部, 速度积分 + drag + 摆动 + child 同步 =====
+            // 2. 第一遍: 末端→根部, 速度积分 + drag + 摆动 + child 同步
+            //    所有段都积分速度 (无特殊处理, 与 PU_V8 一致)
             for (int s = segs.length - 1; s >= 0; s--) {
                 TentacleSeg seg = segs[s];
                 seg.updateLastPosition();
 
-                // ★ attacking 时末端段(s=last)不积分速度, 因为 updateMovement 已设置位置
-                // 只对非末端段或非attacking状态积分速度, 避免末端位置跳变导致抽搐
-                if (!(attacking[t] && s == segs.length - 1)) {
-                    tv.set(seg.vx, seg.vy).limit(speed);
-                    seg.vx = tv.x;
-                    seg.vy = tv.y;
-                    seg.x += seg.vx * Time.delta;
-                    seg.y += seg.vy * Time.delta;
-                }
+                tv.set(seg.vx, seg.vy).limit(speed);
+                seg.vx = tv.x;
+                seg.vy = tv.y;
+                seg.x += seg.vx * Time.delta;
+                seg.y += seg.vy * Time.delta;
 
-                // drag 衰减
                 seg.vx *= 1f - (drag * Time.delta);
                 seg.vy *= 1f - (drag * Time.delta);
 
-                // 摆动
                 if (swayScls[t] >= 0.0001f) {
                     int swayIdx = segs.length - 1 - s;
                     float sin = swayScls[t] * Mathf.sin(Time.time + swayOffset + (swayIdx * swaySegmentOffset), swayScl, swayMag) * Mathf.sign(flipSprite != flip);
                     seg.rotation += sin;
                 }
 
-                // child 同步: 让更靠近根部的段朝向 cur, 位置 = cur 后方端点
                 if (s > 0) {
                     TentacleSeg child = segs[s - 1];
-                    // child 前方端点 (沿 child.rotation+180 走 segmentLength)
                     float cx = Angles.trnsx(child.rotation + 180f, segmentLength) + child.x;
                     float cy = Angles.trnsy(child.rotation + 180f, segmentLength) + child.y;
-                    // cur 后方端点 (沿 cur.rotation+180 走 segmentLength)
                     float sx = Angles.trnsx(seg.rotation + 180f, segmentLength) + seg.x;
                     float sy = Angles.trnsy(seg.rotation + 180f, segmentLength) + seg.y;
 
                     child.rotation = Angles.angle(cx, cy, sx, sy);
-                    // 角度限制: 如果角度差超过 angleLimit, 调整 child.rotation
                     float ang = angleDistSigned(seg.rotation, child.rotation, angleLimit);
                     child.rotation += ang;
 
@@ -166,32 +151,29 @@ public class TentacleAbility extends Ability {
                 }
             }
 
-            // ===== 第二遍: 根部→末端, 位置约束 + 角度限制 =====
+            // 3. 第二遍: 根部→末端, 位置约束 + 角度限制
+            //    所有段都执行 clampedAngle (无 skipRotOverride, 与 PU_V8 一致)
+            //    末端 rotation 受 child 约束, 但位置已由 updateMovement 朝目标移动
             for (int s = 0; s < segs.length; s++) {
                 TentacleSeg seg = segs[s];
-                // ★ attacking 时末端段保留 updateMovement 设置的 rotation (面向目标),
-                // 不被 clampedAngle 覆盖, 否则末端会朝向单位后方
-                boolean skipRotOverride = attacking[t] && s == segs.length - 1;
                 if (s == 0) {
-                    // 根段: 约束到 unit
                     float parentAng = unit.rotation + rotationOffset * sideSign + 180f;
                     float ang = rootPos.angleTo(seg.x, seg.y);
                     seg.rotation = clampedAngle(ang, parentAng, firstSegmentAngleLimit);
                     tv.trns(seg.rotation, segmentLength).add(rootPos.getX(), rootPos.getY());
                 } else {
-                    // 非根段: 约束到前一段
                     TentacleSeg prev = segs[s - 1];
                     float childAng = prev.rotation;
                     float ang = prev.angleToSeg(seg);
-                    if (!skipRotOverride) {
-                        seg.rotation = clampedAngle(ang, childAng, angleLimit);
-                    }
-                    // 即使保留rotation, 仍需基于prev重新计算位置, 保持段间距正确
+                    seg.rotation = clampedAngle(ang, childAng, angleLimit);
                     tv.trns(seg.rotation, segmentLength).add(prev.x, prev.y);
                 }
                 seg.x = tv.x;
                 seg.y = tv.y;
             }
+
+            // 4. updateWeapon (设置下一帧的 attacking 状态)
+            attacking[t] = updateWeapon(unit, t, segs, sideSign, rootPos);
 
             // continuous 模式: 同步子弹位置到末端
             if (continuous && bullets[t] != null) {
@@ -371,7 +353,6 @@ public class TentacleAbility extends Ability {
         if (!inited || tentacles == null) return;
 
         float z = Draw.z();
-        if (top) Draw.z(z + 0.01f);
 
         int count = mirror ? 2 : 1;
         for (int t = 0; t < count; t++) {
@@ -383,11 +364,17 @@ public class TentacleAbility extends Ability {
             float prevX = rootPos.getX(), prevY = rootPos.getY();
             for (int s = 0; s < segs.length; s++) {
                 TentacleSeg seg = segs[s];
+                // ★ PU_V8: if(type.top && cur != root) Draw.z(z + 0.01001f);
+                // 第一节(root, s==0)画在身体下方(默认层级), 其他节画在身体上方
+                if (top && s > 0) {
+                    Draw.z(z + 0.01001f);
+                } else {
+                    Draw.z(z);
+                }
                 TextureRegion reg = (s == segs.length - 1 && tipRegion.found()) ? tipRegion : region;
                 if (reg == null || !reg.found()) continue;
                 unit.type.applyColor(unit);
                 Lines.stroke(reg.height * Draw.scl * Mathf.sign(flipSprite != flip));
-                // ★ 直接连接实际段位置, 无强制长度, 确保节与节紧密相连无空隙
                 Lines.line(reg, prevX, prevY, seg.x, seg.y, false);
                 prevX = seg.x;
                 prevY = seg.y;

@@ -1,28 +1,40 @@
 package zzw.content.blocks;
 
+import arc.util.Time;
 import mindustry.world.blocks.defense.Wall;
 
 /**
- * 简化版 LimitWall (移植自 PU_V8 unity.world.blocks.defense.LimitWall)
- * - 仅保留 maxDamage 特性 (单次伤害上限)
- * - 移除 blinkFrame 闪烁帧 (避免依赖 PU_V8 自定义特效)
- * - 不依赖经验等级系统
+ * LimitWall (移植自 PU_V8 unity.world.blocks.defense.LimitWall)
+ * - maxDamage: 单次伤害上限, 超过会被截断
+ * - blinkFrame: 闪烁帧免伤 (每隔 blinkFrame 帧完全免伤一次)
  */
 public class LimitWall extends Wall {
-    /** 单次受到伤害的最大值, 超过会被截断 (但仍是有效伤害) */
+    /** 单次受到伤害的最大值, 超过会被截断 (0=不限制) */
     public float maxDamage = 0f;
     /** 伤害阈值之上才生效 (避免被低伤害打破 maxDamage 限制) */
     public float over9000 = 90000000f;
+    /** 闪烁帧间隔 (>0 时启用, 每隔此帧数完全免伤一次) */
+    public float blinkFrame = -1f;
 
     public LimitWall(String name) {
         super(name);
     }
 
     public class LimitWallBuild extends WallBuild {
+        protected float blink;
+
         @Override
         public float handleDamage(float amount) {
+            // blinkFrame 闪烁免伤
+            if (blinkFrame > 0f) {
+                if (Time.time - blink >= blinkFrame) {
+                    blink = Time.time;
+                } else {
+                    return 0f;
+                }
+            }
+            // maxDamage 限伤
             if (maxDamage > 0f && amount > maxDamage && amount < over9000) {
-                // 限制单次最大伤害, 但仍是有效伤害
                 return super.handleDamage(Math.min(amount, maxDamage));
             }
             return super.handleDamage(amount);

@@ -11,7 +11,9 @@ import mindustry.world.blocks.environment.OverlayFloor;
 import mindustry.world.blocks.environment.StaticWall;
 import mindustry.world.blocks.distribution.Conveyor;
 import mindustry.world.blocks.distribution.StackConveyor;
+import mindustry.world.meta.Stat;
 import zzw.content.Z_Items;
+import zzw.content.exp.EField;
 
 import arc.Events;
 
@@ -32,10 +34,12 @@ public class Z_Blocks {
     public static Wall stoneWall;
     // dense-wall (致密合金墙, LimitWall maxDamage)
     public static Wall denseWall;
-    // steel-wall (钢墙, LimitWall maxDamage)
+    // steel-wall (钢墙, LevelLimitWall 经验等级墙)
     public static Wall steelWall, steelWallLarge;
-    // dirium-wall (迪里姆合金墙, LimitWall maxDamage)
+    // dirium-wall (迪里姆合金墙, LevelLimitWall 经验等级墙)
     public static Wall diriumWall, diriumWallLarge;
+    // shielded-wall (护盾墙, ShieldWall 护盾+经验)
+    public static Wall shieldedWall, shieldedWallLarge;
     // metaglass-wall (玻璃墙)
     public static Wall metaglassWall, metaglassWallLarge;
     // electrophobic-wall (单极子墙)
@@ -141,30 +145,81 @@ public class Z_Blocks {
             health = 560;
         }};
 
-        // steel-wall: 钢墙 (LimitWall maxDamage=24)
-        steelWall = new LimitWall("steel-wall") {{
+        // steel-wall: 钢墙 (LevelLimitWall 经验等级墙)
+        // PU_V8: maxLevel=6, expFields=[ERational(maxDamage 48→24, axis=-3)]
+        steelWall = new LevelLimitWall("steel-wall") {{
             requirements(Category.defense, ItemStack.with(Z_Items.steel, 6));
             maxDamage = 24f;
             health = 810;
+            maxLevel = 6;
+            expFields = new EField[]{
+                new EField.ERational(v -> maxDamage = v, 48f, 24f, -3f, Stat.abilities, v -> arc.Core.bundle.format("stat.unity.maxdamage", v)).formatAll(false)
+            };
         }};
-        steelWallLarge = new LimitWall("steel-wall-large") {{
+        steelWallLarge = new LevelLimitWall("steel-wall-large") {{
             requirements(Category.defense, ItemStack.with(Z_Items.steel, 24));
             maxDamage = 48f;
             health = 3240;
             size = 2;
+            maxLevel = 12;
+            expFields = new EField[]{
+                new EField.ERational(v -> maxDamage = v, 72f, 24f, -3f, Stat.abilities, v -> arc.Core.bundle.format("stat.unity.maxdamage", v)).formatAll(false)
+            };
         }};
 
-        // dirium-wall: 迪里姆合金墙 (LimitWall maxDamage=76)
-        diriumWall = new LimitWall("dirium-wall") {{
+        // dirium-wall: 迪里姆合金墙 (LevelLimitWall 经验等级墙)
+        // PU_V8: maxLevel=6, blinkFrame=30, expFields=[ERational(maxDamage 152→50, axis=-3), ELinearCap(blinkFrame 10→10, cap=2)]
+        diriumWall = new LevelLimitWall("dirium-wall") {{
             requirements(Category.defense, ItemStack.with(Z_Items.dirium, 6));
             maxDamage = 76f;
+            blinkFrame = 30f;
             health = 760;
+            maxLevel = 6;
+            expFields = new EField[]{
+                new EField.ERational(v -> maxDamage = v, 152f, 50f, -3f, Stat.abilities, v -> arc.Core.bundle.format("stat.unity.maxdamage", v)).formatAll(false),
+                new EField.ELinearCap(v -> blinkFrame = v, 10f, 10f, 2, Stat.abilities, v -> arc.Core.bundle.format("stat.unity.blinkframe", v)).formatAll(false)
+            };
         }};
-        diriumWallLarge = new LimitWall("dirium-wall-large") {{
+        diriumWallLarge = new LevelLimitWall("dirium-wall-large") {{
             requirements(Category.defense, ItemStack.with(Z_Items.dirium, 24));
             maxDamage = 152f;
+            blinkFrame = 30f;
             health = 3040;
             size = 2;
+            maxLevel = 12;
+            expFields = new EField[]{
+                new EField.ERational(v -> maxDamage = v, 304f, 50f, -2f, Stat.abilities, v -> arc.Core.bundle.format("stat.unity.maxdamage", v)).formatAll(false),
+                new EField.ELinearCap(v -> blinkFrame = v, 10f, 5f, 4, Stat.abilities, v -> arc.Core.bundle.format("stat.unity.blinkframe", v)).formatAll(false)
+            };
+        }};
+
+        // shielded-wall: 护盾墙 (ShieldWall 护盾+经验等级)
+        // PU_V8 shieldWall: maxLevel=10, shieldHealth=500, expFields=[ERational(maxDamage 100→25), ELinear(repair 50→10), ELinear(shieldHealth 500→25)]
+        // 贴图: shielded-wall.png + shielded-wall-top.png (PU132/PU_V8 原版)
+        shieldedWall = new ShieldWall("shielded-wall") {{
+            requirements(Category.defense, ItemStack.with(Z_Items.dirium, 8, Z_Items.steel, 6, Items.silicon, 4));
+            health = 500;
+            shieldHealth = 500;
+            maxDamage = 50f;
+            maxLevel = 10;
+            expFields = new EField[]{
+                new EField.ERational(v -> maxDamage = v, 100f, 25f, -3f, Stat.abilities, v -> arc.Core.bundle.format("stat.unity.maxdamage", v)).formatAll(false),
+                new EField.ELinear(v -> repair = v, 50f, 10f, Stat.repairSpeed, v -> arc.Core.bundle.format("stat.unity.repairspeed", v)).formatAll(false),
+                new EField.ELinear(v -> shieldHealth = v, 500, 25, Stat.shieldHealth)
+            };
+        }};
+        shieldedWallLarge = new ShieldWall("shielded-wall-large") {{
+            requirements(Category.defense, ItemStack.with(Z_Items.dirium, 32, Z_Items.steel, 24, Items.silicon, 16));
+            health = 2000;
+            maxDamage = 100f;
+            shieldHealth = 2000;
+            size = 2;
+            maxLevel = 20;
+            expFields = new EField[]{
+                new EField.ERational(v -> maxDamage = v, 200f, 50f, -3f, Stat.abilities, v -> arc.Core.bundle.format("stat.unity.maxdamage", v)).formatAll(false),
+                new EField.ELinear(v -> repair = v, 200f, 20f, Stat.repairSpeed, v -> arc.Core.bundle.format("stat.unity.repairspeed", v)).formatAll(false),
+                new EField.ELinear(v -> shieldHealth = v, 2000, 50, Stat.shieldHealth)
+            };
         }};
 
         // metaglass-wall: 玻璃墙 (简化为 vanilla Wall, 移除光照交互)
@@ -210,8 +265,6 @@ public class Z_Blocks {
             infusedSharpslate.asFloor().wall = this;
             archaicSharpslate.asFloor().wall = this;
         }};
-
-        // shieldWall/shieldWallLarge 跳过: PU_V8 源码无对应贴图, vanilla v158 ShieldWall 需要 glow 贴图
     }
 
     // ===== PU_V8 移植: 地板 (vanilla Floor / OverlayFloor) =====
