@@ -6,7 +6,14 @@ import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Angles;
 import arc.util.Time;
+import mindustry.entities.bullet.ArtilleryBulletType;
+import mindustry.entities.bullet.BulletType;
+import mindustry.entities.bullet.ContinuousLaserBulletType;
 import mindustry.entities.bullet.LaserBulletType;
+import mindustry.entities.bullet.MissileBulletType;
+import mindustry.entities.bullet.ShrapnelBulletType;
+import mindustry.gen.Bullet;
+import mindustry.gen.Building;
 import mindustry.graphics.Pal;
 import mindustry.type.UnitType;
 import mindustry.type.Weapon;
@@ -17,14 +24,24 @@ import zzw.content.units.anticheat.AntiCheatBulletModule;
 import zzw.content.units.anticheat.ArmorDamageModule;
 import zzw.content.units.anticheat.AbilityDamageModule;
 import zzw.content.units.anticheat.ForceFieldDamageModule;
+import zzw.content.units.bullets.AcceleratingLaserBulletType;
+import zzw.content.units.bullets.ArrowBulletType;
+import zzw.content.units.bullets.CygnusBulletType;
 import zzw.content.units.bullets.DesolationBulletType;
 import zzw.content.units.bullets.EndBasicBulletType;
 import zzw.content.units.bullets.EndContinuousLaserBulletType;
+import zzw.content.units.bullets.ContinuousSapLaserBulletType;
 import zzw.content.units.bullets.EndPointBlastLaserBulletType;
 import zzw.content.units.bullets.EndRailBulletType;
 import zzw.content.units.bullets.EndSweepLaser;
+import zzw.content.units.bullets.FlameBulletType;
+import zzw.content.units.bullets.HealingConeBulletType;
+import zzw.content.units.bullets.HealingNukeBulletType;
 import zzw.content.units.bullets.OppressionLaserBulletType;
+import zzw.content.units.bullets.ReflectingLaserBulletType;
+import zzw.content.units.bullets.SagittariusLaserBulletType;
 import zzw.content.units.bullets.SlowLightningBulletType;
+import zzw.content.units.bullets.SlowRailBulletType;
 import zzw.content.units.bullets.TimeStopBulletType;
 import zzw.content.units.bullets.VoidAreaBulletType;
 import zzw.content.units.bullets.VoidFractureBulletType;
@@ -41,7 +58,10 @@ import zzw.content.units.entities.SegmentWormEntity;
 import zzw.content.units.entities.SlowLightningEntity;
 import zzw.content.units.rotor.Rotor;
 import zzw.content.units.types.CopterUnitType;
+import zzw.content.units.weapons.AcceleratingWeapon;
 import zzw.content.units.weapons.EnergyChargeWeapon;
+import zzw.content.units.weapons.LimitedAngleWeapon;
+import zzw.content.units.weapons.MultiBarrelWeapon;
 import zzw.content.units.weapons.SweepWeapon;
 
 /**
@@ -105,6 +125,13 @@ public class Z_Units {
         emission,              // T3 (双EMP发射器)
         waveform,              // T4 (多联EMP+大型EMP)
         ultraviolet;           // T5 (终极EMP, 10座炮台+大型EMP)
+
+    // —— PU_V8 共享子弹 (T6/T7 单位引用, 在 load() 中初始化) ——
+    public static BulletType
+        citadelFlame,           // citadel 火焰喷射
+        sapLaser,               // araneidae 吸血激光
+        continuousSapLaser,     // theraphosidae 持续吸血激光
+        sapArtilleryFrag;       // 磁轨炮子弹的 frag
 
     public static void load() {
         // ★ 关键: 注册自定义 Entity 到 EntityMapping.idMap, 否则 v154.3 的 UnitType.init() 会失败 ★
@@ -2604,16 +2631,73 @@ public class Z_Units {
         }};
 
         // ═══════════════════════════════════════════════════════════
-        //  PU_V8 T6/T7 单位移植 (简化版)
-        //  - 用 vanilla UnitType 替代 UnityUnitType
-        //  - SlowRailBulletType → RailBulletType, EmpBasicBulletType → EmpBulletType
-        //  - AcceleratingLaserBulletType → LaserBulletType, FlameBulletType → ContinuousFlameBulletType
-        //  - ReflectingLaserBulletType/CygnusBulletType → LaserBulletType/EmpBulletType
-        //  - SagittariusLaserBulletType/ArrowBulletType → LaserBulletType/BasicBulletType
-        //  - HealingConeBulletType/HealingNukeBulletType → BasicBulletType(healPercent)
-        //  - LimitedAngleWeapon/MultiBarrelWeapon/AcceleratingWeapon/CloneableSetWeapon → vanilla Weapon
-        //  - 移除 Rotor (旋翼), CopterAI 等自定义组件
+        //  PU_V8 T6/T7 单位移植 (完整版, 使用自定义武器/子弹类)
+        //  - 自定义子弹: SlowRailBulletType/FlameBulletType/CygnusBulletType
+        //                SagittariusLaserBulletType/AcceleratingLaserBulletType
+        //                ReflectingLaserBulletType/HealingConeBulletType
+        //                HealingNukeBulletType/ArrowBulletType
+        //  - 自定义武器: LimitedAngleWeapon/MultiBarrelWeapon/AcceleratingWeapon/EnergyChargeWeapon
+        //  - 共享子弹: citadelFlame/sapLaser/continuousSapLaser/sapArtilleryFrag
+        //  - 移除 PU_V8 自定义 Fx/Sounds/StatusEffects, 用 vanilla 等价替代
         // ═══════════════════════════════════════════════════════════
+
+        // ===== 共享子弹定义 (PU_V8 UnityBullets 移植) =====
+        citadelFlame = new FlameBulletType(4.2f, 50f) {{
+            lifetime = 20f;
+            particleAmount = 17;
+        }};
+
+        sapArtilleryFrag = new ArtilleryBulletType(2.3f, 30) {{
+            hitEffect = mindustry.content.Fx.sapExplosion;
+            knockback = 0.8f;
+            lifetime = 70f;
+            width = height = 20f;
+            collidesTiles = false;
+            splashDamageRadius = 70f;
+            splashDamage = 60f;
+            backColor = Pal.sapBulletBack;
+            frontColor = lightningColor = Pal.sapBullet;
+            lightning = 2;
+            lightningLength = 5;
+            smokeEffect = mindustry.content.Fx.shootBigSmoke2;
+            hitShake = 5f;
+            lightRadius = 30f;
+            lightColor = Pal.sap;
+            lightOpacity = 0.5f;
+            status = mindustry.content.StatusEffects.sapped;
+            statusDuration = 60f * 10;
+        }};
+
+        sapLaser = new LaserBulletType(80f) {{
+            colors = new Color[]{Pal.sapBulletBack.cpy().a(0.4f), Pal.sapBullet, Color.white};
+            length = 150f;
+            width = 25f;
+            sideLength = sideWidth = 0f;
+            shootEffect = mindustry.content.Fx.lancerLaserShoot;
+            hitColor = lightColor = lightningColor = Pal.sapBullet;
+            status = mindustry.content.StatusEffects.sapped;
+            statusDuration = 80f;
+            lightningSpacing = 17f;
+            lightningDelay = 0.12f;
+            lightningDamage = 15f;
+            lightningLength = 4;
+            lightningLengthRand = 2;
+            lightningAngleRand = 15f;
+        }};
+
+        continuousSapLaser = new ContinuousSapLaserBulletType(60f) {{
+            colors = new Color[]{Pal.sapBulletBack.cpy().a(0.3f), Pal.sapBullet.cpy().a(0.6f), Pal.sapBullet, Color.white};
+            length = 190f;
+            width = 5f;
+            shootEffect = mindustry.content.Fx.lancerLaserShoot;
+            hitColor = lightColor = lightningColor = Pal.sapBullet;
+            hitEffect = mindustry.content.Fx.hitBulletSmall;
+            status = mindustry.content.StatusEffects.sapped;
+            statusDuration = 80f;
+            lifetime = 180f;
+            incendChance = 0f;
+            largeHit = false;
+        }};
 
         // ===== citadel (T6 Mech, 磁轨炮+火焰喷射) =====
         citadel = new UnitType("citadel") {{
@@ -2632,8 +2716,8 @@ public class Z_Units {
             controller = unit -> new mindustry.ai.types.GroundAI();
             range = 400f;
 
-            // 武器1: 磁轨炮 (SlowRailBulletType → RailBulletType)
-            weapons.add(new Weapon("create-citadel-weapon") {{
+            // 武器1: 磁轨炮 (SlowRailBulletType), 武器2,3: 火焰喷射器 (LimitedAngleWeapon + FlameBulletType)
+            weapons.add(new Weapon(name + "-weapon") {{
                 top = false;
                 x = 31.5f;
                 y = -6.25f;
@@ -2641,42 +2725,47 @@ public class Z_Units {
                 reload = 90f;
                 recoil = 7f;
                 shake = 3f;
-                mirror = true;
-                rotate = true;
-                rotateSpeed = 2f;
-                shootCone = 30f;
-                bullet = new mindustry.entities.bullet.RailBulletType() {{
-                    length = 400f;
-                    damage = 250f;
-                    pierceCap = 7;
-                    pointEffectSpace = 25f;
-                    pierceEffect = mindustry.content.Fx.hitBulletBig;
-                    pointEffect = mindustry.content.Fx.instShoot;
-                }};
-            }});
+                ejectEffect = mindustry.content.Fx.casing4;
+                shootSound = mindustry.gen.Sounds.shootForeshadow;
 
-            // 武器2,3: 火焰喷射器 (LimitedAngleWeapon → vanilla Weapon, FlameBulletType → ContinuousFlameBulletType)
-            weapons.add(new Weapon("create-citadel-flamethrower") {{
+                bullet = new SlowRailBulletType(25f, 250f) {{
+                    lifetime = 13f;
+                    trailSpacing = 25f;
+                    splashDamage = 95f;
+                    splashDamageRadius = 50f;
+                    hitEffect = mindustry.content.Fx.hitBulletBig;
+                    shootEffect = mindustry.content.Fx.instShoot;
+                    trailEffect = mindustry.content.Fx.smoke;
+                    width = 9f;
+                    height = 17f;
+                    shrinkY = 0f;
+                    shrinkX = 0f;
+                    pierceCap = 7;
+                    backColor = hitColor = trailColor = Pal.bulletYellowBack;
+                    frontColor = Color.white;
+                }};
+            }}, new LimitedAngleWeapon(name + "-flamethrower") {{
                 x = 17.75f;
                 y = 11.25f;
                 shootY = 5.5f;
                 reload = 5f;
                 recoil = 0.5f;
-                mirror = true;
+                shootSound = mindustry.gen.Sounds.shootFlame;
+                angleCone = 80f;
                 rotate = true;
-                rotateSpeed = 5f;
-                shootCone = 80f;
-                bullet = new mindustry.entities.bullet.ContinuousFlameBulletType(75f) {{
-                    length = 90f;
-                    lifetime = 42f;
-                    pierceCap = 6;
-                    pierceBuilding = true;
-                    collidesAir = true;
-                    incendChance = 0.2f;
-                    incendAmount = 1;
-                    status = mindustry.content.StatusEffects.melting;
-                    statusDuration = 60f;
-                }};
+
+                bullet = citadelFlame;
+            }}, new LimitedAngleWeapon(name + "-flamethrower") {{
+                x = 14f;
+                y = -9f;
+                shootY = 5.5f;
+                reload = 4f;
+                recoil = 0.5f;
+                shootSound = mindustry.gen.Sounds.shootFlame;
+                angleCone = 80f;
+                rotate = true;
+
+                bullet = citadelFlame;
             }});
         }};
 
