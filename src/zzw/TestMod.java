@@ -7,6 +7,7 @@ import mindustry.mod.Mod;
 import mindustry.ui.dialogs.BaseDialog;
 
 import zzw.content.blocks.Z_Blocks;
+import zzw.content.blocks.Z_Turrets;
 import zzw.content.Z_Items;
 import zzw.content.Z_Factory;
 import zzw.content.Z_Liquids;
@@ -49,6 +50,9 @@ public class TestMod extends Mod{
 
         // 加载自定义方块（可能需要物品和工厂）
         Z_Blocks.load();
+
+        // 加载 PU 炮台 (需要物品)
+        Z_Turrets.load();
 
         // 加载经验系统（需要物品）
         Z_Exp.load();
