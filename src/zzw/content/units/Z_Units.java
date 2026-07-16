@@ -77,7 +77,31 @@ public class Z_Units {
         ravager,               // PU132 掠夺者 (End 阵营地面单位, 8腿+噩梦激光)
         exowalker,             // PU132 exowalker (Plague 阵营地面单位, 8腿+瘟疫导弹+吸血激光)
         toxoswarmer,           // PU132 toxoswarmer (Plague 阵营地面单位, 6腿+火焰导弹)
-        desolation;            // PU132 desolation (End 阵营地面单位, 8腿+触手+蓄力主炮)
+        desolation,            // PU132 desolation (End 阵营地面单位, 8腿+触手+蓄力主炮)
+        // —— PU_V8 T6/T7 单位 ——
+        citadel,               // T6 Mech (磁轨炮+火焰喷射)
+        empire,                // T7 Mech (火焰+导弹+炮弹)
+        cygnus,                // T6 Legs (反射激光+EMP弹)
+        sagittarius,           // T7 Legs (蓄力激光+加速箭弹, 力场护盾)
+        araneidae,             // T6 Legs (吸血激光+磁轨炮)
+        theraphosidae,         // T7 Legs (导弹+持续激光+磁轨炮)
+        mantle,                // T6 Flying (加速激光+炮弹)
+        aphelion,              // T7 Flying (加速激光+闪电炮弹)
+        sedec,                 // T6 Payload (力场+修复+治疗锥)
+        trigintaduo,           // T7 Payload (治疗锥+核弹)
+        // —— PU_V8 mantodea 直升机系列 (T1-T6, 简化为普通飞行单位, 无旋翼) ——
+        caelifera,             // T1 直升机 (机枪+导弹)
+        schistocerca,          // T2 直升机 (双机枪+燃烧弹)
+        anthophila,            // T3 直升机 (机枪+闪电)
+        vespula,               // T4 直升机 (大机枪+钍弹+激光)
+        lepidoptera,           // T5 直升机 (机枪+导弹+榴弹)
+        mantodea,              // T6 直升机 (双联防空炮)
+        // —— PU_V8 ultraviolet 系列飞行单位 (T1-T5, EMP 特化) ——
+        discharge,             // T1 (EMP弹)
+        pulse,                 // T2 (充能EMP弹)
+        emission,              // T3 (双EMP发射器)
+        waveform,              // T4 (多联EMP+大型EMP)
+        ultraviolet;           // T5 (终极EMP, 10座炮台+大型EMP)
 
     public static void load() {
         // ★ 关键: 注册自定义 Entity 到 EntityMapping.idMap, 否则 v154.3 的 UnitType.init() 会失败 ★
@@ -2573,5 +2597,1643 @@ public class Z_Units {
             //   原因: Weapon 会显示炮台贴图 (误用触手贴图), 且无法实现触手分段动画
             //   TentacleAbility 自主渲染分段, 支持激光发射和碰撞伤害
         }};
+
+        // ═══════════════════════════════════════════════════════════
+        //  PU_V8 T6/T7 单位移植 (简化版)
+        //  - 用 vanilla UnitType 替代 UnityUnitType
+        //  - SlowRailBulletType → RailBulletType, EmpBasicBulletType → EmpBulletType
+        //  - AcceleratingLaserBulletType → LaserBulletType, FlameBulletType → ContinuousFlameBulletType
+        //  - ReflectingLaserBulletType/CygnusBulletType → LaserBulletType/EmpBulletType
+        //  - SagittariusLaserBulletType/ArrowBulletType → LaserBulletType/BasicBulletType
+        //  - HealingConeBulletType/HealingNukeBulletType → BasicBulletType(healPercent)
+        //  - LimitedAngleWeapon/MultiBarrelWeapon/AcceleratingWeapon/CloneableSetWeapon → vanilla Weapon
+        //  - 移除 Rotor (旋翼), CopterAI 等自定义组件
+        // ═══════════════════════════════════════════════════════════
+
+        // ===== citadel (T6 Mech, 磁轨炮+火焰喷射) =====
+        citadel = new UnitType("citadel") {{
+            health = 60000f;
+            armor = 16f;
+            speed = 0.3f;
+            hitSize = 49f;
+            rotateSpeed = 1.5f;
+            mechFrontSway = 2f;
+            mechSideSway = 0.7f;
+            mechStride = (4f + (49f - 8f) / 2.1f) / 1.25f;
+            mechStepParticles = true;
+            immunities.add(mindustry.content.StatusEffects.burning);
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.MechUnit::create;
+            controller = unit -> new mindustry.ai.types.GroundAI();
+            range = 400f;
+
+            // 武器1: 磁轨炮 (SlowRailBulletType → RailBulletType)
+            weapons.add(new Weapon("create-citadel-weapon") {{
+                top = false;
+                x = 31.5f;
+                y = -6.25f;
+                shootY = 30.25f;
+                reload = 90f;
+                recoil = 7f;
+                shake = 3f;
+                mirror = true;
+                rotate = true;
+                rotateSpeed = 2f;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.RailBulletType() {{
+                    length = 400f;
+                    damage = 250f;
+                    pierceCap = 7;
+                    pointEffectSpace = 25f;
+                    pierceEffect = mindustry.content.Fx.hitBulletBig;
+                    pointEffect = mindustry.content.Fx.instShoot;
+                }};
+            }});
+
+            // 武器2,3: 火焰喷射器 (LimitedAngleWeapon → vanilla Weapon, FlameBulletType → ContinuousFlameBulletType)
+            weapons.add(new Weapon("create-citadel-flamethrower") {{
+                x = 17.75f;
+                y = 11.25f;
+                shootY = 5.5f;
+                reload = 5f;
+                recoil = 0.5f;
+                mirror = true;
+                rotate = true;
+                rotateSpeed = 5f;
+                shootCone = 80f;
+                bullet = new mindustry.entities.bullet.ContinuousFlameBulletType(75f) {{
+                    length = 90f;
+                    lifetime = 42f;
+                    pierceCap = 6;
+                    pierceBuilding = true;
+                    collidesAir = true;
+                    incendChance = 0.2f;
+                    incendAmount = 1;
+                    status = mindustry.content.StatusEffects.melting;
+                    statusDuration = 60f;
+                }};
+            }});
+        }};
+
+        // ===== empire (T7 Mech, 火焰+导弹+炮弹) =====
+        empire = new UnitType("empire") {{
+            health = 140000f;
+            armor = 20f;
+            speed = 0.2f;
+            hitSize = 49f;
+            rotateSpeed = 1.25f;
+            mechFrontSway = 4f;
+            mechSideSway = 0.7f;
+            mechStride = (4f + (49f - 8f) / 2.1f) / 1.3f;
+            mechStepParticles = true;
+            immunities.addAll(mindustry.content.StatusEffects.burning, mindustry.content.StatusEffects.melting);
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.MechUnit::create;
+            controller = unit -> new mindustry.ai.types.GroundAI();
+            range = 400f;
+
+            // 武器1: 火焰喷射 (FlameBulletType → ContinuousFlameBulletType)
+            weapons.add(new Weapon("create-empire-weapon") {{
+                top = false;
+                x = 36.5f;
+                y = 2.75f;
+                shootY = 19.25f;
+                xRand = 4.5f;
+                rotate = true;
+                rotateSpeed = 1.2f;
+                inaccuracy = 4f;
+                reload = 3f;
+                shoot.shots = 2;
+                shootCone = 20f;
+                mirror = true;
+                bullet = new mindustry.entities.bullet.ContinuousFlameBulletType(75f) {{
+                    lifetime = 42f;
+                    pierceCap = 6;
+                    pierceBuilding = true;
+                    collidesAir = true;
+                    incendChance = 0.2f;
+                    incendAmount = 1;
+                    status = mindustry.content.StatusEffects.melting;
+                    statusDuration = 60f;
+                }};
+            }});
+
+            // 武器2: 导弹发射器 (MissileBulletType + ShrapnelBulletType frag)
+            weapons.add(new Weapon("create-empire-mount") {{
+                x = 20.75f;
+                y = 10f;
+                shootY = 6.25f;
+                rotate = true;
+                rotateSpeed = 7f;
+                reload = 60f;
+                shootCone = 30f;
+                mirror = true;
+                bullet = new mindustry.entities.bullet.MissileBulletType(2.5f, 22f) {{
+                    lifetime = 40f;
+                    drag = -0.005f;
+                    width = 14f;
+                    height = 15f;
+                    shrinkY = 0f;
+                    splashDamageRadius = 55f;
+                    splashDamage = 85f;
+                    homingRange = 90f;
+                    weaveMag = 2f;
+                    weaveScale = 8f;
+                    status = mindustry.content.StatusEffects.blasted;
+                    statusDuration = 60f;
+                    fragBullets = 5;
+                    fragBullet = new mindustry.entities.bullet.ShrapnelBulletType() {{
+                        damage = 200f;
+                        length = 60f;
+                        width = 12f;
+                        toColor = mindustry.graphics.Pal.missileYellow;
+                        hitColor = mindustry.graphics.Pal.bulletYellow;
+                        serrationLenScl = 5f;
+                        serrationSpaceOffset = 45f;
+                        serrationSpacing = 5f;
+                    }};
+                }};
+            }});
+
+            // 武器3: 炮弹 (ArtilleryBulletType)
+            weapons.add(new Weapon("create-empire-cannon") {{
+                x = 20.75f;
+                y = -4f;
+                shootY = 9.75f;
+                rotate = true;
+                rotateSpeed = 4f;
+                inaccuracy = 10f;
+                shoot.shots = 8;
+                velocityRnd = 0.2f;
+                reload = 40f;
+                mirror = true;
+                bullet = new mindustry.entities.bullet.ArtilleryBulletType(3f, 15f) {{
+                    hitEffect = mindustry.content.Fx.blastExplosion;
+                    knockback = 0.8f;
+                    lifetime = 125f;
+                    width = 14f;
+                    height = 14f;
+                    splashDamageRadius = 45f;
+                    splashDamage = 95f;
+                }};
+            }});
+        }};
+
+        // ===== cygnus (T6 Legs, 反射激光+EMP弹) =====
+        cygnus = new UnitType("cygnus") {{
+            health = 45000f;
+            armor = 10f;
+            speed = 0.26f;
+            hitSize = 37f;
+            rotateSpeed = 1.3f;
+            legCount = 6;
+            legLength = 29f;
+            legBaseOffset = 8f;
+            legMoveSpace = 0.7f;
+            hovering = true;
+            allowLegStep = true;
+            shadowElevation = 0.23f;
+            groundLayer = mindustry.graphics.Layer.legUnit;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.LegsUnit::create;
+            controller = unit -> new mindustry.ai.types.GroundAI();
+            range = 300f;
+
+            // 武器1: 反射激光 (ReflectingLaserBulletType → LaserBulletType, healPercent)
+            weapons.add(new Weapon() {{
+                x = 0f;
+                y = 8.25f;
+                mirror = false;
+                reload = 4f * 60f;
+                continuous = true;
+                shootCone = 360f;
+                rotate = false;
+                bullet = new mindustry.entities.bullet.LaserBulletType(500f) {{
+                    colors = new Color[]{
+                        mindustry.graphics.Pal.heal.cpy().a(0.2f),
+                        mindustry.graphics.Pal.heal.cpy().a(0.5f),
+                        mindustry.graphics.Pal.heal.cpy().mul(1.2f),
+                        Color.white
+                    };
+                    hitColor = lightningColor = mindustry.graphics.Pal.heal;
+                    lifetime = 65f;
+                    healPercent = 6f;
+                    splashDamage = 70f;
+                    splashDamageRadius = 30f;
+                    pierceCap = 3;
+                    collidesTeam = true;
+                    lightningDamage = 75f;
+                    lightningLength = 12;
+                    width = 20f;
+                    length = 300f;
+                }};
+            }});
+
+            // 武器2: EMP弹 (CygnusBulletType → EmpBulletType)
+            weapons.add(new Weapon("create-cygnus-mount") {{
+                x = 22.5f;
+                y = -3f;
+                shootY = 8.75f;
+                rotate = true;
+                alternate = true;
+                rotateSpeed = 5f;
+                reload = 25f;
+                inaccuracy = 5f;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.EmpBulletType() {{
+                    speed = 6f;
+                    damage = 20f;
+                    lifetime = 35f;
+                    splashDamage = 5f;
+                    splashDamageRadius = 70f;
+                    radius = 70f;
+                    backColor = mindustry.graphics.Pal.heal;
+                    hitColor = mindustry.graphics.Pal.heal;
+                    lightColor = mindustry.graphics.Pal.heal;
+                    status = mindustry.content.StatusEffects.electrified;
+                    statusDuration = 30f;
+                    timeIncrease = 1.25f;
+                    powerSclDecrease = 0.5f;
+                }};
+            }});
+        }};
+
+        // ===== sagittarius (T7 Legs, 蓄力激光+加速箭弹, 力场护盾) =====
+        sagittarius = new UnitType("sagittarius") {{
+            health = 102500f;
+            armor = 12f;
+            speed = 0.25f;
+            hitSize = 55f;
+            rotateSpeed = 0.8f;
+            legCount = 4;
+            legLength = 34.36f;
+            legBaseOffset = 11f;
+            legMoveSpace = 0.7f;
+            hovering = true;
+            allowLegStep = true;
+            shadowElevation = 0.23f;
+            groundLayer = mindustry.graphics.Layer.legUnit;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.LegsUnit::create;
+            controller = unit -> new mindustry.ai.types.GroundAI();
+            range = 400f;
+
+            // 力场护盾
+            abilities.add(new mindustry.entities.abilities.ForceFieldAbility(130f, 3f, 3500f, 60f * 7));
+
+            // 武器1: 蓄力激光 (SagittariusLaserBulletType → LaserBulletType, healPercent)
+            weapons.add(new Weapon("create-sagittarius-laser") {{
+                mirror = false;
+                x = 0f;
+                y = 0f;
+                shootY = 16.75f;
+                reload = 12f * 60f;
+                continuous = true;
+                shootCone = 360f;
+                rotate = false;
+                bullet = new mindustry.entities.bullet.LaserBulletType(35f) {{
+                    lifetime = 10f * 60f;
+                    collidesTeam = true;
+                    healPercent = 0.4f;
+                    splashDamage = 4f;
+                    splashDamageRadius = 25f;
+                    knockback = 3f;
+                    buildingDamageMultiplier = 0.6f;
+                    status = mindustry.content.StatusEffects.electrified;
+                    statusDuration = 30f;
+                    colors = new Color[]{
+                        mindustry.graphics.Pal.heal.cpy().a(0.2f),
+                        mindustry.graphics.Pal.heal.cpy().a(0.5f),
+                        mindustry.graphics.Pal.heal,
+                        Color.white
+                    };
+                    hitColor = mindustry.graphics.Pal.heal;
+                    width = 25f;
+                    length = 380f;
+                }};
+            }});
+
+            // 武器2: 加速箭弹 (ArrowBulletType → BasicBulletType, healPercent)
+            weapons.add(new Weapon("create-sagittarius-mount") {{
+                x = 28.25f;
+                y = -9.25f;
+                shootY = 17f;
+                reload = 30f;
+                rotateSpeed = 5f;
+                inaccuracy = 5f;
+                rotate = true;
+                mirror = true;
+                shootCone = 30f;
+                shoot.shots = 2;
+                bullet = new mindustry.entities.bullet.BasicBulletType(7f, 25f) {{
+                    lifetime = 60f;
+                    pierce = true;
+                    pierceBuilding = true;
+                    pierceCap = 4;
+                    backColor = trailColor = hitColor = lightColor = lightningColor = mindustry.graphics.Pal.heal;
+                    frontColor = Color.white;
+                    width = 9f;
+                    height = 15f;
+                    splashDamage = 15f;
+                    splashDamageRadius = 25f;
+                    healPercent = 3f;
+                    homingRange = 70f;
+                    homingPower = 0.05f;
+                }};
+            }});
+        }};
+
+        // ===== araneidae (T6 Legs, 吸血激光+磁轨炮) =====
+        araneidae = new UnitType("araneidae") {{
+            health = 52000f;
+            armor = 13f;
+            speed = 0.42f;
+            hitSize = 35.5f;
+            rotateSpeed = 1.3f;
+            drag = 0.1f;
+            legCount = 8;
+            legMoveSpace = 0.76f;
+            legPairOffset = 0.7f;
+            legGroupSize = 2;
+            legLength = 112f;
+            legExtension = -8.25f;
+            legBaseOffset = 8f;
+            legLengthScl = 1f;
+            rippleScale = 2f;
+            legSpeed = 0.2f;
+            legSplashDamage = 80f;
+            legSplashRange = 40f;
+            hovering = true;
+            allowLegStep = true;
+            shadowElevation = 0.95f;
+            groundLayer = mindustry.graphics.Layer.legUnit + 0.01f;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.LegsUnit::create;
+            controller = unit -> new mindustry.ai.types.GroundAI();
+            range = 350f;
+
+            // 武器1: 吸血激光 (sapLaser → SapBulletType)
+            weapons.add(new Weapon("create-araneidae-mount") {{
+                x = 15f;
+                y = -1.75f;
+                shootY = 7.5f;
+                reload = 30f;
+                shake = 4f;
+                rotateSpeed = 2f;
+                rotate = true;
+                shadow = 15f;
+                shoot.shots = 3;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.SapBulletType() {{
+                    sapStrength = 0.5f;
+                    length = 200f;
+                    damage = 30f;
+                    width = 5f;
+                    color = mindustry.graphics.Pal.sap;
+                    lightColor = mindustry.graphics.Pal.sap;
+                }};
+            }});
+
+            // 武器2: 磁轨炮 (SlowRailBulletType → RailBulletType, MultiBarrelWeapon → vanilla Weapon)
+            weapons.add(new Weapon("create-araneidae-cannon") {{
+                mirror = false;
+                x = 0f;
+                y = -12.25f;
+                shootY = 22f;
+                reload = 120f;
+                shake = 10f;
+                recoil = 3f;
+                rotateSpeed = 1f;
+                rotate = true;
+                shadow = 40f;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.RailBulletType() {{
+                    length = 350f;
+                    damage = 95f;
+                    pierceCap = 2;
+                    splashDamageRadius = 90f;
+                    splashDamage = 90f;
+                    hitEffect = mindustry.content.Fx.sapExplosion;
+                    pointEffectSpace = 15f;
+                    pierceEffect = mindustry.content.Fx.hitBulletSmall;
+                    trailColor = mindustry.graphics.Pal.sapBulletBack;
+                    lightningColor = mindustry.graphics.Pal.sapBullet;
+                    lightning = 3;
+                    lightningLength = 20;
+                }};
+            }});
+        }};
+
+        // ===== theraphosidae (T7 Legs, 导弹+持续激光+磁轨炮) =====
+        theraphosidae = new UnitType("theraphosidae") {{
+            health = 125000f;
+            armor = 16f;
+            speed = 0.4f;
+            drag = 0.12f;
+            hitSize = 49f;
+            rotateSpeed = 1.3f;
+            legCount = 8;
+            legGroupSize = 2;
+            legMoveSpace = 0.7f;
+            legPairOffset = 0.2f;
+            legLength = 176f;
+            legExtension = -24f;
+            legBaseOffset = 9f;
+            rippleScale = 3.4f;
+            legSplashDamage = 130f;
+            hovering = true;
+            allowLegStep = true;
+            shadowElevation = 1f;
+            groundLayer = mindustry.graphics.Layer.legUnit + 0.02f;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.LegsUnit::create;
+            controller = unit -> new mindustry.ai.types.GroundAI();
+            range = 400f;
+
+            // 武器1: 导弹发射器
+            weapons.add(new Weapon("create-theraphosidae-launcher") {{
+                x = 28f;
+                y = -15f;
+                shootY = 8f;
+                reload = 80f;
+                rotate = true;
+                rotateSpeed = 3f;
+                mirror = true;
+                shootCone = 30f;
+                shoot.shots = 4;
+                shoot.shotDelay = 5f;
+                bullet = new mindustry.entities.bullet.MissileBulletType(3f, 30f) {{
+                    lifetime = 50f;
+                    drag = -0.005f;
+                    width = 12f;
+                    height = 13f;
+                    shrinkY = 0f;
+                    splashDamageRadius = 45f;
+                    splashDamage = 60f;
+                    homingRange = 120f;
+                    weaveMag = 2f;
+                    weaveScale = 8f;
+                    backColor = mindustry.graphics.Pal.sapBulletBack;
+                    frontColor = mindustry.graphics.Pal.sapBullet;
+                }};
+            }});
+
+            // 武器2: 持续吸血激光 (continuousSapLaser)
+            weapons.add(new Weapon("create-theraphosidae-laser") {{
+                x = 14f;
+                y = 8f;
+                reload = 2f * 60f;
+                continuous = true;
+                rotate = true;
+                rotateSpeed = 3f;
+                mirror = true;
+                shootCone = 45f;
+                bullet = new mindustry.entities.bullet.SapBulletType() {{
+                    sapStrength = 0.5f;
+                    length = 180f;
+                    damage = 50f;
+                    width = 8f;
+                    color = mindustry.graphics.Pal.sap;
+                    lightColor = mindustry.graphics.Pal.sap;
+                }};
+            }});
+
+            // 武器3: 磁轨炮 (SlowRailBulletType → RailBulletType)
+            weapons.add(new Weapon("create-theraphosidae-cannon") {{
+                mirror = false;
+                x = 0f;
+                y = -18f;
+                shootY = 20f;
+                reload = 120f;
+                shake = 10f;
+                recoil = 3f;
+                rotateSpeed = 1f;
+                rotate = true;
+                shadow = 40f;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.RailBulletType() {{
+                    length = 400f;
+                    damage = 120f;
+                    pierceCap = 3;
+                    splashDamageRadius = 80f;
+                    splashDamage = 80f;
+                    hitEffect = mindustry.content.Fx.sapExplosion;
+                    pointEffectSpace = 15f;
+                    pierceEffect = mindustry.content.Fx.hitBulletSmall;
+                    trailColor = mindustry.graphics.Pal.sapBulletBack;
+                    lightningColor = mindustry.graphics.Pal.sapBullet;
+                    lightning = 3;
+                    lightningLength = 18;
+                }};
+            }});
+        }};
+
+        // ===== mantle (T6 Flying, 加速激光+炮弹) =====
+        mantle = new UnitType("mantle") {{
+            health = 54000f;
+            armor = 17f;
+            speed = 0.45f;
+            accel = 0.04f;
+            drag = 0.04f;
+            rotateSpeed = 0.9f;
+            flying = true;
+            lowAltitude = true;
+            hitSize = 80f;
+            engineOffset = 42.75f;
+            engineSize = 5.75f;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.UnitEntity::create;
+            range = 380f;
+
+            // 武器1: 加速激光 (AcceleratingLaserBulletType → LaserBulletType, continuous)
+            weapons.add(new Weapon() {{
+                x = 0f;
+                y = 0f;
+                shootY = 4f;
+                mirror = false;
+                reload = 4f * 60f;
+                continuous = true;
+                rotate = false;
+                shootCone = 360f;
+                bullet = new mindustry.entities.bullet.LaserBulletType(230f) {{
+                    lifetime = 180f;
+                    length = 380f;
+                    width = 27f;
+                    pierceCap = 2;
+                    incendChance = 0.2f;
+                    incendAmount = 2;
+                    hitColor = mindustry.graphics.Pal.meltdownHit;
+                    colors = new Color[]{
+                        mindustry.graphics.Pal.meltdownHit.cpy().a(0.3f),
+                        mindustry.graphics.Pal.meltdownHit.cpy().a(0.6f),
+                        mindustry.graphics.Pal.meltdownHit,
+                        Color.white
+                    };
+                }};
+            }});
+
+            // 武器2,3: 炮弹 (scepter bullet copy → BasicBulletType)
+            weapons.add(new Weapon("create-mantle-mount") {{
+                x = 30.75f;
+                y = -6.25f;
+                shootY = 10.5f;
+                alternate = true;
+                rotate = true;
+                recoil = 5f;
+                reload = 55f;
+                shoot.shots = 4;
+                shoot.shotDelay = 4f;
+                rotateSpeed = 3f;
+                shadow = 22f;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.BasicBulletType(6.5f, 60f) {{
+                    lifetime = 47f;
+                    width = 12f;
+                    height = 15f;
+                    shrinkY = 0f;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-mantle-mount") {{
+                x = 19f;
+                y = -18f;
+                shootY = 10.5f;
+                alternate = true;
+                rotate = true;
+                recoil = 5f;
+                reload = 60f;
+                shoot.shots = 4;
+                shoot.shotDelay = 4f;
+                rotateSpeed = 3f;
+                shadow = 22f;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.BasicBulletType(6.5f, 60f) {{
+                    lifetime = 47f;
+                    width = 12f;
+                    height = 15f;
+                    shrinkY = 0f;
+                }};
+            }});
+        }};
+
+        // ===== aphelion (T7 Flying, 加速激光+闪电炮弹) =====
+        aphelion = new UnitType("aphelion") {{
+            health = 130000f;
+            armor = 16f;
+            speed = 0.44f;
+            accel = 0.04f;
+            drag = 0.03f;
+            rotateSpeed = 0.7f;
+            flying = true;
+            lowAltitude = true;
+            hitSize = 96f;
+            engineOffset = 46.5f;
+            engineSize = 6.75f;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.UnitEntity::create;
+            range = 430f;
+
+            // 武器1: 加速激光 (AcceleratingLaserBulletType → LaserBulletType, continuous)
+            weapons.add(new Weapon("create-aphelion-laser") {{
+                x = 0f;
+                y = 0f;
+                shootY = 34.25f;
+                shootCone = 2f;
+                mirror = false;
+                reload = 7f * 60f;
+                continuous = true;
+                rotate = false;
+                bullet = new mindustry.entities.bullet.LaserBulletType(320f) {{
+                    lifetime = 4f * 60f;
+                    length = 430f;
+                    width = 37f;
+                    pierceCap = 5;
+                    incendChance = 0.3f;
+                    incendAmount = 2;
+                    splashDamage = 40f;
+                    splashDamageRadius = 50f;
+                    hitColor = mindustry.graphics.Pal.meltdownHit;
+                    colors = new Color[]{
+                        mindustry.graphics.Pal.meltdownHit.cpy().a(0.3f),
+                        mindustry.graphics.Pal.meltdownHit.cpy().a(0.6f),
+                        mindustry.graphics.Pal.meltdownHit,
+                        Color.white
+                    };
+                }};
+            }});
+
+            // 武器2: 闪电炮弹 (scepter bullet with lightning → BasicBulletType with lightning)
+            weapons.add(new Weapon("create-aphelion-mount") {{
+                x = 30f;
+                y = -9.5f;
+                shootY = 14.25f;
+                shadow = 32f;
+                rotate = true;
+                rotateSpeed = 2f;
+                reload = 2f;
+                xRand = 3f;
+                inaccuracy = 4f;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.BasicBulletType(6.5f, 40f) {{
+                    lifetime = 50f;
+                    width = 12f;
+                    height = 15f;
+                    shrinkY = 0f;
+                    lightning = 3;
+                    lightningDamage = 27f;
+                    lightningLength = 14;
+                    lightningColor = mindustry.graphics.Pal.sapBullet;
+                    backColor = mindustry.graphics.Pal.sapBulletBack;
+                    frontColor = Color.white;
+                }};
+            }});
+        }};
+
+        // ===== sedec (T6 Payload, 力场+修复+治疗锥) =====
+        sedec = new UnitType("sedec") {{
+            health = 45000f;
+            armor = 20f;
+            speed = 0.7f;
+            rotateSpeed = 1f;
+            accel = 0.04f;
+            drag = 0.018f;
+            flying = true;
+            engineOffset = 48f;
+            engineSize = 7.8f;
+            hitSize = 85f;
+            payloadCapacity = (6.2f * 6.2f) * mindustry.Vars.tilePayload;
+            buildSpeed = 5f;
+            buildBeamOffset = 29.5f;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.UnitEntity::create;
+            range = 300f;
+
+            // 力场 + 修复能力
+            abilities.add(
+                new mindustry.entities.abilities.ForceFieldAbility(190f, 6f, 8000f, 60f * 12),
+                new mindustry.entities.abilities.RepairFieldAbility(180f, 60f * 2, 160f)
+            );
+
+            // 武器: 治疗锥 (HealingConeBulletType → LaserBulletType, healPercent, continuous)
+            weapons.add(new Weapon("create-sedec-laser") {{
+                top = false;
+                x = 0f;
+                y = 0f;
+                shootY = 39f;
+                reload = 260f;
+                recoil = 3f;
+                continuous = true;
+                rotate = true;
+                mirror = false;
+                rotateSpeed = 1.5f;
+                shootCone = 360f;
+                bullet = new mindustry.entities.bullet.LaserBulletType(3f) {{
+                    healPercent = 6f;
+                    collidesTeam = true;
+                    lifetime = 6f * 60f;
+                    length = 280f;
+                    width = 15f;
+                    colors = new Color[]{
+                        mindustry.graphics.Pal.heal.cpy().a(0.2f),
+                        mindustry.graphics.Pal.heal.cpy().a(0.5f),
+                        mindustry.graphics.Pal.heal,
+                        Color.white
+                    };
+                    hitColor = mindustry.graphics.Pal.heal;
+                    status = mindustry.content.StatusEffects.overclock;
+                    statusDuration = 9f * 60f;
+                }};
+            }});
+        }};
+
+        // ===== trigintaduo (T7 Payload, 治疗锥+核弹) =====
+        trigintaduo = new UnitType("trigintaduo") {{
+            health = 52500f;
+            armor = 22f;
+            speed = 0.6f;
+            rotateSpeed = 1f;
+            accel = 0.04f;
+            drag = 0.018f;
+            flying = true;
+            engineOffset = 41.25f;
+            engineSize = 6.5f;
+            hitSize = 92.5f;
+            payloadCapacity = (8.1f * 8.1f) * mindustry.Vars.tilePayload;
+            buildSpeed = 6f;
+            buildBeamOffset = 47.75f;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.UnitEntity::create;
+            range = 300f;
+
+            // 武器1: 治疗锥 (HealingConeBulletType → LaserBulletType, healPercent, continuous)
+            weapons.add(new Weapon("create-trigintaduo-heal-mount") {{
+                x = 33.5f;
+                y = -7.75f;
+                shootY = 10.25f;
+                reload = 220f;
+                recoil = 3f;
+                shadow = 22f;
+                continuous = true;
+                rotate = true;
+                alternate = false;
+                rotateSpeed = 3.5f;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.LaserBulletType(3f) {{
+                    healPercent = 3f;
+                    collidesTeam = true;
+                    lifetime = 6f * 60f;
+                    length = 250f;
+                    width = 12f;
+                    colors = new Color[]{
+                        mindustry.graphics.Pal.heal.cpy().a(0.2f),
+                        mindustry.graphics.Pal.heal.cpy().a(0.5f),
+                        mindustry.graphics.Pal.heal,
+                        Color.white
+                    };
+                    hitColor = mindustry.graphics.Pal.heal;
+                    status = mindustry.content.StatusEffects.overclock;
+                    statusDuration = 9f * 60f;
+                }};
+            }});
+
+            // 武器2: 治疗核弹 (HealingNukeBulletType → BasicBulletType, healPercent, 大范围)
+            weapons.add(new Weapon() {{
+                mirror = false;
+                x = 0f;
+                y = 10.75f;
+                shootY = 0f;
+                reload = 30f * 60f;
+                shootCone = 360f;
+                rotate = false;
+                bullet = new mindustry.entities.bullet.BasicBulletType(0f, 1f) {{
+                    speed = 0f;
+                    lifetime = 5f;
+                    healPercent = 50f;
+                    collidesTeam = true;
+                    collidesAir = false;
+                    collidesGround = false;
+                    collides = false;
+                    splashDamageRadius = 300f;
+                    splashDamage = 0f;
+                    hitEffect = mindustry.content.Fx.healWaveMend;
+                    despawnEffect = mindustry.content.Fx.healWaveMend;
+                    frontColor = mindustry.graphics.Pal.heal;
+                    backColor = mindustry.graphics.Pal.heal;
+                    lightColor = mindustry.graphics.Pal.heal;
+                    lightRadius = 200f;
+                }};
+            }});
+        }};
+
+        // ═══════════════════════════════════════════════════════════
+        //  PU_V8 mantodea 直升机系列 (T1-T6, 简化为普通飞行单位, 无旋翼)
+        //  - 移除 Rotor 旋翼动画, CopterAI 等自定义组件
+        //  - 用 vanilla UnitEntity::create + FlyingAI
+        // ═══════════════════════════════════════════════════════════
+
+        // ===== caelifera (T1, 机枪+导弹) =====
+        caelifera = new UnitType("caelifera") {{
+            speed = 5f;
+            drag = 0.08f;
+            accel = 0.04f;
+            health = 75f;
+            engineSize = 0f;
+            flying = true;
+            hitSize = 12f;
+            range = 140f;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.UnitEntity::create;
+
+            weapons.add(new Weapon("create-caelifera-gun") {{
+                top = false;
+                reload = 6f;
+                x = 5.25f;
+                y = 6.5f;
+                shootY = 1.5f;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.BasicBulletType(5f, 7f) {{
+                    lifetime = 30f;
+                    shrinkY = 0.2f;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-caelifera-launcher") {{
+                reload = 30f;
+                x = 4.5f;
+                y = 0.5f;
+                shootY = 2.25f;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.MissileBulletType(3f, 1f) {{
+                    speed = 3f;
+                    lifetime = 45f;
+                    splashDamage = 40f;
+                    splashDamageRadius = 8f;
+                    drag = -0.01f;
+                }};
+            }});
+        }};
+
+        // ===== schistocerca (T2, 双机枪+燃烧弹) =====
+        schistocerca = new UnitType("schistocerca") {{
+            speed = 4.5f;
+            drag = 0.07f;
+            accel = 0.03f;
+            health = 150f;
+            engineSize = 0f;
+            flying = true;
+            hitSize = 13f;
+            range = 165f;
+            rotateSpeed = 4.6f;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.UnitEntity::create;
+
+            weapons.add(new Weapon("create-schistocerca-gun") {{
+                top = false;
+                x = 1.5f;
+                y = 11f;
+                shootY = 3f;
+                reload = 8f;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.BasicBulletType(4f, 5f) {{
+                    lifetime = 36f;
+                    shrinkY = 0.2f;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-schistocerca-gun") {{
+                top = false;
+                x = 4f;
+                y = 8.75f;
+                shootY = 3f;
+                reload = 12f;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.BasicBulletType(4f, 8f) {{
+                    width = 7f;
+                    height = 9f;
+                    lifetime = 36f;
+                    shrinkY = 0.2f;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-schistocerca-gun-big") {{
+                x = 6.75f;
+                y = 5.75f;
+                shootY = 2f;
+                reload = 30f;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.BasicBulletType(3f, 10f) {{
+                    lifetime = 40f;
+                    width = 9f;
+                    height = 11f;
+                    incendChance = 0.4f;
+                    incendAmount = 1;
+                    status = mindustry.content.StatusEffects.burning;
+                    statusDuration = 60f;
+                }};
+            }});
+        }};
+
+        // ===== anthophila (T3, 机枪+闪电) =====
+        anthophila = new UnitType("anthophila") {{
+            speed = 4f;
+            drag = 0.07f;
+            accel = 0.03f;
+            health = 450f;
+            engineSize = 0f;
+            flying = true;
+            hitSize = 15f;
+            range = 165f;
+            rotateSpeed = 3.8f;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.UnitEntity::create;
+
+            weapons.add(new Weapon("create-anthophila-gun") {{
+                x = 4.25f;
+                y = 14f;
+                shootY = 2.75f;
+                reload = 15f;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.BasicBulletType(6f, 60f) {{
+                    lifetime = 30f;
+                    width = 16f;
+                    height = 20f;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-anthophila-tesla") {{
+                x = 7.75f;
+                y = 8.25f;
+                shootY = 5.25f;
+                reload = 30f;
+                shoot.shots = 3;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.LightningBulletType() {{
+                    damage = 15f;
+                    lightningLength = 12;
+                    lightningColor = mindustry.graphics.Pal.surge;
+                }};
+            }});
+        }};
+
+        // ===== vespula (T4, 大机枪+钍弹+激光) =====
+        vespula = new UnitType("vespula") {{
+            speed = 3.5f;
+            drag = 0.07f;
+            accel = 0.03f;
+            health = 4000f;
+            engineSize = 0f;
+            flying = true;
+            hitSize = 22f;
+            range = 200f;
+            rotateSpeed = 3f;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.UnitEntity::create;
+
+            weapons.add(new Weapon("create-vespula-gun-big") {{
+                x = 10f;
+                y = 8f;
+                shootY = 4f;
+                reload = 12f;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.BasicBulletType(6f, 25f) {{
+                    lifetime = 35f;
+                    width = 12f;
+                    height = 15f;
+                    shrinkY = 0.2f;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-vespula-mount") {{
+                x = 8f;
+                y = -4f;
+                shootY = 5f;
+                reload = 20f;
+                mirror = true;
+                rotate = true;
+                rotateSpeed = 3f;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.BasicBulletType(7f, 18f) {{
+                    lifetime = 40f;
+                    width = 10f;
+                    height = 12f;
+                    pierce = true;
+                    pierceCap = 2;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-vespula-laser") {{
+                x = 6f;
+                y = -10f;
+                shootY = 4f;
+                reload = 60f;
+                mirror = true;
+                rotate = true;
+                rotateSpeed = 3f;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.LaserBulletType(40f) {{
+                    length = 200f;
+                    width = 12f;
+                    colors = new Color[]{
+                        mindustry.graphics.Pal.surge.cpy().mul(1f, 1f, 1f, 0.4f),
+                        mindustry.graphics.Pal.surge,
+                        Color.white
+                    };
+                    hitColor = mindustry.graphics.Pal.surge;
+                }};
+            }});
+        }};
+
+        // ===== lepidoptera (T5, 机枪+导弹+榴弹) =====
+        lepidoptera = new UnitType("lepidoptera") {{
+            speed = 3f;
+            drag = 0.07f;
+            accel = 0.03f;
+            health = 9500f;
+            engineSize = 0f;
+            flying = true;
+            hitSize = 28f;
+            range = 220f;
+            rotateSpeed = 2.5f;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.UnitEntity::create;
+
+            weapons.add(new Weapon("create-lepidoptera-gun") {{
+                x = 8f;
+                y = 12f;
+                shootY = 3f;
+                reload = 10f;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.BasicBulletType(5f, 15f) {{
+                    lifetime = 35f;
+                    width = 8f;
+                    height = 10f;
+                    shrinkY = 0.2f;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-lepidoptera-launcher") {{
+                x = 10f;
+                y = 2f;
+                shootY = 4f;
+                reload = 40f;
+                mirror = true;
+                shootCone = 30f;
+                shoot.shots = 3;
+                shoot.shotDelay = 3f;
+                bullet = new mindustry.entities.bullet.MissileBulletType(3.5f, 25f) {{
+                    lifetime = 50f;
+                    drag = -0.005f;
+                    width = 11f;
+                    height = 12f;
+                    splashDamageRadius = 35f;
+                    splashDamage = 45f;
+                    homingRange = 100f;
+                    weaveMag = 2f;
+                    weaveScale = 8f;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-lepidoptera-gun-big") {{
+                x = 12f;
+                y = -8f;
+                shootY = 4f;
+                reload = 50f;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.ShrapnelBulletType() {{
+                    damage = 80f;
+                    length = 180f;
+                    width = 18f;
+                    toColor = mindustry.graphics.Pal.missileYellow;
+                    hitColor = mindustry.graphics.Pal.bulletYellow;
+                }};
+            }});
+        }};
+
+        // ===== mantodea (T6, 双联防空炮) =====
+        mantodea = new UnitType("mantodea") {{
+            speed = 5f;
+            drag = 0.07f;
+            accel = 0.03f;
+            health = 25000f;
+            engineSize = 0f;
+            flying = true;
+            hitSize = 38f;
+            range = 260f;
+            rotateSpeed = 2f;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.UnitEntity::create;
+
+            weapons.add(new Weapon("create-mantodea-flak") {{
+                x = 14f;
+                y = 6f;
+                shootY = 8f;
+                reload = 15f;
+                mirror = true;
+                rotate = true;
+                rotateSpeed = 5f;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.FlakBulletType(6f, 30f) {{
+                    lifetime = 60f;
+                    splashDamage = 40f;
+                    splashDamageRadius = 50f;
+                    explodeRange = 60f;
+                    width = 10f;
+                    height = 12f;
+                    collidesAir = true;
+                    collidesGround = false;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-mantodea-flak") {{
+                x = 10f;
+                y = -10f;
+                shootY = 8f;
+                reload = 15f;
+                mirror = true;
+                rotate = true;
+                rotateSpeed = 5f;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.FlakBulletType(6f, 30f) {{
+                    lifetime = 60f;
+                    splashDamage = 40f;
+                    splashDamageRadius = 50f;
+                    explodeRange = 60f;
+                    width = 10f;
+                    height = 12f;
+                    collidesAir = true;
+                    collidesGround = false;
+                }};
+            }});
+        }};
+
+        // ═══════════════════════════════════════════════════════════
+        //  PU_V8 ultraviolet 系列飞行单位 (T1-T5, EMP 特化)
+        //  - EmpBasicBulletType → EmpBulletType (vanilla)
+        //  - CloneableSetWeapon → vanilla Weapon (手动展开每个炮台)
+        // ═══════════════════════════════════════════════════════════
+
+        // ===== discharge (T1, EMP弹) =====
+        discharge = new UnitType("discharge") {{
+            flying = true;
+            lowAltitude = true;
+            health = 60f;
+            speed = 2f;
+            accel = 0.09f;
+            drag = 0.02f;
+            hitSize = 11.5f;
+            engineOffset = 7.25f;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.UnitEntity::create;
+            range = 200f;
+
+            weapons.add(new Weapon() {{
+                rotate = false;
+                mirror = false;
+                x = 0f;
+                y = 0f;
+                shootY = 4f;
+                reload = 4f * 60f;
+                shootCone = 360f;
+                bullet = new mindustry.entities.bullet.EmpBulletType() {{
+                    speed = 6f;
+                    damage = 3f;
+                    lifetime = 35f;
+                    splashDamageRadius = 20f;
+                    splashDamage = 3f;
+                    shrinkY = 0f;
+                    height = 14f;
+                    width = 11f;
+                    hitColor = mindustry.graphics.Pal.lancerLaser;
+                    trailColor = backColor = lightColor = mindustry.graphics.Pal.lancerLaser;
+                    frontColor = Color.white;
+                    radius = 80f;
+                }};
+            }});
+        }};
+
+        // ===== pulse (T2, 充能EMP弹) =====
+        pulse = new UnitType("pulse") {{
+            flying = true;
+            lowAltitude = true;
+            health = 210f;
+            speed = 1.8f;
+            accel = 0.1f;
+            drag = 0.06f;
+            hitSize = 16.5f;
+            engineOffset = 8.25f;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.UnitEntity::create;
+            range = 220f;
+
+            weapons.add(new Weapon() {{
+                rotate = false;
+                mirror = false;
+                x = 0f;
+                y = 0f;
+                shootY = 7f;
+                reload = 3f * 60f;
+                shoot.firstShotDelay = 70f;
+                shootCone = 360f;
+                bullet = new mindustry.entities.bullet.EmpBulletType() {{
+                    speed = 6.25f;
+                    damage = 4f;
+                    splashDamageRadius = 25f;
+                    splashDamage = 9f;
+                    shrinkY = 0f;
+                    height = 16f;
+                    width = 12f;
+                    radius = 120f;
+                    hitColor = mindustry.graphics.Pal.lancerLaser;
+                    trailColor = backColor = lightColor = mindustry.graphics.Pal.lancerLaser;
+                    frontColor = Color.white;
+                }};
+            }});
+        }};
+
+        // ===== emission (T3, 双EMP发射器) =====
+        emission = new UnitType("emission") {{
+            flying = true;
+            lowAltitude = true;
+            health = 550f;
+            speed = 1.2f;
+            accel = 0.1f;
+            drag = 0.07f;
+            hitSize = 24.5f;
+            engineOffset = 3.75f;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.UnitEntity::create;
+            range = 250f;
+
+            // 武器1: 双侧EMP发射器
+            weapons.add(new Weapon("create-emission-launcher") {{
+                rotate = true;
+                mirror = true;
+                x = 11.75f;
+                y = -7.25f;
+                shootY = 5f;
+                reload = 1.7f * 60f;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.EmpBulletType() {{
+                    speed = 6f;
+                    damage = 2f;
+                    lifetime = 35f;
+                    splashDamageRadius = 17f;
+                    splashDamage = 2f;
+                    shrinkY = 0f;
+                    height = 13f;
+                    width = 10f;
+                    radius = 90f;
+                    hitColor = mindustry.graphics.Pal.lancerLaser;
+                    trailColor = backColor = lightColor = mindustry.graphics.Pal.lancerLaser;
+                    frontColor = Color.white;
+                }};
+            }});
+
+            // 武器2: 中央大型EMP
+            weapons.add(new Weapon() {{
+                mirror = false;
+                x = 0f;
+                y = -11.5f;
+                shootY = 0f;
+                reload = 5f * 60f;
+                shoot.firstShotDelay = 70f;
+                shootCone = 360f;
+                bullet = new mindustry.entities.bullet.EmpBulletType() {{
+                    speed = 6.7f;
+                    damage = 8f;
+                    splashDamageRadius = 30f;
+                    splashDamage = 12f;
+                    shrinkY = 0f;
+                    height = 17f;
+                    width = 13f;
+                    radius = 150f;
+                    hitColor = mindustry.graphics.Pal.lancerLaser;
+                    trailColor = backColor = lightColor = mindustry.graphics.Pal.lancerLaser;
+                    frontColor = Color.white;
+                }};
+            }});
+        }};
+
+        // ===== waveform (T4, 多联EMP+大型EMP) =====
+        waveform = new UnitType("waveform") {{
+            flying = true;
+            lowAltitude = true;
+            health = 4500f;
+            speed = 0.9f;
+            accel = 0.09f;
+            drag = 0.07f;
+            hitSize = 41.5f;
+            engineOffset = 24.25f;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.UnitEntity::create;
+            range = 280f;
+
+            // 4个小EMP炮台 (CloneableSetWeapon → vanilla Weapon)
+            weapons.add(new Weapon("create-waveform-small-mount") {{
+                x = 15.75f;
+                y = 4f;
+                shootY = 3f;
+                reload = 40f;
+                mirror = true;
+                rotate = true;
+                rotateSpeed = 3f;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.EmpBulletType() {{
+                    speed = 5f;
+                    damage = 3f;
+                    lifetime = 30f;
+                    splashDamageRadius = 15f;
+                    splashDamage = 3f;
+                    shrinkY = 0f;
+                    height = 10f;
+                    width = 8f;
+                    radius = 60f;
+                    hitColor = mindustry.graphics.Pal.lancerLaser;
+                    trailColor = backColor = lightColor = mindustry.graphics.Pal.lancerLaser;
+                    frontColor = Color.white;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-waveform-small-mount") {{
+                x = 15.75f;
+                y = -15.25f;
+                shootY = 3f;
+                reload = 40f;
+                mirror = true;
+                flipSprite = true;
+                rotate = true;
+                rotateSpeed = 3f;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.EmpBulletType() {{
+                    speed = 5f;
+                    damage = 3f;
+                    lifetime = 30f;
+                    splashDamageRadius = 15f;
+                    splashDamage = 3f;
+                    shrinkY = 0f;
+                    height = 10f;
+                    width = 8f;
+                    radius = 60f;
+                    hitColor = mindustry.graphics.Pal.lancerLaser;
+                    trailColor = backColor = lightColor = mindustry.graphics.Pal.lancerLaser;
+                    frontColor = Color.white;
+                }};
+            }});
+
+            // 大型EMP发射器
+            weapons.add(new Weapon("create-waveform-launcher") {{
+                x = 10f;
+                y = -8.5f;
+                reload = 4f * 60f;
+                mirror = true;
+                rotate = true;
+                rotateSpeed = 3f;
+                shootY = 5f;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.EmpBulletType() {{
+                    speed = 6.8f;
+                    damage = 8f;
+                    hitSize = 6f;
+                    splashDamageRadius = 30f;
+                    splashDamage = 14f;
+                    shrinkY = 0f;
+                    height = 18f;
+                    width = 14f;
+                    radius = 160f;
+                    hitColor = mindustry.graphics.Pal.lancerLaser;
+                    trailColor = backColor = lightColor = mindustry.graphics.Pal.lancerLaser;
+                    frontColor = Color.white;
+                }};
+            }});
+        }};
+
+        // ===== ultraviolet (T5, 终极EMP, 10座炮台+大型EMP) =====
+        ultraviolet = new UnitType("ultraviolet") {{
+            flying = true;
+            lowAltitude = true;
+            health = 12000f;
+            speed = 0.53f;
+            accel = 0.06f;
+            drag = 0.07f;
+            hitSize = 57.5f;
+            engineOffset = 33.75f;
+            engineSize = 3.5f;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = mindustry.gen.UnitEntity::create;
+            range = 320f;
+
+            // 10个小EMP炮台 (CloneableSetWeapon → vanilla Weapon, 手动展开)
+            // 前2座
+            weapons.add(new Weapon("create-ultraviolet-mount") {{
+                x = 13.25f; y = 20.25f;
+                shootY = 3f;
+                reload = 30f;
+                mirror = true;
+                rotate = true;
+                rotateSpeed = 3f;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.EmpBulletType() {{
+                    speed = 5f;
+                    damage = 4f;
+                    lifetime = 30f;
+                    splashDamageRadius = 15f;
+                    splashDamage = 4f;
+                    shrinkY = 0f;
+                    height = 10f;
+                    width = 8f;
+                    radius = 80f;
+                    hitColor = mindustry.graphics.Pal.lancerLaser;
+                    trailColor = backColor = lightColor = mindustry.graphics.Pal.lancerLaser;
+                    frontColor = Color.white;
+                }};
+            }});
+
+            // 中4座
+            weapons.add(new Weapon("create-ultraviolet-mount") {{
+                x = 19.75f; y = 12f;
+                shootY = 3f;
+                reload = 30f;
+                mirror = true;
+                rotate = true;
+                rotateSpeed = 3f;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.EmpBulletType() {{
+                    speed = 5f;
+                    damage = 4f;
+                    lifetime = 30f;
+                    splashDamageRadius = 15f;
+                    splashDamage = 4f;
+                    shrinkY = 0f;
+                    height = 10f;
+                    width = 8f;
+                    radius = 80f;
+                    hitColor = mindustry.graphics.Pal.lancerLaser;
+                    trailColor = backColor = lightColor = mindustry.graphics.Pal.lancerLaser;
+                    frontColor = Color.white;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-ultraviolet-mount") {{
+                x = 25.25f; y = 0f;
+                shootY = 3f;
+                reload = 30f;
+                mirror = true;
+                rotate = true;
+                rotateSpeed = 3f;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.EmpBulletType() {{
+                    speed = 5f;
+                    damage = 4f;
+                    lifetime = 30f;
+                    splashDamageRadius = 15f;
+                    splashDamage = 4f;
+                    shrinkY = 0f;
+                    height = 10f;
+                    width = 8f;
+                    radius = 80f;
+                    hitColor = mindustry.graphics.Pal.lancerLaser;
+                    trailColor = backColor = lightColor = mindustry.graphics.Pal.lancerLaser;
+                    frontColor = Color.white;
+                }};
+            }});
+
+            // 后4座
+            weapons.add(new Weapon("create-ultraviolet-mount") {{
+                x = 22.75f; y = -12f;
+                shootY = 3f;
+                reload = 30f;
+                mirror = true;
+                flipSprite = true;
+                rotate = true;
+                rotateSpeed = 3f;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.EmpBulletType() {{
+                    speed = 5f;
+                    damage = 4f;
+                    lifetime = 30f;
+                    splashDamageRadius = 15f;
+                    splashDamage = 4f;
+                    shrinkY = 0f;
+                    height = 10f;
+                    width = 8f;
+                    radius = 80f;
+                    hitColor = mindustry.graphics.Pal.lancerLaser;
+                    trailColor = backColor = lightColor = mindustry.graphics.Pal.lancerLaser;
+                    frontColor = Color.white;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-ultraviolet-mount") {{
+                x = 16f; y = -19.5f;
+                shootY = 3f;
+                reload = 30f;
+                mirror = true;
+                flipSprite = true;
+                rotate = true;
+                rotateSpeed = 3f;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.EmpBulletType() {{
+                    speed = 5f;
+                    damage = 4f;
+                    lifetime = 30f;
+                    splashDamageRadius = 15f;
+                    splashDamage = 4f;
+                    shrinkY = 0f;
+                    height = 10f;
+                    width = 8f;
+                    radius = 80f;
+                    hitColor = mindustry.graphics.Pal.lancerLaser;
+                    trailColor = backColor = lightColor = mindustry.graphics.Pal.lancerLaser;
+                    frontColor = Color.white;
+                }};
+            }});
+
+            // 大型EMP发射器
+            weapons.add(new Weapon("create-ultraviolet-large-launcher") {{
+                x = 0f;
+                y = -15f;
+                reload = 5f * 60f;
+                mirror = true;
+                rotate = true;
+                rotateSpeed = 2f;
+                shootY = 8f;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.EmpBulletType() {{
+                    speed = 7f;
+                    damage = 12f;
+                    hitSize = 8f;
+                    splashDamageRadius = 40f;
+                    splashDamage = 20f;
+                    shrinkY = 0f;
+                    height = 20f;
+                    width = 16f;
+                    radius = 200f;
+                    hitColor = mindustry.graphics.Pal.lancerLaser;
+                    trailColor = backColor = lightColor = mindustry.graphics.Pal.lancerLaser;
+                    frontColor = Color.white;
+                }};
+            }});
+        }};
+
+        // ★ 用反射设置新单位的音效 (v158 字段名可能与 PU_V8 不同) ★
+        try {
+            Class<?> soundsClass = Class.forName("mindustry.gen.Sounds");
+            // citadel: 磁轨炮音效
+            try {
+                java.lang.reflect.Field f = soundsClass.getField("railgun");
+                arc.audio.Sound snd = (arc.audio.Sound) f.get(null);
+                citadel.weapons.first().shootSound = snd;
+            } catch (Throwable ignored) {}
+            // citadel/empire: 火焰喷射音效
+            try {
+                java.lang.reflect.Field f = soundsClass.getField("flame");
+                arc.audio.Sound snd = (arc.audio.Sound) f.get(null);
+                for (int i = 1; i < citadel.weapons.size; i++) citadel.weapons.get(i).shootSound = snd;
+                empire.weapons.first().shootSound = snd;
+            } catch (Throwable ignored) {}
+            // empire: 导弹音效
+            try {
+                java.lang.reflect.Field f = soundsClass.getField("shootSnap");
+                arc.audio.Sound snd = (arc.audio.Sound) f.get(null);
+                empire.weapons.get(1).shootSound = snd;
+            } catch (Throwable ignored) {}
+            // empire: 炮弹音效
+            try {
+                java.lang.reflect.Field f = soundsClass.getField("artillery");
+                arc.audio.Sound snd = (arc.audio.Sound) f.get(null);
+                empire.weapons.get(2).shootSound = snd;
+            } catch (Throwable ignored) {}
+            // cygnus/mantodea: 激光音效
+            try {
+                java.lang.reflect.Field f = soundsClass.getField("laser");
+                arc.audio.Sound snd = (arc.audio.Sound) f.get(null);
+                cygnus.weapons.first().shootSound = snd;
+            } catch (Throwable ignored) {}
+            // caelifera/schistocerca/anthophila: 基础枪械音效
+            try {
+                java.lang.reflect.Field f = soundsClass.getField("pew");
+                arc.audio.Sound snd = (arc.audio.Sound) f.get(null);
+                caelifera.weapons.first().shootSound = snd;
+                schistocerca.weapons.first().shootSound = snd;
+            } catch (Throwable ignored) {}
+        } catch (Throwable t) {
+            try { arc.util.Log.err("set PU_V8 unit sounds failed", t); } catch (Throwable ignored) {}
+        }
     }
 }
