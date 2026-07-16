@@ -243,7 +243,7 @@ public class Z_Exp {
 
         btLaserTurret = new ExpPowerTurret("bt-laser-turret"){{
             requirements(Category.turret, ItemStack.with(Items.surgeAlloy, 80, Z_Items.steel, 120, Z_Items.dirium, 70));
-            size = 3;
+            size = 4;
             health = 2400;
 
             reload = 90f;
@@ -299,7 +299,7 @@ public class Z_Exp {
                 hittable = false;
             }});
             requirements(Category.turret, ItemStack.with(Items.copper, 60, Items.graphite, 50));
-            size = 2;
+            size = 3;
             health = 1200;
 
             reload = 20f;
