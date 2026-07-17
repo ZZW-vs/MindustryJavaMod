@@ -31,6 +31,9 @@ import zzw.content.blocks.soul.SoulItemTurret;
 import zzw.content.blocks.soul.SoulLifeStealerTurret;
 import zzw.content.blocks.soul.SoulTractorBeamTurret;
 import zzw.content.blocks.soul.SoulTurretPowerTurret;
+import zzw.content.blocks.turrets.EndLaserTurret;
+import zzw.content.blocks.turrets.EndGameTurret;
+import zzw.content.units.bullets.EndCutterLaserBulletType;
 
 import static mindustry.Vars.tilesize;
 
@@ -68,6 +71,9 @@ public class Z_AdvTurrets {
     // ===== 3D 模型炮台 (简化为 2D) =====
     public static PowerTurret prism;
     public static LaserTurret supernova;
+    // ===== End 阵营非 3D 炮台 =====
+    public static EndLaserTurret tenmeikiri;
+    public static EndGameTurret endGame;
 
     public static void load() {
         // ===== lifeStealer (PU_V8 L2462-2475) =====
@@ -337,6 +343,70 @@ public class Z_AdvTurrets {
                 incendSpread = 0f;
                 incendChance = 0f;
             }};
+        }};
+
+        // ===== tenmeikiri (PU_V8 L3542-3584, EndLaserTurret + EndCutterLaserBulletType) =====
+        // 持续激光炮台, 充能后发射超长激光 (防作弊伤害, 4 色叠加 + 闪电)
+        // ★ 完整移植: 防作弊系统 + 持续激光跟踪 + 7 层灯光渲染
+        tenmeikiri = new EndLaserTurret("tenmeikiri") {{
+            requirements(Category.turret, ItemStack.with(
+                Items.phaseFabric, 3000, Items.surgeAlloy, 4000,
+                Z_Items.darkAlloy, 1800, Z_Items.terminum, 1200, Z_Items.terminaAlloy, 200));
+            health = 23000;
+            range = 900f;
+            size = 15;
+            shootCone = 1.5f;
+            reload = 5f * 60f;
+            coolantMultiplier = 0.5f;
+            recoilAmount = 15f;
+            consumePower(350f);
+            absorbLasers = true;
+            shootLength = 8f;
+            chargeTime = 158f;
+            chargeEffects = 12;
+            chargeMaxDelay = 80f;
+            // 充能特效 (使用 v158 原生 lancerLaserCharge / lancerLaserChargeBegin)
+            chargeSound = Z_Sounds.tenmeikiriCharge;
+            shootSound = Z_Sounds.tenmeikiriShoot;
+            shake = 4f;
+            shootType = new EndCutterLaserBulletType(7800f) {{
+                maxLength = 1200f;
+                lifetime = 3f * 60f;
+                width = 30f;
+                laserSpeed = 80f;
+                status = mindustry.content.StatusEffects.melting;
+                statusDuration = 200f;
+                lightningColor = Color.valueOf("f53036");  // scarColor
+                lightningDamage = 85f;
+                lightningLength = 15;
+                // 防作弊参数 (PU132 tenmeikiri 原值)
+                ratioDamage = 1f / 60f;
+                ratioStart = 30000f;
+                overDamage = 350000f;
+                bleedDuration = 5f * 60f;
+            }};
+            // 冷却液体 (温度 <= 0.25, 不可燃, 流量 3.1)
+            consume(new mindustry.world.consumers.ConsumeLiquidFilter(
+                liquid -> liquid.temperature <= 0.25f && liquid.flammability < 0.1f, 3.1f));
+        }};
+
+        // ===== endGame (PU_V8 L3586-3607, EndGameTurret) =====
+        // 终极炮台: 三层旋转环 + 16 眼睛追踪射击 + 范围摧毁 + 反子弹 + 防作弊
+        endGame = new EndGameTurret("endgame") {{
+            requirements(Category.turret, ItemStack.with(
+                Items.phaseFabric, 9500, Items.surgeAlloy, 10500,
+                Z_Items.darkAlloy, 2300, Z_Items.lightAlloy, 2300, Z_Items.advanceAlloy, 2300,
+                Z_Items.plagueAlloy, 2300, Z_Items.sparkAlloy, 2300, Z_Items.monolithAlloy, 2300,
+                Z_Items.superAlloy, 2300, Z_Items.terminum, 1600, Z_Items.terminaAlloy, 800, Z_Items.terminationFragment, 100));
+            hasItems = true;
+            itemCapacity = 10;
+            loopSoundVolume = 0.2f;
+            loopSound = Z_Sounds.endgameActive;
+            shootSound = Z_Sounds.endgameShoot;
+            shootType = new BulletType() {{
+                damage = Float.MAX_VALUE;
+            }};
+            consumeItem(Z_Items.terminum, 2);
         }};
     }
 }

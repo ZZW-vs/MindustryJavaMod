@@ -38,7 +38,13 @@ public class Z_Sounds {
         eclipseBeam,      // eclipse 炮台激光循环音效
         // dark/ 目录炮台音效
         extinctionShoot,            // extinction 炮台射击音效
-        beamIntenseHighpitchTone;   // extinction 炮台激光循环音效
+        beamIntenseHighpitchTone,   // extinction 炮台激光循环音效
+        // end/ 目录 tenmeikiri/endgame 音效
+        tenmeikiriCharge,   // tenmeikiri 充能音效
+        tenmeikiriShoot,    // tenmeikiri 射击音效
+        endgameActive,      // endgame 循环音效
+        endgameShoot,       // endgame 主射击音效
+        endgameSmallShoot;  // endgame 副射击音效
 
     public static void load() {
         spaceFracture = loadSound("end/space-fracture");
@@ -72,6 +78,13 @@ public class Z_Sounds {
         // dark/ 目录
         extinctionShoot = loadSound("dark/extinction-shoot");
         beamIntenseHighpitchTone = loadSound("dark/beam-intense-highpitch-tone");
+
+        // end/ 目录 tenmeikiri/endgame
+        tenmeikiriCharge = loadSound("end/tenmeikiri-charge");
+        tenmeikiriShoot = loadSound("end/tenmeikiri-shoot");
+        endgameActive = loadSound("end/endgame-active");
+        endgameShoot = loadSound("end/endgame-shoot");
+        endgameSmallShoot = loadSound("end/endgame-small-shoot");
     }
 
     /**
