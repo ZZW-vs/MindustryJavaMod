@@ -61,7 +61,8 @@ public class ZObjs {
         prism.lightColor = Color.valueOf("87ceeb");
         prism.shadeColor = Color.valueOf("6586b0");
         prism.drawLayer = Layer.turret;
-        // prism.obj 已添加法线 (vn), 用默认 normalAngle 着色 + 背面剔除
+        // prism.obj 已添加法线 (vn), 用默认 normalAngle 着色
+        // ★ cullBackfaces 默认 false - 伪3D俯视相机中屏幕 Z 轴剔除会错误移除大量面
 
         Events.on(EventType.FileTreeInitEvent.class, e -> {
             // 延迟到下一帧, 确保 atlas 已就绪 (PU_V8 同样用 Core.app.post 包裹)

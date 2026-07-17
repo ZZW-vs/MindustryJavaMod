@@ -76,7 +76,9 @@ public class PrismTurret extends SoulTurretPowerTurret {
 
             boolean act = isActive();
             prismHeat = Mathf.lerpDelta(prismHeat, act ? efficiency : 0f, act ? warmup : cooldownSpeed);
-            prismRotation += prismHeat * prismRotateSpeed * Mathf.signs[id % 2];
+            // ★ 钻石旋转方向与炮台旋转方向相反 (用户要求)
+            // PU132 原版用 += Mathf.signs[id % 2] (相邻炮台交替), 改为 -= 让钻石反向旋转
+            prismRotation -= prismHeat * prismRotateSpeed * Mathf.signs[id % 2];
         }
 
         @Override

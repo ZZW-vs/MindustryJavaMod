@@ -195,6 +195,27 @@
 
 ## 更新日志
 
+### v1.6.1 (5炮台修复 - 严格按PU132原版)
+- **create-supernova 完全重写**：修复之前重写失败的问题（不转向/不显示底座/不发射/无蓄力动画）
+  - 移除 `SoulLaserTurret.updateTile()` 中的 `efficiency *= soulEfficiency()` 副作用（导致 LaserTurret.updateShooting 检查失败，炮台无法发射）
+  - `chargeWarmup` 从 0.002（原版8秒充满）改为 0.015f（约1秒充满），phase 累积同步提速
+  - 完整移植 PU132 6 部件 drawer（outline + 主体 + core）+ heatDrawer 加法混合渲染到 `SupernovaDrawer.draw()`
+  - 保留完整机制：attractUnits 吸引单位 + 持续闪电 + 星辰闪光环 + 充能音效
+- **create-endgame 慢闪电调优 + 红色光束 + 湮灭特效**：
+  - 慢闪电参数：nodeLength=80（更长的闪电链）、splitChance=0.025（减少分叉）、jaggedPoints=1、jaggedness=0.06（更自然的锯齿）
+  - 光束攻击（非激光）：每个眼睛发射多层叠加红色光束（f53036 红 → ff786e 淡红 → 白），持续时间 76f（原版时长）
+  - 湮灭特效：被打死的单位触发 mixcol(red,1) + additive 混合 + 渲染单位 fullIcon 的湮灭效果
+  - 修复编译错误：添加 `import mindustry.graphics.Layer;`
+- **create-tenmeikiri 真正的单位切割动画**：重写 [UnitCutEffect.java](src/zzw/content/units/effects/UnitCutEffect.java)
+  - 使用 v155.4 内置 `Draw.stencil(mask, content)` API 替代简化版两半椭圆模拟
+  - mask 半平面 quad 遮罩 + content 单位贴图渲染，实现真正的单位切割
+  - 摄像机偏移让两半飞出动画更具视觉冲击力
+  - 末期爆炸（dynamicExplosion + scorch + deathSound）+ 持续烟尘
+- **create-prism 钻石锥形修复 + 反向旋转**：
+  - 修复法线剔除 bug：`Math.abs(face.normal[0].angle(Vec3.Z)) >= 90f` 在伪3D俯视相机中错误剔除大量面，通过 `cullBackfaces` 字段（默认 false）控制
+  - 钻石旋转方向改为与炮台相反：`prismRotation -= prismHeat * prismRotateSpeed * Mathf.signs[id % 2]`
+- **create-wavefront 3D 炮身显示修复**：与 prism 共用 WavefrontObject.cullBackfaces 修复，伪3D俯视相机不再错误剔除面
+
 ### v1.5.2 (EndGame 红光束 + tenmeikiri 切割 + prism 钻石 + wavefront 修复)
 - **create-endgame 完整移植红色光束**：按 PU_V8 UnityFx.endgameLaser 原版完整移植 endgameLaserEffect。3 层颜色叠加（f53036 红 → ff786e 淡红 → 白）+ 持续时间从 22f 升级到 76f（原版时长）+ 头部偏移动画（lerp 渐进到目标点）。每个眼睛发射激光时不再只是单线，而是真实的多层叠加红光束
 - **create-tenmeikiri 还原切割效果**：新增 [UnitCutEffect.java](src/zzw/content/units/effects/UnitCutEffect.java)，当大单位（hitSize>=30）被激光击杀时触发切割动画：沿激光方向将单位分为两半飞出 + 持续烟尘 + 末期爆炸（dynamicExplosion + scorch + deathSound）。简化版用两半椭圆 + 红色切线模拟切割，因 v158 EffectState 是注解生成的 pooled entity 不能继承，改用 Effect + CutData 模式

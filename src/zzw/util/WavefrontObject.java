@@ -48,6 +48,8 @@ public class WavefrontObject{
     public float size = 1f;
     public float shadingSmoothness = 2.8f;
     public float drawLayer = Layer.blockBuilding;
+    /** 是否启用屏幕法线背面剔除 (默认 false - 伪3D 中屏幕 Z 轴剔除不适用俯视相机) */
+    public boolean cullBackfaces = false;
     protected int indexerA;
     protected float indexerZ;
 
@@ -285,7 +287,7 @@ public class WavefrontObject{
             float z = (indexerZ * zScale) + drawLayer;
             Draw.z(z);
 
-            if(hasNormal){
+            if(cullBackfaces && hasNormal){
                 if(Math.abs(face.normal[0].angle(Vec3.Z)) >= 90f) continue;
             }
 

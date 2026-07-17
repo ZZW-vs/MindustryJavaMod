@@ -119,8 +119,9 @@ public class SoulLaserTurret extends LaserTurret implements ISoulTurret {
         @Override
         public void updateTile() {
             super.updateTile();
-            // v158 中 efficiency 是字段, 通过乘以灵魂倍率调整
-            efficiency *= soulEfficiency();
+            // ★ 不在 updateTile 中修改 efficiency (会导致 LaserTurret.updateShooting 失败)
+            // 灵魂系统通过 updateSoulDamage() 影响 shootType.damage, 而非 efficiency
+            // efficiency *= soulEfficiency() 已移除 - 避免 supernova 等炮台无法射击
         }
 
         @Override

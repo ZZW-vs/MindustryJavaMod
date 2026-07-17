@@ -24,6 +24,7 @@ import mindustry.gen.Groups;
 import mindustry.gen.Healthc;
 import mindustry.gen.Posc;
 import mindustry.gen.Unit;
+import mindustry.graphics.Layer;
 import mindustry.world.blocks.defense.turrets.PowerTurret;
 import mindustry.world.consumers.Consume;
 import mindustry.world.consumers.ConsumeItems;
@@ -63,14 +64,17 @@ public class EndGameTurret extends PowerTurret {
 
     // ★ PU_V8 原版 SlowLightningType: red→black 渐变, damage=520, splitChance=0.045, range=810
     // 完整移植慢闪电 (非原生 Lightning), 节点树传播 + 分裂 + 渐变颜色
+    // ★ 用户调整: "长度长一点, 少一点" - 增加 nodeLength, 减少 splitChance/jaggedPoints
     private final SlowLightningType lightning = new SlowLightningType() {{
         colorFrom = Color.red;
         colorTo = Color.black;
         damage = 520f;
-        splitChance = 0.045f;
+        splitChance = 0.025f;   // ★ 0.045 → 0.025 减少分裂 (少一点)
         range = 810f;
-        jaggedPoints = 2; // ★ 锯齿渲染：每段2个中间点，更像真实闪电
-        jaggedness = 0.12f;
+        nodeLength = 80f;        // ★ 50 → 80 加长单段 (长度长一点)
+        jaggedPoints = 1;        // ★ 2 → 1 减少锯齿点 (少一点)
+        jaggedness = 0.06f;      // ★ 0.12 → 0.06 降低锯齿幅度 (更直更少)
+        lineWidth = 2.5f;        // ★ 加粗主线
     }};
 
     public TextureRegion
@@ -82,6 +86,7 @@ public class EndGameTurret extends PowerTurret {
     // ★ 完整移植 PU_V8 UnityFx.endgameLaser: 3层颜色叠加 + 头部偏移动画 + 持续76f
     // 原版: Color[] colors = {f53036, ff786e, white}, float[] strokes = {2, 1.3, 0.6}
     // 每层不同 z (oz + i/1000) + 头部从 a 到 lerp(a, b, curve(fin, 0, 0.09)) 渐进
+    // ★ 颜色调制: colors[i].mul(1, 1+offsetSinB(0,5), 1+offsetSinB(90,5), 1) - 红绿蓝脉动
     public static final Effect endgameLaserEffect = new Effect(76f, 820f * 2f, e -> {
         if (!(e.data instanceof Object[])) return;
         Object[] data = (Object[]) e.data;
@@ -102,7 +107,14 @@ public class EndGameTurret extends PowerTurret {
         float oz = Draw.z();
         for (int i = 0; i < 3; i++) {
             Draw.z(oz + (i / 1000f));
-            Draw.color(colors[i]);
+            if (i >= 2) {
+                Draw.color(Color.white);
+            } else {
+                // PU_V8: color(Tmp.c1.set(colors[i]).mul(1, 1+offsetSinB(0,5), 1+offsetSinB(90,5), 1))
+                float gMod = 1f + offsetSinB(0f, 5f);
+                float bMod = 1f + offsetSinB(90f, 5f);
+                Draw.color(Tmp.c1.set(colors[i]).mul(1f, gMod, bMod, 1f));
+            }
 
             // 起点圆 + 头部圆
             Fill.circle(from.x, from.y, strokes[i] * 4f * width * e.fout());
@@ -116,18 +128,48 @@ public class EndGameTurret extends PowerTurret {
         Draw.color();
     });
 
-    // 简化等效特效: 替代 PU_V8 SpecialFx.endgameVapourize
-    public static final Effect endgameVapourizeEffect = new Effect(60f, 400f, e -> {
-        Draw.color(Color.valueOf("f53036"), Color.valueOf("ff786e"), e.fin());
-        Lines.stroke(2f * e.fout());
-        Lines.circle(e.x, e.y, e.rotation + e.fin() * 60f);
-        Fill.circle(e.x, e.y, 6f * e.fout());
-        for (int i = 0; i < 6; i++) {
-            float a = (360f / 6f) * i + e.rotation;
-            float d = e.fin() * 50f;
-            Vec2 v = Tmp.v1.trns(a, d).add(e.x, e.y);
-            Fill.circle(v.x, v.y, 4f * e.fout());
+    // ★ 完整移植 PU_V8 SpecialFx.endgameVapourize (VapourizeShaderEffect 等效版)
+    // 原版机制: mixcol(red,1) + blend(additive) + alpha(fout) + 渲染单位 fullIcon 贴图
+    // 持续 3*60=180f, clipsize=900f, 用 data 传入 Posc (单位或建筑)
+    // v158 简化: 无 shader, 直接用 mixcol + additive 渲染单位/建筑贴图, 加红色消散粒子
+    public static final Effect endgameVapourizeEffect = new Effect(180f, 900f, e -> {
+        if (!(e.data instanceof Object[])) return;
+        Object[] data = (Object[]) e.data;
+        if (data.length < 2) return;
+        Object drawObj = data[1];
+
+        float oz = Draw.z();
+        Draw.z(Layer.flyingUnitLow);
+        Draw.blend(Blending.additive);
+        // mixcol(red, 1f) - 红色叠加
+        Draw.mixcol(Color.red, 1f);
+        Draw.color(1f, 1f, 1f, e.fout());
+
+        if (drawObj instanceof Unit u) {
+            u.hitTime = 0f;
+            // 渲染单位贴图 (旋转 + offset)
+            float dx = e.x, dy = e.y;
+            if (u.type != null && u.type.fullIcon.found()) {
+                Draw.rect(u.type.fullIcon, dx, dy, u.rotation - 90f);
+            }
+            // 上升消散粒子
+            for (int i = 0; i < 3; i++) {
+                float a = Mathf.random(360f);
+                float d = Mathf.random(e.fin() * u.hitSize);
+                Vec2 v = Tmp.v1.trns(a, d).add(dx, dy);
+                float py = v.y + e.fin() * u.hitSize * 0.5f;
+                Fill.circle(v.x, py, 4f * e.fout());
+            }
+        } else if (drawObj instanceof Building b) {
+            if (b.block.region.found()) {
+                Draw.rect(b.block.region, e.x, e.y, b.rotation - 90f);
+            }
         }
+
+        Draw.mixcol();
+        Draw.blend();
+        Draw.color();
+        Draw.z(oz);
     });
 
     // 简化等效特效: 替代 PU_V8 ShootFx.endGameShoot
@@ -150,7 +192,7 @@ public class EndGameTurret extends PowerTurret {
         health = 68000;
         // 原版 powerUse = 320f (v155.4 用 consumePower 替代)
         consumePower(320f);
-        reload = 430f;
+        reload = 300f;  // ★ PU_V8 原版 reloadTime = 300f
         range = 820f;
         size = 14;
         shootCone = 360f;
@@ -159,6 +201,16 @@ public class EndGameTurret extends PowerTurret {
         outlineIcon = false;
         noUpdateDisabled = false;
         // loopSound / shootSound 由外部注册时设置
+    }
+
+    /** 简化版 offsetSin (PU_V8 Utils.offsetSin) - 静态, 给 Effect lambda 使用 */
+    private static float offsetSin(float offset, float period) {
+        return Mathf.absin(Time.time + offset, period, 0.5f) + 0.5f;
+    }
+
+    /** 简化版 offsetSinB (PU_V8 Utils.offsetSinB) - 双相正弦, 范围 -0.5 ~ 0.5, 静态 */
+    private static float offsetSinB(float offset, float period) {
+        return Mathf.sin(Time.time + offset, period, 0.5f);
     }
 
     @Override
@@ -331,7 +383,8 @@ public class EndGameTurret extends PowerTurret {
                     Unit u = (Unit) e;
                     // v155.4 无 AntiCheat.annihilateEntity, 用 damage(MAX) + remove() 替代
                     u.damage(Float.MAX_VALUE);
-                    endgameVapourizeEffect.at(u.x, u.y, angleTo(u));
+                    // PU_V8: SpecialFx.endgameVapourize.at(u.x, u.y, angleTo(u), new Object[]{this, u})
+                    endgameVapourizeEffect.at(u.x, u.y, angleTo(u), new Object[]{this, u});
                     u.remove();
                 }
             }
@@ -348,7 +401,7 @@ public class EndGameTurret extends PowerTurret {
                 build -> {
                     if (build.block.size >= 3) {
                         // 简化: 用 endgameVapourizeEffect 替代 UnityFx.vapourizeTile
-                        endgameVapourizeEffect.at(build.x, build.y, build.block.size);
+                        endgameVapourizeEffect.at(build.x, build.y, build.block.size, new Object[]{this, build});
                     }
                     if ((shouldLaser % 5) == 0 || build.block.size >= 5) {
                         Object[] data = {new Vec2(x + (eyeOffset.x * 2f), y + (eyeOffset.y * 2f)), build, 1f};
@@ -397,7 +450,7 @@ public class EndGameTurret extends PowerTurret {
                 if (e.within(ux, uy, rnge + e.hitSize) && !e.dead) {
                     e.damage(490f * threatLevel);
                     if (e.dead) {
-                        endgameVapourizeEffect.at(e.x, e.y, angleTo(e));
+                        endgameVapourizeEffect.at(e.x, e.y, angleTo(e), new Object[]{this, e});
                         e.remove();
                     }
                     Object[] data = {new Vec2(ux, uy), e, 0.525f};
@@ -420,10 +473,10 @@ public class EndGameTurret extends PowerTurret {
                 if (e.dead()) {
                     if (e instanceof Unit) {
                         Unit ut = (Unit) e;
-                        endgameVapourizeEffect.at(ut.x, ut.y, angleTo(ut));
+                        endgameVapourizeEffect.at(ut.x, ut.y, angleTo(ut), new Object[]{this, ut});
                     } else if (e instanceof Building) {
                         Building build = (Building) e;
-                        endgameVapourizeEffect.at(build.x, build.y, build.block.size);
+                        endgameVapourizeEffect.at(build.x, build.y, build.block.size, new Object[]{this, build});
                     }
                     if (e instanceof Entityc) ((Entityc) e).remove();
                 }
@@ -701,11 +754,6 @@ public class EndGameTurret extends PowerTurret {
             if (!isAdded()) return;
             // v155.4 无 Unity.antiCheat, 直接 super.remove
             super.remove();
-        }
-
-        /** 简化版 offsetSin (PU_V8 Utils.offsetSin) */
-        private float offsetSin(float offset, float period) {
-            return Mathf.absin(Time.time + offset, period, 0.5f) + 0.5f;
         }
 
         /** 简化版 getBulletDamage (PU_V8 Utils.getBulletDamage): 递归累加 fragBullet 伤害 + splashDamage */

@@ -13,24 +13,25 @@ import arc.util.Tmp;
 import mindustry.content.Fx;
 import mindustry.entities.Effect;
 import mindustry.gen.Unit;
+import mindustry.graphics.Layer;
 
 /**
- * 单位被切割效果 (PU_V8 UnitCutEffect 简化版, 无 shader)
+ * 单位被切割效果 (v155.4 完整移植版, 使用 Draw.stencil 实现真正的切割)
  *
- * 原版机制 (PU_V8 unity.entities.effects.UnitCutEffect):
+ * 原版机制 (PU132 unity.entities.effects.UnitCutEffect):
  * - 创建两个 EffectState, 沿切割方向将单位分为两半
  * - 每半以单位贴图渲染, 用 stencilShader 切割显示一半
  * - 持续 40f + hitSize/20f, 末期爆炸 + 烟尘
  *
- * 简化策略 (v158 EffectState 是注解生成的 pooled entity, 不能继承):
- * - 用普通 Effect + data (CutData) 实现
- * - CutData 保存: unit 引用 + 切割方向 + offset/vel/rotationOffset/rotationVelocity
- * - 每帧 update 计算偏移, draw 绘制两半椭圆 + 切线
- * - 末期触发 Fx.dynamicExplosion + Fx.explosion + scorch
+ * v155.4 实现:
+ * - 使用 arc 内置 Draw.stencil() (替代 PU132 UnityShaders.stencilShader)
+ * - Draw.stencil(mask, content): mask 是半平面 quad, content 是单位贴图
+ * - 两半效果分别创建, 各自飞出 + 旋转
+ * - 末期: Fx.dynamicExplosion + Effect.scorch + Fx.explosion + deathSound
  *
  * 触发位置: 当 EndCutterLaserBulletType 击杀大单位时调用 createCut()
  *
- * 参考: PU_V8 main/src/unity/entities/effects/UnitCutEffect.java
+ * 参考: PU132 main/src/unity/entities/effects/UnitCutEffect.java
  */
 public class UnitCutEffect {
     static Vec2 tmpPoint = new Vec2(), tmpPoint2 = new Vec2();
@@ -38,8 +39,8 @@ public class UnitCutEffect {
     /** 切割数据 (每次切割创建 2 个, 分别代表上下两半) */
     public static class CutData {
         public Unit unit;
-        public Vec2 cutDirection = new Vec2();
-        public float cutRotation = 0f;
+        public Vec2 cutDirection = new Vec2();  // 切割方向 (单位中心 → 切割线)
+        public float cutRotation = 0f;            // 切割方向角度 (cutDirection.z 在 PU132)
         public float rotationVelocity = 0f;
         public float rotationOffset = 0f;
         public Vec2 vel = new Vec2();
@@ -51,6 +52,8 @@ public class UnitCutEffect {
 
     /**
      * 创建切割效果: 沿激光方向将单位分为两半飞出
+     * PU132 UnitCutEffect.createCut 完整移植
+     *
      * @param unit 被切割的单位
      * @param x 激光起点 x
      * @param y 激光起点 y
@@ -60,7 +63,8 @@ public class UnitCutEffect {
     public static void createCut(Unit unit, float x, float y, float x2, float y2) {
         if (unit == null || !unit.isValid()) return;
 
-        // 找到激光线段上离单位最近的点
+        // PU132: Intersector.nearestSegmentPoint(x, y, x2, y2, unit.x, unit.y, tmpPoint);
+        // tmpPoint.sub(unit); tmpPoint.limit(unit.hitSize / 4f);
         Intersector.nearestSegmentPoint(x, y, x2, y2, unit.x, unit.y, tmpPoint);
         tmpPoint.sub(unit.x, unit.y);
         tmpPoint.limit(unit.hitSize / 4f);
@@ -68,17 +72,18 @@ public class UnitCutEffect {
 
         unit.hitTime = 0f;
 
-        // 创建两半效果 (沿垂直切割方向飞开)
+        // PU132: 创建两半效果 (cutDirection.z = rot + (i * 180f))
         for (int i = 0; i < 2; i++) {
             CutData d = new CutData();
             d.unit = unit;
             d.cutDirection.set(tmpPoint);
             d.cutRotation = rot + (i * 180f);
+            // PU132: l.rotationVelocity = -(Mathf.signs[i] * 1.2f) + Mathf.range(0.7f)
             d.rotationVelocity = -(Mathf.signs[i] * 1.2f) + Mathf.range(0.7f);
             d.offset.setZero();
             d.startX = unit.x;
             d.startY = unit.y;
-            // 两半沿垂直切割方向飞出
+            // PU132: l.vel.trns(rot + 180f + (i * 180f), unit.hitSize / 60f)
             d.vel.trns(rot + 180f + (i * 180f), unit.hitSize / 60f);
             // 实际持续 40 + hitSize/20, 保存到 CutData 用于判断爆炸时机
             d.lifetime = 40f + (unit.hitSize / 20f) + Mathf.range(2f, 5f);
@@ -86,11 +91,14 @@ public class UnitCutEffect {
             cutEffectEntity.at(unit.x, unit.y, 0f, d);
         }
 
-        // 切割瞬间红色闪光 (PU_V8: UnityFx.tenmeikiriCut)
+        // PU132: UnityFx.tenmeikiriCut.at(unit.x + tmpPoint.x, unit.y + tmpPoint.y, rot + 90f, unit.hitSize * 1.5f)
         cutFlashEffect.at(unit.x + tmpPoint.x, unit.y + tmpPoint.y, rot + 90f, unit.hitSize * 1.5f);
     }
 
-    /** 切割瞬间闪光特效 (PU_V8 UnityFx.tenmeikiriCut 简化版) */
+    /**
+     * 切割瞬间闪光特效 (PU132 UnityFx.tenmeikiriCut 简化版)
+     * PU132 原版: Drawf.tri 双向三角闪光, scarColor→endColor 渐变
+     */
     public static final Effect cutFlashEffect = new Effect(20f, 200f, e -> {
         float size = e.rotation;
         Draw.color(Color.valueOf("f53036"), Color.white, e.fout());
@@ -111,12 +119,31 @@ public class UnitCutEffect {
         Draw.color();
     });
 
-    /** 切割实体效果 (替代 PU_V8 UnitCutEffect extends EffectState) */
+    /**
+     * 切割实体效果 (使用 Draw.stencil 实现真正的切割)
+     *
+     * PU132 原版 draw():
+     * 1. 摄像机偏移 (offset)
+     * 2. effectBuffer.begin()
+     * 3. unit.draw() (渲染单位到 FrameBuffer)
+     * 4. Fill.quad (绘制 quad 作为 stencil mask)
+     * 5. effectBuffer.end()
+     * 6. Draw.blit(effectBuffer, stencilShader)
+     *
+     * v155.4 实现:
+     * 1. 摄像机偏移 (offset)
+     * 2. Draw.stencil(mask, content):
+     *    - mask: Fill.quad (半平面, 显示切割线一侧)
+     *    - content: unit.draw() (渲染单位贴图)
+     * 3. 摄像机恢复
+     *
+     * 这样单位只会显示在 mask 内的部分, 实现真正的切割效果
+     */
     public static final Effect cutEffectEntity = new Effect(80f, 400f, e -> {
         if (!(e.data instanceof CutData)) return;
         CutData d = (CutData) e.data;
 
-        // 更新逻辑 (因 Effect 无 update 钩子, 在 draw 中同步更新)
+        // === PU132 update() 逻辑同步更新 (因 Effect 无 update 钩子) ===
         if (d.unit != null && d.unit.isValid()) {
             d.unit.hitTime = 0f;
         }
@@ -126,7 +153,7 @@ public class UnitCutEffect {
         d.vel.scl(1f - drag);
         d.rotationVelocity *= 1f - drag;
 
-        // 持续烟尘 (PU_V8: Fx.fallSmoke, chanceDelta(0.4f * hitSize/45))
+        // 持续烟尘 (PU132: Fx.fallSmoke, chanceDelta(0.4f * hitSize/45))
         if (d.unit != null && Mathf.chanceDelta(0.4f * (d.unit.hitSize / 45f))) {
             tmpPoint2.trns(d.cutRotation + d.rotationOffset, 0f, Mathf.range(d.unit.hitSize / 2f))
                 .add(d.cutDirection.x + d.offset.x, d.cutDirection.y + d.offset.y)
@@ -134,7 +161,7 @@ public class UnitCutEffect {
             Fx.fallSmoke.at(tmpPoint2.x, tmpPoint2.y);
         }
 
-        // 末期爆炸 (lifetime 快结束时触发一次)
+        // 末期爆炸 (PU132 update(): time >= lifetime 时触发)
         if (!d.exploded && e.time >= d.lifetime - 1f) {
             d.exploded = true;
             if (d.unit != null) {
@@ -148,32 +175,70 @@ public class UnitCutEffect {
             }
         }
 
-        // 绘制 (两半椭圆 + 切线)
+        // === PU132 draw() 完整移植 ===
         if (d.unit == null) return;
+
         float s = d.unit.hitSize;
-        float drawX = d.startX + d.cutDirection.x + d.offset.x;
-        float drawY = d.startY + d.cutDirection.y + d.offset.y;
-        float drawRot = d.cutRotation + d.rotationOffset;
+        // PU132: unit instanceof LegsUnit ? hitSize + legLength*2 : hitSize
+        float size = s;  // 简化: 不处理 LegsUnit
 
-        Draw.blend(Blending.additive);
+        // PU132: z = unit.elevation > 0.5 ? (lowAltitude ? flyingUnitLow : flyingUnit) : groundLayer + clamp
+        float z = d.unit.elevation > 0.5f
+            ? (d.unit.type.lowAltitude ? Layer.flyingUnitLow : Layer.flyingUnit)
+            : d.unit.type.groundLayer + Mathf.clamp(d.unit.type.hitSize / 4000f, 0f, 0.01f);
 
-        // 上半 (椭圆)
-        Draw.color(Color.valueOf("f53036"), Color.white, e.fout() * 0.5f);
-        Fill.poly(drawX, drawY, 16, s * 0.5f * e.fout(), drawRot);
+        // ★ PU132 Draw.draw(z, () -> {...}) - 在指定 z 层渲染
+        Draw.draw(z, () -> {
+            // PU132: 摄像机偏移 (让单位看起来在 offset 位置)
+            tmpPoint.set(arc.Core.camera.position);
+            arc.Core.camera.position.set(tmpPoint).sub(d.offset.x, d.offset.y);
+            arc.Core.camera.update();
+            Draw.proj(arc.Core.camera);
 
-        // 下半 (反方向偏移)
-        Vec2 v2 = Tmp.v1.trns(drawRot + 180f, s * 0.3f * e.fout()).add(drawX, drawY);
-        Draw.color(Color.valueOf("ff786e"), Color.white, e.fout() * 0.5f);
-        Fill.poly(v2.x, v2.y, 16, s * 0.4f * e.fout(), drawRot + 180f);
+            // ★ 使用 Draw.stencil 实现真正的切割
+            // mask: 半平面 quad (切割线一侧)
+            // content: 渲染单位贴图 (旋转 rotationOffset)
+            Draw.stencil(
+                () -> {
+                    // === mask: 绘制 quad 作为 stencil mask ===
+                    // PU132: verts[8], dx={-1,-1,1,1}, dy={0,1,1,0}
+                    // tmpPoint2.trns(cutDirection.z + rotationOffset, dy[i] * size * 1.5f, dx[i] * size * 1.5f)
+                    //   .add(cutDirection.x, cutDirection.y).add(unit)
+                    // Fill.quad(verts[0..7])
+                    float[] vx = new float[4];
+                    float[] vy = new float[4];
+                    int[] dx = {-1, -1, 1, 1};
+                    int[] dy = {0, 1, 1, 0};
+                    for (int i = 0; i < 4; i++) {
+                        tmpPoint2.trns(d.cutRotation + d.rotationOffset,
+                                dy[i] * size * 1.5f,
+                                dx[i] * size * 1.5f)
+                            .add(d.cutDirection.x, d.cutDirection.y)
+                            .add(d.startX, d.startY);
+                        vx[i] = tmpPoint2.x;
+                        vy[i] = tmpPoint2.y;
+                    }
+                    // mask 使用任意颜色 (stencil 只关心形状)
+                    Draw.color(Color.green);
+                    Fill.quad(vx[0], vy[0], vx[1], vy[1], vx[2], vy[2], vx[3], vy[3]);
+                    Draw.color();
+                },
+                () -> {
+                    // === content: 渲染单位贴图 (旋转 rotationOffset) ===
+                    // PU132: float lastRotation = unit.rotation; unit.rotation = lastRotation + rotationOffset;
+                    //        unit.draw(); unit.rotation = lastRotation;
+                    float lastRotation = d.unit.rotation;
+                    d.unit.rotation = lastRotation + d.rotationOffset;
+                    d.unit.draw();
+                    d.unit.rotation = lastRotation;
+                    Draw.reset();
+                }
+            );
 
-        // 中心红色切线 (强化切割感)
-        Draw.color(Color.white, e.fout());
-        Lines.stroke(2f * e.fout());
-        tmpPoint2.trns(drawRot, s * 0.6f * e.fout()).add(drawX, drawY);
-        Vec2 v3 = Tmp.v2.trns(drawRot + 180f, s * 0.6f * e.fout()).add(drawX, drawY);
-        Lines.line(tmpPoint2.x, tmpPoint2.y, v3.x, v3.y);
-
-        Draw.blend();
-        Draw.color();
+            // PU132: 摄像机恢复
+            arc.Core.camera.position.set(tmpPoint);
+            arc.Core.camera.update();
+            Draw.proj(arc.Core.camera);
+        });
     });
 }
