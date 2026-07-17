@@ -10,6 +10,8 @@ import arc.math.geom.Vec2;
 import arc.util.Tmp;
 import arc.util.Time;
 import arc.util.Log;
+import arc.util.io.Reads;
+import arc.util.io.Writes;
 import mindustry.Vars;
 import mindustry.gen.Unit;
 import mindustry.gen.UnitEntity;
@@ -374,6 +376,11 @@ public class SegmentWormEntity extends UnitEntity {
     /** 段身是否已创建 (兜底: add() 没触发就在 update() 里创建) */
     private boolean segmentsCreated = false;
 
+    /** ★ 存档读入的段身数量 (-1 = 未读档, 0+ = 按此数量重建段身)
+     *  PU132 WormDefaultUnit.read/write: 保存 segmentUnits.length 防止读档时重建完整虫子
+     *  v158 调用顺序: read() → add(), 所以 add() 时可读取此值 */
+    private int savedSegmentCount = -1;
+
     /** 上一帧速度 (PU132 lastVelocityC, 用于段身速度平滑) */
     protected final Vec2 lastVelocityC = new Vec2();
     /** 上上帧速度 (PU132 lastVelocityD, 用于 3 帧平均) */
@@ -452,7 +459,9 @@ public class SegmentWormEntity extends UnitEntity {
                     preventDrifting = cfg.preventDrifting;
                     headOffset = cfg.headOffset;
                     barrageRange = cfg.barrageRange;
-                    createSegments(cfg.count, cfg.segmentType);
+                    // ★ 读档时用 savedSegmentCount, 新建时用 cfg.count (PU132 addSegments=false 模式)
+                    int count = savedSegmentCount >= 0 ? savedSegmentCount : cfg.count;
+                    createSegments(count, cfg.segmentType);
                     segmentsCreated = true;
                 } catch (Throwable t) {
                     Log.err("[头部] 段身创建失败", t);
@@ -462,7 +471,8 @@ public class SegmentWormEntity extends UnitEntity {
                 // 旧路径 (向后兼容)
                 try {
                     segmentSpacing = defaultSegmentSpacing;
-                    createSegments(defaultSegmentCount, defaultSegmentType);
+                    int count = savedSegmentCount >= 0 ? savedSegmentCount : defaultSegmentCount;
+                    createSegments(count, defaultSegmentType);
                     segmentsCreated = true;
                 } catch (Throwable t) {
                     Log.err("[头部] 旧路径创建失败", t);
@@ -673,6 +683,46 @@ public class SegmentWormEntity extends UnitEntity {
             type.deathSound.at(seg);
             seg.remove();
         }
+    }
+
+    /**
+     * ★ 存档写入 (PU132 WormDefaultUnit.write L462-478 简化版)
+     *
+     * PU132 原版完整保存每段位置/朝向/类型/血量, v158 简化为只保存段身数量:
+     * - 读档时按保存数量 createSegments() 重建段身 (位置由算法计算)
+     * - 这样修复"读档后段身重置成完整"的问题:
+     *   原本3个头无段身 → 保存 segments.length=0 → 读档创建0段身 → 不重建
+     *
+     * v158 调用顺序: read() → add() → update()
+     * - read() 中读取 savedSegmentCount, 但 type 此时可能未设置 (TypeIO.readUnit 在 super.read 中调用)
+     * - add() 中根据 savedSegmentCount 创建对应数量段身
+     */
+    @Override
+    public void write(Writes write) {
+        super.write(write);
+        // 写出当前段身数量
+        write.i(segments.length);
+        // 写出 splittable 标志 (PU132 原版, 用于未来扩展保存段身独立血量)
+        write.bool(splittable);
+        // 写出再生计时器 (PU132 原版)
+        write.f(repairTime);
+    }
+
+    /**
+     * ★ 存档读取 (PU132 WormDefaultUnit.read L418-458 简化版)
+     *
+     * v158 UnitEntity.read(Reads) 不带 revision 参数 (与 Building.read 不同)
+     * v158 调用顺序: read() → add() → update()
+     * - read() 中读取 savedSegmentCount, 但 type 此时可能未设置 (TypeIO.readUnit 在 super.read 中调用)
+     * - add() 中根据 savedSegmentCount 创建对应数量段身
+     */
+    @Override
+    public void read(Reads read) {
+        super.read(read);
+        savedSegmentCount = read.i();
+        boolean savedSplittable = read.bool();
+        splittable = savedSplittable;
+        repairTime = read.f();
     }
 
     /** 获取段身 (index=-1 表示头部自己, PU132 WormDefaultUnit.getSegment L204-208) */
@@ -1175,7 +1225,9 @@ public class SegmentWormEntity extends UnitEntity {
                 headOffset = cfg.headOffset;
                 barrageRange = cfg.barrageRange;
                 try {
-                    createSegments(cfg.count, cfg.segmentType);
+                    // ★ 读档时用 savedSegmentCount, 新建时用 cfg.count (PU132 addSegments=false 模式)
+                    int count = savedSegmentCount >= 0 ? savedSegmentCount : cfg.count;
+                    createSegments(count, cfg.segmentType);
                     segmentsCreated = true;
                 } catch (Throwable t) {
                     Log.err("[头部] 段身创建失败", t);
@@ -1184,7 +1236,8 @@ public class SegmentWormEntity extends UnitEntity {
             } else if (defaultSegmentType != null) {
                 segmentSpacing = defaultSegmentSpacing;
                 try {
-                    createSegments(defaultSegmentCount, defaultSegmentType);
+                    int count = savedSegmentCount >= 0 ? savedSegmentCount : defaultSegmentCount;
+                    createSegments(count, defaultSegmentType);
                     segmentsCreated = true;
                 } catch (Throwable t) {
                     Log.err("[头部] 旧路径创建失败", t);

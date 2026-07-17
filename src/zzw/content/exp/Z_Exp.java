@@ -368,7 +368,7 @@ public class Z_Exp {
 
         // ===== swarmLaserTurret (PU_V8 L1890-1935, BurstChargePowerTurret → 简化为 ExpPowerTurret)
         // PU_V8: chargeTime=50, chargeMaxDelay=30, chargeEffects=4, shots=4, burstSpacing=20
-        // v158: 用 shoot.firstShotDelay=50 替代 chargeTime, ShootSpread(4, 0f) 实现同时4发齐射
+        // ★ v158 完整移植: firstShotDelay=50 (chargeTime), shotDelay=20 (burstSpacing), shots=4
         // shootSound: PU_V8 Sounds.plasmaboom → v158 无该音效, 用 Z_Sounds.singularityShoot 替代
         swarmLaserTurret = new ExpPowerTurret("swarm-laser-turret"){{
             requirements(Category.turret, ItemStack.with(Z_Items.steel, 50, Items.silicon, 90, Items.thorium, 95));
@@ -381,11 +381,12 @@ public class Z_Exp {
             targetAir = true;
             range = 150f;
 
-            // v158: 用 shoot.firstShotDelay 替代 PU_V8 chargeTime
-            // ShootSpread(shots=4, spread=0f) 实现4发齐射 (PU_V8 burstSpacing=20 间隔发射, 简化为同时发射)
-            shoot = new mindustry.entities.pattern.ShootSpread(4, 0f);
-            shoot.firstShotDelay = 50f;
-            inaccuracy = 1f;  // v158 inaccuracy 在 Turret 上, 不在 shoot 上
+            // ★ PU_V8 完整移植: ShootPattern + shotDelay 实现间隔发射 (每发间隔20tick)
+            shoot = new mindustry.entities.pattern.ShootPattern();
+            shoot.shots = 4;
+            shoot.firstShotDelay = 50f;  // 充能时间
+            shoot.shotDelay = 20f;  // ★ burstSpacing: 4发依次间隔20tick发射
+            inaccuracy = 1f;
 
             recoil = 2f;
             cooldownTime = 0.03f;  // v158 用 cooldownTime 替代 cooldown

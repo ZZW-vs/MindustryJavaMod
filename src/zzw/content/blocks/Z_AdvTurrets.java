@@ -25,7 +25,10 @@ import mindustry.world.blocks.defense.turrets.PowerTurret;
 import mindustry.world.blocks.defense.turrets.Turret;
 import zzw.content.Z_Items;
 import zzw.content.Z_Sounds;
+import zzw.content.blocks.soul.SoulAbsorberTurret;
+import zzw.content.blocks.soul.SoulBurstPowerTurret;
 import zzw.content.blocks.soul.SoulItemTurret;
+import zzw.content.blocks.soul.SoulLifeStealerTurret;
 import zzw.content.blocks.soul.SoulTractorBeamTurret;
 import zzw.content.blocks.soul.SoulTurretPowerTurret;
 
@@ -55,9 +58,11 @@ import static mindustry.Vars.tilesize;
 public class Z_AdvTurrets {
 
     // ===== TractorBeam 炮台 (持续激光) =====
-    public static SoulTractorBeamTurret lifeStealer, absorberAura, heatRay, incandescence;
+    public static SoulLifeStealerTurret lifeStealer;
+    public static SoulAbsorberTurret absorberAura;
+    public static SoulTractorBeamTurret heatRay, incandescence;
     // ===== 爆发炮台 =====
-    public static SoulTurretPowerTurret oracle;
+    public static SoulBurstPowerTurret oracle;
     // ===== 物品炮台 =====
     public static SoulItemTurret recluse;
     // ===== 3D 模型炮台 (简化为 2D) =====
@@ -66,9 +71,9 @@ public class Z_AdvTurrets {
 
     public static void load() {
         // ===== lifeStealer (PU_V8 L2462-2475) =====
-        // SoulLifeStealerTurret: 持续激光, damage=120, 无灵魂需求
+        // SoulLifeStealerTurret: 持续激光+吸血蓄能+范围治疗
         // ★ 修复: 默认 TractorBeamTurret 只攻击空中, 需显式设 targetGround=true 才能攻击地面
-        lifeStealer = new SoulTractorBeamTurret("life-stealer") {{
+        lifeStealer = new SoulLifeStealerTurret("life-stealer") {{
             requirements(Category.turret, ItemStack.with(Items.silicon, 50, Z_Items.monolite, 25));
             size = 1;
             health = 320;
@@ -87,17 +92,22 @@ public class Z_AdvTurrets {
             requireSoul = false;
             efficiencyFrom = 0.8f;
             efficiencyTo = 1.5f;
+            // ★ 吸血机制参数 (PU_V8 LifeStealerTurret)
+            maxContain = 600f;       // 蓄能阈值: 累积 600 伤害触发范围治疗
+            healPercent = 0.05f;     // 治疗 5% maxHealth
+            healTrnsEffect = Fx.healBlockFull;
+            healEffect = Fx.healBlockFull;
         }};
 
         // ===== absorberAura (PU_V8 L2505-2521) =====
-        // SoulAbsorberTurret: 持续激光, resistance=0.8f, targetBullets=true (简化为普通激光)
+        // SoulAbsorberTurret: 持续激光+吸收敌方单位能量产电
         // ★ 修复: 默认 TractorBeamTurret 只攻击空中, 需显式设 targetGround=true 才能攻击地面
-        absorberAura = new SoulTractorBeamTurret("absorber-aura") {{
+        absorberAura = new SoulAbsorberTurret("absorber-aura") {{
             requirements(Category.turret, ItemStack.with(Items.silicon, 75, Z_Items.monolite, 125));
             size = 2;
             health = 720;
             range = 150f;
-            consumePower(1f);
+            // ★ SoulAbsorberTurret 自身 outputsPower=true, 不调用 consumePower
             damage = 80f;
             shootCone = 6f;
             rotateSpeed = 10f;
@@ -110,10 +120,15 @@ public class Z_AdvTurrets {
             requireSoul = false;
             efficiencyFrom = 0.8f;
             efficiencyTo = 1.6f;
+            // ★ 灵魂吸收产电参数 (PU_V8 AbsorberTurret)
+            powerProduction = 2.5f;   // 基础产电倍率
+            resistance = 0.8f;       // 抵抗强度
+            damageScale = 18f;        // 伤害缩放
+            speedScale = 3.5f;        // 速度缩放
         }};
 
         // ===== heatRay (PU_V8 L2624-2641) =====
-        // SoulHeatRayTurret: 持续热射线, damage=240, 仅对地
+        // SoulHeatRayTurret: 持续热射线, damage=240, 仅对地, 施加 melting 状态
         heatRay = new SoulTractorBeamTurret("heat-ray") {{
             requirements(Category.turret, ItemStack.with(Items.copper, 75, Items.lead, 50, Items.graphite, 25, Items.titanium, 45, Z_Items.monolite, 50));
             size = 2;
@@ -128,6 +143,9 @@ public class Z_AdvTurrets {
             targetAir = false;
             laserColor = Color.valueOf("ff7b54");
             shootSound = Z_Sounds.heatRay;
+            // ★ PU_V8: 施加 melting 状态 (热射线核心机制)
+            status = mindustry.content.StatusEffects.melting;
+            statusDuration = 60f;
             requireSoul = false;
             maxSouls = 5;
             efficiencyFrom = 0.8f;
@@ -135,7 +153,7 @@ public class Z_AdvTurrets {
         }};
 
         // ===== incandescence (PU_V8 L2712-2732) =====
-        // SoulHeatRayTurret: 强化热射线, damage=480, 对空对地
+        // SoulHeatRayTurret: 强化热射线, damage=480, 对空对地, 施加 melting 状态
         incandescence = new SoulTractorBeamTurret("incandescence") {{
             requirements(Category.turret, ItemStack.with(Z_Items.monolite, 250, Items.phaseFabric, 45, Z_Items.monolithAlloy, 100));
             size = 3;
@@ -153,6 +171,9 @@ public class Z_AdvTurrets {
             laserWidth = 0.54f;
             shootLength = 6f;
             shootSound = Z_Sounds.heatRay;
+            // ★ PU_V8: 施加 melting 状态
+            status = mindustry.content.StatusEffects.melting;
+            statusDuration = 60f;
             requireSoul = false;
             maxSouls = 7;
             efficiencyFrom = 0.7f;
@@ -160,9 +181,9 @@ public class Z_AdvTurrets {
         }};
 
         // ===== oracle (PU_V8 L2643-2686) =====
-        // SoulTurretBurstPowerTurret: 充能+爆发闪电+激光副炮
-        // 简化: 用 PowerTurret + ShootPattern(shots=8, shotDelay=2f) 替代 chargeTime/burst
-        oracle = new SoulTurretPowerTurret("oracle") {{
+        // SoulBurstPowerTurret: 充能+主弹幕(闪电8连发)+副弹幕(激光)
+        // ★ 完整移植 PU_V8 BurstPowerTurret: 主弹幕由 shoot.shots/shotDelay 处理, 副弹幕由 SoulBurstPowerTurret.shoot() 重写处理
+        oracle = new SoulBurstPowerTurret("oracle") {{
             requirements(Category.turret, ItemStack.with(Items.silicon, 175, Items.titanium, 150, Z_Items.monolithAlloy, 75));
             size = 3;
             health = 1440;
@@ -186,6 +207,21 @@ public class Z_AdvTurrets {
             maxSouls = 7;
             efficiencyFrom = 0.7f;
             efficiencyTo = 1.67f;
+            // ★ 副弹幕: 激光 (PU_V8 BurstPowerTurret.subShootType)
+            subShootType = new LaserBulletType(35f) {{
+                colors = new Color[]{Pal.lancerLaser.cpy().a(0.4f), Pal.lancerLaser, Color.white};
+                hitEffect = Fx.hitLancer;
+                hitSize = 4;
+                lifetime = 16f;
+                drawSize = 400f;
+                length = 180f;
+                ammoMultiplier = 1f;
+            }};
+            subShots = 1;             // 副弹幕发射 1 次
+            subBurstSpacing = 0f;     // 副弹幕间隔 (单发无意义)
+            subShootEffect = Fx.lancerLaserShoot;
+            subShootSound = Sounds.shootLancer;
+            subShootSoundVolume = 0.8f;
         }};
 
         // ===== recluse (PU_V8 L2477-2503) =====
