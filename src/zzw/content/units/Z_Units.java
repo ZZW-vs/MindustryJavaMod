@@ -30,6 +30,7 @@ import zzw.content.units.anticheat.AntiCheatBulletModule;
 import zzw.content.units.anticheat.ArmorDamageModule;
 import zzw.content.units.anticheat.AbilityDamageModule;
 import zzw.content.units.anticheat.ForceFieldDamageModule;
+import zzw.content.Z_Sounds;
 import zzw.content.units.bullets.AcceleratingLaserBulletType;
 import zzw.content.units.bullets.AntiBulletFlakBulletType;
 import zzw.content.units.bullets.ArrowBulletType;
@@ -3702,7 +3703,7 @@ public class Z_Units {
         //  PU_V8 治疗机系列 (cherub/malakhim/seraphim, 飞行+RepairBeamWeapon)
         //  - v158 适配: 用 vanilla UnitType + RepairBeamWeapon + NewHealerAI
         //  - bullet.maxRange 决定 RepairBeamWeapon 的实际射程
-        //  - bullet.healPercent=100 让 canHeal=true, 触发 NewHealerAI 查找受伤建筑
+        //  - 不设置 bullet.healPercent, 避免 canHeal=true 让 AI 寻找建筑而非单位 (匹配 PU_V8 原版行为)
         // ═══════════════════════════════════════════════════════════
 
         // ===== cherub (天使级治疗机, T1) =====
@@ -3728,7 +3729,7 @@ public class Z_Units {
                     lifetime = 100f;
                     maxRange = 85f;        // ★ 决定 RepairBeamWeapon 的射程
                     collidesTeam = true;
-                    healPercent = 100f;     // ★ 让 canHeal=true, 触发建筑查找
+                    // ★ 不设置 healPercent, 避免 canHeal=true 让 AI 寻找建筑而非单位 (匹配 PU_V8 原版行为)
                 }};
             }});
         }};
@@ -3757,7 +3758,7 @@ public class Z_Units {
                     lifetime = 100f;
                     maxRange = 130f;       // ★ 决定 RepairBeamWeapon 的射程
                     collidesTeam = true;
-                    healPercent = 100f;
+                    // 不设置 healPercent, 避免 canHeal=true 让 AI 寻找建筑而非单位
                 }};
             }});
         }};
@@ -3789,7 +3790,7 @@ public class Z_Units {
                     lifetime = 100f;
                     maxRange = 210f;       // ★ 决定 RepairBeamWeapon 的射程
                     collidesTeam = true;
-                    healPercent = 100f;
+                    // 不设置 healPercent, 避免 canHeal=true 让 AI 寻找建筑而非单位
                 }};
             }},
             new mindustry.type.weapons.RepairBeamWeapon("repair-beam-weapon") {{
@@ -3801,7 +3802,7 @@ public class Z_Units {
                     lifetime = 100f;
                     maxRange = 210f;
                     collidesTeam = true;
-                    healPercent = 100f;
+                    // 不设置 healPercent, 避免 canHeal=true 让 AI 寻找建筑而非单位
                 }};
             }},
             new mindustry.type.weapons.RepairBeamWeapon("repair-beam-weapon") {{
@@ -3813,7 +3814,7 @@ public class Z_Units {
                     lifetime = 100f;
                     maxRange = 210f;
                     collidesTeam = true;
-                    healPercent = 100f;
+                    // 不设置 healPercent, 避免 canHeal=true 让 AI 寻找建筑而非单位
                 }};
             }});
         }};
@@ -4488,10 +4489,12 @@ public class Z_Units {
             weapons.add(new Weapon("create-lepidoptera-gun") {{
                 x = 14f;
                 y = 27f;
-                shootY = 3f;
+                shootY = 5.5f;  // ★ 原版 5.5f
                 reload = 10f;
                 mirror = true;
                 shootCone = 30f;
+                shootSound = Sounds.shootSpectre;  // ★ 原版 Sounds.shootBig, v158 无此音效用 shootSpectre 替代
+                ejectEffect = mindustry.content.Fx.casing3Double;
                 bullet = new mindustry.entities.bullet.BasicBulletType(7f, 80f) {{
                     lifetime = 30f;
                     width = 18f;
@@ -4504,12 +4507,14 @@ public class Z_Units {
             weapons.add(new Weapon("create-lepidoptera-launcher") {{
                 x = 17f;
                 y = 14f;
-                shootY = 4f;
+                shootY = 5.75f;  // ★ 原版 5.75f
                 reload = 20f;
                 mirror = true;
                 shootCone = 30f;
-                shoot.shots = 2;
-                shoot.shotDelay = 2f;
+                shootSound = Sounds.shootMissile;  // ★ 原版 Sounds.shootSnap, v158 无此音效用 shootMissile 替代
+                ejectEffect = mindustry.content.Fx.casing2;
+                // ★ PU_V8 原版: shots=2, spacing=2f (同时发射, 角度间隔2度), 用 ShootSpread 还原
+                shoot = new mindustry.entities.pattern.ShootSpread(2, 2f);
                 bullet = new mindustry.entities.bullet.MissileBulletType(6f, 1f) {{
                     width = 8f;
                     height = 14f;
@@ -4528,14 +4533,15 @@ public class Z_Units {
             weapons.add(new Weapon("create-lepidoptera-gun-big") {{
                 x = 8f;
                 y = 3f;
-                shootY = 4f;
+                shootY = 6.75f;  // ★ 原版 6.75f
                 reload = 45f;
                 mirror = true;
                 rotate = true;
                 rotateSpeed = 3f;
                 shootCone = 30f;
-                // PU132: shots=3, spacing=15f, shotDelay=0f (3发同时发射, 角度间隔15度)
-                // v158 用 ShootSpread 替代 spacing 字段
+                shootSound = Sounds.shootScatter;  // ★ 原版 Sounds.shotgun, v158 无此音效用 shootScatter 替代
+                ejectEffect = mindustry.content.Fx.none;
+                // PU_V8: shots=3, spacing=15f, shotDelay=0f (3发同时发射, 角度间隔15度)
                 shoot = new mindustry.entities.pattern.ShootSpread(3, 15f);
                 bullet = new mindustry.entities.bullet.ShrapnelBulletType() {{
                     damage = 150f;
@@ -4655,8 +4661,9 @@ public class Z_Units {
 
         // ═══════════════════════════════════════════════════════════
         //  PU_V8 ultraviolet 系列飞行单位 (T1-T5, EMP 特化)
-        //  - EmpBasicBulletType → EmpBulletType (vanilla)
+        //  - EmpBasicBulletType: 自定义 EMP 子弹 (清空电池+停发电机+重置炮台+禁用建筑)
         //  - CloneableSetWeapon → vanilla Weapon (手动展开每个炮台)
+        //  - alternate=true 让配对武器交替齐射 (匹配 PU_V8 原版发射模式)
         // ═══════════════════════════════════════════════════════════
 
         // ===== discharge (T1, EMP弹) =====
@@ -4681,9 +4688,8 @@ public class Z_Units {
                 shootY = 4f;
                 reload = 4f * 60f;
                 shootCone = 360f;
-                bullet = new mindustry.entities.bullet.EmpBulletType() {{
-                    speed = 6f;
-                    damage = 3f;
+                shootSound = Z_Sounds.zbosonShoot;  // ★ 原版 UnitySounds.zbosonShoot
+                bullet = new zzw.content.units.bullets.EmpBasicBulletType(6f, 3f) {{
                     lifetime = 35f;
                     splashDamageRadius = 20f;
                     splashDamage = 3f;
@@ -4695,7 +4701,9 @@ public class Z_Units {
                     hitColor = mindustry.graphics.Pal.lancerLaser;
                     trailColor = backColor = lightColor = mindustry.graphics.Pal.lancerLaser;
                     frontColor = Color.white;
-                    radius = 100f;
+                    empRange = 100f;       // ★ EMP 影响电力建筑的范围
+                    empDuration = 120f;    // ★ EMP 禁用持续时间
+                    empBatteryDamage = 7000f;  // ★ 电池电量损失
                 }};
             }});
         }};
@@ -4725,20 +4733,22 @@ public class Z_Units {
                 shootStatus = mindustry.content.StatusEffects.unmoving;
                 shootStatusDuration = 70f;
                 shootCone = 360f;
-                bullet = new mindustry.entities.bullet.EmpBulletType() {{
-                    speed = 6.25f;
-                    damage = 4f;
+                shootSound = Z_Sounds.zbosonShoot;  // ★ 原版 UnitySounds.zbosonShoot
+                bullet = new zzw.content.units.bullets.EmpBasicBulletType(6.25f, 4f) {{
                     splashDamageRadius = 25f;
                     splashDamage = 9f;
                     shrinkY = 0f;
                     height = 16f;
                     width = 12f;
                     trailWidth = (width / 2f) / 2f;
-                    radius = 120f;
                     hitEffect = Fx.hitLancer;
                     hitColor = mindustry.graphics.Pal.lancerLaser;
                     trailColor = backColor = lightColor = mindustry.graphics.Pal.lancerLaser;
                     frontColor = Color.white;
+                    empRange = 120f;                  // ★ EMP 范围
+                    empDisconnectRange = 40f;         // ★ 断开电力连接范围
+                    empBatteryDamage = 11000f;        // ★ 电池电量损失
+                    empLogicDamage = 5f;               // ★ 逻辑损坏强度
                 }};
             }});
         }};
@@ -4766,9 +4776,8 @@ public class Z_Units {
                 shootY = 5f;
                 reload = 1.7f * 60f;
                 shootCone = 30f;
-                bullet = new mindustry.entities.bullet.EmpBulletType() {{
-                    speed = 6f;
-                    damage = 2f;
+                shootSound = Z_Sounds.zbosonShoot;  // ★ 原版 UnitySounds.zbosonShoot
+                bullet = new zzw.content.units.bullets.EmpBasicBulletType(6f, 2f) {{
                     lifetime = 35f;
                     splashDamageRadius = 17f;
                     splashDamage = 2f;
@@ -4776,11 +4785,14 @@ public class Z_Units {
                     height = 13f;
                     width = 10f;
                     trailWidth = (width / 2f) / 2f;
-                    radius = 90f;
                     hitEffect = Fx.hitLancer;
                     hitColor = mindustry.graphics.Pal.lancerLaser;
                     trailColor = backColor = lightColor = mindustry.graphics.Pal.lancerLaser;
                     frontColor = Color.white;
+                    empRange = 90f;
+                    empDuration = 15f;
+                    empBatteryDamage = 4300f;
+                    powerGridIteration = 5;  // ★ 沿电网传播5次
                 }};
             }});
 
@@ -4795,20 +4807,26 @@ public class Z_Units {
                 shootStatus = mindustry.content.StatusEffects.unmoving;
                 shootStatusDuration = 70f;
                 shootCone = 360f;
-                bullet = new mindustry.entities.bullet.EmpBulletType() {{
-                    speed = 6.7f;
-                    damage = 8f;
+                shootSound = Z_Sounds.zbosonShoot;  // ★ 原版 UnitySounds.zbosonShoot
+                bullet = new zzw.content.units.bullets.EmpBasicBulletType(6.7f, 8f) {{
                     splashDamageRadius = 30f;
                     splashDamage = 12f;
                     shrinkY = 0f;
                     height = 17f;
                     width = 13f;
                     trailWidth = (width / 2f) / 2f;
-                    radius = 150f;
                     hitEffect = Fx.hitLancer;
                     hitColor = mindustry.graphics.Pal.lancerLaser;
                     trailColor = backColor = lightColor = mindustry.graphics.Pal.lancerLaser;
                     frontColor = Color.white;
+                    empRange = 150f;
+                    empDuration = 60f * 2f;
+                    empMaxRange = 800f;
+                    empDisconnectRange = 95f;
+                    empBatteryDamage = 26000f;
+                    empLogicDamage = 12f;
+                    powerGridIteration = 15;
+                    trailLength = 13;
                 }};
             }});
         }};
@@ -4827,19 +4845,19 @@ public class Z_Units {
             constructor = mindustry.gen.UnitEntity::create;
             range = 280f;
 
-            // 4个小EMP炮台 (CloneableSetWeapon → vanilla Weapon)
+            // 4个小EMP炮台 (2 组 mirror=true, alternate=true 交替齐射)
             weapons.add(new Weapon("create-emp-small-mount") {{
                 x = 15.75f;
                 y = 4f;
                 shootY = 3f;
                 reload = 24f;
                 mirror = true;
+                alternate = true;  // ★ 交替齐射: 5把一组 → 5把另一组
                 rotate = true;
                 rotateSpeed = 3f;
                 shootCone = 30f;
-                bullet = new mindustry.entities.bullet.EmpBulletType() {{
-                    speed = 5.5f;
-                    damage = 9f;
+                shootSound = Z_Sounds.zbosonShoot;  // ★ 原版 UnitySounds.zbosonShoot
+                bullet = new zzw.content.units.bullets.EmpBasicBulletType(5.5f, 9f) {{
                     lifetime = 38f;
                     splashDamageRadius = 15f;
                     splashDamage = 1.5f;
@@ -4847,11 +4865,14 @@ public class Z_Units {
                     height = 12f;
                     width = 9f;
                     trailWidth = (width / 2f) / 2f;
-                    radius = 90f;
                     hitEffect = Fx.hitLancer;
                     hitColor = mindustry.graphics.Pal.lancerLaser;
                     trailColor = backColor = lightColor = mindustry.graphics.Pal.lancerLaser;
                     frontColor = Color.white;
+                    empRange = 90f;
+                    empDuration = 0f;
+                    empBatteryDamage = 4000f;
+                    powerGridIteration = 1;
                 }};
             }});
 
@@ -4861,13 +4882,13 @@ public class Z_Units {
                 shootY = 3f;
                 reload = 24f;
                 mirror = true;
+                alternate = true;  // ★ 交替齐射
                 flipSprite = true;
                 rotate = true;
                 rotateSpeed = 3f;
                 shootCone = 30f;
-                bullet = new mindustry.entities.bullet.EmpBulletType() {{
-                    speed = 5.5f;
-                    damage = 9f;
+                shootSound = Z_Sounds.zbosonShoot;
+                bullet = new zzw.content.units.bullets.EmpBasicBulletType(5.5f, 9f) {{
                     lifetime = 38f;
                     splashDamageRadius = 15f;
                     splashDamage = 1.5f;
@@ -4875,11 +4896,14 @@ public class Z_Units {
                     height = 12f;
                     width = 9f;
                     trailWidth = (width / 2f) / 2f;
-                    radius = 90f;
                     hitEffect = Fx.hitLancer;
                     hitColor = mindustry.graphics.Pal.lancerLaser;
                     trailColor = backColor = lightColor = mindustry.graphics.Pal.lancerLaser;
                     frontColor = Color.white;
+                    empRange = 90f;
+                    empDuration = 0f;
+                    empBatteryDamage = 4000f;
+                    powerGridIteration = 1;
                 }};
             }});
 
@@ -4893,9 +4917,8 @@ public class Z_Units {
                 rotateSpeed = 3f;
                 shootY = 5f;
                 shootCone = 30f;
-                bullet = new mindustry.entities.bullet.EmpBulletType() {{
-                    speed = 6.8f;
-                    damage = 8f;
+                shootSound = Z_Sounds.zbosonShoot;
+                bullet = new zzw.content.units.bullets.EmpBasicBulletType(6.8f, 8f) {{
                     hitSize = 6f;
                     splashDamageRadius = 30f;
                     splashDamage = 14f;
@@ -4903,11 +4926,18 @@ public class Z_Units {
                     height = 18f;
                     width = 14f;
                     trailWidth = (width / 2f) / 2f;
-                    radius = 160f;
                     hitEffect = Fx.hitLancer;
                     hitColor = mindustry.graphics.Pal.lancerLaser;
                     trailColor = backColor = lightColor = mindustry.graphics.Pal.lancerLaser;
                     frontColor = Color.white;
+                    empRange = 160f;
+                    empDuration = 60f * 2f;
+                    empMaxRange = 800f;
+                    empDisconnectRange = 100f;
+                    empBatteryDamage = 30000f;
+                    empLogicDamage = 12f;
+                    powerGridIteration = 15;
+                    trailLength = 15;
                 }};
             }});
         }};
@@ -4928,10 +4958,9 @@ public class Z_Units {
             range = 320f;
 
             // 10 个小 EMP 炮台 (5 座 × mirror=true 对称展开 = 10 座)
+            // ★ alternate=true 让 5 把炮台交替齐射 (匹配 PU_V8 原版发射模式)
             // 共享弹药
-            BulletType empSmall = new EmpBulletType() {{
-                speed = 5.7f;
-                damage = 25f;
+            BulletType empSmall = new zzw.content.units.bullets.EmpBasicBulletType(5.7f, 25f) {{
                 lifetime = 40f;
                 splashDamageRadius = 15f;
                 splashDamage = 5f;
@@ -4939,10 +4968,13 @@ public class Z_Units {
                 height = 14f;
                 width = 10f;
                 trailWidth = (width / 2f) / 2f;
-                radius = 120f;
                 hitEffect = Fx.hitLancer;
                 trailColor = backColor = lightColor = hitColor = Pal.lancerLaser;
                 frontColor = Color.white;
+                empRange = 120f;
+                empDuration = 20f;
+                empBatteryDamage = 8000f;
+                powerGridIteration = 7;
             }};
 
             weapons.add(new Weapon("create-emp-small-launcher") {{
@@ -4950,9 +4982,10 @@ public class Z_Units {
                 shootY = 6.75f;
                 reload = 20f;
                 mirror = true;
+                alternate = true;  // ★ 5把一组交替齐射
                 rotate = true;
                 shootCone = 30f;
-                shootSound = Sounds.shootSalvo;
+                shootSound = Z_Sounds.zbosonShoot;
                 bullet = empSmall;
             }});
 
@@ -4961,9 +4994,10 @@ public class Z_Units {
                 shootY = 6.75f;
                 reload = 20f;
                 mirror = true;
+                alternate = true;
                 rotate = true;
                 shootCone = 30f;
-                shootSound = Sounds.shootSalvo;
+                shootSound = Z_Sounds.zbosonShoot;
                 bullet = empSmall;
             }});
 
@@ -4972,9 +5006,10 @@ public class Z_Units {
                 shootY = 6.75f;
                 reload = 20f;
                 mirror = true;
+                alternate = true;
                 rotate = true;
                 shootCone = 30f;
-                shootSound = Sounds.shootSalvo;
+                shootSound = Z_Sounds.zbosonShoot;
                 bullet = empSmall;
             }});
 
@@ -4983,9 +5018,10 @@ public class Z_Units {
                 shootY = 6.75f;
                 reload = 20f;
                 mirror = true;
+                alternate = true;
                 rotate = true;
                 shootCone = 30f;
-                shootSound = Sounds.shootSalvo;
+                shootSound = Z_Sounds.zbosonShoot;
                 bullet = empSmall;
             }});
 
@@ -4994,9 +5030,10 @@ public class Z_Units {
                 shootY = 6.75f;
                 reload = 20f;
                 mirror = true;
+                alternate = true;
                 rotate = true;
                 shootCone = 30f;
-                shootSound = Sounds.shootSalvo;
+                shootSound = Z_Sounds.zbosonShoot;
                 bullet = empSmall;
             }});
 
@@ -5010,10 +5047,8 @@ public class Z_Units {
                 rotateSpeed = 2f;
                 reload = 4f * 60f;
                 shootCone = 30f;
-                shootSound = Sounds.shootSalvo;
-                bullet = new EmpBulletType() {{
-                    speed = 6.8f;
-                    damage = 9f;
+                shootSound = Z_Sounds.zbosonShoot;
+                bullet = new zzw.content.units.bullets.EmpBasicBulletType(6.8f, 9f) {{
                     lifetime = 42f;
                     hitSize = 6f;
                     splashDamageRadius = 45f;
@@ -5022,10 +5057,17 @@ public class Z_Units {
                     height = 19f;
                     width = 14.5f;
                     trailWidth = (width / 2f) / 2f;
-                    radius = 175f;
                     hitEffect = Fx.hitLancer;
                     trailColor = backColor = lightColor = hitColor = Pal.lancerLaser;
                     frontColor = Color.white;
+                    empRange = 175f;
+                    empDuration = 60f * 2f;
+                    empMaxRange = 800f;
+                    empDisconnectRange = 125f;
+                    empBatteryDamage = 40000f;
+                    empLogicDamage = 26f;
+                    powerGridIteration = 15;
+                    trailLength = 15;
                 }};
             }});
         }};

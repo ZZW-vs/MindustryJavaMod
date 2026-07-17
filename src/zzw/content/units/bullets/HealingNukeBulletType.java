@@ -71,8 +71,15 @@ public class HealingNukeBulletType extends BulletType {
                 build -> true,
                 build -> {
                     if (build.team == b.team) {
-                        Fx.healBlockFull.at(build.x, build.y, build.block.size, Pal.heal);
-                        build.heal((healPercent / 100f) * build.maxHealth);
+                        if (build.damaged()) {
+                            Fx.healBlockFull.at(build.x, build.y, build.block.size, Pal.heal);
+                            // ★ v158 修复: BuildingComp.heal(amount) 用 @MethodPriority(100) 覆盖了 HealthComp 默认实现,
+                            //   但只调用 healthChanged() 更新显示, 没有真正增加 health 字段!
+                            //   所以这里直接修改 health 字段, 然后调用 healthChanged() 通知显示更新
+                            float healAmount = (healPercent / 100f) * build.maxHealth;
+                            build.health = Math.min(build.maxHealth, build.health + healAmount);
+                            build.healthChanged();
+                        }
                     } else {
                         build.damage(damage * b.damageMultiplier() * buildingDamageMultiplier);
                     }
@@ -88,6 +95,7 @@ public class HealingNukeBulletType extends BulletType {
 
             if (b.within(u, radius + (u.hitSize / 2f)) && dst <= d * d) {
                 if (u.team == b.team) {
+                    // 单位 heal() 不受 @MethodPriority 覆盖影响, 可以正常调用
                     u.heal((healPercent / 100f) * u.maxHealth);
                     u.apply(allyStatus, allyStatusDuration);
                 } else {

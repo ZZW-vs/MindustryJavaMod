@@ -224,47 +224,45 @@ public class Z_Turrets {
         // ===== photon (激光炮, PU132 L590-610) =====
         // PU132: LaserTurret + LaserBulletType
         photon = new LaserTurret("photon") {{
-            requirements(Category.turret, ItemStack.with(Items.lead, 110, Items.silicon, 75, Z_Items.luminum, 165, Items.titanium, 135));
+            requirements(Category.turret, ItemStack.with(Items.lead, 50, Items.silicon, 35, Z_Items.luminum, 65, Items.titanium, 65));
             size = 2;
-            health = 2540;
-            reload = 60f;
-            coolantMultiplier = 2f;
-            range = 160f;
-            consumePower(6.6f);
+            health = 1280;
+            reload = 100f;
+            shootCone = 30f;
+            range = 120f;
+            consumePower(4.5f);
             heatColor = Pal.turretHeat;
-            shootSound = Sounds.shootLancer;
-            shootType = new LaserBulletType(20f) {{
-                colors = new Color[]{Pal.lancerLaser.cpy().a(0.4f), Pal.lancerLaser, Color.white};
-                hitEffect = Fx.hitLancer;
-                hitSize = 4;
-                lifetime = 16f;
-                drawSize = 400f;
-                length = 160f;
-                ammoMultiplier = 1f;
+            loopSound = Sounds.beamLustre;  // ★ 原版 Sounds.respawning, v158 无此音效用 beamLustre 替代
+            shootType = new ContinuousLaserBulletType(16f) {{
+                incendChance = -1f;
+                length = 130f;
+                width = 4f;
+                colors = new Color[]{Pal.lancerLaser.cpy().a(3.75f), Pal.lancerLaser, Color.white};
+                lightColor = hitColor = Pal.lancerLaser;
             }};
+            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability < 0.1f, 0.2f)).update(false);
         }};
 
         // ===== graviton (重力子激光炮, PU132 L611-631) =====
         // PU132: LaserTurret + 更强激光
         graviton = new LaserTurret("graviton") {{
-            requirements(Category.turret, ItemStack.with(Items.silicon, 300, Z_Items.luminum, 430, Items.titanium, 190, Items.thorium, 110, Z_Items.lightAlloy, 15));
-            size = 3;  // ★ 修正: 贴图 96x96 对应 size=3, 之前 size=4 不匹配
-            health = 5000;
-            reload = 90f;
-            coolantMultiplier = 3f;
-            range = 200f;
-            consumePower(1.9f);
+            requirements(Category.turret, ItemStack.with(Items.lead, 110, Items.graphite, 90, Items.silicon, 70, Z_Items.luminum, 180, Items.titanium, 135));
+            size = 3;
+            health = 2780;
+            reload = 150f;
+            recoil = 2f;  // ★ 原版 recoilAmount=2f
+            shootCone = 30f;
+            range = 230f;
+            consumePower(5.75f);
             heatColor = Pal.turretHeat;
-            shootSound = Sounds.shootLancer;
-            shootType = new LaserBulletType(35f) {{
-                colors = new Color[]{Pal.lancerLaser.cpy().a(0.4f), Pal.lancerLaser, Color.white};
-                hitEffect = Fx.hitLancer;
-                hitSize = 6;
-                lifetime = 20f;
-                drawSize = 500f;
-                length = 200f;
-                ammoMultiplier = 1f;
+            loopSound = Z_Sounds.xenoBeam;  // ★ 原版 UnitySounds.xenoBeam (advance/xeno-beam.ogg)
+            shootType = new ContinuousLaserBulletType(0.8f) {{
+                length = 260f;
+                knockback = -5f;  // ★ 重力吸引: 负值拉向炮台
+                incendChance = -1f;
+                colors = new Color[]{Color.valueOf("3a3a4c").cpy().a(0.1f), Pal.lancerLaser.cpy().a(0.2f)};
             }};
+            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability < 0.1f, 0.25f)).update(false);
         }};
 
         // ===========================================================================
@@ -330,6 +328,7 @@ public class Z_Turrets {
             shootEffect = Fx.none;
             smokeEffect = Fx.none;
             consumePowerCond(10f, b -> ((mindustry.world.blocks.defense.turrets.Turret.TurretBuild)b).isActive());
+            shootSound = Sounds.shootLaser;  // ★ 原版 Sounds.laser, v158 无 laser 用 shootLaser 替代
             ammo(Z_Items.sparkAlloy, new BasicBulletType(7f, 100f, "large-bomb") {{  // ★ sprite=large-bomb
                 width = height = 30f;
                 backColor = Pal.surge;
@@ -464,7 +463,7 @@ public class Z_Turrets {
                 // v158 充能特效在 BulletType.chargeEffect 上
                 chargeEffect = Fx.lightningShoot;
             }};
-            shootSound = Sounds.shootSpectre;
+            shootSound = Sounds.shootMeltdown;  // ★ 原版 Sounds.laserbig, v158 用 shootMeltdown (大型激光射击) 替代
             consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability <= 0.1f, 0.52f)).boost();
         }};
 
@@ -690,7 +689,7 @@ public class Z_Turrets {
             rotateSpeed = 3.3f;
             recoil = 6f;
             consumePower(39.3f);
-            shootSound = Sounds.shootLancer;
+            shootSound = Z_Sounds.singularityShoot;  // ★ 原版 UnitySounds.singularityShoot (light/singularity-shoot.ogg)
             shootType = new BasicBulletType(6.6f, 7f) {
                 {
                     lifetime = 110f;
@@ -888,7 +887,7 @@ public class Z_Turrets {
             recoil = 2f;
             consumePower(3.6f);
             targetAir = true;
-            shootSound = Sounds.shootLancer;
+            shootSound = Z_Sounds.zbosonShoot;  // ★ 原版 UnitySounds.zbosonShoot (light/zboson-shoot.ogg)
             shoot = new ShootAlternate(2);
             shoot.shots = 2;
             ((ShootAlternate)shoot).spread = 14f;
@@ -927,7 +926,7 @@ public class Z_Turrets {
             consumePower(26f);
             shake = 2f;
             recoil = 4f;
-            shootSound = Sounds.shootLancer;
+            shootSound = Z_Sounds.ephemeronShoot;  // ★ 原版 UnitySounds.ephemeronShoot (light/ephemeron-shoot.ogg)
             rotateSpeed = 1.9f;
             heatColor = Pal.turretHeat;
             // v158 无 chargeTime/chargeBeginEffect 字段, 用 shoot.firstShotDelay 替代充能时间
@@ -1052,7 +1051,7 @@ public class Z_Turrets {
             firingMoveFract = 0.2f;
             shootEffect = Fx.shootBigSmoke2;
             recoil = 4f;
-            shootSound = Sounds.shootSpectre;
+            shootSound = Sounds.shootMeltdown;  // ★ 原版 Sounds.laserbig, v158 用 shootMeltdown 替代
             heatColor = Color.valueOf("e04300");
             rotateSpeed = 3.5f;
             loopSound = Sounds.beamPlasma;
@@ -1109,7 +1108,7 @@ public class Z_Turrets {
             recoil = 7f;
             heatColor = Color.white;
             rotateSpeed = 0.97f;
-            shootSound = Sounds.shootSpectre;
+            shootSound = Sounds.shootMeltdown;  // ★ 原版 Sounds.laserbig, v158 用 shootMeltdown 替代
             loopSound = Sounds.beamPlasma;
             loopSoundVolume = 2.6f;
             requirements(Category.turret, ItemStack.with(Items.copper, 2800, Items.lead, 2970, Items.graphite, 2475, Items.titanium, 3100, Items.surgeAlloy, 2790, Items.silicon, 3025, Items.thorium, 1750, Z_Items.darkAlloy, 1250));
