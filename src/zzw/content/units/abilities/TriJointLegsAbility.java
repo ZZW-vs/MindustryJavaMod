@@ -81,6 +81,19 @@ public class TriJointLegsAbility extends Ability {
             inited = true;
         }
         updateLegs(unit);
+
+        // ★ 同步 TriJointLeg[] 到原生腿系统 (unit.legs())
+        // 让脚步声/水波纹/溅射伤害基于 TriJointLegsAbility 的位置, 而非 v158 原生 IK
+        // 映射: joints[2](脚) → native.base, joints[1](膝) → native.joint
+        if (unit instanceof mindustry.gen.Legsc legUnit) {
+            mindustry.entities.Leg[] nativeLegs = legUnit.legs();
+            for (int i = 0; i < legs.length && i < nativeLegs.length; i++) {
+                nativeLegs[i].base.set(legs[i].joints[2]);
+                nativeLegs[i].joint.set(legs[i].joints[1]);
+                nativeLegs[i].moving = legs[i].moving;
+                nativeLegs[i].stage = legs[i].stage;
+            }
+        }
     }
 
     /** Ability.draw 为空操作, 腿渲染由 UnitType.drawLegs() 委托 drawLegs() 完成 (确保在 body 之前) */

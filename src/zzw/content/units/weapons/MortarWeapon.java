@@ -7,6 +7,7 @@ import arc.graphics.g2d.TextureRegion;
 import arc.math.Angles;
 import arc.math.Mathf;
 import arc.util.Tmp;
+import mindustry.entities.Mover;
 import mindustry.entities.units.WeaponMount;
 import mindustry.gen.Unit;
 import mindustry.type.Weapon;
@@ -107,6 +108,24 @@ public class MortarWeapon extends Weapon {
         float r = bullet.range;
         mMount.incline = Mathf.approachDelta(mMount.incline, Mathf.clamp(unit.dst(mount.aimX, mount.aimY) / r), barrelSpeed / r);
         super.update(unit, mount);
+    }
+
+    /**
+     * 覆写 bullet() (移植自 PU132 MortarWeapon.shoot + bullet)
+     * 根据 incline 调整子弹发射点, 让子弹从炮管末端发射 (而非固定 shootY 位置)
+     * PU132: shootX/Y = mX/Y + trns(weaponRotation - 90, -incline + barrelOffset)
+     * v158 适配: 临时修改 this.shootY 实现 (shootY 沿 weaponRotation 方向, 对应 PU132 的 weaponRotation - 90 方向)
+     */
+    @Override
+    protected void bullet(Unit unit, WeaponMount mount, float xOffset, float yOffset, float angleOffset, Mover mover) {
+        MortarMount mMount = (MortarMount) mount;
+        // PU132: incline = sin(lerp(inclineOffset, maxIncline, mMount.incline)) * shootY
+        // 倾角越大 (远距离), incline 越大, 炮口越靠近 mount (shootY 减小)
+        float originalShootY = this.shootY;
+        float incline = Mathf.sinDeg(Mathf.lerp(inclineOffset, maxIncline, mMount.incline)) * this.shootY;
+        this.shootY = this.shootY - incline + barrelOffset;
+        super.bullet(unit, mount, xOffset, yOffset, angleOffset, mover);
+        this.shootY = originalShootY;
     }
 
     /** 迫击炮武器挂载点 (含倾角动画状态) */

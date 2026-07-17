@@ -10,7 +10,9 @@ import mindustry.Vars;
 import mindustry.content.Fx;
 import mindustry.content.StatusEffects;
 import mindustry.entities.bullet.BulletType;
+import mindustry.gen.Building;
 import mindustry.gen.Bullet;
+import mindustry.gen.Groups;
 import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
 import mindustry.type.StatusEffect;
@@ -112,13 +114,13 @@ public class HealingConeBulletType extends BulletType {
                 }
             });
 
-            // 检测锥形范围内建筑
-            for (int i = 0; i < scanAccuracy; i++) {
-                float ang = b.rotation() + Mathf.lerp(-cone, cone, i / (scanAccuracy - 1f));
-                Tmp.v1.trns(ang, Mathf.sqrt(data[i])).add(b);
-                Tile tile = Vars.world.tileWorld(Tmp.v1.x, Tmp.v1.y);
-                if (tile != null && tile.build != null) {
-                    var build = tile.build;
+            // 遍历锥形范围内所有建筑 (修复 PU_V8 Utils.castConeTile 的功能)
+            // 用 Groups.build 遍历, 检查是否在锥形范围内且未被 absorbLasers 建筑遮挡
+            Groups.build.forEach(build -> {
+                if (!b.within(build, length + (build.block.size * Vars.tilesize / 2f))) return;
+                if (!Angles.within(b.rotation(), b.angleTo(build), cone)) return;
+                int index = Mathf.clamp(Mathf.round(((angleDistSigned(b.angleTo(build), b.rotation()) + cone) / (cone * 2f)) * (data.length - 1)), 0, data.length - 1);
+                if ((b.dst2(build) + (build.block.size * Vars.tilesize / 2f)) < data[index]) {
                     if (build.team == b.team) {
                         if (build.damaged()) {
                             build.heal(build.maxHealth / 100f * healPercent);
@@ -128,7 +130,7 @@ public class HealingConeBulletType extends BulletType {
                         build.damage(b.damage * buildingDamageMultiplier);
                     }
                 }
-            }
+            });
         }
     }
 

@@ -3588,6 +3588,8 @@ public class Z_Units {
             outlineColor = Color.valueOf("2e3142");
             constructor = mindustry.gen.UnitEntity::create;
             range = 300f;
+            // PU132 原版: HealingDefenderAI 主动找受伤友军并射击治疗锥
+            aiController = () -> new zzw.content.units.ai.HealingDefenderAI();
 
             // 力场 + 修复能力
             abilities.add(
@@ -3637,6 +3639,8 @@ public class Z_Units {
             outlineColor = Color.valueOf("2e3142");
             constructor = mindustry.gen.UnitEntity::create;
             range = 300f;
+            // PU132 原版: HealingDefenderAI 主动找受伤友军并射击治疗锥
+            aiController = () -> new zzw.content.units.ai.HealingDefenderAI();
 
             // 武器1: 治疗锥 (HealingConeBulletType, cone=15°, scanAccuracy=25, healPercent, continuous)
             // PU132 原版: cone=15f, scanAccuracy=25, allyStatus=overclock, status=weaken(用 sapped 替代)
@@ -3927,6 +3931,85 @@ public class Z_Units {
                     collidesAir = false;
                 }};
             }});
+        }};
+
+        // ===== schistocerca (T2, 双机枪+燃烧弹) =====
+        // 提前定义: blue 单位通过 UnitSpawnAbility 引用 schistocerca, 必须在 blue 之前初始化
+        schistocerca = new CopterUnitType("schistocerca") {{
+            speed = 4.5f;
+            drag = 0.07f;
+            accel = 0.03f;
+            health = 150f;
+            engineSize = 0f;
+            flying = true;
+            hitSize = 13f;
+            range = 165f;
+            rotateSpeed = 4.6f;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = CopterUnitEntity::create;
+
+            weapons.add(new Weapon("create-schistocerca-gun") {{
+                top = false;
+                x = 1.5f;
+                y = 11f;
+                shootY = 3f;
+                reload = 8f;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.BasicBulletType(4f, 5f) {{
+                    lifetime = 36f;
+                    shrinkY = 0.2f;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-schistocerca-gun") {{
+                top = false;
+                x = 4f;
+                y = 8.75f;
+                shootY = 3f;
+                reload = 12f;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.BasicBulletType(4f, 8f) {{
+                    width = 7f;
+                    height = 9f;
+                    lifetime = 36f;
+                    shrinkY = 0.2f;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-schistocerca-gun-big") {{
+                x = 6.75f;
+                y = 5.75f;
+                shootY = 2f;
+                reload = 30f;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.BasicBulletType(3.2f, 16f) {{
+                    width = 10f;
+                    height = 12f;
+                    lifetime = 60f;
+                    frontColor = mindustry.graphics.Pal.lightishOrange;
+                    backColor = mindustry.graphics.Pal.lightOrange;
+                    splashDamage = 10f;
+                    splashDamageRadius = 22f;
+                    makeFire = true;
+                    status = mindustry.content.StatusEffects.burning;
+                    statusDuration = 60f;
+                }};
+            }});
+
+            for(int i : arc.math.Mathf.signs){
+                rotors.add(new Rotor(name + "-rotor"){{
+                    x = 0f;
+                    y = 6.5f;
+                    bladeCount = 3;
+                    ghostAlpha = 0.4f;
+                    shadowAlpha = 0.2f;
+                    shadeSpeed = 3f * i;
+                    speed = 29f * i;
+                }});
+            }
         }};
 
         // ===== blue (蓝鲸级旗舰, PU_V8 原版) =====
@@ -4240,83 +4323,6 @@ public class Z_Units {
         }};
 
         // ===== schistocerca (T2, 双机枪+燃烧弹) =====
-        schistocerca = new CopterUnitType("schistocerca") {{
-            speed = 4.5f;
-            drag = 0.07f;
-            accel = 0.03f;
-            health = 150f;
-            engineSize = 0f;
-            flying = true;
-            hitSize = 13f;
-            range = 165f;
-            rotateSpeed = 4.6f;
-            outlineColor = Color.valueOf("2e3142");
-            constructor = CopterUnitEntity::create;
-
-            weapons.add(new Weapon("create-schistocerca-gun") {{
-                top = false;
-                x = 1.5f;
-                y = 11f;
-                shootY = 3f;
-                reload = 8f;
-                mirror = true;
-                shootCone = 30f;
-                bullet = new mindustry.entities.bullet.BasicBulletType(4f, 5f) {{
-                    lifetime = 36f;
-                    shrinkY = 0.2f;
-                }};
-            }});
-
-            weapons.add(new Weapon("create-schistocerca-gun") {{
-                top = false;
-                x = 4f;
-                y = 8.75f;
-                shootY = 3f;
-                reload = 12f;
-                mirror = true;
-                shootCone = 30f;
-                bullet = new mindustry.entities.bullet.BasicBulletType(4f, 8f) {{
-                    width = 7f;
-                    height = 9f;
-                    lifetime = 36f;
-                    shrinkY = 0.2f;
-                }};
-            }});
-
-            weapons.add(new Weapon("create-schistocerca-gun-big") {{
-                x = 6.75f;
-                y = 5.75f;
-                shootY = 2f;
-                reload = 30f;
-                mirror = true;
-                shootCone = 30f;
-                bullet = new mindustry.entities.bullet.BasicBulletType(3.2f, 16f) {{
-                    width = 10f;
-                    height = 12f;
-                    lifetime = 60f;
-                    frontColor = mindustry.graphics.Pal.lightishOrange;
-                    backColor = mindustry.graphics.Pal.lightOrange;
-                    splashDamage = 10f;
-                    splashDamageRadius = 22f;
-                    makeFire = true;
-                    status = mindustry.content.StatusEffects.burning;
-                    statusDuration = 60f;
-                }};
-            }});
-
-            for(int i : arc.math.Mathf.signs){
-                rotors.add(new Rotor(name + "-rotor"){{
-                    x = 0f;
-                    y = 6.5f;
-                    bladeCount = 3;
-                    ghostAlpha = 0.4f;
-                    shadowAlpha = 0.2f;
-                    shadeSpeed = 3f * i;
-                    speed = 29f * i;
-                }});
-            }
-        }};
-
         // ===== anthophila (T3, 机枪+闪电) =====
         anthophila = new CopterUnitType("anthophila") {{
             speed = 4f;
@@ -4528,8 +4534,9 @@ public class Z_Units {
                 rotate = true;
                 rotateSpeed = 3f;
                 shootCone = 30f;
-                shoot.shots = 3;
-                shoot.shotDelay = 15f;
+                // PU132: shots=3, spacing=15f, shotDelay=0f (3发同时发射, 角度间隔15度)
+                // v158 用 ShootSpread 替代 spacing 字段
+                shoot = new mindustry.entities.pattern.ShootSpread(3, 15f);
                 bullet = new mindustry.entities.bullet.ShrapnelBulletType() {{
                     damage = 150f;
                     length = 150f;
