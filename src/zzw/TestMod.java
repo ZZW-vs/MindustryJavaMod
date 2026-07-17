@@ -16,12 +16,17 @@ import zzw.content.Z_Sounds;
 import zzw.content.exp.Z_Exp;
 import zzw.content.mechanics.Z_Mechanics;
 import zzw.content.units.Z_Units;
+import zzw.util.ZObjs;
 
 
 public class TestMod extends Mod{
     private static final float WELCOME_DIALOG_DELAY = 3f;
 
     public TestMod(){
+        // 初始化 WavefrontObject 占位实例 (cube/wavefront 炮台引用)
+        // 实际 .obj 文件加载在 FileTreeInitEvent 时触发
+        ZObjs.init();
+
         Events.on(EventType.ClientLoadEvent.class, e -> {
             Time.run(WELCOME_DIALOG_DELAY, this::showWelcomeDialog);
         });

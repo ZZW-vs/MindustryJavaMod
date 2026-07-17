@@ -117,6 +117,8 @@ public class EndGameTurret extends PowerTurret {
         shake = 2.2f;
         outlineIcon = false;
         noUpdateDisabled = false;
+        // 原版 powerUse = 320f (v158 用 consumePower 替代 v7 powerUse 字段)
+        consumePower(320f);
         // loopSound / shootSound 由外部注册时设置
     }
 
@@ -192,6 +194,28 @@ public class EndGameTurret extends PowerTurret {
 
         float trueEfficiency() {
             return Mathf.clamp(efficiency + chargeValue);
+        }
+
+        /**
+         * 原版 consValid 逻辑: (电力 OR 蓄能) AND 物品
+         * 电力缺失时若被攻击累积了 chargeValue, 仍可发射 (但需有 terminum 弹药)
+         * v158 用 canConsume() 替代 v7 consValid()
+         */
+        @Override
+        public boolean canConsume() {
+            boolean valid = false;
+            if (power != null) {
+                valid = power.status > 0.0001f;
+            }
+            valid |= chargeValue > 0.001f;
+            // 检查物品消耗 (terminum)
+            if (items == null) return false;
+            for (var cons : block.consumers) {
+                if (cons instanceof mindustry.world.consumers.ConsumeItems ci && !ci.booster) {
+                    if (!items.has(ci.items, 1f)) return false;
+                }
+            }
+            return valid;
         }
 
         float deltaB() {

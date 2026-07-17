@@ -33,7 +33,12 @@ import zzw.content.blocks.soul.SoulTractorBeamTurret;
 import zzw.content.blocks.soul.SoulTurretPowerTurret;
 import zzw.content.blocks.turrets.EndLaserTurret;
 import zzw.content.blocks.turrets.EndGameTurret;
+import zzw.content.blocks.turrets.ObjPowerTurret;
+import zzw.content.blocks.turrets.WavefrontTurret;
 import zzw.content.units.bullets.EndCutterLaserBulletType;
+import zzw.content.units.bullets.PointBlastLaserBulletType;
+import zzw.content.units.bullets.WavefrontLaserBulletType;
+import zzw.util.ZObjs;
 
 import static mindustry.Vars.tilesize;
 
@@ -74,6 +79,9 @@ public class Z_AdvTurrets {
     // ===== End 阵营非 3D 炮台 =====
     public static EndLaserTurret tenmeikiri;
     public static EndGameTurret endGame;
+    // ===== 3D 模型炮台 (伪 3D, WavefrontObject) =====
+    public static ObjPowerTurret cube;
+    public static WavefrontTurret wavefront;
 
     public static void load() {
         // ===== lifeStealer (PU_V8 L2462-2475) =====
@@ -385,9 +393,12 @@ public class Z_AdvTurrets {
                 overDamage = 350000f;
                 bleedDuration = 5f * 60f;
             }};
-            // 冷却液体 (温度 <= 0.25, 不可燃, 流量 3.1)
-            consume(new mindustry.world.consumers.ConsumeLiquidFilter(
-                liquid -> liquid.temperature <= 0.25f && liquid.flammability < 0.1f, 3.1f));
+            // 冷却液体 (可选 boost, 非必需): 参考 v158 原版 consumeCoolant + BaseTurret.checkInitCoolant
+            // 用 ConsumeCoolant 子类并设 maxTemp=0.25f 匹配原版过滤条件
+            // BaseTurret.init() 会自动设 update=false + booster=true + optional=true
+            coolant = new mindustry.world.consumers.ConsumeCoolant(3.1f) {{
+                maxTemp = 0.25f;
+            }};
         }};
 
         // ===== endGame (PU_V8 L3586-3607, EndGameTurret) =====
@@ -407,6 +418,52 @@ public class Z_AdvTurrets {
                 damage = Float.MAX_VALUE;
             }};
             consumeItem(Z_Items.terminum, 2);
+        }};
+
+        // ===== cube (PU_V8 L3411-3429, ObjPowerTurret + PointBlastLaserBulletType) =====
+        // 3D 立方体炮台: 伪 3D 渲染 + 受击形变 + 旋转动画
+        // ★ v155.4 适配: reloadTime → reload; powerUse → consumePower(); UnityObjs.cube → ZObjs.cube
+        cube = new ObjPowerTurret("the-cube") {{
+            requirements(Category.turret, ItemStack.with(
+                Items.copper, 3300, Items.lead, 2900, Items.graphite, 4400,
+                Items.silicon, 3800, Items.titanium, 4600,
+                Z_Items.xenium, 2300, Items.phaseFabric, 670, Z_Items.advanceAlloy, 1070));
+            health = 22500;
+            object = ZObjs.cube;
+            size = 10;
+            range = 320f;
+            reload = 240f;
+            consumePower(260f);
+            coolantMultiplier = 1.1f;
+            shootSound = Sounds.shootLancer;  // ★ v155.4 替代 UnitySounds.cubeBlast (无 shootBig)
+            shootType = new PointBlastLaserBulletType(580f) {{
+                length = 320f;
+                lifetime = 17f;
+                pierce = true;
+                auraDamage = 8000f;
+                damageRadius = 120f;
+                laserColors = new Color[]{Color.valueOf("a3e3ff")};  // UnityPal.advance
+            }};
+        }};
+
+        // ===== wavefront (PU_V8 L3431-3444, WavefrontTurret + WavefrontLaser) =====
+        // 3D wavefront 炮台: 伪 3D 渲染 (因 arc 无 g3d 包, 用 WavefrontObject 替代 ModelInstance)
+        // ★ v155.4 简化: 移除 AnimControl (展开/折叠动画), 保留旋转和间隙动画
+        wavefront = new WavefrontTurret("wavefront") {{
+            requirements(Category.turret, ItemStack.with(
+                Items.copper, 4900, Items.graphite, 6000, Items.silicon, 5000,
+                Items.titanium, 6500, Z_Items.xenium, 1500, Z_Items.advanceAlloy, 1500,
+                Z_Items.terminum, 700, Z_Items.terminaAlloy, 500));
+            health = 50625;
+            object = ZObjs.wavefront;
+            size = 15;
+            range = 420f;
+            rotateSpeed = 3f;
+            reload = 240f;
+            consumePower(260f);
+            coolantMultiplier = 0.9f;
+            shootSound = Sounds.shootLancer;  // ★ v155.4 替代 UnitySounds.cubeBlast (无 shootBig)
+            shootType = new WavefrontLaserBulletType(2400f);
         }};
     }
 }

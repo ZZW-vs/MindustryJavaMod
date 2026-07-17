@@ -242,7 +242,7 @@ public class Z_Turrets {
                 colors = new Color[]{Pal.lancerLaser.cpy().a(3.75f), Pal.lancerLaser, Color.white};
                 lightColor = hitColor = Pal.lancerLaser;
             }};
-            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability < 0.1f, 0.2f)).update(false);
+            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability < 0.1f, 0.2f)).boost().update(false);
         }};
 
         // ===== graviton (重力子激光炮, PU132 L611-631) =====
@@ -267,7 +267,7 @@ public class Z_Turrets {
                 strokes = new float[]{2.4f, 1.8f};
                 width = 9f;
             }};
-            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability < 0.1f, 0.25f)).update(false);
+            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability < 0.1f, 0.25f)).boost().update(false);
         }};
 
         // ===========================================================================
@@ -634,7 +634,7 @@ public class Z_Turrets {
                 smokeEffect = Fx.none;
                 hitEffect = Fx.hitLancer;
             }};
-            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.4f && liquid.flammability < 0.1f, 2.1f)).update(false);
+            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.4f && liquid.flammability < 0.1f, 2.1f)).boost().update(false);
         }};
 
         // ===== wBoson (PU_V8 L765-838, PowerTurret + DecayBasicBulletType) =====
@@ -848,7 +848,7 @@ public class Z_Turrets {
                 color = Pal.surge;
             }};
             shootSound = Sounds.shootLancer;
-            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability <= 0.1f, 0.4f)).update(false);
+            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability <= 0.1f, 0.4f)).boost().update(false);
         }};
 
         // ===== shielder (PU_V8 L1268-1287, ShieldTurret + ShieldBulletType) =====
@@ -883,7 +883,7 @@ public class Z_Turrets {
             // v158 无 chargeEffect/chargeBeginEffect 字段, 用 shoot.firstShotDelay + BulletType.chargeEffect 替代
             shoot.firstShotDelay = 38f;
             chargeSound = Sounds.shootLancer;
-            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability <= 0.1f, 0.4f)).update(false);
+            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability <= 0.1f, 0.4f)).boost().update(false);
         }};
 
         // ===== zBoson (PU_V8 L840-889, RampupPowerTurret + VelocityLaserBoltBulletType) =====
@@ -1089,7 +1089,7 @@ public class Z_Turrets {
                 fromBlockLen = 2;
                 fromBlockLenRand = 5;
             }};
-            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability < 0.1f, 0.58f)).update(false);
+            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability < 0.1f, 0.58f)).boost().update(false);
         }};
 
         // ===== catastrophe (PU_V8 L483-505, BigLaserTurret + SparkingContinuousLaserBulletType) =====
@@ -1117,7 +1117,7 @@ public class Z_Turrets {
                 incendSpread = 7f;
                 incendAmount = 2;
             }};
-            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.4f && liquid.flammability < 0.1f, 1.3f)).update(false);
+            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.4f && liquid.flammability < 0.1f, 1.3f)).boost().update(false);
         }};
 
         // ===== calamity (PU_V8 L507-529, BigLaserTurret + SparkingContinuousLaserBulletType) =====
@@ -1153,7 +1153,7 @@ public class Z_Turrets {
                 incendSpread = 9f;
                 incendAmount = 2;
             }};
-            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.3f && liquid.flammability < 0.1f, 2.1f)).update(false);
+            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.3f && liquid.flammability < 0.1f, 2.1f)).boost().update(false);
         }};
 
         // ===== extinction (PU_V8 L531-554, BigLaserTurret + SparkingContinuousLaserBulletType) =====
@@ -1190,7 +1190,7 @@ public class Z_Turrets {
                 incendAmount = 2;
                 extinction = true;
             }};
-            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.27f && liquid.flammability < 0.1f, 2.5f)).update(false);
+            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.27f && liquid.flammability < 0.1f, 2.5f)).boost().update(false);
         }};
 
         // ===== buffTurret (PU_V8 L2106-2112, BlockOverdriveTurret) =====
@@ -1290,7 +1290,7 @@ public class Z_Turrets {
                 convertBlocks = false;
                 colors = new Color[]{Color.valueOf("59a7ff55"), Color.valueOf("59a7ffaa"), Color.valueOf("a3e3ff"), Color.white};
             }};
-            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.4f && liquid.flammability < 0.1f, 2.1f)).update(false);
+            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.4f && liquid.flammability < 0.1f, 2.1f)).boost().update(false);
         }};
     }
 }

@@ -7,7 +7,6 @@ import arc.graphics.g2d.Lines;
 import arc.math.Mathf;
 import arc.math.geom.Geometry;
 import arc.math.geom.Intersector;
-import arc.math.geom.Rect;
 import arc.math.geom.Vec2;
 import arc.struct.Seq;
 import arc.util.Tmp;
@@ -22,21 +21,21 @@ import mindustry.gen.Unit;
 import mindustry.graphics.Drawf;
 
 /**
- * PU132 EndCutterLaserBulletType 移植版 (tenmeikiri 主激光)
+ * PU_V8 EndCutterLaserBulletType 移植版 (tenmeikiri 主激光)
  *
- * 机制:
+ * 完全按原版复制, v158 适配:
  * - 激光长度随时间增长 (laserSpeed, accel, maxLength)
- * - 4色叠加渲染 (scarColorAlpha → scarColor → endColor → white)
+ * - 4 色叠加渲染 (scarColorAlpha → scarColor → endColor → white)
  * - 沿激光路径产生闪电
  * - 命中障碍物时激光停止增长, 在尖端产生命中特效
  * - 防作弊伤害 (继承 AntiCheatBulletTypeBase)
  *
- * 简化:
- * - 移除 PU132 复杂的 collideLineRawEnemy, 改用 Vars.indexer.eachBlock + Units.nearbyEnemies
- * - 移除 Unity.antiCheat 采样湮灭系统
- * - 移除 UnitCutEffect (切割特效)
+ * v158 适配:
+ * - Drawf.light 无 Team 参数版本: light(x1, y1, x2, y2, stroke, color, alpha)
+ * - 用 Vars.indexer.eachBlock + Units.nearbyEnemies 替代 Utils.collideLineRawEnemy
+ * - 移除 Unity.antiCheat 采样湮灭系统 + UnitCutEffect
  *
- * 参考: PU132 main/src/unity/entities/bullet/anticheat/EndCutterLaserBulletType.java
+ * 参考: PU_V8 main/src/unity/entities/bullet/anticheat/EndCutterLaserBulletType.java
  */
 public class EndCutterLaserBulletType extends AntiCheatBulletTypeBase {
     public float maxLength = 1000f;
@@ -47,7 +46,7 @@ public class EndCutterLaserBulletType extends AntiCheatBulletTypeBase {
     public float fadeTime = 60f;
     public float fadeInTime = 8f;
 
-    // PU132 颜色常量
+    // PU132 颜色常量 (UnityPal)
     public Color[] colors = {
         Color.valueOf("f5303690"),  // scarColorAlpha (半透明红)
         Color.valueOf("f53036"),    // scarColor (红)
@@ -109,9 +108,8 @@ public class EndCutterLaserBulletType extends AntiCheatBulletTypeBase {
 
     @Override
     public void draw(Bullet b) {
-        // ★ 渲染前重置混合模式 (避免 bloom additive 残留导致红色变白)
-        Draw.blend();
-
+        // ★ 原版不调用 Draw.blend(), 让激光保持 additive 渲染 (红色激光在 additive 模式下更亮更粗)
+        // (黑色激光才需要 Draw.blend() 重置为 alpha 混合, 红色激光不需要)
         float fade = Mathf.clamp(b.time > b.lifetime - fadeTime ? 1f - (b.time - (lifetime - fadeTime)) / fadeTime : 1f) * Mathf.clamp(b.time / fadeInTime);
         float tipHeight = width / 2f;
 
