@@ -107,7 +107,7 @@ public class Z_Turrets {
             consumePower(6.6f);
             heatColor = Pal.turretHeat;
             shootEffect = Fx.lancerLaserShoot;
-            shootSound = Sounds.shoot;
+            shootSound = Sounds.shootArc;  // ★ v158 无 Sounds.pew, 用 shootArc (电弧炮音效) 替代
             shootType = new BasicBulletType(9f, 34f) {{
                 lifetime = 22f;
                 width = 12f;
@@ -205,7 +205,7 @@ public class Z_Turrets {
             rotateSpeed = 4.3f;
             recoil = 2f;
             consumePower(1.9f);
-            shootSound = Sounds.shootLancer;
+            shootSound = Z_Sounds.gluonShoot;  // ★ 原版 UnitySounds.gluonShoot (light/gluon-shoot.ogg)
             shootType = new BasicBulletType(8f, 60f) {{
                 lifetime = 60f;
                 width = 16f;
@@ -283,30 +283,30 @@ public class Z_Turrets {
             inaccuracy = 3f;
             shoot = new ShootAlternate(2);
             shoot.shots = 2;
-            shootSound = Sounds.shootSpectre;
+            shootSound = Sounds.shootSpectre;  // ★ v158 无 Sounds.shootBig, 用 shootSpectre (大型炮弹) 替代
             recoil = 3f;
             rotateSpeed = 4.5f;
-            ammo(Items.graphite, new BasicBulletType(3.3f, 98f) {{
-                lifetime = 30f; width = 18f; height = 21f;
+            ammo(Items.graphite, new BasicBulletType(3.63f, 98f) {{  // ★ speed×1.1, damage×1.4 (原版 standardDenseBig×1.4)
+                lifetime = 35f; width = 18f; height = 21f;
                 splashDamage = 30f; splashDamageRadius = 25f;
                 backColor = trailColor = hitColor = Pal.darkerMetal;
                 frontColor = Color.white;
                 hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
-            }}, Items.silicon, new BasicBulletType(3.3f, 86f) {{
-                lifetime = 30f; width = 17f; height = 20f;
+            }}, Items.silicon, new BasicBulletType(3.63f, 86f) {{  // ★ speed×1.1, damage×1.23 (原版 standardHomingLarge×1.23)
+                lifetime = 35f; width = 17f; height = 20f;
                 homingPower = 0.09f; reloadMultiplier = 1.3f;
                 backColor = trailColor = hitColor = Pal.darkerMetal;
                 frontColor = Color.white;
                 hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
-            }}, Items.pyratite, new BasicBulletType(3.3f, 70f) {{
-                lifetime = 30f; width = 18f; height = 21f;
-                splashDamage = 30f; splashDamageRadius = 30f;
+            }}, Items.pyratite, new BasicBulletType(3.63f, 98f) {{  // ★ speed×1.1, damage×1.4 (原版 standardIncendiaryLarge×1.4)
+                lifetime = 35f; width = 18f; height = 21f;
+                splashDamage = 30f; splashDamageRadius = 25f;  // ★ radius 修正为 25f (原为 30f)
                 makeFire = true; status = mindustry.content.StatusEffects.burning;
                 backColor = trailColor = hitColor = Color.valueOf("ffaa5f");
                 frontColor = Color.white;
                 hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
-            }}, Items.thorium, new BasicBulletType(3.3f, 115f) {{
-                lifetime = 30f; width = 18f; height = 21f;
+            }}, Items.thorium, new BasicBulletType(3.63f, 161f) {{  // ★ speed×1.1, damage×1.4 (原版 standardThoriumLarge×1.4)
+                lifetime = 35f; width = 18f; height = 21f;
                 pierceCap = 2; pierce = true;
                 backColor = trailColor = hitColor = Pal.darkerMetal;
                 frontColor = Color.white;
@@ -330,11 +330,12 @@ public class Z_Turrets {
             shootEffect = Fx.none;
             smokeEffect = Fx.none;
             consumePowerCond(10f, b -> ((mindustry.world.blocks.defense.turrets.Turret.TurretBuild)b).isActive());
-            ammo(Z_Items.sparkAlloy, new BasicBulletType(7f, 100f) {{
+            ammo(Z_Items.sparkAlloy, new BasicBulletType(7f, 100f, "large-bomb") {{  // ★ sprite=large-bomb
                 width = height = 30f;
                 backColor = Pal.surge;
                 frontColor = Color.white;
-                hitSound = Sounds.explosion;
+                mixColorTo = Color.white;  // ★ 原版 mixColorTo
+                hitSound = Sounds.explosionTitan;  // ★ v158 无 Sounds.plasmaboom, 用 explosionTitan (钛爆炸) 替代
                 despawnShake = 4f;
                 collidesAir = false;
                 lifetime = 70f;
@@ -347,6 +348,19 @@ public class Z_Turrets {
                 lightning = 10;
                 lightningDamage = 136f;
                 lightningLength = 20;
+                spin = 2f;  // ★ 原版 spin (旋转动画)
+                shrinkX = 0.7f; shrinkY = 0.7f;  // ★ 原版 shrinkX/Y
+                // ★ frag 子弹 (8 个 plasmaFragTriangle)
+                fragBullets = 8;
+                fragLifeMin = 0.8f; fragLifeMax = 1.1f;
+                // ★ v158 BulletType 无 scaleVelocity 字段, 省略 (效果: fragBullet 继承母弹速度)
+                fragBullet = new TriangleBulletType(11, 10, 4.5f, 90f) {{
+                    lifetime = 160f;
+                    trailWidth = 3f; trailLength = 8;
+                    drag = 0.05f;
+                    collides = false;
+                    castsLightning = true;
+                }};
             }});
         }};
 
@@ -380,7 +394,7 @@ public class Z_Turrets {
                 collidesAir = true;
                 pierce = true;
                 statusDuration = 770f;
-                status = mindustry.content.StatusEffects.wet;
+                status = mindustry.content.StatusEffects.burning;  // ★ 原版 blueBurn, 用 burning 替代 (v158 无自定义 blueBurn)
             }};
         }};
 
@@ -413,7 +427,7 @@ public class Z_Turrets {
                 collidesAir = true;
                 pierce = true;
                 statusDuration = 770f;
-                status = mindustry.content.StatusEffects.wet;
+                status = mindustry.content.StatusEffects.burning;  // ★ 原版 blueBurn, 用 burning 替代
             }};
         }};
 
@@ -469,7 +483,7 @@ public class Z_Turrets {
             shake = 5f;
             recoil = 8f;
             shootY = size * tilesize / 2f - 8f;
-            shootSound = Sounds.shootLancer;
+            shootSound = Z_Sounds.muonShoot;  // ★ 原版 UnitySounds.muonShoot (light/muon-shoot.ogg)
             rotateSpeed = 1.9f;
             heatColor = Pal.turretHeat;
             shootType = new RoundLaserBulletType(200f) {{
@@ -500,7 +514,7 @@ public class Z_Turrets {
             rotateSpeed = 2.2f;
             recoil = 1.5f;
             consumePower(10.4f);
-            shootSound = Sounds.shootLancer;
+            shootSound = Z_Sounds.higgsBosonShoot;  // ★ 原版 UnitySounds.higgsBosonShoot (light/higgs-boson-shoot.ogg)
             shootType = new RoundLaserBulletType(85f) {{
                 length = 270f;
                 width = 5.8f;
@@ -590,8 +604,8 @@ public class Z_Turrets {
             shake = 3f;
             shootEffect = Fx.shootBigSmoke2;
             recoil = 8f;
-            shootSound = Sounds.shootLancer;
-            loopSound = Sounds.beamPlasma;
+            shootSound = Sounds.shootLancer;  // ★ v158 无 Sounds.laser, 用 shootLancer (激光炮射击) 替代
+            loopSound = Z_Sounds.eclipseBeam;  // ★ 原版 UnitySounds.eclipseBeam (advance/eclipse-beam.ogg)
             loopSoundVolume = 2.5f;
             heatColor = Pal.lancerLaser;
             rotateSpeed = 1.9f;
@@ -1129,8 +1143,8 @@ public class Z_Turrets {
             recoil = 7f;
             heatColor = Color.white;
             rotateSpeed = 0.82f;
-            shootSound = Sounds.shootSpectre;
-            loopSound = Sounds.beamPlasma;
+            shootSound = Z_Sounds.extinctionShoot;  // ★ 原版 UnitySounds.extinctionShoot (dark/extinction-shoot.ogg)
+            loopSound = Z_Sounds.beamIntenseHighpitchTone;  // ★ 原版 UnitySounds.beamIntenseHighpitchTone (dark/beam-intense-highpitch-tone.ogg)
             loopSoundVolume = 2f;
             shootType = new SparkingContinuousLaserBulletType(770f) {{
                 length = 560f;

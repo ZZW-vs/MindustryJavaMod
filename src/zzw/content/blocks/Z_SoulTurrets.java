@@ -4,10 +4,13 @@ import arc.graphics.Color;
 import mindustry.content.Fx;
 import mindustry.content.Items;
 import mindustry.content.StatusEffects;
+import mindustry.entities.Units;
 import mindustry.entities.bullet.BasicBulletType;
 import mindustry.entities.bullet.LaserBulletType;
 import mindustry.entities.bullet.LightningBulletType;
 import mindustry.entities.pattern.ShootPattern;
+import mindustry.gen.Bullet;
+import mindustry.gen.Hitboxc;
 import mindustry.gen.Sounds;
 import mindustry.graphics.Pal;
 import mindustry.type.Category;
@@ -135,7 +138,7 @@ public class Z_SoulTurrets {
             range = 200f;
             rotateSpeed = 10f;
             recoil = 3f;
-            shootSound = Sounds.shootBreach;  // v158 无 Sounds.shootBig, 用 shootBreach 替代
+            shootSound = Sounds.shootSpectre;  // ★ v158 无 Sounds.shootBig, 用 shootSpectre 替代
             targetGround = true;
             targetAir = false;
             shootType = new BasicBulletType(6f, 180f, "shell") {{
@@ -147,7 +150,20 @@ public class Z_SoulTurrets {
                 hitEffect = despawnEffect = Fx.blastExplosion;
                 splashDamage = 90f;
                 splashDamageRadius = 3.2f * tilesize;
-            }};
+            }
+
+            // ★ 原版 blackout: hitEntity 时在 splashDamageRadius 范围内对所有敌人施加 unmoving(60f) + disarmed(60f)
+            @Override
+            public void hitEntity(Bullet b, Hitboxc other, float initialHealth) {
+                super.hitEntity(b, other, initialHealth);
+                Units.nearbyEnemies(b.team, b.x, b.y, splashDamageRadius, u -> {
+                    if (u.isValid()) {
+                        u.apply(StatusEffects.unmoving, 60f);
+                        u.apply(StatusEffects.disarmed, 60f);
+                    }
+                });
+            }
+            };
 
             requireSoul = false;
             maxSouls = 5;

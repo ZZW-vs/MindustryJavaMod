@@ -6,7 +6,7 @@ import mindustry.Vars;
 /**
  * 自定义音效注册 (模仿 PU132 UnitySounds)
  *
- * 音效文件在 assets/sounds/end/ 目录下
+ * 音效文件在 assets/sounds/ 目录下
  * v158 加载规则: assets/sounds/ 下的 .ogg 文件通过 Vars.tree.loadSound() 加载
  */
 public class Z_Sounds {
@@ -25,7 +25,20 @@ public class Z_Sounds {
         energyBolt,       // fmonolith 能量弹射击音效
         heatRay,          // fmonolith heat-ray 持续激光音效
         supernovaShoot,   // fmonolith supernova 射击音效
-        supernovaActive;  // fmonolith supernova 激活循环音效
+        supernovaActive,  // fmonolith supernova 激活循环音效
+        // light/ 目录炮台音效
+        gluonShoot,       // gluon 炮台射击音效
+        muonShoot,        // muon 炮台射击音效
+        higgsBosonShoot,  // higgsBoson 炮台射击音效
+        singularityShoot, // singularity 炮台射击音效
+        wbosonShoot,      // wBoson 炮台射击音效
+        zbosonShoot,      // zBoson 炮台射击音效
+        ephemeronShoot,   // ephemeron 炮台射击音效
+        // advance/ 目录炮台音效
+        eclipseBeam,      // eclipse 炮台激光循环音效
+        // dark/ 目录炮台音效
+        extinctionShoot,            // extinction 炮台射击音效
+        beamIntenseHighpitchTone;   // extinction 炮台激光循环音效
 
     public static void load() {
         spaceFracture = loadSound("end/space-fracture");
@@ -43,6 +56,22 @@ public class Z_Sounds {
         heatRay = loadSound("heat-ray");
         supernovaShoot = loadSound("monolith/supernova-shoot");
         supernovaActive = loadSound("monolith/supernova-active");
+
+        // light/ 目录: light/gluon-shoot.ogg 等
+        gluonShoot = loadSound("light/gluon-shoot");
+        muonShoot = loadSound("light/muon-shoot");
+        higgsBosonShoot = loadSound("light/higgs-boson-shoot");
+        singularityShoot = loadSound("light/singularity-shoot");
+        wbosonShoot = loadSound("light/wboson-shoot");
+        zbosonShoot = loadSound("light/zboson-shoot");
+        ephemeronShoot = loadSound("light/ephemeron-shoot");
+
+        // advance/ 目录
+        eclipseBeam = loadSound("advance/eclipse-beam");
+
+        // dark/ 目录
+        extinctionShoot = loadSound("dark/extinction-shoot");
+        beamIntenseHighpitchTone = loadSound("dark/beam-intense-highpitch-tone");
     }
 
     /**

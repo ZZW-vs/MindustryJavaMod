@@ -57,6 +57,9 @@ public class TestMod extends Mod{
         // 加载 fmonolith 灵魂炮台 (需要物品)
         zzw.content.blocks.Z_SoulTurrets.load();
 
+        // 加载高级炮台 (TractorBeam/oracle/recluse/prism/supernova)
+        zzw.content.blocks.Z_AdvTurrets.load();
+
         // 加载经验系统（需要物品）
         Z_Exp.load();
 
