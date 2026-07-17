@@ -34,6 +34,8 @@ import zzw.content.Z_Bullets.TriangleBulletType;
 import zzw.content.Z_Bullets.VelocityLaserBoltBulletType;
 import zzw.content.Z_Bullets.AcceleratingLaserBulletType;
 import zzw.content.Z_Items;
+import zzw.content.Z_Sounds;
+import zzw.content.units.bullets.ChangeTeamLaserBulletType;
 import zzw.content.blocks.turrets.AbsorberTurret;
 import zzw.content.blocks.turrets.BarrelsItemTurret;
 import zzw.content.blocks.turrets.BigLaserTurret;
@@ -88,6 +90,8 @@ public class Z_Turrets {
     public static BlockOverdriveTurret buffTurret, upgradeTurret;
     public static AbsorberTurret absorber;
     public static OrbTurret orbTurret;
+    // 西诺腐蚀者 (LaserTurret + ChangeTeamLaserBulletType)
+    public static LaserTurret xenoCorruptor;
 
     public static void load() {
         // ===== electron (T1 电力炮, PU132 L632-662) =====
@@ -244,7 +248,7 @@ public class Z_Turrets {
         // PU132: LaserTurret + 更强激光
         graviton = new LaserTurret("graviton") {{
             requirements(Category.turret, ItemStack.with(Items.silicon, 300, Z_Items.luminum, 430, Items.titanium, 190, Items.thorium, 110, Z_Items.lightAlloy, 15));
-            size = 4;
+            size = 3;  // ★ 修正: 贴图 96x96 对应 size=3, 之前 size=4 不匹配
             health = 5000;
             reload = 90f;
             coolantMultiplier = 3f;
@@ -1201,6 +1205,44 @@ public class Z_Turrets {
                     arc.graphics.g2d.Fill.circle(b.x, b.y, 2f);
                 }
             };
+        }};
+
+        // ===== xenoCorruptor (PU_V8 L3369-3409, LaserTurret + ChangeTeamLaserBulletType) =====
+        // PU_V8: 发射连续激光, 将生命值低于阈值的敌方单位转化为己方, 转化后单位会被削弱
+        // v158 适配: powerUse→consumePower, reloadTime→reload, UnitySounds.xenoBeam→Z_Sounds.xenoBeam,
+        //           UnityPal.advanceDark→暗蓝色, UnityStatusEffects.teamConverted→StatusEffects.none,
+        //           consumes.add→consume, baseRegion查找由DrawTurret自动处理
+        xenoCorruptor = new LaserTurret("xeno-corruptor") {{
+            requirements(Category.turret, ItemStack.with(Items.lead, 640, Items.graphite, 740, Items.titanium, 560, Items.surgeAlloy, 650, Items.silicon, 720, Items.thorium, 400, Z_Items.xenium, 340, Z_Items.advanceAlloy, 640));
+            health = 7900;
+            size = 7;
+            reload = 230f;
+            range = 290f;
+            coolantMultiplier = 1.4f;
+            shootCone = 40f;
+            shootDuration = 310f;
+            firingMoveFract = 0.16f;
+            consumePower(45f);
+            shake = 3f;
+            recoil = 8f;
+            shootSound = Sounds.shootLancer;
+            loopSound = Z_Sounds.xenoBeam;
+            loopSoundVolume = 2f;
+            heatColor = Color.valueOf("3a4a7a");
+            rotateSpeed = 2f;
+            shootType = new ChangeTeamLaserBulletType(60f) {{
+                length = 300f;
+                lifetime = 18f;
+                shootEffect = Fx.none;
+                smokeEffect = Fx.none;
+                hitEffect = Fx.hitLancer;
+                incendChance = -1f;
+                lightColor = Color.valueOf("59a7ff");
+                conversionStatusEffect = mindustry.content.StatusEffects.none;
+                convertBlocks = false;
+                colors = new Color[]{Color.valueOf("59a7ff55"), Color.valueOf("59a7ffaa"), Color.valueOf("a3e3ff"), Color.white};
+            }};
+            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.4f && liquid.flammability < 0.1f, 2.1f)).update(false);
         }};
     }
 }

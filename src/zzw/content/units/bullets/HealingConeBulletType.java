@@ -116,6 +116,9 @@ public class HealingConeBulletType extends BulletType {
 
             // 遍历锥形范围内所有建筑 (修复 PU_V8 Utils.castConeTile 的功能)
             // 用 Groups.build 遍历, 检查是否在锥形范围内且未被 absorbLasers 建筑遮挡
+            // ★ v158 修复: BuildingComp.heal(amount) 用 @MethodPriority(100) 覆盖了 HealthComp 默认实现,
+            //   但只调用 healthChanged() 更新显示, 没有真正增加 health 字段!
+            //   所以这里直接修改 health 字段, 然后调用 healthChanged() 通知显示更新
             Groups.build.forEach(build -> {
                 if (!b.within(build, length + (build.block.size * Vars.tilesize / 2f))) return;
                 if (!Angles.within(b.rotation(), b.angleTo(build), cone)) return;
@@ -123,7 +126,9 @@ public class HealingConeBulletType extends BulletType {
                 if ((b.dst2(build) + (build.block.size * Vars.tilesize / 2f)) < data[index]) {
                     if (build.team == b.team) {
                         if (build.damaged()) {
-                            build.heal(build.maxHealth / 100f * healPercent);
+                            float healAmount = build.maxHealth / 100f * healPercent;
+                            build.health = Math.min(build.maxHealth, build.health + healAmount);
+                            build.healthChanged();
                             Fx.healBlockFull.at(build.x, build.y, build.block.size, Pal.heal);
                         }
                     } else {

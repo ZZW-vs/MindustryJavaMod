@@ -20,7 +20,12 @@ public class Z_Sounds {
         endMissile,       // ravager 小型炮台导弹射击音效
         endBasicSmall,    // 基础小型子弹射击音效
         endBasic,         // 基础子弹射击音效
-        devourerMainLaser; // 噬界虫主激光射击音效
+        devourerMainLaser, // 噬界虫主激光射击音效
+        xenoBeam,         // 西诺腐蚀者激光循环音效
+        energyBolt,       // fmonolith 能量弹射击音效
+        heatRay,          // fmonolith heat-ray 持续激光音效
+        supernovaShoot,   // fmonolith supernova 射击音效
+        supernovaActive;  // fmonolith supernova 激活循环音效
 
     public static void load() {
         spaceFracture = loadSound("end/space-fracture");
@@ -33,6 +38,11 @@ public class Z_Sounds {
         endBasicSmall = loadSound("end/end-basic-small");
         endBasic = loadSound("end/end-basic");
         devourerMainLaser = loadSound("end/devourer-main-laser");
+        xenoBeam = loadSound("advance/xeno-beam");
+        energyBolt = loadSound("energy-bolt");
+        heatRay = loadSound("heat-ray");
+        supernovaShoot = loadSound("monolith/supernova-shoot");
+        supernovaActive = loadSound("monolith/supernova-active");
     }
 
     /**
