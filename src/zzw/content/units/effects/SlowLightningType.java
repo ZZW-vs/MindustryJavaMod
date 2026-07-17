@@ -7,6 +7,7 @@ import arc.func.Floatp;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Lines;
+import arc.math.Mathf;
 import arc.math.geom.Position;
 import arc.math.geom.Vec2;
 import arc.util.Time;
@@ -53,6 +54,10 @@ public class SlowLightningType {
     /** ★ 优化：碰撞检测间隔，从5tick增加到10tick */
     public float collideInterval = 10f;
     public Effect hitEffect = mindustry.content.Fx.hitLancer;
+    /** ★ 锯齿渲染：每段中间插入的锯齿点数 (0=禁用, 2-3=闪电感) */
+    public int jaggedPoints = 0;
+    /** ★ 锯齿幅度：占线段长度的比例 (0.12 = 12%) */
+    public float jaggedness = 0.12f;
 
     public SlowLightningEntity create(Team team, float x, float y, float rotation, Floatp liveDamage, Posc parent, Position target) {
         return create(team, null, x, y, rotation, liveDamage, parent, target);
@@ -89,6 +94,9 @@ public class SlowLightningType {
     }
 
     public static class SlowLightningNode implements Position, arc.util.pooling.Pool.Poolable {
+        /** ★ 性能优化：锯齿顶点静态缓冲区，避免每帧 new float[] */
+        private static final float[] jaggedVerts = new float[20];
+
         public float x, y, colorProgress, time, rotation, rotRand, dist;
         public int layer = 0;
         public SlowLightningEntity main;
@@ -116,12 +124,56 @@ public class SlowLightningType {
             SlowLightningType type = main.type;
             Draw.color(type.colorFrom, type.colorTo, colorProgress);
             Position p = getLast();
+            float sx = p.getX(), sy = p.getY();
+            float ex, ey;
             if (time >= 1f) {
-                Lines.line(p.getX(), p.getY(), x, y);
+                ex = x;
+                ey = y;
             } else {
                 Vec2 v = Tmp.v1.set(this).sub(p).scl(time).add(p);
-                Lines.line(p.getX(), p.getY(), v.x, v.y);
+                ex = v.x;
+                ey = v.y;
             }
+
+            int jp = type.jaggedPoints;
+            // 无锯齿或线段过短：直接画直线
+            if (jp <= 0) {
+                Lines.line(sx, sy, ex, ey);
+                return;
+            }
+
+            float dx = ex - sx, dy = ey - sy;
+            float len = (float)Math.sqrt(dx * dx + dy * dy);
+            if (len < 0.001f) {
+                Lines.line(sx, sy, ex, ey);
+                return;
+            }
+
+            // ★ 锯齿渲染：起点 + jp 中间点 + 终点，使用 polyline 一次性绘制
+            int count = jp + 2;
+            float[] verts = jaggedVerts;
+            verts[0] = sx;
+            verts[1] = sy;
+            verts[count * 2 - 2] = ex;
+            verts[count * 2 - 1] = ey;
+
+            // 垂直方向（归一化）
+            float inv = 1f / len;
+            float nx = -dy * inv, ny = dx * inv;
+
+            // 插入中间点：基于位置生成稳定 hash 偏移，避免每帧抖动
+            for (int i = 1; i <= jp; i++) {
+                float t = (float)i / (count - 1);
+                float cx = sx + dx * t, cy = sy + dy * t;
+                // 稳定伪随机：基于线段端点位置 + 索引
+                float h = sx * 127.1f + sy * 311.7f + ex * 74.7f + ey * 93.3f + i * 53.7f;
+                float frac = h - Mathf.floor(h);
+                float offset = (frac * 2f - 1f) * len * type.jaggedness;
+                verts[i * 2] = cx + nx * offset;
+                verts[i * 2 + 1] = cy + ny * offset;
+            }
+
+            Lines.polyline(verts, count * 2, false);
         }
 
         void line(float x, float y, float x2, float y2) {

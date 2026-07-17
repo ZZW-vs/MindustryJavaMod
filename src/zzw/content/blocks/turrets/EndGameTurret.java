@@ -69,6 +69,8 @@ public class EndGameTurret extends PowerTurret {
         damage = 520f;
         splitChance = 0.045f;
         range = 810f;
+        jaggedPoints = 2; // ★ 锯齿渲染：每段2个中间点，更像真实闪电
+        jaggedness = 0.12f;
     }};
 
     public TextureRegion

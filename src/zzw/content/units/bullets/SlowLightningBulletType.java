@@ -59,6 +59,8 @@ public class SlowLightningBulletType extends AntiCheatBulletTypeBase {
             splitChance = b.splitChance;
             continuous = true;
             lineWidth = 3f;
+            jaggedPoints = 2; // ★ 锯齿渲染：每段2个中间点，更像真实闪电
+            jaggedness = 0.12f;
         }
 
         @Override

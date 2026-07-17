@@ -122,8 +122,28 @@ public class SupernovaTurret extends SoulLaserTurret {
         // 所有绘制逻辑在 SupernovaTurretBuild.draw() 中实现
         drawer = new DrawBlock() {
             @Override
+            public void draw(mindustry.gen.Building build) {
+                // 空实现: 实际绘制由 SupernovaTurretBuild.draw() 处理
+            }
+
+            @Override
+            public void load(mindustry.world.Block block) {
+                // 由 SupernovaTurret.load() 处理
+            }
+
+            @Override
             public TextureRegion[] icons(mindustry.world.Block block) {
-                return new TextureRegion[]{Core.atlas.find(block.name + "-head", block.region)};
+                // ★ 修复信息显示界面: 返回完整组合图标 (底座+翅膀+头部+核心)
+                // 之前只返回 -head, 导致显示不全
+                return new TextureRegion[]{
+                    Core.atlas.find(block.name + "-bottom"),
+                    Core.atlas.find(block.name + "-wing-left-bottom"),
+                    Core.atlas.find(block.name + "-wing-right-bottom"),
+                    Core.atlas.find(block.name + "-wing-left"),
+                    Core.atlas.find(block.name + "-wing-right"),
+                    Core.atlas.find(block.name + "-head"),
+                    Core.atlas.find(block.name + "-core")
+                };
             }
         };
     }
@@ -185,11 +205,18 @@ public class SupernovaTurret extends SoulLaserTurret {
             if (isShooting() && bullets.isEmpty()) {
                 // PU_V8: consumes.<ConsumeLiquidBase>get(ConsumeType.liquid).amount
                 // v158: BaseTurret.coolant (ConsumeLiquidBase 字段) + coolant.amount
-                Liquid liquid = liquids.current();
-                float maxUsed = coolant != null ? coolant.amount : 0f;
-
-                // v158: cheating() 方法存在, efficiency 字段 (非方法)
-                float used = baseReloadSpeed() * ((cheating() ? maxUsed : Math.min(liquids.get(liquid), maxUsed * Time.delta)) * liquid.heatCapacity * coolantMultiplier);
+                float used;
+                if (coolant != null) {
+                    Liquid liquid = liquids.current();
+                    float maxUsed = coolant.amount;
+                    // v158: cheating() 方法存在, efficiency 字段 (非方法)
+                    used = baseReloadSpeed() * ((cheating() ? maxUsed : Math.min(liquids.get(liquid), maxUsed * Time.delta)) * liquid.heatCapacity * coolantMultiplier);
+                } else {
+                    // ★ 修复: 无 coolant consumer 时 (Z_AdvTurers 未配置 consumeLiquid)
+                    // 用等效默认值累积 novaCharge, 避免永远无法开炮
+                    // 等效于 maxUsed=1, heatCapacity=1, coolantMultiplier=1
+                    used = baseReloadSpeed() * Time.delta;
+                }
                 novaCharge = Mathf.clamp(novaCharge + 120f * chargeWarmup * used);
             }
 

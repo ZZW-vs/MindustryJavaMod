@@ -29,6 +29,10 @@ public class BarrelsItemTurret extends ItemTurret {
 
     public BarrelsItemTurret(String name) {
         super(name);
+        // ★ v155.4 bullet(type, xOffset, yOffset, ...) 期望 LOCAL 局部坐标 (rotation-90 坐标系)
+        // 默认 shootY = size*tilesize/2 (前向半身高偏移), 我们自定义每个炮管的前向偏移
+        // 所以将默认值清零, 这样 yOffset 就是相对于炮台中心的前向距离
+        shootY = 0f;
     }
 
     public void addBarrel(float x, float y, float reloadTime) {
@@ -72,15 +76,19 @@ public class BarrelsItemTurret extends ItemTurret {
                 heat = 1f;
                 float i = barrelCounter % 2 - 0.5f;
                 float spread = getSpread();
-                // tr3 既是位置偏移 (替代 PU_V8 的 tr)
-                tr3.trns(rotation - 90f, spread * i + Mathf.range(xRand), size * tilesize / 2f);
+                // ★ v155.4 bullet() 期望 LOCAL 局部坐标 (rotation-90 坐标系), 不是世界坐标
+                // 之前错误地传入了已旋转的 tr3.x/tr3.y 导致双重旋转, 子弹位置偏移
+                float xOff = spread * i;
+                float yOff = size * tilesize / 2f;
+                // 用 tr3 (世界坐标) 仅用于角度计算 (从炮口位置到目标点的角度)
+                tr3.trns(rotation - 90f, xOff, yOff);
                 Vec2 targetVec = new Vec2();
                 targetVec.trns(rotation, Math.max(Mathf.dst(x, y, targetPos.x, targetPos.y), size * tilesize));
                 float rot = Angles.angle(tr3.x, tr3.y, targetVec.x, targetVec.y);
-                // v155.4 bullet 5 参签名: (type, xOffset, yOffset, angleOffset, mover)
-                bullet(type, tr3.x, tr3.y, rot - rotation + Mathf.range(inaccuracy), null);
+                // v155.4 bullet 5 参签名: 传入 LOCAL 偏移, bullet() 内部会旋转+加 (x,y)
+                // bullet() 自动处理 useAmmo/effects/recoil/heat, 无需重复调用
+                bullet(type, xOff, yOff, rot - rotation + Mathf.range(inaccuracy), null);
                 barrelCounter++;
-                useAmmo();
             } else {
                 super.shoot(type);
             }
@@ -89,20 +97,19 @@ public class BarrelsItemTurret extends ItemTurret {
         protected void shootBarrel(BulletType type, int index) {
             curRecoil = Mathf.clamp(curRecoil + 0.5f, 0f, 1f);
             float i = barrelShotCounters[index] % 2 - 0.5f;
-            // 炮管相对位置 (交替 ±x/2 偏移)
-            float bx = barrels.get(index).x * i;
-            float by = barrels.get(index).y;
+            // ★ v155.4 bullet() 期望 LOCAL 局部坐标 (rotation-90 坐标系)
+            float xOff = barrels.get(index).x * i;
+            float yOff = barrels.get(index).y;
             float rot = rotation;
             if (focus) {
+                // 用 tr3 (世界坐标) 仅用于角度计算
+                tr3.trns(rotation - 90f, xOff, yOff);
                 Vec2 targetVec = new Vec2();
                 targetVec.trns(rotation, Math.max(Mathf.dst(x, y, targetPos.x, targetPos.y), size * tilesize));
-                // 计算炮管世界位置
-                float barrelWorldX = x + Angles.trnsx(rotation - 90f, bx, by);
-                float barrelWorldY = y + Angles.trnsy(rotation - 90f, bx, by);
-                rot = Angles.angle(barrelWorldX, barrelWorldY, targetVec.x + x, targetVec.y + y);
+                rot = Angles.angle(tr3.x, tr3.y, targetVec.x, targetVec.y);
             }
             // v155.4 bullet 5 参签名, 自动处理声音/特效/反冲
-            bullet(type, bx, by, rot - rotation + Mathf.range(inaccuracy), null);
+            bullet(type, xOff, yOff, rot - rotation + Mathf.range(inaccuracy), null);
             barrelShotCounters[index]++;
         }
 
