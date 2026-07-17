@@ -5,15 +5,21 @@ import arc.math.Mathf;
 import arc.math.geom.Vec2;
 import arc.struct.Seq;
 import mindustry.entities.bullet.BulletType;
+import mindustry.entities.pattern.ShootAlternate;
 import mindustry.world.blocks.defense.turrets.ItemTurret;
 
 import static mindustry.Vars.tilesize;
 
 /**
- * 多管物品炮台 (PU_V8 BarrelsItemTurret 移植版)
+ * 多管物品炮台 (PU_V8 BarrelsItemTurret 完整移植)
  * ghost/banshee: 支持多炮管独立装填, focus 模式下所有炮管集中瞄准目标点
- * 简化: 保留多炮管系统 (addBarrel + barrelReloads), focus 模式逻辑;
- *       移除 baseRegion 自定义查找 (v158 用 @Load 注解)
+ * ★完整移植 PU_V8 原版机制 (v155.4 API 适配):
+ *  - shoot(): focus 模式下使用 barrelCounter 交替 + spread + xRand 计算位置
+ *  - shootBarrel(): 各炮管独立装填计数, focus 模式下瞄向目标点
+ *  - bullet() 5 参方法 (v155.4): 自动处理声音/特效/反冲/弹药消耗
+ *  - 使用 barrelCounter 替代 PU_V8 shotCounter (v155.4 无 shotCounter 字段)
+ *  - 使用 tr3 自有 Vec2 替代 PU_V8 tr (v155.4 ItemTurretBuild 无 tr 字段)
+ *  - spread 从 ShootAlternate 模式提取 (v155.4 无独立 spread 字段)
  * 参考: PU_V8 main/src/unity/world/blocks/defense/turrets/BarrelsItemTurret.java
  */
 public class BarrelsItemTurret extends ItemTurret {
@@ -27,6 +33,14 @@ public class BarrelsItemTurret extends ItemTurret {
 
     public void addBarrel(float x, float y, float reloadTime) {
         barrels.add(new Barrel(x, y, reloadTime));
+    }
+
+    /** 从 shoot 模式提取 spread (PU_V8 直接访问 spread 字段, v155.4 需从 ShootAlternate 提取) */
+    protected float getSpread() {
+        if (shoot instanceof ShootAlternate) {
+            return ((ShootAlternate) shoot).spread;
+        }
+        return 0f;
     }
 
     protected class Barrel {
@@ -53,18 +67,18 @@ public class BarrelsItemTurret extends ItemTurret {
         @Override
         protected void shoot(BulletType type) {
             if (focus) {
-                // focus 模式: 集中瞄准目标点 (原版逻辑)
+                // ★完整移植 PU_V8: focus 模式集中瞄准目标点
                 curRecoil = 1f;
                 heat = 1f;
-
-                // 使用 shootX/shootY (v158 字段) 作为炮口位置
-                float bx = x + Angles.trnsx(rotation - 90, shootX, shootY);
-                float by = y + Angles.trnsy(rotation - 90, shootX, shootY);
-                tr3.trns(rotation, Math.max(Mathf.dst(x, y, targetPos.x, targetPos.y), size * tilesize));
-
-                float rot = Angles.angle(bx, by, tr3.x + x, tr3.y + y);
-
-                bullet(type, 0f, 0f, rot - rotation, null);
+                float i = barrelCounter % 2 - 0.5f;
+                float spread = getSpread();
+                // tr3 既是位置偏移 (替代 PU_V8 的 tr)
+                tr3.trns(rotation - 90f, spread * i + Mathf.range(xRand), size * tilesize / 2f);
+                Vec2 targetVec = new Vec2();
+                targetVec.trns(rotation, Math.max(Mathf.dst(x, y, targetPos.x, targetPos.y), size * tilesize));
+                float rot = Angles.angle(tr3.x, tr3.y, targetVec.x, targetVec.y);
+                // v155.4 bullet 5 参签名: (type, xOffset, yOffset, angleOffset, mover)
+                bullet(type, tr3.x, tr3.y, rot - rotation + Mathf.range(inaccuracy), null);
                 barrelCounter++;
                 useAmmo();
             } else {
@@ -74,22 +88,22 @@ public class BarrelsItemTurret extends ItemTurret {
 
         protected void shootBarrel(BulletType type, int index) {
             curRecoil = Mathf.clamp(curRecoil + 0.5f, 0f, 1f);
-
             float i = barrelShotCounters[index] % 2 - 0.5f;
-            float bx = x + Angles.trnsx(rotation - 90, barrels.get(index).x * i, barrels.get(index).y);
-            float by = y + Angles.trnsy(rotation - 90, barrels.get(index).x * i, barrels.get(index).y);
+            // 炮管相对位置 (交替 ±x/2 偏移)
+            float bx = barrels.get(index).x * i;
+            float by = barrels.get(index).y;
             float rot = rotation;
-
             if (focus) {
-                tr3.trns(rotation, Math.max(Mathf.dst(x, y, targetPos.x, targetPos.y), size * tilesize));
-                rot = Angles.angle(bx, by, tr3.x + x, tr3.y + y);
+                Vec2 targetVec = new Vec2();
+                targetVec.trns(rotation, Math.max(Mathf.dst(x, y, targetPos.x, targetPos.y), size * tilesize));
+                // 计算炮管世界位置
+                float barrelWorldX = x + Angles.trnsx(rotation - 90f, bx, by);
+                float barrelWorldY = y + Angles.trnsy(rotation - 90f, bx, by);
+                rot = Angles.angle(barrelWorldX, barrelWorldY, targetVec.x + x, targetVec.y + y);
             }
-
-            // 直接创建子弹 (绕过 v158 pattern 系统, 实现多管独立射击)
-            type.create(this, team, bx, by, rot + Mathf.range(inaccuracy), 1f, 1f);
+            // v155.4 bullet 5 参签名, 自动处理声音/特效/反冲
+            bullet(type, bx, by, rot - rotation + Mathf.range(inaccuracy), null);
             barrelShotCounters[index]++;
-            useAmmo();
-            (shootEffect == null ? type.shootEffect : shootEffect).at(bx, by, rot, type.hitColor);
         }
 
         @Override

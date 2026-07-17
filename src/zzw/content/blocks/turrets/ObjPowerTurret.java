@@ -46,18 +46,22 @@ public class ObjPowerTurret extends PowerTurret {
     }
 
     public class ObjPowerTurretBuild extends PowerTurretBuild {
-        float time = 0f;
+        // 初始旋转时间随机化, 使多个炮台旋转方向/相位不同 (原版 effect: 旋转方向不固定)
+        float time = Mathf.random(0f, 360f * Mathf.degRad);
         float distortionTime = 0f;
 
         @Override
         public void updateTile() {
             super.updateTile();
-            if (Float.isNaN(time)) time = 0f;
+            if (Float.isNaN(time)) time = Mathf.random(0f, 360f * Mathf.degRad);
             // 立方体旋转速度随 reload 进度变化
             // PU_V8: efficiency() * (1f + ((reload * 2.5f) / reloadTime)) * Time.delta
             // v155.4: efficiency() → efficiency (字段), reloadTime → reload (Block 字段),
             //         PU_V8 reload (Build 计数器) → reloadCounter
-            time += efficiency * (1f + ((reloadCounter * 2.5f) / reload)) * Time.delta;
+            // ★ 修复: 即使 efficiency=0 (无电/无弹药), 仍保持基础旋转 (与原版一致)
+            float speed = efficiency * (1f + ((reloadCounter * 2.5f) / reload));
+            if (speed < 0.1f) speed = 0.1f;  // 最小旋转速度, 避免蓄力完后静止
+            time += speed * Time.delta;
             distortionTime = Math.max(0f, distortionTime - (Time.delta * 0.2f));
         }
 

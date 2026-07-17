@@ -15,15 +15,10 @@ import mindustry.gen.Sounds;
 import mindustry.graphics.Pal;
 import mindustry.type.Category;
 import mindustry.type.ItemStack;
-import mindustry.world.blocks.defense.Wall;
-import mindustry.world.blocks.production.GenericCrafter;
-import mindustry.world.consumers.ConsumeItems;
-import mindustry.world.meta.StatUnit;
 import zzw.content.Z_Items;
 import zzw.content.Z_Sounds;
 import zzw.content.blocks.soul.ISoulTurret;
 import zzw.content.blocks.soul.RicochetBulletType;
-import zzw.content.blocks.soul.SoulInfuser;
 import zzw.content.blocks.soul.SoulTurretPowerTurret;
 
 import static mindustry.Vars.tilesize;
@@ -46,9 +41,6 @@ public class Z_SoulTurrets {
 
     // ===== 6 个简单 SoulTurretPowerTurret 炮台 =====
     public static SoulTurretPowerTurret ricochet, diviner, mage, blackout, shellshock, purge;
-
-    // ===== 灵魂配套建筑 =====
-    public static SoulInfuser soulInfuser;
 
     public static void load() {
         // ===== ricochet (PU_V8 L2412-2435) =====
@@ -225,20 +217,6 @@ public class Z_SoulTurrets {
             maxSouls = 7;
             efficiencyFrom = 0.7f;
             efficiencyTo = 1.67f;
-        }};
-
-        // ===== SoulInfuser 灵魂注入器 =====
-        // 简化版: 消耗 monolite + 电力产生灵魂, 注入附近炮台/容器
-        // ★ PU_V8: size=3, Category.crafting; 用户要求归入电力系统 → Category.power
-        soulInfuser = new SoulInfuser("soul-infuser") {{
-            requirements(Category.power, ItemStack.with(Z_Items.monolite, 200, Items.titanium, 250, Items.silicon, 420));
-            size = 3;
-            health = 600;
-            craftTime = 60f;
-            consumePower(3.2f);
-            consume(new ConsumeItems(ItemStack.with(Z_Items.monolite, 2)));
-            range = 15f;
-            injectEffect = Fx.smokeCloud;
         }};
     }
 }

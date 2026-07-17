@@ -42,7 +42,9 @@ public class ZObjs {
         // wavefront: Color.white, UnityPal.wavefrontDark=9e9f9f
         wavefront = new WavefrontObject();
         wavefront.textureName = "wavefront";
-        wavefront.size = 4f;
+        // size=15 炮台, defaultScl=4f, wavefront.obj 顶点范围 ~2.5x2.5x0.5
+        // 需要更大的 size 使模型可见 (size=15 炮台占地 120 单位, 模型需 ~60 单位)
+        wavefront.size = 8f;  // 4 * 8 = 32 倍缩放, 2.5 * 32 = 80 单位 (合适)
         wavefront.shadingSmoothness = 1f;
         wavefront.lightColor = Color.white;
         wavefront.shadeColor = Color.valueOf("9e9f9f");
@@ -56,6 +58,8 @@ public class ZObjs {
         prism.lightColor = Color.valueOf("87ceeb");
         prism.shadeColor = Color.valueOf("6586b0");
         prism.drawLayer = Layer.turret;
+        // prism.obj 无法线 (vn), 用 zMedian 着色避免 normalAngleDraw NPE
+        prism.shadingType = WavefrontObject.ShadingType.zMedian;
 
         Events.on(EventType.FileTreeInitEvent.class, e -> {
             // 延迟到下一帧, 确保 atlas 已就绪 (PU_V8 同样用 Core.app.post 包裹)

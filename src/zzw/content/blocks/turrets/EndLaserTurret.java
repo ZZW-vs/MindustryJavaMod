@@ -134,7 +134,7 @@ public class EndLaserTurret extends PowerTurret {
 
                 tr.trns(rotation, shootLength);
                 float bx = x + tr.x, by = y + tr.y;
-                chargeBeginEffect.at(bx, by, 0f, this);
+                chargeBeginEffect.at(bx, by, rotation, this);
                 chargeSound.at(bx, by, 1f);
 
                 for (int i = 0; i < chargeEffects; i++) {

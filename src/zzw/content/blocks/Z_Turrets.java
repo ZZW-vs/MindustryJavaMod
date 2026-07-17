@@ -275,7 +275,12 @@ public class Z_Turrets {
         // ===========================================================================
 
         // ===== apparition (PU_V8 L384-409, ItemTurret 多发交替) =====
-        // PU_V8: ammo(graphite, standardDenseLarge) 等, v158 无 standardDenseBig, 用 BasicBulletType 自建
+        // ★完整移植 PU_V8: spread=12, shots=2, alternate=true, standardDenseLarge 等 Large 子弹
+        // ★ Large 子弹 = Spectre 子弹 (v7 standardDenseBig 等) × Large 倍率 (v155.4 内联实现)
+        //   - standardDenseLarge: damage*1.4, speed*1.1, width*1.12, height*1.12
+        //   - standardHomingLarge: damage*1.23, speed*1.1, width*1.12, height*1.12, homingPower=0.09, reloadMult=1.3
+        //   - standardIncendiaryLarge: damage*1.4, speed*1.1, width*1.12, height*1.12
+        //   - standardThoriumLarge: damage*1.4, speed*1.1, width*1.12, height*1.12
         apparition = new ItemTurret("apparition") {{
             requirements(Category.turret, ItemStack.with(Items.copper, 350, Items.graphite, 380, Items.silicon, 360, Items.plastanium, 200, Items.thorium, 220, Z_Items.umbrium, 370, Items.surgeAlloy, 290));
             size = 5;
@@ -284,40 +289,69 @@ public class Z_Turrets {
             reload = 6f;
             coolantMultiplier = 0.5f;
             inaccuracy = 3f;
-            // ★ PU_V8: spread=12, shots=2, alternate=true → v158: ShootAlternate(12f) 自带 shots=2 alternate
+            // ★ PU_V8: spread=12, shots=2, alternate=true → ShootAlternate(12f) 自带 shots=2 alternate
             shoot = new ShootAlternate(12f);
-            shootSound = Sounds.shootSpectre;  // ★ v158 无 Sounds.shootBig, 用 shootSpectre (大型炮弹) 替代
+            shootSound = Sounds.shootSpectre;  // v155.4 无 Sounds.shootBig, 用 shootSpectre 替代
             recoil = 3f;
             rotateSpeed = 4.5f;
-            // ★ 子弹颜色按 PU_V8/v7 标准区分不同弹药类型 (不再统一白色)
-            ammo(Items.graphite, new BasicBulletType(3.63f, 98f) {{  // ★ speed×1.1, damage×1.4 (原版 standardDenseLarge×1.4)
-                lifetime = 35f; width = 18f; height = 21f;
-                splashDamage = 30f; splashDamageRadius = 25f;
-                backColor = Pal.darkerGray;
-                trailColor = hitColor = Pal.darkerMetal;
-                frontColor = Color.white;
-                hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
-            }}, Items.silicon, new BasicBulletType(3.63f, 86f) {{  // ★ speed×1.1, damage×1.23 (原版 standardHomingLarge×1.23)
-                lifetime = 35f; width = 17f; height = 20f;
-                homingPower = 0.09f; reloadMultiplier = 1.3f;
-                backColor = Pal.darkerGray;
-                trailColor = hitColor = Pal.darkerMetal;
-                frontColor = Color.white;
-                hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
-            }}, Items.pyratite, new BasicBulletType(3.63f, 98f) {{  // ★ speed×1.1, damage×1.4 (原版 standardIncendiaryLarge×1.4)
-                lifetime = 35f; width = 18f; height = 21f;
-                splashDamage = 30f; splashDamageRadius = 25f;
-                makeFire = true; status = mindustry.content.StatusEffects.burning;
-                backColor = trailColor = hitColor = Color.valueOf("ffaa5f");
-                frontColor = Color.valueOf("ffd49a");
-                hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
-            }}, Items.thorium, new BasicBulletType(3.63f, 161f) {{  // ★ speed×1.1, damage×1.4 (原版 standardThoriumLarge×1.4)
-                lifetime = 35f; width = 18f; height = 21f;
-                pierceCap = 2; pierce = true;
-                backColor = Pal.darkerGray;
-                trailColor = hitColor = Color.valueOf("f4ba6e");
-                frontColor = Color.white;
-                hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
+            // ★ Large 子弹 (基于 v155.4 Spectre 内联 standardDenseBig 等的属性 + PU_V8 Large 倍率)
+            ammo(Items.graphite, new BasicBulletType(7.5f * 1.1f, 50f * 1.4f) {{
+                // standardDenseLarge (graphite)
+                lifetime = 40f;
+                width = 15f * 1.12f;
+                height = 21f * 1.12f;
+                hitSize = 4.8f;
+                shootEffect = Fx.shootBig;
+                ammoMultiplier = 4;
+                reloadMultiplier = 1.7f;
+                knockback = 0.3f;
+                hitEffect = despawnEffect = Fx.hitBulletColor;
+                hitColor = backColor = trailColor = Pal.graphiteAmmoBack;
+                frontColor = Pal.graphiteAmmoFront;
+            }}, Items.silicon, new BasicBulletType(7.5f * 1.1f, 50f * 1.23f) {{
+                // standardHomingLarge (silicon, 追踪型)
+                lifetime = 40f;
+                width = 15f * 1.12f;
+                height = 21f * 1.12f;
+                hitSize = 4.8f;
+                shootEffect = Fx.shootBig;
+                ammoMultiplier = 4;
+                reloadMultiplier = 1.3f;
+                knockback = 0.3f;
+                homingPower = 0.09f;
+                hitEffect = despawnEffect = Fx.hitBulletColor;
+                hitColor = backColor = trailColor = Pal.graphiteAmmoBack;
+                frontColor = Pal.graphiteAmmoFront;
+            }}, Items.pyratite, new BasicBulletType(7f * 1.1f, 70f * 1.4f) {{
+                // standardIncendiaryLarge (pyratite, 燃烧型)
+                lifetime = 40f;
+                width = 16f * 1.12f;
+                height = 21f * 1.12f;
+                hitSize = 5f;
+                shootEffect = Fx.shootBig;
+                frontColor = Pal.lightishOrange;
+                backColor = Pal.lightOrange;
+                status = mindustry.content.StatusEffects.burning;
+                hitEffect = new mindustry.entities.effect.MultiEffect(Fx.hitBulletSmall, Fx.fireHit);
+                makeFire = true;
+                pierceCap = 2;
+                pierceBuilding = true;
+                knockback = 0.6f;
+                ammoMultiplier = 3;
+                splashDamage = 20f;
+                splashDamageRadius = 25f;
+            }}, Items.thorium, new BasicBulletType(8f * 1.1f, 80f * 1.4f) {{
+                // standardThoriumLarge (thorium, 穿透型)
+                lifetime = 40f;
+                width = 16f * 1.12f;
+                height = 23f * 1.12f;
+                hitSize = 5f;
+                shootEffect = Fx.shootBig;
+                pierceCap = 2;
+                pierceBuilding = true;
+                knockback = 0.7f;
+                backColor = hitColor = trailColor = Pal.thoriumAmmoBack;
+                frontColor = Pal.thoriumAmmoFront;
             }});
         }};
 
@@ -685,7 +719,10 @@ public class Z_Turrets {
         }};
 
         // ===== singularity (PU_V8 L926-949, PowerTurret + singularityEnergyBall -> 黑洞子弹) =====
-        // ★完整移植 PU_V8: 发射能量球, 接近敌人时变成黑洞, 吸引并伤害范围内敌方单位/建筑
+        // ★完整移植 PU_V8 singularityEnergyBall + SingularityBulletType:
+        //  - 能量球飞向目标位置, 接近敌人(20f内)或到达寿命终点时移除
+        //  - despawned() 创建黑洞子弹 (SingularityBulletType)
+        //  - 黑洞: 吸引范围内敌方单位 + 摧毁建筑 + 多层旋转尖刺光球渲染
         singularity = new PowerTurret("singularity") {{
             requirements(Category.turret, ItemStack.with(Items.silicon, 290, Z_Items.luminum, 430, Items.titanium, 190, Items.thorium, 120, Z_Items.lightAlloy, 20));
             size = 7;
@@ -698,7 +735,7 @@ public class Z_Turrets {
             rotateSpeed = 3.3f;
             recoil = 6f;
             consumePower(39.3f);
-            shootSound = Z_Sounds.singularityShoot;  // ★ 原版 UnitySounds.singularityShoot (light/singularity-shoot.ogg)
+            shootSound = Z_Sounds.singularityShoot;
             shootType = new BasicBulletType(6.6f, 7f) {
                 {
                     lifetime = 110f;
@@ -713,13 +750,20 @@ public class Z_Turrets {
                 @Override
                 public void update(mindustry.gen.Bullet b) {
                     super.update(b);
-                    // 接近敌人时变成黑洞
+                    // 接近敌人时移除, 触发 despawned() 创建黑洞
                     if (mindustry.entities.Units.closestTarget(b.team, b.x, b.y, 20f) != null) {
-                        // 创建黑洞子弹
-                        SingularityBulletType blackHole = new SingularityBulletType(26f);
-                        blackHole.create(b, b.x, b.y, 0f);
                         b.remove();
                     }
+                }
+
+                @Override
+                public void despawned(mindustry.gen.Bullet b) {
+                    super.despawned(b);
+                    // 创建黑洞子弹 (原版: singularityBlackHole.create(b, b.x, b.y, 0f))
+                    SingularityBulletType blackHole = new SingularityBulletType(26f);
+                    blackHole.lifetime = 3.5f * 60f;
+                    blackHole.hitSize = 19f;
+                    blackHole.create(b, b.x, b.y, 0f);
                 }
 
                 @Override
@@ -971,7 +1015,12 @@ public class Z_Turrets {
         }};
 
         // ===== ghost (PU_V8 L411-428, BarrelsItemTurret) =====
-        // ★ PU_V8: spread=21, addBarrel(8f, 18.75f, 6f)
+        // ★完整移植 PU_V8: spread=21, addBarrel(8f, 18.75f, 6f), standardDenseHeavy 等 Heavy 子弹
+        // ★ Heavy 子弹 = Spectre 子弹 (v7 standardDenseBig 等) × Heavy 倍率 (v155.4 内联实现)
+        //   - standardDenseHeavy: damage*1.7, speed*1.3, width*1.32, height*1.32
+        //   - standardHomingHeavy: damage*1.4, speed*1.3, width*1.19, height*1.19, homingPower=0.09, reloadMult=1.3
+        //   - standardIncendiaryHeavy: damage*1.7, speed*1.3, width*1.32, height*1.32
+        //   - standardThoriumHeavy: damage*1.7, speed*1.3, width*1.32, height*1.32
         ghost = new BarrelsItemTurret("ghost") {{
             size = 8;
             health = 9750;
@@ -979,43 +1028,81 @@ public class Z_Turrets {
             reload = 9f;
             coolantMultiplier = 0.5f;
             inaccuracy = 3f;
-            // ★ PU_V8: spread=21, shots=2, alternate=true → ShootAlternate(21f)
+            // ★ PU_V8: spread=21, shots=2, alternate=true → ShootAlternate(21f) 自带 shots=2 alternate
             shoot = new ShootAlternate(21f);
-            shootSound = Sounds.shootSpectre;
+            shootSound = Sounds.shootSpectre;  // v155.4 无 Sounds.shootBig, 用 shootSpectre 替代
             recoil = 5.5f;
             rotateSpeed = 3.5f;
             addBarrel(8f, 18.75f, 6f);
-            // ★ 子弹颜色按 PU_V8/v7 标准区分
-            ammo(Items.graphite, new BasicBulletType(3.3f, 120f) {{
-                lifetime = 35f; width = 21f; height = 26f;
-                splashDamage = 40f; splashDamageRadius = 30f;
-                backColor = Pal.darkerGray;
-                trailColor = hitColor = Pal.darkerMetal; frontColor = Color.white;
-                hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
-            }}, Items.silicon, new BasicBulletType(3.3f, 98f) {{
-                lifetime = 35f; width = 19f; height = 24f;
-                homingPower = 0.09f; reloadMultiplier = 1.3f;
-                backColor = Pal.darkerGray;
-                trailColor = hitColor = Pal.darkerMetal; frontColor = Color.white;
-                hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
-            }}, Items.pyratite, new BasicBulletType(3.3f, 90f) {{
-                lifetime = 35f; width = 21f; height = 26f;
-                splashDamage = 40f; splashDamageRadius = 35f; makeFire = true;
+            // ★ Heavy 子弹 (基于 v155.4 Spectre 内联 standardDenseBig 等的属性 + PU_V8 Heavy 倍率)
+            ammo(Items.graphite, new BasicBulletType(7.5f * 1.3f, 50f * 1.7f) {{
+                // standardDenseHeavy (graphite)
+                lifetime = 40f;
+                width = 15f * 1.32f;
+                height = 21f * 1.32f;
+                hitSize = 4.8f;
+                shootEffect = Fx.shootBig;
+                ammoMultiplier = 4;
+                reloadMultiplier = 1.7f;
+                knockback = 0.3f;
+                hitEffect = despawnEffect = Fx.hitBulletColor;
+                hitColor = backColor = trailColor = Pal.graphiteAmmoBack;
+                frontColor = Pal.graphiteAmmoFront;
+            }}, Items.silicon, new BasicBulletType(7.5f * 1.3f, 50f * 1.4f) {{
+                // standardHomingHeavy (silicon, 追踪型)
+                lifetime = 40f;
+                width = 15f * 1.19f;
+                height = 21f * 1.19f;
+                hitSize = 4.8f;
+                shootEffect = Fx.shootBig;
+                ammoMultiplier = 4;
+                reloadMultiplier = 1.3f;
+                knockback = 0.3f;
+                homingPower = 0.09f;
+                hitEffect = despawnEffect = Fx.hitBulletColor;
+                hitColor = backColor = trailColor = Pal.graphiteAmmoBack;
+                frontColor = Pal.graphiteAmmoFront;
+            }}, Items.pyratite, new BasicBulletType(7f * 1.3f, 70f * 1.7f) {{
+                // standardIncendiaryHeavy (pyratite, 燃烧型)
+                lifetime = 40f;
+                width = 16f * 1.32f;
+                height = 21f * 1.32f;
+                hitSize = 5f;
+                shootEffect = Fx.shootBig;
+                frontColor = Pal.lightishOrange;
+                backColor = Pal.lightOrange;
                 status = mindustry.content.StatusEffects.burning;
-                backColor = trailColor = hitColor = Color.valueOf("ffaa5f"); frontColor = Color.valueOf("ffd49a");
-                hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
-            }}, Items.thorium, new BasicBulletType(3.3f, 140f) {{
-                lifetime = 35f; width = 21f; height = 26f;
-                pierceCap = 2; pierce = true;
-                backColor = Pal.darkerGray;
-                trailColor = hitColor = Color.valueOf("f4ba6e"); frontColor = Color.white;
-                hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
+                hitEffect = new mindustry.entities.effect.MultiEffect(Fx.hitBulletSmall, Fx.fireHit);
+                makeFire = true;
+                pierceCap = 2;
+                pierceBuilding = true;
+                knockback = 0.6f;
+                ammoMultiplier = 3;
+                splashDamage = 20f;
+                splashDamageRadius = 25f;
+            }}, Items.thorium, new BasicBulletType(8f * 1.3f, 80f * 1.7f) {{
+                // standardThoriumHeavy (thorium, 穿透型)
+                lifetime = 40f;
+                width = 16f * 1.32f;
+                height = 23f * 1.32f;
+                hitSize = 5f;
+                shootEffect = Fx.shootBig;
+                pierceCap = 2;
+                pierceBuilding = true;
+                knockback = 0.7f;
+                backColor = hitColor = trailColor = Pal.thoriumAmmoBack;
+                frontColor = Pal.thoriumAmmoFront;
             }});
             requirements(Category.turret, ItemStack.with(Items.copper, 1150, Items.graphite, 1420, Items.silicon, 960, Items.plastanium, 800, Items.thorium, 1230, Z_Items.darkAlloy, 380));
         }};
 
         // ===== banshee (PU_V8 L430-449, BarrelsItemTurret + focus) =====
-        // ★ PU_V8: spread=37, addBarrel×2, focus=true
+        // ★完整移植 PU_V8: spread=37, addBarrel×2, focus=true, standardDenseMassive 等 Massive 子弹
+        // ★ Massive 子弹 = Spectre 子弹 (v7 standardDenseBig 等) × Massive 倍率 (v155.4 内联实现)
+        //   - standardDenseMassive: damage*1.8, speed*1.3, width*1.34, height*1.34, lifetime*1.1
+        //   - standardHomingMassive: damage*1.6, speed*1.3, width*1.21, height*1.21, lifetime*1.1, homingPower=0.09, reloadMult=1.3
+        //   - standardIncendiaryMassive: damage*1.8, speed*1.3, width*1.34, height*1.34, lifetime*1.1
+        //   - standardThoriumMassive: damage*1.8, speed*1.3, width*1.34, height*1.34, lifetime*1.1
         banshee = new BarrelsItemTurret("banshee") {{
             size = 12;
             health = 22000;
@@ -1023,39 +1110,72 @@ public class Z_Turrets {
             reload = 12f;
             coolantMultiplier = 0.5f;
             inaccuracy = 3f;
-            // ★ PU_V8: spread=37, shots=2, alternate=true → ShootAlternate(37f)
+            // ★ PU_V8: spread=37, shots=2, alternate=true → ShootAlternate(37f) 自带 shots=2 alternate
             shoot = new ShootAlternate(37f);
-            shootSound = Sounds.shootSpectre;
+            shootSound = Sounds.shootSpectre;  // v155.4 无 Sounds.shootBig, 用 shootSpectre 替代 (同为大型炮弹音效)
             recoil = 5.5f;
             rotateSpeed = 3.5f;
             focus = true;
             addBarrel(23.5f, 36.5f, 9f);
             addBarrel(8.5f, 24.5f, 6f);
-            // ★ 子弹颜色按 PU_V8/v7 标准区分
-            ammo(Items.graphite, new BasicBulletType(3.3f, 130f) {{
-                lifetime = 40f; width = 21f; height = 27f;
-                splashDamage = 50f; splashDamageRadius = 35f;
-                backColor = Pal.darkerGray;
-                trailColor = hitColor = Pal.darkerMetal; frontColor = Color.white;
-                hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
-            }}, Items.silicon, new BasicBulletType(3.3f, 115f) {{
-                lifetime = 40f; width = 19f; height = 25f;
-                homingPower = 0.09f; reloadMultiplier = 1.3f;
-                backColor = Pal.darkerGray;
-                trailColor = hitColor = Pal.darkerMetal; frontColor = Color.white;
-                hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
-            }}, Items.pyratite, new BasicBulletType(3.3f, 100f) {{
-                lifetime = 40f; width = 21f; height = 27f;
-                splashDamage = 50f; splashDamageRadius = 40f; makeFire = true;
+            // ★ Massive 子弹 (基于 v155.4 Spectre 内联 standardDenseBig 等的属性 + PU_V8 Massive 倍率)
+            ammo(Items.graphite, new BasicBulletType(7.5f * 1.3f, 50f * 1.8f) {{
+                // standardDenseMassive (graphite)
+                lifetime = 40f * 1.1f;
+                width = 15f * 1.34f;
+                height = 21f * 1.34f;
+                hitSize = 4.8f;
+                shootEffect = Fx.shootBig;
+                ammoMultiplier = 4;
+                reloadMultiplier = 1.7f;
+                knockback = 0.3f;
+                hitEffect = despawnEffect = Fx.hitBulletColor;
+                hitColor = backColor = trailColor = Pal.graphiteAmmoBack;
+                frontColor = Pal.graphiteAmmoFront;
+            }}, Items.silicon, new BasicBulletType(7.5f * 1.3f, 50f * 1.6f) {{
+                // standardHomingMassive (silicon, 追踪型)
+                lifetime = 40f * 1.1f;
+                width = 15f * 1.21f;
+                height = 21f * 1.21f;
+                hitSize = 4.8f;
+                shootEffect = Fx.shootBig;
+                ammoMultiplier = 4;
+                reloadMultiplier = 1.3f;
+                knockback = 0.3f;
+                homingPower = 0.09f;
+                hitEffect = despawnEffect = Fx.hitBulletColor;
+                hitColor = backColor = trailColor = Pal.graphiteAmmoBack;
+                frontColor = Pal.graphiteAmmoFront;
+            }}, Items.pyratite, new BasicBulletType(7f * 1.3f, 70f * 1.8f) {{
+                // standardIncendiaryMassive (pyratite, 燃烧型)
+                lifetime = 40f * 1.1f;
+                width = 16f * 1.34f;
+                height = 21f * 1.34f;
+                hitSize = 5f;
+                shootEffect = Fx.shootBig;
+                frontColor = Pal.lightishOrange;
+                backColor = Pal.lightOrange;
                 status = mindustry.content.StatusEffects.burning;
-                backColor = trailColor = hitColor = Color.valueOf("ffaa5f"); frontColor = Color.valueOf("ffd49a");
-                hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
-            }}, Items.thorium, new BasicBulletType(3.3f, 160f) {{
-                lifetime = 40f; width = 21f; height = 27f;
-                pierceCap = 2; pierce = true;
-                backColor = Pal.darkerGray;
-                trailColor = hitColor = Color.valueOf("f4ba6e"); frontColor = Color.white;
-                hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
+                hitEffect = new mindustry.entities.effect.MultiEffect(Fx.hitBulletSmall, Fx.fireHit);
+                makeFire = true;
+                pierceCap = 2;
+                pierceBuilding = true;
+                knockback = 0.6f;
+                ammoMultiplier = 3;
+                splashDamage = 20f;
+                splashDamageRadius = 25f;
+            }}, Items.thorium, new BasicBulletType(8f * 1.3f, 80f * 1.8f) {{
+                // standardThoriumMassive (thorium, 穿透型)
+                lifetime = 40f * 1.1f;
+                width = 16f * 1.34f;
+                height = 23f * 1.34f;
+                hitSize = 5f;
+                shootEffect = Fx.shootBig;
+                pierceCap = 2;
+                pierceBuilding = true;
+                knockback = 0.7f;
+                backColor = hitColor = trailColor = Pal.thoriumAmmoBack;
+                frontColor = Pal.thoriumAmmoFront;
             }});
             requirements(Category.turret, ItemStack.with(Items.copper, 2800, Items.graphite, 2980, Items.silicon, 2300, Items.titanium, 1900, Items.phaseFabric, 1760, Items.thorium, 1780, Z_Items.darkAlloy, 1280));
         }};

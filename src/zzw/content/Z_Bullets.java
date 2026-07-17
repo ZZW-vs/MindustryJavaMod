@@ -8,14 +8,17 @@ import arc.math.Angles;
 import arc.math.Interp;
 import arc.math.Mathf;
 import arc.math.geom.Vec2;
+import arc.struct.Seq;
 import arc.util.Tmp;
 import arc.util.Time;
+import mindustry.Vars;
 import mindustry.content.Fx;
 import mindustry.content.StatusEffects;
 import mindustry.entities.Damage;
 import mindustry.entities.Effect;
 import mindustry.entities.Fires;
 import mindustry.entities.Lightning;
+import mindustry.entities.Units;
 import mindustry.entities.bullet.BasicBulletType;
 import mindustry.entities.bullet.BulletType;
 import mindustry.entities.bullet.ContinuousLaserBulletType;
@@ -23,6 +26,7 @@ import mindustry.entities.bullet.LaserBulletType;
 import mindustry.gen.Bullet;
 import mindustry.gen.Healthc;
 import mindustry.gen.Hitboxc;
+import mindustry.gen.Unit;
 import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
@@ -733,12 +737,14 @@ public class Z_Bullets {
      *  - 范围内敌方建筑受持续伤害, 接近中心的建筑被瞬间摧毁
      *  - 中心范围内的单位受到瞬间伤害
      *  - 多层同心圆+旋转尖刺光球渲染 (shiningCircle 风格)
+     *  - GluonOrbData 单位列表管理 (timer 2f 间隔收集单位, 每帧吸引)
      */
     public static class SingularityBulletType extends BasicBulletType {
         public float force = 8f, scaledForce = 5f;
         public float tileDamage = 150f;
         public float radius = 230f;
         public float size = 5f;
+        public float buildingDamageMultiplier = 1f;
         public float[] scales = {8.6f, 7f, 5.5f, 4.2f, 3.9f};
         public Color[] colors = new Color[]{Color.valueOf("4787ff80"), Pal.lancerLaser, Color.white, Pal.lancerLaser, Color.black};
 
@@ -752,35 +758,53 @@ public class Z_Bullets {
         }
 
         @Override
+        public void init(Bullet b) {
+            super.init(b);
+            b.data = new GluonOrbData();
+        }
+
+        @Override
         public void update(Bullet b) {
             super.update(b);
-            float interp = b.fin(arc.math.Interp.exp10Out);
+            float interp = b.fin(Interp.exp10Out);
             Effect.shake(interp, interp, b);
 
-            // 锥形扫描敌方建筑
+            // 建筑伤害 (每 7 tick 一次)
             if (b.timer(1, 7f)) {
-                mindustry.entities.Units.nearbyEnemies(b.team, b.x - radius, b.y - radius, 2 * radius, 2 * radius, u -> {
-                    if (u != null && u.isValid() && Mathf.within(b.x, b.y, u.x, u.y, radius)) {
-                        // 中心瞬间伤害
-                        if (Mathf.within(b.x, b.y, u.x, u.y, (interp * size * 3.9f) + u.hitSize / 2f)) {
-                            u.damage(120f);
+                Vars.indexer.eachBlock(null, b.x, b.y, radius, build -> build.team != b.team, e -> {
+                    if (e.isValid() && e.team != b.team) {
+                        // 中心范围内或血量低于阈值的建筑直接摧毁
+                        if (e.health < tileDamage || Mathf.within(b.x, b.y, e.x, e.y, (interp * size * 3.9f) + e.block.size / 2f)) {
+                            e.kill();
                         }
-                        // 吸引力
-                        if (!u.dead) {
-                            Tmp.v1.trns(u.angleTo(b), force + ((1f - u.dst(b) / radius) * scaledForce * b.fin(arc.math.Interp.exp10Out) * (u.isFlying() ? 1.5f : 1f))).scl(20f * Time.delta);
-                            u.impulse(Tmp.v1);
-                        }
+                        float dst = Math.abs(1f - (Mathf.dst(b.x, b.y, e.x, e.y) / radius));
+                        e.damage(tileDamage * buildingDamageMultiplier * dst);
                     }
                 });
-                // 建筑伤害
-                mindustry.gen.Groups.build.each(build -> {
-                    if (build.isValid() && build.team != b.team && Mathf.within(b.x, b.y, build.x, build.y, radius)) {
-                        float dst = Math.abs(1f - (Mathf.dst(b.x, b.y, build.x, build.y) / radius));
-                        if (build.health < tileDamage || Mathf.within(b.x, b.y, build.x, build.y, (interp * size * 3.9f) + build.block.size / 2f)) {
-                            build.kill();
-                        } else {
-                            build.damage(tileDamage * dst);
+            }
+
+            // 单位收集 + 中心伤害 (每 2 tick 一次)
+            if (b.data instanceof GluonOrbData) {
+                GluonOrbData data = (GluonOrbData) b.data;
+                if (b.timer(2, 2f)) {
+                    data.units.clear();
+                    Units.nearbyEnemies(b.team, b.x - radius, b.y - radius, 2 * radius, 2 * radius, u -> {
+                        if (u != null && Mathf.within(b.x, b.y, u.x, u.y, radius)) {
+                            data.units.add(u);
+                            // 中心瞬间伤害
+                            if (Mathf.within(b.x, b.y, u.x, u.y, (interp * size * 3.9f) + u.hitSize / 2f)) {
+                                u.damage(120f);
+                            }
                         }
+                    });
+                    // 范围伤害
+                    Damage.damage(b.team, b.x, b.y, hitSize, damage);
+                }
+                // 每帧吸引 (收集到的单位列表)
+                data.units.each(u -> {
+                    if (!u.dead) {
+                        Tmp.v1.trns(u.angleTo(b), force + ((1f - u.dst(b) / radius) * scaledForce * b.fin(Interp.exp10Out) * (u.isFlying() ? 1.5f : 1f))).scl(20f * Time.delta);
+                        u.impulse(Tmp.v1);
                     }
                 });
             }
@@ -788,11 +812,14 @@ public class Z_Bullets {
 
         @Override
         public void draw(Bullet b) {
-            float interp = b.fin(arc.math.Interp.exp10Out);
+            float interp = b.fin(Interp.exp10Out);
             for (int i = 0; i < colors.length; i++) {
                 Draw.color(colors[i]);
                 if (i != 0) {
-                    // 旋转尖刺三角形光球 (5个三角形按角度分布)
+                    // 旋转尖刺三角形光球 (替代 UnityDrawf.shiningCircle)
+                    // 中心实心圆
+                    Fill.circle(b.x + Mathf.range(0.5f), b.y + Mathf.range(0.5f), interp * size * scales[i]);
+                    // 旋转尖刺三角形 (按 spikeDuration 周期闪烁)
                     int spikeCount = 6;
                     float baseAngle = Time.time * 1.5f - i * 30f;
                     float radius0 = interp * size * scales[i];
@@ -802,16 +829,18 @@ public class Z_Bullets {
                         Tmp.v1.trns(ang, spikeLen).add(b);
                         Tmp.v2.trns(ang + 30f, radius0 * 0.5f).add(b);
                         Tmp.v3.trns(ang - 30f, radius0 * 0.5f).add(b);
-                        Fill.tri(b.x, b.y, Tmp.v2.x, Tmp.v2.y, Tmp.v3.x, Tmp.v3.y);
                         Fill.tri(Tmp.v1.x, Tmp.v1.y, Tmp.v2.x, Tmp.v2.y, Tmp.v3.x, Tmp.v3.y);
                     }
-                    // 中心圆
-                    Fill.circle(b.x + Mathf.range(0.5f), b.y + Mathf.range(0.5f), radius0 * 0.6f);
                 } else {
                     Fill.circle(b.x + Mathf.range(0.5f), b.y + Mathf.range(0.5f), interp * size * scales[i]);
                 }
             }
             Draw.color();
         }
+    }
+
+    /** GluonOrbData - 黑洞单位列表管理 (PU_V8 移植) */
+    public static class GluonOrbData {
+        public Seq<Unit> units = new Seq<>();
     }
 }

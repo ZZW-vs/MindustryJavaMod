@@ -45,7 +45,7 @@ import mindustry.world.consumers.ConsumeItems;
  * - Utils.trueEachBlock -> Vars.indexer.eachBlock
  * - Utils.nearbyEnemySorted -> Units.nearbyEnemies 收集后排序
  * - Utils.getBulletDamage -> 递归累加 fragBullet 伤害 + splashDamage
- * - SlowLightningType -> Lightning.create (紫色 bf92f9)
+ * - SlowLightningType -> Lightning.create (原版红色 Color.red)
  * - added (private) -> isAdded()
  */
 public class EndGameTurret extends PowerTurret {
@@ -61,8 +61,8 @@ public class EndGameTurret extends PowerTurret {
     protected static final int eyeTime = 0;
     protected static final int bulletTime = 1;
 
-    // 慢闪电颜色 (原版 SlowLightningType red/black, 简化版用紫色 purpleLightning)
-    private static final Color slowLightningColor = Color.valueOf("bf92f9");
+    // 慢闪电颜色 (原版 SlowLightningType red/black, 简化版用红色 Color.red)
+    private static final Color slowLightningColor = Color.red;
 
     public TextureRegion
         baseRegion, baseLightsRegion, bottomLightsRegion, eyeMainRegion,
@@ -616,7 +616,7 @@ public class EndGameTurret extends PowerTurret {
                 Tmp.v1.add(x, y);
 
                 if (Mathf.chanceDelta(0.75f * chance)) {
-                    // v155.4 简化版: Lightning.create 替代 SlowLightningType, 紫色 bf92f9
+                    // v155.4 简化版: Lightning.create 替代 SlowLightningType, 原版红色 Color.red
                     Lightning.create(team, slowLightningColor, 520f * trueEfficiency(),
                         Tmp.v1.x, Tmp.v1.y, randomAngle, 25);
                 }

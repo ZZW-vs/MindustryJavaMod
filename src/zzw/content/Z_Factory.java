@@ -7,17 +7,22 @@ import mindustry.type.Category;
 import mindustry.type.ItemStack;
 import mindustry.world.Block;
 import mindustry.world.blocks.production.Drill;
+import mindustry.world.consumers.ConsumeItems;
+import zzw.content.blocks.soul.SoulInfuser;
 import zzw.content.mechanics.FactoryBoost;
 
 public class Z_Factory {
     public static Block Plate_Maker_Iron, Plate_Maker_Gold, Plate_Maker_Copper;
     public static Block Large_Plate_Maker_Iron, Large_Plate_Maker_Gold, Large_Plate_Maker_Copper;
     public static Block Pumpkin_Drill;
+    // 灵魂注入器 (从 Z_SoulTurrets 移至工厂类, 使用 Category.crafting)
+    public static SoulInfuser soulInfuser;
 
     public static void load() {
         createPlateMakers();
         createLargePlateMakers();
         createDrills();
+        createSoulInfuser();
     }
 
     private static FactoryBoost.BoostedGenericCrafter plateMaker(String name,
@@ -96,6 +101,22 @@ public class Z_Factory {
             drillEffect = Fx.pulverizeSmall;
             warmupSpeed = 0.02f;
             consumeLiquid(Liquids.water, 0.1f).boost();
+        }};
+    }
+
+    // ===== SoulInfuser 灵魂注入器 (从 Z_SoulTurrets 移至工厂类) =====
+    // 简化版: 消耗 monolite + 电力产生灵魂, 注入附近炮台/容器
+    // PU_V8: size=3, Category.crafting (工厂类)
+    private static void createSoulInfuser() {
+        soulInfuser = new SoulInfuser("soul-infuser") {{
+            requirements(Category.crafting, ItemStack.with(Z_Items.monolite, 200, Items.titanium, 250, Items.silicon, 420));
+            size = 3;
+            health = 600;
+            craftTime = 60f;
+            consumePower(3.2f);
+            consume(new ConsumeItems(ItemStack.with(Z_Items.monolite, 2)));
+            range = 15f;
+            injectEffect = Fx.smokeCloud;
         }};
     }
 }
