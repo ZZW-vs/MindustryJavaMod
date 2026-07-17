@@ -79,23 +79,41 @@ public class EndGameTurret extends PowerTurret {
         ringBBottomRegion, ringBEyesRegion, ringBRegion, ringBLightsRegion,
         ringCRegion, ringCLightsRegion;
 
-    // 简化等效特效: 替代 PU_V8 UnityFx.endgameLaser
-    public static final Effect endgameLaserEffect = new Effect(22f, 400f, e -> {
+    // ★ 完整移植 PU_V8 UnityFx.endgameLaser: 3层颜色叠加 + 头部偏移动画 + 持续76f
+    // 原版: Color[] colors = {f53036, ff786e, white}, float[] strokes = {2, 1.3, 0.6}
+    // 每层不同 z (oz + i/1000) + 头部从 a 到 lerp(a, b, curve(fin, 0, 0.09)) 渐进
+    public static final Effect endgameLaserEffect = new Effect(76f, 820f * 2f, e -> {
         if (!(e.data instanceof Object[])) return;
         Object[] data = (Object[]) e.data;
         if (data.length < 3) return;
+        if (!(data[0] instanceof Vec2) || !(data[1] instanceof Posc)) return;
         Vec2 from = (Vec2) data[0];
-        Object target = data[1];
+        Posc to = (Posc) data[1];
         float width = (Float) data[2];
-        if (target instanceof Posc) {
-            Posc p = (Posc) target;
-            // 红色渐变到白色激光束
-            Draw.color(Color.valueOf("f53036"), Color.white, e.fout());
-            Lines.stroke(width * 2f * e.fout());
-            Lines.line(from.x, from.y, p.getX(), p.getY(), false);
-            Fill.circle(from.x, from.y, width * 2f * e.fout());
-            Fill.circle(p.getX(), p.getY(), width * 3f * e.fout());
+
+        Color[] colors = {Color.valueOf("f53036"), Color.valueOf("ff786e"), Color.white};
+        float[] strokes = {2f, 1.3f, 0.6f};
+
+        // 头部偏移: 沿激光渐进 (PU_V8: lerp(a, b, curve(fin, 0, 0.09)))
+        float t = Mathf.curve(e.fin(), 0f, 0.09f);
+        float hx = Mathf.lerp(from.x, to.getX(), t);
+        float hy = Mathf.lerp(from.y, to.getY(), t);
+
+        float oz = Draw.z();
+        for (int i = 0; i < 3; i++) {
+            Draw.z(oz + (i / 1000f));
+            Draw.color(colors[i]);
+
+            // 起点圆 + 头部圆
+            Fill.circle(from.x, from.y, strokes[i] * 4f * width * e.fout());
+            Fill.circle(hx, hy, strokes[i] * 4f * width * e.fout());
+
+            // 主激光线 (从起点到头部)
+            Lines.stroke(strokes[i] * 4f * width * e.fout());
+            Lines.line(from.x, from.y, hx, hy, false);
         }
+        Draw.z(oz);
+        Draw.color();
     });
 
     // 简化等效特效: 替代 PU_V8 SpecialFx.endgameVapourize

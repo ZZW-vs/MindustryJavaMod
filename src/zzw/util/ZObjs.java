@@ -51,11 +51,12 @@ public class ZObjs {
         wavefront.drawLayer = Layer.turret;
 
         // prism: UnityPal.monolith=87ceeb, UnityPal.monolithDark=6586b0
-        // ★ 原版 scale=0.6f (ModelInstance transform scale), 在 WavefrontObject 中等效 size = 0.6 / 4 = 0.15f
-        // 但 0.15f 太小看不清, 折中用 1.0f (模型约 8 单位高, 炮台 32 单位的 1/4)
+        // ★ 原版钻石形 (6顶点+8面), 顶点范围 ~2x2x2.5 (高度 2.5)
+        // size=2.5f: defaultScl(4) * 2.5 = 10倍缩放, 模型实际高度 2.5 * 10 = 25单位 (匹配炮台size=5占地50单位的1/2)
+        // PrismTurret 中 prismOffset=10f (距炮台中心10单位), 模型高度25单位, 总占用35单位 (合理)
         prism = new WavefrontObject();
         prism.textureName = "prism";
-        prism.size = 1.0f;
+        prism.size = 2.5f;
         prism.shadingSmoothness = 1f;
         prism.lightColor = Color.valueOf("87ceeb");
         prism.shadeColor = Color.valueOf("6586b0");

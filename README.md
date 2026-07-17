@@ -195,6 +195,12 @@
 
 ## 更新日志
 
+### v1.5.2 (EndGame 红光束 + tenmeikiri 切割 + prism 钻石 + wavefront 修复)
+- **create-endgame 完整移植红色光束**：按 PU_V8 UnityFx.endgameLaser 原版完整移植 endgameLaserEffect。3 层颜色叠加（f53036 红 → ff786e 淡红 → 白）+ 持续时间从 22f 升级到 76f（原版时长）+ 头部偏移动画（lerp 渐进到目标点）。每个眼睛发射激光时不再只是单线，而是真实的多层叠加红光束
+- **create-tenmeikiri 还原切割效果**：新增 [UnitCutEffect.java](src/zzw/content/units/effects/UnitCutEffect.java)，当大单位（hitSize>=30）被激光击杀时触发切割动画：沿激光方向将单位分为两半飞出 + 持续烟尘 + 末期爆炸（dynamicExplosion + scorch + deathSound）。简化版用两半椭圆 + 红色切线模拟切割，因 v158 EffectState 是注解生成的 pooled entity 不能继承，改用 Effect + CutData 模式
+- **create-prism 还原钻石形状**：直接复制 PU_V8 原版 prism.obj 内容（6 顶点 + 8 三角形面，钻石形），将所有三角形面转为退化四边形避免 WavefrontObject odd=true 延迟渲染污染。模型 size 从 1.0f 调整到 2.5f（defaultScl(4) * 2.5 = 10 倍缩放，模型高度 25 单位，匹配炮台占地 50 单位的 1/2，原版 PU_V8 prismOffset=10f）
+- **修复 create-wavefront 3D 炮身未显示**：wavefront.obj 中有 8 个三角形面（3 顶点）触发 odd=true 延迟渲染，导致 3D 炮身被 Face.data 共享数组污染后无法正常显示。将所有三角形面转为退化四边形（重复末顶点），所有面现在都是 4 顶点走即时渲染路径
+
 ### v1.5.1 (炮台问题修复)
 - **慢闪电锯齿渲染优化**：在 `SlowLightningType` 添加 `jaggedPoints`/`jaggedness` 字段，draw() 方法在每段插入中间锯齿点形成真实闪电效果。性能优化：静态缓冲区避免 GC 压力，基于位置的稳定 hash 偏移避免视觉抖动。压迫者（`SlowLightningBulletType`）和 create-endgame（`EndGameTurret`）均启用 `jaggedPoints = 2`
 - **完整重写 create-supernova**：严格遵循 PU_V8 原版结构重写。核心改动：

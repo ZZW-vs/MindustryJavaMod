@@ -19,6 +19,7 @@ import mindustry.gen.Bullet;
 import mindustry.gen.Building;
 import mindustry.gen.Unit;
 import mindustry.graphics.Drawf;
+import zzw.content.units.effects.UnitCutEffect;
 
 /**
  * PU_V8 EndCutterLaserBulletType 移植版 (tenmeikiri 主激光)
@@ -269,6 +270,15 @@ public class EndCutterLaserBulletType extends AntiCheatBulletTypeBase {
             // 对所有命中单位造成伤害
             for (Unit u : units) {
                 hitUnitAntiCheat(b, u);
+                // ★ PU_V8 切割效果: 大单位被击杀时触发切割动画
+                // 原版条件: (unit.dead || unit.health >= Float.MAX_VALUE) && (hitSize >= 30 || health >= MAX_VALUE)
+                if ((u.dead || u.health >= Float.MAX_VALUE) && (u.hitSize >= 30f || u.health >= Float.MAX_VALUE)) {
+                    // 激光延伸方向 (用于切割方向计算)
+                    Tmp.v2.trns(b.rotation(), maxLength * 1.5f).add(b);
+                    UnitCutEffect.createCut(u, b.x, b.y, Tmp.v2.x, Tmp.v2.y);
+                    // 移除单位 (避免单位本身绘制与切割效果重叠)
+                    u.remove();
+                }
             }
         }
     }
