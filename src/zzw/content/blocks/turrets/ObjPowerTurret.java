@@ -7,6 +7,7 @@ import arc.math.Mathf;
 import arc.math.geom.Vec3;
 import arc.util.Time;
 import mindustry.world.blocks.defense.turrets.PowerTurret;
+import mindustry.world.draw.DrawTurret;
 import zzw.util.WavefrontObject;
 
 /**
@@ -36,6 +37,12 @@ public class ObjPowerTurret extends PowerTurret {
     public void load() {
         super.load();
         baseRegion = region;
+        // 修复 UI 图标显示问题: DrawTurret.icons() 返回 {base, region},
+        // 若 base 找不到 (create-the-cube-base 不存在) 会导致图标只显示一个角.
+        // 让 DrawTurret.base 也用 region, 使 UI 图标正确显示.
+        if (drawer instanceof DrawTurret dt) {
+            dt.base = region;
+        }
     }
 
     public class ObjPowerTurretBuild extends PowerTurretBuild {

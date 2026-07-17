@@ -23,7 +23,6 @@ import zzw.content.Z_Items;
 import zzw.content.Z_Sounds;
 import zzw.content.blocks.soul.ISoulTurret;
 import zzw.content.blocks.soul.RicochetBulletType;
-import zzw.content.blocks.soul.SoulContainer;
 import zzw.content.blocks.soul.SoulInfuser;
 import zzw.content.blocks.soul.SoulTurretPowerTurret;
 
@@ -50,7 +49,6 @@ public class Z_SoulTurrets {
 
     // ===== 灵魂配套建筑 =====
     public static SoulInfuser soulInfuser;
-    public static SoulContainer soulContainer;
 
     public static void load() {
         // ===== ricochet (PU_V8 L2412-2435) =====
@@ -241,15 +239,6 @@ public class Z_SoulTurrets {
             consume(new ConsumeItems(ItemStack.with(Z_Items.monolite, 2)));
             range = 15f;
             injectEffect = Fx.smokeCloud;
-        }};
-
-        // ===== SoulContainer 灵魂容器 =====
-        // 存储 12 个灵魂
-        soulContainer = new SoulContainer("soul-container") {{
-            requirements(Category.defense, ItemStack.with(Z_Items.monolite, 50, Items.thorium, 40));
-            size = 1;
-            health = 480;
-            maxSouls = 12;
         }};
     }
 }

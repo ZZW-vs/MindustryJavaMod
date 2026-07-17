@@ -3575,6 +3575,8 @@ public class Z_Units {
         // 完全复制 PU_V8 UnityUnitTypes.java L1807-1855 (sedec)
         // v158 适配: 用 vanilla UnitType 替代 UnityUnitType (添加 outlines=false), status=sapped 替代 weaken
         sedec = new UnitType("sedec") {{
+            // v158: flying 单位必须指定 constructor = UnitEntity::create, 否则 createIcons 崩溃
+            constructor = mindustry.gen.UnitEntity::create;
             // PU_V8: defaultController = HealingDefenderAI::new (v158 用 aiController 等效)
             aiController = () -> new zzw.content.units.ai.HealingDefenderAI();
             health = 45000f;
@@ -3632,6 +3634,8 @@ public class Z_Units {
         // 完全复制 PU_V8 UnityUnitTypes.java L1857-1931 (trigintaduo)
         // v158 适配: 用 vanilla UnitType 替代 UnityUnitType (添加 outlines=false), status 替代 weaken/disabled
         trigintaduo = new UnitType("trigintaduo") {{
+            // v158: flying 单位必须指定 constructor = UnitEntity::create, 否则 createIcons 崩溃
+            constructor = mindustry.gen.UnitEntity::create;
             // PU_V8: defaultController = HealingDefenderAI::new (v158 用 aiController 等效)
             aiController = () -> new zzw.content.units.ai.HealingDefenderAI();
             health = 52500f;

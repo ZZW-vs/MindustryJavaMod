@@ -45,6 +45,12 @@ public class WavefrontTurret extends PowerTurret {
         baseRegion = Core.atlas.find(name + "-base");
     }
 
+    /** wavefront.png 不存在 (3D 炮台用 WavefrontObject 渲染), UI 图标只显示底座 */
+    @Override
+    public TextureRegion[] icons() {
+        return new TextureRegion[]{baseRegion};
+    }
+
     public class WavefrontTurretBuild extends PowerTurretBuild {
         float gap = 0f;
         float angle = 0f;
