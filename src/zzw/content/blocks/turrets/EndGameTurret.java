@@ -15,7 +15,6 @@ import arc.util.Time;
 import arc.util.io.Reads;
 import arc.util.io.Writes;
 import mindustry.entities.Effect;
-import mindustry.entities.Lightning;
 import mindustry.entities.bullet.BulletType;
 import mindustry.Vars;
 import mindustry.gen.Bullet;
@@ -28,6 +27,7 @@ import mindustry.gen.Unit;
 import mindustry.world.blocks.defense.turrets.PowerTurret;
 import mindustry.world.consumers.Consume;
 import mindustry.world.consumers.ConsumeItems;
+import zzw.content.units.effects.SlowLightningType;
 
 /**
  * EndGameTurret 移植自 PU_V8 unity/world/blocks/defense/turrets/EndGameTurret.java
@@ -61,8 +61,15 @@ public class EndGameTurret extends PowerTurret {
     protected static final int eyeTime = 0;
     protected static final int bulletTime = 1;
 
-    // 慢闪电颜色 (原版 SlowLightningType red/black, 简化版用红色 Color.red)
-    private static final Color slowLightningColor = Color.red;
+    // ★ PU_V8 原版 SlowLightningType: red→black 渐变, damage=520, splitChance=0.045, range=810
+    // 完整移植慢闪电 (非原生 Lightning), 节点树传播 + 分裂 + 渐变颜色
+    private final SlowLightningType lightning = new SlowLightningType() {{
+        colorFrom = Color.red;
+        colorTo = Color.black;
+        damage = 520f;
+        splitChance = 0.045f;
+        range = 810f;
+    }};
 
     public TextureRegion
         baseRegion, baseLightsRegion, bottomLightsRegion, eyeMainRegion,
@@ -616,9 +623,10 @@ public class EndGameTurret extends PowerTurret {
                 Tmp.v1.add(x, y);
 
                 if (Mathf.chanceDelta(0.75f * chance)) {
-                    // v155.4 简化版: Lightning.create 替代 SlowLightningType, 原版红色 Color.red
-                    Lightning.create(team, slowLightningColor, 520f * trueEfficiency(),
-                        Tmp.v1.x, Tmp.v1.y, randomAngle, 25);
+                    // ★ PU_V8 原版: lightning.create 慢闪电 (非原生 Lightning)
+                    // liveDamage 回调实时计算伤害: 520f * trueEfficiency()
+                    lightning.create(team, Tmp.v1.x, Tmp.v1.y, randomAngle,
+                        () -> 520f * trueEfficiency(), null, targetPos);
                 }
             } else {
                 if (eyeResetTime >= 60f) {

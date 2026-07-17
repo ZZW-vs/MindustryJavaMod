@@ -58,8 +58,7 @@ public class ZObjs {
         prism.lightColor = Color.valueOf("87ceeb");
         prism.shadeColor = Color.valueOf("6586b0");
         prism.drawLayer = Layer.turret;
-        // prism.obj 无法线 (vn), 用 zMedian 着色避免 normalAngleDraw NPE
-        prism.shadingType = WavefrontObject.ShadingType.zMedian;
+        // prism.obj 已添加法线 (vn), 用默认 normalAngle 着色 + 背面剔除
 
         Events.on(EventType.FileTreeInitEvent.class, e -> {
             // 延迟到下一帧, 确保 atlas 已就绪 (PU_V8 同样用 Core.app.post 包裹)
