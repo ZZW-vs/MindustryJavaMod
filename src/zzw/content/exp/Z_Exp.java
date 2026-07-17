@@ -1,12 +1,20 @@
 package zzw.content.exp;
 
+import arc.graphics.Color;
 import mindustry.content.Items;
+import mindustry.content.Liquids;
+import mindustry.content.StatusEffects;
+import mindustry.entities.bullet.BasicBulletType;
 import mindustry.entities.bullet.LaserBulletType;
+import mindustry.gen.Sounds;
+import mindustry.graphics.Pal;
 import mindustry.type.Category;
 import mindustry.type.ItemStack;
 import mindustry.world.Block;
 import mindustry.world.blocks.defense.turrets.Turret;
 import zzw.content.Z_Items;
+import zzw.content.units.bullets.GeyserBulletType;
+import zzw.content.units.bullets.GeyserLaserBulletType;
 
 import static mindustry.Vars.tilesize;
 import static zzw.content.exp.EField.*;
@@ -26,6 +34,10 @@ public class Z_Exp {
     public static ExpItemTurret infernoTurret;
     // 经验炮台 (液体)
     public static ExpLiquidTurret frostLaserTurret;
+    // 经验炮台 (BurstCharge 电力, PU_V8 BurstChargePowerTurret 简化为 ExpPowerTurret)
+    public static ExpPowerTurret swarmLaserTurret;
+    // 经验炮台 (OmniLiquid 液体)
+    public static OmniLiquidTurret kelvinLaserTurret;
 
     public static void load() {
         //region 经验存储运输
@@ -316,6 +328,126 @@ public class Z_Exp {
                 new LinearReloadTime(v -> reload = v, 20f, -0.5f),
                 new ELinear(v -> range = v, 100f, 1f, mindustry.world.meta.Stat.shootRange, v -> arc.util.Strings.autoFixed(v / tilesize, 2) + " blocks")
             };
+        }};
+
+        // ===== swarmLaserTurret (PU_V8 L1890-1935, BurstChargePowerTurret → 简化为 ExpPowerTurret)
+        // PU_V8: chargeTime=50, chargeMaxDelay=30, chargeEffects=4, shots=4, burstSpacing=20
+        // v158: 用 shoot.firstShotDelay=50 替代 chargeTime, ShootSpread(4, 0f) 实现同时4发齐射
+        // shootSound: PU_V8 Sounds.plasmaboom → v158 无该音效, 用 Z_Sounds.singularityShoot 替代
+        swarmLaserTurret = new ExpPowerTurret("swarm-laser-turret"){{
+            requirements(Category.turret, ItemStack.with(Z_Items.steel, 50, Items.silicon, 90, Items.thorium, 95));
+            size = 3;
+            health = 2400;
+
+            reload = 90f;
+            coolantMultiplier = 2.25f;
+            powerUse = 15f;
+            targetAir = true;
+            range = 150f;
+
+            // v158: 用 shoot.firstShotDelay 替代 PU_V8 chargeTime
+            // ShootSpread(shots=4, spread=0f) 实现4发齐射 (PU_V8 burstSpacing=20 间隔发射, 简化为同时发射)
+            shoot = new mindustry.entities.pattern.ShootSpread(4, 0f);
+            shoot.firstShotDelay = 50f;
+            inaccuracy = 1f;  // v158 inaccuracy 在 Turret 上, 不在 shoot 上
+
+            recoil = 2f;
+            cooldownTime = 0.03f;  // v158 用 cooldownTime 替代 cooldown
+            shake = 2f;
+            shootEffect = mindustry.content.Fx.lancerLaserShoot;
+            smokeEffect = mindustry.content.Fx.none;
+            heatColor = Color.red;
+            shootSound = zzw.content.Z_Sounds.singularityShoot;
+
+            // branchLaser 子弹: 激光 + 3 发 frag (branchLaserFrag)
+            // PU_V8: ExpLaserBulletType(140, 20) + fragBullet=branchLaserFrag + fragBullets=3
+            // 简化: v158 LaserBulletType + fragBullet + fragBullets (省略等级颜色/伤害增量)
+            shootType = new LaserBulletType(20f){{
+                colors = new Color[]{
+                        Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.5f).a(0.4f),
+                        Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.5f),
+                        Color.white
+                };
+                hitEffect = mindustry.content.Fx.hitLancer;
+                hitSize = 4;
+                lifetime = 16f;
+                drawSize = 400f;
+                collidesAir = false;
+                length = 150f;
+                ammoMultiplier = 1f;
+                pierceCap = 10;
+                status = StatusEffects.shocked;
+                statusDuration = 3 * 60f;
+
+                // frag: branchLaserFrag (BasicBulletType 简化版)
+                fragBullets = 3;
+                fragBullet = new BasicBulletType(3.5f, 15f){{
+                    width = 4f;
+                    height = 4f;
+                    lifetime = 30f;
+                    shootEffect = mindustry.content.Fx.hitLancer;
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                    despawnEffect = mindustry.content.Fx.none;
+                    pierceCap = 10;
+                    pierceBuilding = true;
+                    splashDamageRadius = 4f;
+                    splashDamage = 4f;
+                    status = StatusEffects.burning;  // PU_V8 UnityStatusEffects.plasmaed → v158 burning
+                    statusDuration = 180f;
+                    trailLength = 6;
+                    trailColor = Color.white;
+                    weaveScale = 0.6f;
+                    weaveMag = 0.5f;
+                    homingPower = 0.4f;
+                    frontColor = Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.5f);
+                    backColor = Pal.sapBullet;
+                    hitColor = Pal.sapBullet;
+                }};
+            }};
+
+            maxLevel = 30;
+            expFields = new EField[]{
+                    // v158: shots 通过 ShootSpread 设置, 这里 EField 只能修改 inaccuracy/range
+                    // shots 字段简化为通过 maxLevel 增加伤害而非数量 (因 ShootSpread 在 init 时已固定)
+                    new ELinearCap(v -> inaccuracy = v, 1f, 0.25f, 10, mindustry.world.meta.Stat.inaccuracy, v -> arc.util.Strings.autoFixed(v, 1) + " degrees"),
+                    new ELinear(v -> range = v, 150f, 2f, mindustry.world.meta.Stat.shootRange, v -> arc.util.Strings.autoFixed(v / tilesize, 2) + " blocks")
+            };
+            pregrade = chargeLaserTurret;
+            pregradeLevel = 15;
+            effectColors = new Color[]{
+                    Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.3f),
+                    Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.6f),
+                    Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.8f),
+                    Pal.sapBullet
+            };
+        }};
+
+        // ===== kelvinLaserTurret (PU_V8 L1937-1960, OmniLiquidTurret + GeyserLaserBulletType)
+        // PU_V8: 基于当前液体类型调整伤害/击退/特效, 在目标点生成 GeyserBulletType 喷泉
+        kelvinLaserTurret = new OmniLiquidTurret("kelvin-laser-turret"){{
+            requirements(Category.turret, ItemStack.with(Items.phaseFabric, 50, Items.metaglass, 90, Items.thorium, 95));
+            size = 3;
+            health = 2100;
+
+            range = 180f;
+            reload = 120f;
+            targetAir = true;
+            liquidCapacity = 15f;
+            shootAmount = 3f;
+            shootSound = Sounds.shootLaser;
+
+            // GeyserLaserBulletType: 激光命中后生成 GeyserBulletType 喷泉
+            shootType = new GeyserLaserBulletType(185f, 30f){{
+                geyser = new GeyserBulletType(400f, 10f){{
+                    radius = 25f;
+                }};
+            }};
+
+            consumePowerCond(2.5f, Turret.TurretBuild::isActive);
+
+            maxLevel = 30;
+            pregrade = frostLaserTurret;
+            pregradeLevel = 15;
         }};
         //endregion
     }
