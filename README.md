@@ -197,8 +197,12 @@
 
 ### v1.5.1 (炮台问题修复)
 - **慢闪电锯齿渲染优化**：在 `SlowLightningType` 添加 `jaggedPoints`/`jaggedness` 字段，draw() 方法在每段插入中间锯齿点形成真实闪电效果。性能优化：静态缓冲区避免 GC 压力，基于位置的稳定 hash 偏移避免视觉抖动。压迫者（`SlowLightningBulletType`）和 create-endgame（`EndGameTurret`）均启用 `jaggedPoints = 2`
-- **修复 create-supernova 信息显示界面**：drawer 的 icons() 之前只返回 `-head` 单张图导致显示不全，改为返回底座+翅膀+头部+核心 7 张图组合
-- **修复 create-supernova 不能开炮**：项目配置中未添加 `consumeLiquid`，导致 `coolant == null`，`novaCharge` 累积公式中 `coolant.amount = 0` 永远累积不到 1。新增无 coolant 时的等效累积路径（用 `baseReloadSpeed() * Time.delta`）
+- **完整重写 create-supernova**：严格遵循 PU_V8 原版结构重写。核心改动：
+  - **drawer/heatDrawer lambda → 自定义 DrawBlock 子类 `SupernovaDrawer`**：v158 Turret.drawer 是 DrawBlock 类型而非 Cons，合并 PU_V8 的 drawer lambda（绘制 6 部件 outline + 主体 + core z+0.001）和 heatDrawer lambda（heat region 加法混合）到单个 draw() 方法
+  - **修复信息显示界面**：icons() 之前只返回 `-head` 单张图导致显示不全，改为返回底座+所有部件 8 张图组合
+  - **修复不能开炮**：项目配置中未添加 `consumeLiquid`，导致 `coolant == null`，`novaCharge` 累积公式中 `coolant.amount = 0` 永远累积不到 1。新增无 coolant 时的等效累积路径（用 `baseReloadSpeed() * Time.delta`）
+  - **完整保留蓄力动画**：charge/phase/starHeat 三阶段充能 + attractUnits 吸引单位 + 持续闪电 + 星辰闪光环（UnityDrawf.shiningCircle）+ PitchedSoundLoop 等效（v158 soundLoop 系统重写 shouldActiveSound/activeSoundVolume）
+  - **字段重命名**：`charge` → `novaCharge`（避免 shadow v158 TurretBuild.charge 充能进度字段）；`tr2` → `recoilOffset`（v158 字段名变更）
 - **修复 create-banshee 子弹位置偏移**：v155.4 `bullet(type, xOffset, yOffset, ...)` 期望 LOCAL 局部坐标（rotation-90 坐标系），之前错误传入了已旋转的世界坐标 `tr3.x/tr3.y` 导致双重旋转。改为传入 LOCAL 坐标 `xOff/yOff`，bullet() 内部自动旋转。同时构造函数设置 `shootY = 0f` 清除默认前向偏移，自定义每个炮管的前向偏移
 - **修复 create-prism 3D 模型渲染污染**：prism.obj 的三角形面（3 顶点）触发 WavefrontObject 的 `odd=true` 延迟渲染路径（`Draw.draw(z, face::draw)`），共享的 `Face.data` 数组被后续 `updateFace()` 覆盖污染，导致多 prism 同时存在时模型错乱。将三角形面转为退化四边形（重复末顶点），让所有面都是 4 顶点走即时渲染路径
 - **优化 create-prism 模型尺寸**：原 `prism.size = 4f`（实际缩放 16 倍，模型 32 单位占满整个炮台）过大，调整为 `1.0f`（约 8 单位高，炮台的 1/4），更接近原版 PU_V8 的视觉比例
