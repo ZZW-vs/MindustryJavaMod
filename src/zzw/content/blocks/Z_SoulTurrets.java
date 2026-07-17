@@ -231,14 +231,15 @@ public class Z_SoulTurrets {
 
         // ===== SoulInfuser 灵魂注入器 =====
         // 简化版: 消耗 monolite + 电力产生灵魂, 注入附近炮台/容器
+        // ★ PU_V8: size=3, Category.crafting; 用户要求归入电力系统 → Category.power
         soulInfuser = new SoulInfuser("soul-infuser") {{
-            requirements(Category.crafting, ItemStack.with(Z_Items.monolite, 100, Items.lead, 80, Items.silicon, 60));
-            size = 2;
+            requirements(Category.power, ItemStack.with(Z_Items.monolite, 200, Items.titanium, 250, Items.silicon, 420));
+            size = 3;
             health = 600;
             craftTime = 60f;
-            consumePower(2f);
+            consumePower(3.2f);
             consume(new ConsumeItems(ItemStack.with(Z_Items.monolite, 2)));
-            range = 12f;
+            range = 15f;
             injectEffect = Fx.smokeCloud;
         }};
 

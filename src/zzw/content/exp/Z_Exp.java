@@ -297,36 +297,72 @@ public class Z_Exp {
         }};
 
         infernoTurret = new ExpItemTurret("inferno"){{
-            ammo(mindustry.content.Items.coal, new mindustry.entities.bullet.BulletType(3.35f, 17f){{
-                ammoMultiplier = 3f;
-                hitSize = 7f;
-                lifetime = 18f;
-                pierce = true;
-                collidesAir = false;
-                statusDuration = 60f * 4;
-                shootEffect = mindustry.content.Fx.shootSmallFlame;
-                hitEffect = mindustry.content.Fx.hitFlameSmall;
-                despawnEffect = mindustry.content.Fx.none;
-                status = mindustry.content.StatusEffects.burning;
-                hittable = false;
-            }});
-            requirements(Category.turret, ItemStack.with(Items.copper, 60, Items.graphite, 50));
+            // ★完整移植 PU_V8: 3 种弹药 (scrap/slagShot, coal/coalBlaze, pyratite/pyraBlaze)
+            // shootSmallBlaze/shootPyraBlaze: 火焰色粒子向射击方向喷射 (PU_V8 自定义)
+            // ★ v158 简化: 用 BulletType 替代 ExpBulletType, 用自定义 Effect 替代 ShootFx
+            ammo(
+                mindustry.content.Items.scrap, new mindustry.entities.bullet.LiquidBulletType(mindustry.content.Liquids.slag) {{
+                    // slagShot 等效
+                }},
+                mindustry.content.Items.coal, new mindustry.entities.bullet.BulletType(3.35f, 32f) {{
+                    ammoMultiplier = 3;
+                    hitSize = 7f;
+                    lifetime = 24f;
+                    pierce = true;
+                    collidesAir = false;
+                    statusDuration = 60f * 4;
+                    // ★ PU_V8 shootSmallBlaze: 火焰色 (lightFlame/darkFlame/gray) 16粒子向射击方向喷射
+                    shootEffect = new mindustry.entities.Effect(22f, e -> {
+                        arc.graphics.g2d.Draw.color(Pal.lightFlame, Pal.darkFlame, Pal.gray, e.fin());
+                        arc.math.Angles.randLenVectors(e.id, 16, e.finpow() * 60f, e.rotation, 18f, (x, y) ->
+                            arc.graphics.g2d.Fill.circle(e.x + x, e.y + y, 0.85f + e.fout() * 3.5f));
+                    });
+                    hitEffect = mindustry.content.Fx.hitFlameSmall;
+                    despawnEffect = mindustry.content.Fx.none;
+                    status = mindustry.content.StatusEffects.burning;
+                    keepVelocity = true;
+                    hittable = false;
+                }},
+                mindustry.content.Items.pyratite, new mindustry.entities.bullet.BulletType(3.35f, 46f) {{
+                    ammoMultiplier = 3;
+                    hitSize = 7f;
+                    lifetime = 24f;
+                    pierce = true;
+                    collidesAir = false;
+                    statusDuration = 60f * 4;
+                    // ★ PU_V8 shootPyraBlaze: pyra 火焰色粒子
+                    shootEffect = new mindustry.entities.Effect(32f, e -> {
+                        arc.graphics.g2d.Draw.color(Pal.lightPyraFlame, Pal.darkPyraFlame, Pal.gray, e.fin());
+                        arc.math.Angles.randLenVectors(e.id, 16, e.finpow() * 60f, e.rotation, 18f, (x, y) ->
+                            arc.graphics.g2d.Fill.circle(e.x + x, e.y + y, 0.85f + e.fout() * 3.5f));
+                    });
+                    hitEffect = mindustry.content.Fx.hitFlameSmall;
+                    despawnEffect = mindustry.content.Fx.none;
+                    status = mindustry.content.StatusEffects.burning;
+                    keepVelocity = false;
+                    hittable = false;
+                }}
+            );
+            requirements(Category.turret, ItemStack.with(Z_Items.stone, 150, Z_Items.denseAlloy, 65, Items.graphite, 60));
             size = 3;
             health = 1200;
 
-            reload = 20f;
-            range = 100f;
+            reload = 6f;  // ★ PU_V8 reloadTime=6f (快速发射)
+            range = 80f;  // ★ PU_V8 range=80f
             targetAir = false;
             targetGround = true;
-            inaccuracy = 10f;
-
-            shootSound = V7Sounds.laser;
+            shootCone = 5f;
+            recoil = 0f;
+            coolantMultiplier = 2f;
+            shootSound = Sounds.shootFlame;  // ★ PU_V8 Sounds.flame → v158 Sounds.shootFlame (火焰喷射)
             heatColor = mindustry.graphics.Pal.redderDust;
 
-            maxLevel = 20;
+            // ★ v158: shoot 默认为 ShootPattern (无 spread 字段), 需初始化为 ShootSpread
+            shoot = new mindustry.entities.pattern.ShootSpread(1, 0f);
+            maxLevel = 10;  // ★ PU_V8 maxLevel=10
             expFields = new EField[]{
-                new LinearReloadTime(v -> reload = v, 20f, -0.5f),
-                new ELinear(v -> range = v, 100f, 1f, mindustry.world.meta.Stat.shootRange, v -> arc.util.Strings.autoFixed(v / tilesize, 2) + " blocks")
+                new EList<>(v -> shoot.shots = v, new Integer[]{1, 1, 2, 2, 2, 3, 3, 4, 4, 5, 5}, mindustry.world.meta.Stat.shots),
+                new EList<>(v -> ((mindustry.entities.pattern.ShootSpread)shoot).spread = v, new Float[]{0f, 0f, 5f, 10f, 15f, 7f, 14f, 8f, 10f, 6f, 9f}, null)
             };
         }};
 

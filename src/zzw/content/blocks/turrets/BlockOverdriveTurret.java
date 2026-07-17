@@ -55,7 +55,11 @@ public class BlockOverdriveTurret extends ReloadTurret {
     @Override
     public void load() {
         super.load();
-        baseRegion = Core.atlas.find(name + "-base");
+        // ★ 贴图缺失时回退到 vanilla 方块底座 + overdrive-projector (PU_V8 原版也无 buff-turret 贴图)
+        baseRegion = Core.atlas.find(name + "-base", Core.atlas.find("block-" + size));
+        if(!region.found()){
+            region = Core.atlas.find("overdrive-projector");
+        }
         laserRegion = Core.atlas.find("exp-laser");
         laserEndRegion = Core.atlas.find("exp-laser-end");
     }

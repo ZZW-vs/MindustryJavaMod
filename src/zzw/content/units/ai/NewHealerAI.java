@@ -1,11 +1,14 @@
 package zzw.content.units.ai;
 
+import arc.math.Angles;
 import arc.math.Mathf;
+import arc.math.geom.Vec2;
 import arc.struct.Seq;
 import arc.util.Time;
 import mindustry.Vars;
 import mindustry.ai.types.FlyingAI;
 import mindustry.entities.Sized;
+import mindustry.entities.Units;
 import mindustry.entities.units.WeaponMount;
 import mindustry.gen.Building;
 import mindustry.gen.Healthc;
@@ -14,26 +17,34 @@ import mindustry.gen.Unit;
 import mindustry.type.weapons.RepairBeamWeapon;
 
 /**
- * 治疗机单位专用 AI (移植 PU_V8 NewHealerAI, 继承 v158 FlyingAI)
+ * 治疗机单位专用 AI (移植 PU_V8 NewHealerAI + 增加敌方规避)
  *
  * 功能:
- * - findMainTarget(): 查找受伤友军单位/建筑 (用 Vars.indexer.getDamaged + team.data().units)
+ * - findMainTarget(): 查找最近的受伤友军单位/建筑 (纯距离优先, 匹配用户需求 "找最近的没满血的单位")
  * - updateMovement(): 移动到受伤友军附近并治疗
- * - circleTarget=true 时用 v158 原生 circle() 围绕目标盘旋
+ * - ★ 新增: updateMovement 中检测附近敌方单位, 叠加远离向量, 避免靠近敌方
+ * - circleTarget=true 时用 v158 原生 circle(target, range) 围绕目标盘旋
  *
  * ★ v158 适配:
- *   - 删除自定义 circle() 方法, 改用 AIController.circle(target, range)
  *   - Vars.indexer.getDamaged / unit.team.data().units / unit.type.canHeal 在 v158 中均存在
  *   - RepairBeamWeapon 自带 autoTarget, 武器索敌由其内部 findTarget 处理, AI 只负责移动定位
+ *   - RepairBeamWeapon.findTarget 只查找友军 damaged 单位, 不会攻击敌方
  */
 public class NewHealerAI extends FlyingAI{
     /** 最多扫描多少个受损建筑 (避免大地图性能问题) */
     final static int depth = 32;
 
+    /** 敌方规避距离: 当敌方单位进入此距离时, 治疗机会被推开 */
+    final static float enemyAvoidRange = 220f;
+    /** 敌方规避推力强度 (相对单位速度的倍数) */
+    final static float enemyAvoidStrength = 1.5f;
+
     /** 切换目标冷却计时器, >0 时不重新索敌 */
     float switchTime = 0f;
     /** 是否查找受损建筑 (canHeal 或 武器带 targetBuildings) */
     boolean findTile = false;
+    /** 临时向量用于敌方规避 */
+    final Vec2 avoidVec = new Vec2();
 
     @Override
     public void init(){
@@ -54,17 +65,62 @@ public class NewHealerAI extends FlyingAI{
 
     @Override
     public void updateMovement(){
+        unloadPayloads();
+
+        // ★ 敌方规避: 检测附近敌方单位, 叠加远离向量
+        // 即使有治疗目标, 也要优先远离敌方, 避免被攻击
+        avoidVec.setZero();
+        Units.nearbyEnemies(unit.team, unit.x, unit.y, enemyAvoidRange, enemy -> {
+            if (enemy.dead() || (!enemy.type.flying && !enemy.type.targetable)) return;
+            float dst = unit.dst(enemy);
+            if (dst > 0f && dst < enemyAvoidRange) {
+                // 距离越近推力越大 (倒数衰减)
+                float push = (1f - dst / enemyAvoidRange);
+                avoidVec.add((unit.x - enemy.x) / dst * push, (unit.y - enemy.y) / dst * push);
+            }
+        });
+
         if(target != null){
             // 治疗距离 = 单位射程 * 0.8 + 目标体积/4 (让大单位能贴近些)
             float range = unit.type.range * 0.8f;
             if(target instanceof Sized) range += ((Sized)target).hitSize() / 4f;
+
+            // ★ 计算治疗移动向量 (用 AIController.vec 静态字段)
+            vec.set(target).sub(unit);
+
             if(!unit.type.circleTarget){
                 // cherub/malakhim: 直接近身停下治疗
-                moveTo(target, range, 40f);
                 unit.lookAt(target);
+                float len = vec.len();
+                if(len > range + 40f){
+                    vec.setLength(unit.speed());
+                }else{
+                    vec.setZero();
+                }
             }else{
-                // seraphim: 用 v158 原生 circle 围绕目标盘旋 (持续治疗)
-                circle(target, range);
+                // seraphim: 围绕目标盘旋 (持续治疗)
+                if(vec.len() < range){
+                    float side = Mathf.randomSeed(unit.id, 0, 1) == 0 ? -1 : 1;
+                    vec.rotate((range - vec.len()) / range * 180f * side);
+                }
+                vec.setLength(unit.speed());
+            }
+
+            // ★ 合并规避向量到治疗向量 (避免 moveTo + moveAt 互相覆盖)
+            if(avoidVec.len() > 0.001f){
+                avoidVec.setLength(unit.speed() * enemyAvoidStrength);
+                vec.add(avoidVec);
+                // 限制合并后最大速度
+                float maxSpeed = unit.speed() * (1f + enemyAvoidStrength);
+                if(vec.len() > maxSpeed) vec.setLength(maxSpeed);
+            }
+
+            unit.movePref(vec);
+        }else{
+            // 无目标: 仅远离敌方
+            if(avoidVec.len() > 0.001f){
+                avoidVec.setLength(unit.speed() * enemyAvoidStrength);
+                unit.movePref(avoidVec);
             }
         }
     }
@@ -130,11 +186,14 @@ public class NewHealerAI extends FlyingAI{
 
     /**
      * 计算目标优先级分数:
-     * - 血量缺口越大分数越高 (优先治疗重伤)
-     * - 距离越近分数越高 (优先就近治疗)
+     * ★ 用户需求: "找最近的没满血的单位" → 主要按距离优先, 距离越近分数越高
+     * 同时保留少量 health gap 加成, 避免反复在两个等距离目标间切换
      */
     float calculateScore(Healthc target, float s){
-        float h = Mathf.sqrt(Math.max(target.maxHealth() - target.health(), 0f)) * 500f;
-        return ((-unit.dst2(target) / (s * s)) / 2000f) + h;
+        // 距离项: 距离越近分数越高 (主要项)
+        float distScore = -unit.dst2(target) / (s * s + 1f) / 200f;
+        // health 加成: 受伤越严重分数略高 (次要项, 避免完全忽略重伤单位)
+        float healthBonus = Mathf.sqrt(Math.max(target.maxHealth() - target.health(), 0f)) * 5f;
+        return distScore + healthBonus;
     }
 }

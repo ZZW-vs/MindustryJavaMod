@@ -1,5 +1,6 @@
 package zzw.content.blocks.soul;
 
+import arc.Core;
 import arc.util.io.Reads;
 import arc.util.io.Writes;
 import mindustry.gen.Building;
@@ -25,6 +26,15 @@ public class SoulContainer extends Wall {
         update = true;
         solid = true;
         sync = true;
+    }
+
+    @Override
+    public void load(){
+        super.load();
+        // ★ 贴图缺失时回退到 vanilla 墙体贴图 (PU_V8 原版未注册 SoulContainer, 无贴图)
+        if(!region.found()){
+            region = Core.atlas.find("thorium-wall");
+        }
     }
 
     public class SoulContainerBuild extends WallBuild {

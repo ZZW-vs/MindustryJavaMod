@@ -9,8 +9,6 @@ import mindustry.world.blocks.defense.Wall;
 import mindustry.world.blocks.environment.Floor;
 import mindustry.world.blocks.environment.OverlayFloor;
 import mindustry.world.blocks.environment.StaticWall;
-import mindustry.world.blocks.distribution.Conveyor;
-import mindustry.world.blocks.distribution.StackConveyor;
 import mindustry.world.meta.Stat;
 import zzw.content.Z_Items;
 import zzw.content.exp.EField;
@@ -22,8 +20,6 @@ public class Z_Blocks {
     public static Block Copper_Block, Large_Copper_Block;
     // 铁方块
     public static Block Iron_Block, Large_Iron_Block;
-    // 传送带
-    public static Block PPC_Conveyor, Better_PPC_Conveyor;
     // 其他方块
     public static Block Pumpkin, Carved_Pumpkin;
 
@@ -58,7 +54,6 @@ public class Z_Blocks {
 
     public static void load() {
         createDefenseBlocks();
-        createConveyors();
         createDecorativeBlocks();
         createPUFloors();
         createPUWalls();
@@ -83,21 +78,6 @@ public class Z_Blocks {
                 ItemStack.with(Z_Items.Iron_Sheet, 4, Items.copper, 3), 1, 400);
         Large_Iron_Block = wall("large_iron_block",
                 ItemStack.with(Z_Items.Iron_Sheet, 16, Z_Items.Iron, 12), 2, 1600);
-    }
-
-    private static void createConveyors() {
-        PPC_Conveyor = new Conveyor("ppc") {{
-            requirements(Category.distribution, ItemStack.with(Items.lead, 1));
-            health = 50;
-            speed = 0.05f;
-            displayedSpeed = 7f;
-        }};
-        Better_PPC_Conveyor = new StackConveyor("b_ppc") {{
-            requirements(Category.distribution, ItemStack.with(Items.lead, 3, Z_Items.Iron_Sheet, 2));
-            health = 70;
-            speed = 0.045f;
-            itemCapacity = 16;
-        }};
     }
 
     private static Block decorative(String name, ItemStack[] requirements, int health_) {

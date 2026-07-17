@@ -3324,6 +3324,7 @@ public class Z_Units {
             }});
 
             // 武器3: 磁轨炮 (PU_V8 SlowRailBulletType with fragBullet sapArtilleryFrag)
+            // ★ PU_V8 原版 mirror 默认 true (左右镜像), alternate=true 让左右镜像对交替发射
             weapons.add(new Weapon("create-theraphosidae-railgun") {{
                 x = 20.5f;
                 y = -10f;
@@ -3334,7 +3335,6 @@ public class Z_Units {
                 rotateSpeed = 0.9f;
                 shake = 6f;
                 recoil = 8f;
-                mirror = false;
                 shootSound = Sounds.shootForeshadow;
                 bullet = new SlowRailBulletType(15f, 95f) {{
                     lifetime = 23f;
@@ -4539,7 +4539,8 @@ public class Z_Units {
                 rotate = true;
                 rotateSpeed = 3f;
                 shootCone = 30f;
-                shootSound = Sounds.shootScatter;  // ★ 原版 Sounds.shotgun, v158 无此音效用 shootScatter 替代
+                shootSound = Sounds.shootToxopidShotgun;  // ★ 原版 Sounds.shotgun, v158 用 shootToxopidShotgun (强烈的霰弹枪音效)
+                shootSoundVolume = 1.2f;  // ★ 提高音量确保可听见
                 ejectEffect = mindustry.content.Fx.none;
                 // PU_V8: shots=3, spacing=15f, shotDelay=0f (3发同时发射, 角度间隔15度)
                 shoot = new mindustry.entities.pattern.ShootSpread(3, 15f);
@@ -4957,8 +4958,9 @@ public class Z_Units {
             constructor = mindustry.gen.UnitEntity::create;
             range = 320f;
 
-            // 10 个小 EMP 炮台 (5 座 × mirror=true 对称展开 = 10 座)
-            // ★ alternate=true 让 5 把炮台交替齐射 (匹配 PU_V8 原版发射模式)
+            // ★ PU_V8 原版: 10 座炮台 (mirror=false) 显式对称排列, alternate=true + otherSide 链
+            // 实现逆时针一个一个开炮: 0→2→4→6→8→9→7→5→3→1→0 (循环)
+            // v158 Weapon 原生支持 otherSide 字段 + update() 中的翻转逻辑, 直接使用
             // 共享弹药
             BulletType empSmall = new zzw.content.units.bullets.EmpBasicBulletType(5.7f, 25f) {{
                 lifetime = 40f;
@@ -4977,64 +4979,87 @@ public class Z_Units {
                 powerGridIteration = 7;
             }};
 
-            weapons.add(new Weapon("create-emp-small-launcher") {{
+            // 10 座小 EMP 炮台, otherSide 形成单向链
+            // flipSprite: 仅 index 0 为 false (初始可发射), 其余为 true (等待链翻转激活)
+            weapons.add(new Weapon("create-emp-small-launcher") {{ // 0: 右前
                 x = 13.25f; y = 20.25f;
-                shootY = 6.75f;
-                reload = 20f;
-                mirror = true;
-                alternate = true;  // ★ 5把一组交替齐射
-                rotate = true;
-                shootCone = 30f;
-                shootSound = Z_Sounds.zbosonShoot;
-                bullet = empSmall;
+                shootY = 6.75f; reload = 20f;
+                mirror = false; alternate = true; flipSprite = false;
+                rotate = true; shootCone = 30f;
+                shootSound = Z_Sounds.zbosonShoot; bullet = empSmall;
+                otherSide = 2;
             }});
-
-            weapons.add(new Weapon("create-emp-small-launcher") {{
+            weapons.add(new Weapon("create-emp-small-launcher") {{ // 1: 左前
+                x = -13.25f; y = 20.25f;
+                shootY = 6.75f; reload = 20f;
+                mirror = false; alternate = true; flipSprite = true;
+                rotate = true; shootCone = 30f;
+                shootSound = Z_Sounds.zbosonShoot; bullet = empSmall;
+                otherSide = 0;
+            }});
+            weapons.add(new Weapon("create-emp-small-launcher") {{ // 2: 右上
                 x = 19.75f; y = 12f;
-                shootY = 6.75f;
-                reload = 20f;
-                mirror = true;
-                alternate = true;
-                rotate = true;
-                shootCone = 30f;
-                shootSound = Z_Sounds.zbosonShoot;
-                bullet = empSmall;
+                shootY = 6.75f; reload = 20f;
+                mirror = false; alternate = true; flipSprite = true;
+                rotate = true; shootCone = 30f;
+                shootSound = Z_Sounds.zbosonShoot; bullet = empSmall;
+                otherSide = 4;
             }});
-
-            weapons.add(new Weapon("create-emp-small-launcher") {{
+            weapons.add(new Weapon("create-emp-small-launcher") {{ // 3: 左上
+                x = -19.75f; y = 12f;
+                shootY = 6.75f; reload = 20f;
+                mirror = false; alternate = true; flipSprite = true;
+                rotate = true; shootCone = 30f;
+                shootSound = Z_Sounds.zbosonShoot; bullet = empSmall;
+                otherSide = 1;
+            }});
+            weapons.add(new Weapon("create-emp-small-launcher") {{ // 4: 右中
                 x = 25.25f; y = 0f;
-                shootY = 6.75f;
-                reload = 20f;
-                mirror = true;
-                alternate = true;
-                rotate = true;
-                shootCone = 30f;
-                shootSound = Z_Sounds.zbosonShoot;
-                bullet = empSmall;
+                shootY = 6.75f; reload = 20f;
+                mirror = false; alternate = true; flipSprite = true;
+                rotate = true; shootCone = 30f;
+                shootSound = Z_Sounds.zbosonShoot; bullet = empSmall;
+                otherSide = 6;
             }});
-
-            weapons.add(new Weapon("create-emp-small-launcher") {{
+            weapons.add(new Weapon("create-emp-small-launcher") {{ // 5: 左中
+                x = -25.25f; y = 0f;
+                shootY = 6.75f; reload = 20f;
+                mirror = false; alternate = true; flipSprite = true;
+                rotate = true; shootCone = 30f;
+                shootSound = Z_Sounds.zbosonShoot; bullet = empSmall;
+                otherSide = 3;
+            }});
+            weapons.add(new Weapon("create-emp-small-launcher") {{ // 6: 右下
                 x = 22.75f; y = -12f;
-                shootY = 6.75f;
-                reload = 20f;
-                mirror = true;
-                alternate = true;
-                rotate = true;
-                shootCone = 30f;
-                shootSound = Z_Sounds.zbosonShoot;
-                bullet = empSmall;
+                shootY = 6.75f; reload = 20f;
+                mirror = false; alternate = true; flipSprite = true;
+                rotate = true; shootCone = 30f;
+                shootSound = Z_Sounds.zbosonShoot; bullet = empSmall;
+                otherSide = 8;
             }});
-
-            weapons.add(new Weapon("create-emp-small-launcher") {{
+            weapons.add(new Weapon("create-emp-small-launcher") {{ // 7: 左下
+                x = -22.75f; y = -12f;
+                shootY = 6.75f; reload = 20f;
+                mirror = false; alternate = true; flipSprite = true;
+                rotate = true; shootCone = 30f;
+                shootSound = Z_Sounds.zbosonShoot; bullet = empSmall;
+                otherSide = 5;
+            }});
+            weapons.add(new Weapon("create-emp-small-launcher") {{ // 8: 右底
                 x = 16f; y = -19.5f;
-                shootY = 6.75f;
-                reload = 20f;
-                mirror = true;
-                alternate = true;
-                rotate = true;
-                shootCone = 30f;
-                shootSound = Z_Sounds.zbosonShoot;
-                bullet = empSmall;
+                shootY = 6.75f; reload = 20f;
+                mirror = false; alternate = true; flipSprite = true;
+                rotate = true; shootCone = 30f;
+                shootSound = Z_Sounds.zbosonShoot; bullet = empSmall;
+                otherSide = 9;
+            }});
+            weapons.add(new Weapon("create-emp-small-launcher") {{ // 9: 左底
+                x = -16f; y = -19.5f;
+                shootY = 6.75f; reload = 20f;
+                mirror = false; alternate = true; flipSprite = true;
+                rotate = true; shootCone = 30f;
+                shootSound = Z_Sounds.zbosonShoot; bullet = empSmall;
+                otherSide = 7;
             }});
 
             // 大型 EMP 发射器 (1 座, mirror=false)

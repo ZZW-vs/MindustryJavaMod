@@ -67,6 +67,7 @@ public class Z_AdvTurrets {
     public static void load() {
         // ===== lifeStealer (PU_V8 L2462-2475) =====
         // SoulLifeStealerTurret: 持续激光, damage=120, 无灵魂需求
+        // ★ 修复: 默认 TractorBeamTurret 只攻击空中, 需显式设 targetGround=true 才能攻击地面
         lifeStealer = new SoulTractorBeamTurret("life-stealer") {{
             requirements(Category.turret, ItemStack.with(Items.silicon, 50, Z_Items.monolite, 25));
             size = 1;
@@ -78,6 +79,8 @@ public class Z_AdvTurrets {
             rotateSpeed = 10f;
             force = 0.3f;
             scaledForce = 0f;
+            targetAir = true;
+            targetGround = true;  // ★ 修复: 默认 false 导致只攻击空中单位
             laserColor = Pal.lancerLaser;
             status = mindustry.content.StatusEffects.none;
             shootSound = Sounds.beamParallax;
@@ -88,6 +91,7 @@ public class Z_AdvTurrets {
 
         // ===== absorberAura (PU_V8 L2505-2521) =====
         // SoulAbsorberTurret: 持续激光, resistance=0.8f, targetBullets=true (简化为普通激光)
+        // ★ 修复: 默认 TractorBeamTurret 只攻击空中, 需显式设 targetGround=true 才能攻击地面
         absorberAura = new SoulTractorBeamTurret("absorber-aura") {{
             requirements(Category.turret, ItemStack.with(Items.silicon, 75, Z_Items.monolite, 125));
             size = 2;
@@ -99,6 +103,8 @@ public class Z_AdvTurrets {
             rotateSpeed = 10f;
             force = 0.3f;
             scaledForce = 0f;
+            targetAir = true;
+            targetGround = true;  // ★ 修复
             laserColor = Pal.lancerLaser;
             shootSound = Sounds.beamParallax;
             requireSoul = false;
@@ -231,7 +237,8 @@ public class Z_AdvTurrets {
 
         // ===== prism (PU_V8 L2734-2763) =====
         // PrismTurret: 3D 棱镜炮台, 多目标攻击
-        // 简化: 用 PowerTurret, 单目标, BulletType(0.0001f, 320f) 即时命中
+        // ★ 修复: 原版用 speed=0.0001f 模拟即时命中, 但在 v158 中子弹过快或过短会导致不显示/不命中
+        //         改用合理的速度 + 较长的 lifetime 实现可见的激光样子弹
         prism = new PowerTurret("prism") {{
             requirements(Category.turret, ItemStack.with(Items.copper, 1));  // ★ 原版占位需求
             size = 4;
@@ -246,10 +253,18 @@ public class Z_AdvTurrets {
             consumePower(8f);
             shootSound = Sounds.shootScatter;  // ★ v158 无 Sounds.shotgun, 用 shootScatter 替代
             shootEffect = Fx.hitLaserBlast;
-            shootType = new BulletType(0.0001f, 320f) {{
-                lifetime = 1f;
+            shootType = new BasicBulletType(80f, 320f) {{  // ★ BasicBulletType 才有 width/height/backColor/frontColor
+                lifetime = 4f;  // 4 ticks 内飞行 320f 单位 (即时感)
+                pierce = true;
+                pierceBuilding = true;
                 hitEffect = Fx.hitLancer;
                 despawnEffect = Fx.hitLancer;
+                hittable = false;
+                // 视觉: 短促激光样
+                width = 6f;
+                height = 12f;
+                backColor = Pal.lancerLaser;
+                frontColor = Color.white;
             }};
         }};
 

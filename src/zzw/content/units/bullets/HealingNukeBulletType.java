@@ -8,19 +8,25 @@ import arc.util.Tmp;
 import mindustry.content.Fx;
 import mindustry.content.StatusEffects;
 import mindustry.entities.bullet.BulletType;
+import mindustry.entities.Units;
 import mindustry.gen.Bullet;
 import mindustry.graphics.Pal;
 import mindustry.type.StatusEffect;
-import mindustry.world.Tile;
+import zzw.content.units.util.UnityUtils;
 
 /**
- * 治疗核弹 (PU_V8 HealingNukeBulletType 移植版)
+ * 治疗核弹 (PU_V8 HealingNukeBulletType 完整移植版)
+ * 参考: PU_V8 main/src/unity/entities/bullet/energy/HealingNukeBulletType.java
+ *
+ * 功能 (与 PU_V8 一致):
  * - 圆形范围: 友军治疗+allyStatus, 敌方伤害+status
  * - 多射线检测 absorbLasers 建筑 (遮挡)
  * - 自定义绘制: 多三角形组成圆形
- * 简化: 用 v158 world.raycastEachWorld + Units.nearby 替代 Utils.castCircle
- *       移除 UnityStatusEffects.disabled → StatusEffects.unmoving
- * 参考: PU_V8 main/src/unity/entities/bullet/energy/HealingNukeBulletType.java
+ *
+ * v158 适配:
+ * - 用 zzw.content.units.util.UnityUtils.castCircle 替代 Utils.castCircle
+ * - 用 Units.nearby(rect, cons) 替代 v158 中无对应方法的 Group 查询 (与 PU_V8 行为一致)
+ * - ★ v158 BuildingComp.heal(amount) 不修改 health 字段, 直接修改 build.health + healthChanged()
  */
 public class HealingNukeBulletType extends BulletType {
     public float radius = 650f;
@@ -41,53 +47,34 @@ public class HealingNukeBulletType extends BulletType {
     }
 
     @Override
+    protected float calculateRange() {
+        return radius;
+    }
+
+    @Override
     public void init() {
         super.init();
-        range = radius;
         drawSize = radius * 2f;
     }
 
     @Override
     public void init(Bullet b) {
-        // 圆形射线检测, 记录每个角度的最大长度 (被 absorbLasers 建筑遮挡)
-        float[] data = new float[rays];
-        for (int i = 0; i < rays; i++) {
-            float ang = i * (360f / rays);
-            Tmp.v1.trns(ang, radius).add(b);
-            final int fi = i;
-            data[fi] = radius;
-            mindustry.Vars.world.raycastEachWorld(b.x, b.y, Tmp.v1.x, Tmp.v1.y, (cx, cy) -> {
-                Tile tile = mindustry.Vars.world.tile(cx, cy);
-                if (tile != null && tile.block() != null && tile.block().absorbLasers && tile.team() != b.team) {
-                    data[fi] = Mathf.dst(b.x, b.y, cx * mindustry.Vars.tilesize, cy * mindustry.Vars.tilesize);
-                    return true;
-                }
-                return false;
-            });
-        }
+        // ★ 与 PU_V8 一致: 用 castCircle 一次性扫描所有建筑 + 射线遮挡
+        float[] data = UnityUtils.castCircle(b.x, b.y, radius, rays, bd -> true, building -> {
+            if (building.team == b.team) {
+                Fx.healBlockFull.at(building.x, building.y, building.block.size, Pal.heal);
+                // ★ v158 修复: BuildingComp.heal(amount) 只调用 healthChanged(), 不修改 health 字段!
+                //   直接修改 health 字段, 然后调用 healthChanged() 通知显示更新
+                float healAmount = (healPercent / 100f) * building.maxHealth;
+                building.health = Math.min(building.maxHealth, building.health + healAmount);
+                building.healthChanged();
+            } else {
+                building.damage(damage * b.damageMultiplier() * buildingDamageMultiplier);
+            }
+        }, tile -> tile.block() != null && tile.block().absorbLasers && tile.team() != b.team);
 
-        // 检测建筑伤害/治疗
-        mindustry.Vars.indexer.eachBlock(null, b.x, b.y, radius,
-                build -> true,
-                build -> {
-                    if (build.team == b.team) {
-                        if (build.damaged()) {
-                            Fx.healBlockFull.at(build.x, build.y, build.block.size, Pal.heal);
-                            // ★ v158 修复: BuildingComp.heal(amount) 用 @MethodPriority(100) 覆盖了 HealthComp 默认实现,
-                            //   但只调用 healthChanged() 更新显示, 没有真正增加 health 字段!
-                            //   所以这里直接修改 health 字段, 然后调用 healthChanged() 通知显示更新
-                            float healAmount = (healPercent / 100f) * build.maxHealth;
-                            build.health = Math.min(build.maxHealth, build.health + healAmount);
-                            build.healthChanged();
-                        }
-                    } else {
-                        build.damage(damage * b.damageMultiplier() * buildingDamageMultiplier);
-                    }
-                });
-
-        // 检测单位
-        float nearbyR = radius + 50f;
-        mindustry.entities.Units.nearby(b.x - nearbyR, b.y - nearbyR, nearbyR * 2f, nearbyR * 2f, u -> {
+        // ★ 与 PU_V8 一致: 用 Units.nearby(rect, cons) 扫描圆内所有单位 (包括友军和敌军)
+        Units.nearby(Tmp.r1.setCentered(b.x, b.y, radius * 2f), u -> {
             float ang = b.angleTo(u);
             float dst = u.dst2(b) - ((u.hitSize * u.hitSize) / 2f);
             int idx = Mathf.mod(Mathf.round((ang % 360f) / (360f / data.length)), data.length);
@@ -95,7 +82,6 @@ public class HealingNukeBulletType extends BulletType {
 
             if (b.within(u, radius + (u.hitSize / 2f)) && dst <= d * d) {
                 if (u.team == b.team) {
-                    // 单位 heal() 不受 @MethodPriority 覆盖影响, 可以正常调用
                     u.heal((healPercent / 100f) * u.maxHealth);
                     u.apply(allyStatus, allyStatusDuration);
                 } else {

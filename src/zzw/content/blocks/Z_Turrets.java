@@ -26,10 +26,12 @@ import zzw.content.Z_Bullets.BeamBulletType;
 import zzw.content.Z_Bullets.DecayBasicBulletType;
 import zzw.content.Z_Bullets.EphemeronBulletType;
 import zzw.content.Z_Bullets.EphemeronPairBulletType;
+import zzw.content.Z_Bullets.GravitonLaserBulletType;
 import zzw.content.Z_Bullets.RoundLaserBulletType;
 import zzw.content.Z_Bullets.ShieldBulletType;
 import zzw.content.Z_Bullets.SmokeBulletType;
 import zzw.content.Z_Bullets.SparkingContinuousLaserBulletType;
+import zzw.content.Z_Bullets.SingularityBulletType;
 import zzw.content.Z_Bullets.TriangleBulletType;
 import zzw.content.Z_Bullets.VelocityLaserBoltBulletType;
 import zzw.content.Z_Bullets.AcceleratingLaserBulletType;
@@ -244,7 +246,7 @@ public class Z_Turrets {
         }};
 
         // ===== graviton (重力子激光炮, PU132 L611-631) =====
-        // PU132: LaserTurret + 更强激光
+        // ★完整移植 PU132: GravitonLaserBulletType - 牵引激光 (吸引敌方单位)
         graviton = new LaserTurret("graviton") {{
             requirements(Category.turret, ItemStack.with(Items.lead, 110, Items.graphite, 90, Items.silicon, 70, Z_Items.luminum, 180, Items.titanium, 135));
             size = 3;
@@ -256,11 +258,14 @@ public class Z_Turrets {
             consumePower(5.75f);
             heatColor = Pal.turretHeat;
             loopSound = Z_Sounds.xenoBeam;  // ★ 原版 UnitySounds.xenoBeam (advance/xeno-beam.ogg)
-            shootType = new ContinuousLaserBulletType(0.8f) {{
+            shootType = new GravitonLaserBulletType(0.8f) {{
                 length = 260f;
                 knockback = -5f;  // ★ 重力吸引: 负值拉向炮台
                 incendChance = -1f;
-                colors = new Color[]{Color.valueOf("3a3a4c").cpy().a(0.1f), Pal.lancerLaser.cpy().a(0.2f)};
+                // ★ 提高颜色可见度, 原版过透明看不清
+                colors = new Color[]{Color.valueOf("3a3a4c").cpy().a(0.55f), Pal.lancerLaser.cpy().a(0.8f)};
+                strokes = new float[]{2.4f, 1.8f};
+                width = 9f;
             }};
             consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability < 0.1f, 0.25f)).update(false);
         }};
@@ -279,34 +284,38 @@ public class Z_Turrets {
             reload = 6f;
             coolantMultiplier = 0.5f;
             inaccuracy = 3f;
-            shoot = new ShootAlternate(2);
-            shoot.shots = 2;
+            // ★ PU_V8: spread=12, shots=2, alternate=true → v158: ShootAlternate(12f) 自带 shots=2 alternate
+            shoot = new ShootAlternate(12f);
             shootSound = Sounds.shootSpectre;  // ★ v158 无 Sounds.shootBig, 用 shootSpectre (大型炮弹) 替代
             recoil = 3f;
             rotateSpeed = 4.5f;
-            ammo(Items.graphite, new BasicBulletType(3.63f, 98f) {{  // ★ speed×1.1, damage×1.4 (原版 standardDenseBig×1.4)
+            // ★ 子弹颜色按 PU_V8/v7 标准区分不同弹药类型 (不再统一白色)
+            ammo(Items.graphite, new BasicBulletType(3.63f, 98f) {{  // ★ speed×1.1, damage×1.4 (原版 standardDenseLarge×1.4)
                 lifetime = 35f; width = 18f; height = 21f;
                 splashDamage = 30f; splashDamageRadius = 25f;
-                backColor = trailColor = hitColor = Pal.darkerMetal;
+                backColor = Pal.darkerGray;
+                trailColor = hitColor = Pal.darkerMetal;
                 frontColor = Color.white;
                 hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
             }}, Items.silicon, new BasicBulletType(3.63f, 86f) {{  // ★ speed×1.1, damage×1.23 (原版 standardHomingLarge×1.23)
                 lifetime = 35f; width = 17f; height = 20f;
                 homingPower = 0.09f; reloadMultiplier = 1.3f;
-                backColor = trailColor = hitColor = Pal.darkerMetal;
+                backColor = Pal.darkerGray;
+                trailColor = hitColor = Pal.darkerMetal;
                 frontColor = Color.white;
                 hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
             }}, Items.pyratite, new BasicBulletType(3.63f, 98f) {{  // ★ speed×1.1, damage×1.4 (原版 standardIncendiaryLarge×1.4)
                 lifetime = 35f; width = 18f; height = 21f;
-                splashDamage = 30f; splashDamageRadius = 25f;  // ★ radius 修正为 25f (原为 30f)
+                splashDamage = 30f; splashDamageRadius = 25f;
                 makeFire = true; status = mindustry.content.StatusEffects.burning;
                 backColor = trailColor = hitColor = Color.valueOf("ffaa5f");
-                frontColor = Color.white;
+                frontColor = Color.valueOf("ffd49a");
                 hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
             }}, Items.thorium, new BasicBulletType(3.63f, 161f) {{  // ★ speed×1.1, damage×1.4 (原版 standardThoriumLarge×1.4)
                 lifetime = 35f; width = 18f; height = 21f;
                 pierceCap = 2; pierce = true;
-                backColor = trailColor = hitColor = Pal.darkerMetal;
+                backColor = Pal.darkerGray;
+                trailColor = hitColor = Color.valueOf("f4ba6e");
                 frontColor = Color.white;
                 hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
             }});
@@ -675,8 +684,8 @@ public class Z_Turrets {
             }};
         }};
 
-        // ===== singularity (PU_V8 L926-949, PowerTurret + singularityEnergyBall) =====
-        // PU_V8: singularityEnergyBall (BasicBulletType, 接近敌人时变成黑洞)
+        // ===== singularity (PU_V8 L926-949, PowerTurret + singularityEnergyBall -> 黑洞子弹) =====
+        // ★完整移植 PU_V8: 发射能量球, 接近敌人时变成黑洞, 吸引并伤害范围内敌方单位/建筑
         singularity = new PowerTurret("singularity") {{
             requirements(Category.turret, ItemStack.with(Items.silicon, 290, Z_Items.luminum, 430, Items.titanium, 190, Items.thorium, 120, Z_Items.lightAlloy, 20));
             size = 7;
@@ -704,7 +713,11 @@ public class Z_Turrets {
                 @Override
                 public void update(mindustry.gen.Bullet b) {
                     super.update(b);
+                    // 接近敌人时变成黑洞
                     if (mindustry.entities.Units.closestTarget(b.team, b.x, b.y, 20f) != null) {
+                        // 创建黑洞子弹
+                        SingularityBulletType blackHole = new SingularityBulletType(26f);
+                        blackHole.create(b, b.x, b.y, 0f);
                         b.remove();
                     }
                 }
@@ -958,6 +971,7 @@ public class Z_Turrets {
         }};
 
         // ===== ghost (PU_V8 L411-428, BarrelsItemTurret) =====
+        // ★ PU_V8: spread=21, addBarrel(8f, 18.75f, 6f)
         ghost = new BarrelsItemTurret("ghost") {{
             size = 8;
             health = 9750;
@@ -965,38 +979,43 @@ public class Z_Turrets {
             reload = 9f;
             coolantMultiplier = 0.5f;
             inaccuracy = 3f;
-            shoot.shots = 2;
+            // ★ PU_V8: spread=21, shots=2, alternate=true → ShootAlternate(21f)
+            shoot = new ShootAlternate(21f);
             shootSound = Sounds.shootSpectre;
-            shoot = new ShootAlternate(2);
             recoil = 5.5f;
             rotateSpeed = 3.5f;
             addBarrel(8f, 18.75f, 6f);
+            // ★ 子弹颜色按 PU_V8/v7 标准区分
             ammo(Items.graphite, new BasicBulletType(3.3f, 120f) {{
                 lifetime = 35f; width = 21f; height = 26f;
                 splashDamage = 40f; splashDamageRadius = 30f;
-                backColor = trailColor = hitColor = Pal.darkerMetal; frontColor = Color.white;
+                backColor = Pal.darkerGray;
+                trailColor = hitColor = Pal.darkerMetal; frontColor = Color.white;
                 hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
             }}, Items.silicon, new BasicBulletType(3.3f, 98f) {{
                 lifetime = 35f; width = 19f; height = 24f;
                 homingPower = 0.09f; reloadMultiplier = 1.3f;
-                backColor = trailColor = hitColor = Pal.darkerMetal; frontColor = Color.white;
+                backColor = Pal.darkerGray;
+                trailColor = hitColor = Pal.darkerMetal; frontColor = Color.white;
                 hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
             }}, Items.pyratite, new BasicBulletType(3.3f, 90f) {{
                 lifetime = 35f; width = 21f; height = 26f;
                 splashDamage = 40f; splashDamageRadius = 35f; makeFire = true;
                 status = mindustry.content.StatusEffects.burning;
-                backColor = trailColor = hitColor = Color.valueOf("ffaa5f"); frontColor = Color.white;
+                backColor = trailColor = hitColor = Color.valueOf("ffaa5f"); frontColor = Color.valueOf("ffd49a");
                 hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
             }}, Items.thorium, new BasicBulletType(3.3f, 140f) {{
                 lifetime = 35f; width = 21f; height = 26f;
                 pierceCap = 2; pierce = true;
-                backColor = trailColor = hitColor = Pal.darkerMetal; frontColor = Color.white;
+                backColor = Pal.darkerGray;
+                trailColor = hitColor = Color.valueOf("f4ba6e"); frontColor = Color.white;
                 hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
             }});
             requirements(Category.turret, ItemStack.with(Items.copper, 1150, Items.graphite, 1420, Items.silicon, 960, Items.plastanium, 800, Items.thorium, 1230, Z_Items.darkAlloy, 380));
         }};
 
         // ===== banshee (PU_V8 L430-449, BarrelsItemTurret + focus) =====
+        // ★ PU_V8: spread=37, addBarrel×2, focus=true
         banshee = new BarrelsItemTurret("banshee") {{
             size = 12;
             health = 22000;
@@ -1004,34 +1023,38 @@ public class Z_Turrets {
             reload = 12f;
             coolantMultiplier = 0.5f;
             inaccuracy = 3f;
-            shoot.shots = 2;
+            // ★ PU_V8: spread=37, shots=2, alternate=true → ShootAlternate(37f)
+            shoot = new ShootAlternate(37f);
             shootSound = Sounds.shootSpectre;
-            shoot = new ShootAlternate(2);
             recoil = 5.5f;
             rotateSpeed = 3.5f;
             focus = true;
             addBarrel(23.5f, 36.5f, 9f);
             addBarrel(8.5f, 24.5f, 6f);
+            // ★ 子弹颜色按 PU_V8/v7 标准区分
             ammo(Items.graphite, new BasicBulletType(3.3f, 130f) {{
                 lifetime = 40f; width = 21f; height = 27f;
                 splashDamage = 50f; splashDamageRadius = 35f;
-                backColor = trailColor = hitColor = Pal.darkerMetal; frontColor = Color.white;
+                backColor = Pal.darkerGray;
+                trailColor = hitColor = Pal.darkerMetal; frontColor = Color.white;
                 hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
             }}, Items.silicon, new BasicBulletType(3.3f, 115f) {{
                 lifetime = 40f; width = 19f; height = 25f;
                 homingPower = 0.09f; reloadMultiplier = 1.3f;
-                backColor = trailColor = hitColor = Pal.darkerMetal; frontColor = Color.white;
+                backColor = Pal.darkerGray;
+                trailColor = hitColor = Pal.darkerMetal; frontColor = Color.white;
                 hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
             }}, Items.pyratite, new BasicBulletType(3.3f, 100f) {{
                 lifetime = 40f; width = 21f; height = 27f;
                 splashDamage = 50f; splashDamageRadius = 40f; makeFire = true;
                 status = mindustry.content.StatusEffects.burning;
-                backColor = trailColor = hitColor = Color.valueOf("ffaa5f"); frontColor = Color.white;
+                backColor = trailColor = hitColor = Color.valueOf("ffaa5f"); frontColor = Color.valueOf("ffd49a");
                 hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
             }}, Items.thorium, new BasicBulletType(3.3f, 160f) {{
                 lifetime = 40f; width = 21f; height = 27f;
                 pierceCap = 2; pierce = true;
-                backColor = trailColor = hitColor = Pal.darkerMetal; frontColor = Color.white;
+                backColor = Pal.darkerGray;
+                trailColor = hitColor = Color.valueOf("f4ba6e"); frontColor = Color.white;
                 hitEffect = Fx.hitBulletBig; despawnEffect = Fx.hitBulletBig;
             }});
             requirements(Category.turret, ItemStack.with(Items.copper, 2800, Items.graphite, 2980, Items.silicon, 2300, Items.titanium, 1900, Items.phaseFabric, 1760, Items.thorium, 1780, Z_Items.darkAlloy, 1280));
@@ -1062,6 +1085,9 @@ public class Z_Turrets {
                 fromBlockChance = 0.12f;
                 fromBlockDamage = 23f;
                 fromLaserAmount = 0;
+                incendChance = 0f;
+                fromBlockLen = 2;
+                fromBlockLenRand = 5;
             }};
             consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability < 0.1f, 0.58f)).update(false);
         }};
@@ -1088,6 +1114,8 @@ public class Z_Turrets {
             requirements(Category.turret, ItemStack.with(Items.copper, 1250, Items.lead, 1320, Items.graphite, 1100, Items.titanium, 1340, Items.surgeAlloy, 1240, Items.silicon, 1350, Items.thorium, 770, Z_Items.darkAlloy, 370));
             shootType = new SparkingContinuousLaserBulletType(240f) {{
                 length = 340f;
+                incendSpread = 7f;
+                incendAmount = 2;
             }};
             consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.4f && liquid.flammability < 0.1f, 1.3f)).update(false);
         }};
@@ -1121,6 +1149,9 @@ public class Z_Turrets {
                 fromLaserAmount = 3;
                 fromLaserLen = 5;
                 fromLaserLenRand = 7;
+                incendChance = 0.6f;
+                incendSpread = 9f;
+                incendAmount = 2;
             }};
             consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.3f && liquid.flammability < 0.1f, 2.1f)).update(false);
         }};
@@ -1154,6 +1185,10 @@ public class Z_Turrets {
                 fromLaserAmount = 4;
                 fromLaserLen = 10;
                 fromLaserLenRand = 7;
+                incendChance = 0.7f;
+                incendSpread = 9f;
+                incendAmount = 2;
+                extinction = true;
             }};
             consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.27f && liquid.flammability < 0.1f, 2.5f)).update(false);
         }};

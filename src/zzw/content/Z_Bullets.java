@@ -13,6 +13,8 @@ import arc.util.Time;
 import mindustry.content.Fx;
 import mindustry.content.StatusEffects;
 import mindustry.entities.Damage;
+import mindustry.entities.Effect;
+import mindustry.entities.Fires;
 import mindustry.entities.Lightning;
 import mindustry.entities.bullet.BasicBulletType;
 import mindustry.entities.bullet.BulletType;
@@ -32,7 +34,7 @@ import static mindustry.Vars.tilesize;
  * 包含: SmokeBulletType, RoundLaserBulletType, ArcBulletType, AcceleratingLaserBulletType,
  *       DecayBasicBulletType, TriangleBulletType, BeamBulletType, ShieldBulletType,
  *       VelocityLaserBoltBulletType, EphemeronBulletType, EphemeronPairBulletType,
- *       SparkingContinuousLaserBulletType
+ *       SparkingContinuousLaserBulletType, SingularityBulletType
  *
  * 简化策略:
  * - 移除 UnityFx / UnityPal / HitFx / ChargeFx / ShootFx 依赖, 用 v158 Fx / Pal 替代
@@ -483,7 +485,8 @@ public class Z_Bullets {
 
         public EphemeronPairBulletType(float damage) {
             super(0.001f, damage);
-            lifetime = 360f;
+            // ★ 用户反馈小球存在时间过短, 将 lifetime 从 360f 延长至 720f
+            lifetime = 720f;
             hitEffect = Fx.hitLancer;
             despawnEffect = Fx.none;
             hitSize = 8f;
@@ -568,11 +571,21 @@ public class Z_Bullets {
         }
     }
 
-    /** ===== SparkingContinuousLaserBulletType (PU_V8 fallout/catastrophe/calamity/extinction) ===== */
+    /** ===== SparkingContinuousLaserBulletType (PU_V8 fallout/catastrophe/calamity/extinction) =====
+     * ★移植 PU_V8 完整机制:
+     *  - fromBlockChance/fromBlockAmount: 在炮台位置生成定向闪电
+     *  - fromLaserChance/fromLaserAmount: 在激光线上随机点生成闪电
+     *  - incendChance/incendSpread/incendAmount: 在激光线上生成火焰 (v158继承自BulletType)
+     *  - extinction=true: 锥形扫描区域点燃地面 (Fires.create) + 损伤敌方建筑
+     */
     public static class SparkingContinuousLaserBulletType extends ContinuousLaserBulletType {
         public float fromBlockChance = 0.4f, fromBlockDamage = 23f;
         public float fromLaserChance = 0.9f, fromLaserDamage = 23f;
+        public float incendStart = 2.9f;
+        public float coneRange = 1.1f;
         public int fromLaserLen = 4, fromLaserLenRand = 5, fromLaserAmount = 1;
+        public int fromBlockLen = 2, fromBlockLenRand = 5, fromBlockAmount = 1;
+        public boolean extinction = false;
         public Color sparkColor = Color.valueOf("ff9c5a");
 
         public SparkingContinuousLaserBulletType(float damage) {
@@ -588,6 +601,15 @@ public class Z_Bullets {
         public void update(Bullet b) {
             super.update(b);
             float realLength = Damage.findLaserLength(b, length);
+
+            // 炮台位置闪电 (fromBlock)
+            for (int i = 0; i < fromBlockAmount; i++) {
+                if (Mathf.chanceDelta(fromBlockChance)) {
+                    Lightning.create(b.team, lightningColor, fromBlockDamage, b.x, b.y, b.rotation(),
+                            Mathf.round(length / 8f) + fromBlockLen + Mathf.random(fromBlockLenRand));
+                }
+            }
+            // 激光线上的闪电 (fromLaser)
             for (int i = 0; i < fromLaserAmount; i++) {
                 if (Mathf.chanceDelta(fromLaserChance)) {
                     int lLength = fromLaserLen + Mathf.random(fromLaserLenRand);
@@ -595,9 +617,201 @@ public class Z_Bullets {
                     Lightning.create(b.team, sparkColor, fromLaserDamage, b.x + Tmp.v1.x, b.y + Tmp.v1.y, b.rotation(), lLength);
                 }
             }
-            if (Mathf.chanceDelta(fromBlockChance)) {
-                Lightning.create(b.team, lightningColor, fromBlockDamage, b.x, b.y, b.rotation(), Mathf.round(length / 8f) + fromLaserLen + Mathf.random(fromLaserLenRand));
+            // 激光线上点燃火灾
+            if (incendChance > 0 && Mathf.chance(incendChance)) {
+                Tmp.v1.trns(b.rotation(), Mathf.random(incendStart, realLength));
+                Damage.createIncend(b.x + Tmp.v1.x, b.y + Tmp.v1.y, incendSpread, incendAmount);
             }
+
+            // extinction 锥形扫描: 在激光路径前方锥形区域内点燃地面+伤害敌方建筑
+            if (extinction && b.timer(2, 15f)) {
+                float coneLen = length * coneRange;
+                float coneHalfAngle = 70f;
+                // 遍历锥形区域内的所有 tile
+                int tx = mindustry.Vars.world.toTile(b.x);
+                int ty = mindustry.Vars.world.toTile(b.y);
+                int range = Mathf.ceilPositive(coneLen / mindustry.Vars.tilesize);
+                for (int dx = -range; dx <= range; dx++) {
+                    for (int dy = -range; dy <= range; dy++) {
+                        mindustry.world.Tile tile = mindustry.Vars.world.tile(tx + dx, ty + dy);
+                        if (tile == null) continue;
+                        float wx = tile.worldx(), wy = tile.worldy();
+                        float ang = Angles.angle(wx - b.x, wy - b.y);
+                        float angDiff = Math.abs(Angles.angleDist(ang, b.rotation()));
+                        if (angDiff > coneHalfAngle) continue;
+                        float dst = Mathf.dst(wx - b.x, wy - b.y);
+                        if (dst > coneLen) continue;
+                        float angD = Mathf.clamp(1f - angDiff / coneHalfAngle);
+                        float dstC = Mathf.clamp(1f - dst / coneLen);
+                        // 锥形点燃地面
+                        if (Mathf.chance(arc.math.Interp.smooth.apply(angD) * 0.32f * Mathf.clamp(dstC * 1.7f))) {
+                            Fires.create(tile);
+                        }
+                        // 锥形伤害敌方建筑
+                        mindustry.gen.Building build = tile.build;
+                        if (build != null && build.team != b.team) {
+                            build.damage(arc.math.Interp.smooth.apply(angD) * 23.3f * Mathf.clamp(dstC * 1.7f));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** ===== GravitonLaserBulletType (PU132 graviton) - 重力子牵引激光 =====
+     * ★完整移植 PU132 GravitonLaserBulletType:
+     *  - 较高可见度的连续激光 (彩色 alpha 较高, 较粗的描边)
+     *  - 负值 knockback 实现吸引效果
+     *  - 自定义 draw 方法使用 strokes[] 数组渲染
+     */
+    public static class GravitonLaserBulletType extends ContinuousLaserBulletType {
+        public int max = 6;
+        public float[] strokes = {2.4f, 1.8f};
+        public float[] tscales = {1f, 0.7f};
+        public float[] lenscales = {1f, 1.13f};
+        public float spaceMag = 45f;
+        public float oscMag = 1.5f;
+        public float oscScl = 0.8f;
+        public float widthMul = 1f;
+
+        public GravitonLaserBulletType(float damage) {
+            super(damage);
+            fadeTime = 16f;
+        }
+
+        @Override
+        public void init(Bullet b) {
+            super.init(b);
+            b.fdata = length;
+        }
+
+        @Override
+        public void update(Bullet b) {
+            super.update(b);
+            // ★ 补充: 对范围内敌方单位施加持续吸引力 (每5tick)
+            if (b.timer(2, 5f)) {
+                mindustry.entities.Units.nearbyEnemies(b.team, b.x, b.y, length, u -> {
+                    if (u != null && u.isValid()) {
+                        // 仅影响激光前方锥形范围内单位
+                        float ang = b.angleTo(u);
+                        if (Math.abs(Angles.angleDist(ang, b.rotation())) > 30f) return;
+                        float dst = b.dst(u);
+                        if (dst > length) return;
+                        // 越远拉力越大
+                        Tmp.v1.set(b).sub(u).nor().scl(Math.abs(knockback) * 80f * (1f - dst / length) * Time.delta * 5f);
+                        u.impulse(Tmp.v1);
+                    }
+                });
+            }
+        }
+
+        @Override
+        public void draw(Bullet b) {
+            float realLength = b.fdata;
+            float fout = Mathf.clamp(b.time > b.lifetime - fadeTime ? 1f - (b.time - (lifetime - fadeTime)) / fadeTime : 1f);
+            float baseLen = realLength * fout;
+
+            Lines.lineAngle(b.x, b.y, b.rotation(), baseLen);
+            for (int s = 0; s < colors.length; s++) {
+                Draw.color(Tmp.c1.set(colors[s]).mul(1f + Mathf.absin(Time.time, 1f, 0.1f)));
+                for (int i = 0; i < tscales.length; i++) {
+                    Tmp.v1.trns(b.rotation() + 180f, (lenscales[i] - 1f) * spaceMag);
+                    Lines.stroke((width + Mathf.absin(Time.time, oscScl, oscMag)) * fout * strokes[s] * tscales[i] * widthMul);
+                    Lines.lineAngle(b.x + Tmp.v1.x, b.y + Tmp.v1.y, b.rotation(), baseLen * lenscales[i], false);
+                }
+            }
+
+            Tmp.v1.trns(b.rotation(), baseLen * 1.1f);
+            Drawf.light(b.x, b.y, b.x + Tmp.v1.x, b.y + Tmp.v1.y, lightStroke, lightColor, 0.7f);
+            Draw.reset();
+        }
+    }
+
+    /** ===== SingularityBulletType (PU_V8 singularity) - 黑洞子弹 =====
+     * ★完整移植 PU_V8 黑洞机制:
+     *  - 吸引锥形范围内敌方单位 (force + scaledForce)
+     *  - 范围内敌方建筑受持续伤害, 接近中心的建筑被瞬间摧毁
+     *  - 中心范围内的单位受到瞬间伤害
+     *  - 多层同心圆+旋转尖刺光球渲染 (shiningCircle 风格)
+     */
+    public static class SingularityBulletType extends BasicBulletType {
+        public float force = 8f, scaledForce = 5f;
+        public float tileDamage = 150f;
+        public float radius = 230f;
+        public float size = 5f;
+        public float[] scales = {8.6f, 7f, 5.5f, 4.2f, 3.9f};
+        public Color[] colors = new Color[]{Color.valueOf("4787ff80"), Pal.lancerLaser, Color.white, Pal.lancerLaser, Color.black};
+
+        public SingularityBulletType(float damage) {
+            super(0.001f, damage);
+            pierce = pierceBuilding = true;
+            hitEffect = Fx.none;
+            despawnEffect = Fx.blastExplosion;
+            hitSize = 19f;
+            lifetime = 3.5f * 60f;
+        }
+
+        @Override
+        public void update(Bullet b) {
+            super.update(b);
+            float interp = b.fin(arc.math.Interp.exp10Out);
+            Effect.shake(interp, interp, b);
+
+            // 锥形扫描敌方建筑
+            if (b.timer(1, 7f)) {
+                mindustry.entities.Units.nearbyEnemies(b.team, b.x - radius, b.y - radius, 2 * radius, 2 * radius, u -> {
+                    if (u != null && u.isValid() && Mathf.within(b.x, b.y, u.x, u.y, radius)) {
+                        // 中心瞬间伤害
+                        if (Mathf.within(b.x, b.y, u.x, u.y, (interp * size * 3.9f) + u.hitSize / 2f)) {
+                            u.damage(120f);
+                        }
+                        // 吸引力
+                        if (!u.dead) {
+                            Tmp.v1.trns(u.angleTo(b), force + ((1f - u.dst(b) / radius) * scaledForce * b.fin(arc.math.Interp.exp10Out) * (u.isFlying() ? 1.5f : 1f))).scl(20f * Time.delta);
+                            u.impulse(Tmp.v1);
+                        }
+                    }
+                });
+                // 建筑伤害
+                mindustry.gen.Groups.build.each(build -> {
+                    if (build.isValid() && build.team != b.team && Mathf.within(b.x, b.y, build.x, build.y, radius)) {
+                        float dst = Math.abs(1f - (Mathf.dst(b.x, b.y, build.x, build.y) / radius));
+                        if (build.health < tileDamage || Mathf.within(b.x, b.y, build.x, build.y, (interp * size * 3.9f) + build.block.size / 2f)) {
+                            build.kill();
+                        } else {
+                            build.damage(tileDamage * dst);
+                        }
+                    }
+                });
+            }
+        }
+
+        @Override
+        public void draw(Bullet b) {
+            float interp = b.fin(arc.math.Interp.exp10Out);
+            for (int i = 0; i < colors.length; i++) {
+                Draw.color(colors[i]);
+                if (i != 0) {
+                    // 旋转尖刺三角形光球 (5个三角形按角度分布)
+                    int spikeCount = 6;
+                    float baseAngle = Time.time * 1.5f - i * 30f;
+                    float radius0 = interp * size * scales[i];
+                    float spikeLen = radius0 * 1.4f;
+                    for (int s = 0; s < spikeCount; s++) {
+                        float ang = baseAngle + s * (360f / spikeCount);
+                        Tmp.v1.trns(ang, spikeLen).add(b);
+                        Tmp.v2.trns(ang + 30f, radius0 * 0.5f).add(b);
+                        Tmp.v3.trns(ang - 30f, radius0 * 0.5f).add(b);
+                        Fill.tri(b.x, b.y, Tmp.v2.x, Tmp.v2.y, Tmp.v3.x, Tmp.v3.y);
+                        Fill.tri(Tmp.v1.x, Tmp.v1.y, Tmp.v2.x, Tmp.v2.y, Tmp.v3.x, Tmp.v3.y);
+                    }
+                    // 中心圆
+                    Fill.circle(b.x + Mathf.range(0.5f), b.y + Mathf.range(0.5f), radius0 * 0.6f);
+                } else {
+                    Fill.circle(b.x + Mathf.range(0.5f), b.y + Mathf.range(0.5f), interp * size * scales[i]);
+                }
+            }
+            Draw.color();
         }
     }
 }
