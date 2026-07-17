@@ -12,6 +12,7 @@ import arc.util.*;
 import arc.util.io.*;
 import mindustry.content.*;
 import mindustry.entities.*;
+import mindustry.entities.bullet.*;
 import mindustry.game.*;
 import mindustry.gen.*;
 import mindustry.graphics.*;
@@ -346,6 +347,50 @@ public class ExpTurret extends Turret {
             super.drawLight();
         }
 
+        /** v158 无 effects() 方法 (PU_V8 v159 有), 射击特效颜色通过覆写 bullet() 实现 */
+        @Override
+        protected void bullet(BulletType type, float xOffset, float yOffset, float angleOffset, Mover mover){
+            queuedBullets--;
+            if(dead || (!consumeAmmoOnce && !hasAmmo())) return;
+
+            float
+            xSpread = Mathf.range(xRand),
+            bulletX = x + Angles.trnsx(rotation - 90, shootX + xOffset + xSpread, shootY + yOffset),
+            bulletY = y + Angles.trnsy(rotation - 90, shootX + xOffset + xSpread, shootY + yOffset),
+            shootAngle = rotation + angleOffset + Mathf.range(inaccuracy + type.inaccuracy);
+
+            float lifeScl = type.scaleLife ? Mathf.clamp((1 + scaleLifetimeOffset) * Mathf.dst(bulletX, bulletY, targetPos.x, targetPos.y) / type.range, minRange() / type.range, range() / type.range) : 1f;
+
+            handleBullet(type.create(this, team, bulletX, bulletY, shootAngle, -1f, (1f - velocityRnd) + Mathf.random(velocityRnd), lifeScl, null, mover, targetPos.x, targetPos.y), xOffset, yOffset, shootAngle - rotation);
+
+            // PU_V8: 使用 effectColor() 替代 type.hitColor, 让特效随等级变色
+            Color effectc = effectColor();
+            (shootEffect == null ? type.shootEffect : shootEffect).at(bulletX, bulletY, rotation + angleOffset, effectc);
+            (smokeEffect == null ? type.smokeEffect : smokeEffect).at(bulletX, bulletY, rotation + angleOffset, effectc);
+            (type.shootSound != Sounds.none ? type.shootSound : shootSound).at(bulletX, bulletY, Mathf.random(soundPitchMin, soundPitchMax), shootSoundVolume);
+
+            ammoUseEffect.at(
+                x - Angles.trnsx(rotation, ammoEjectBack),
+                y - Angles.trnsy(rotation, ammoEjectBack),
+                rotation * Mathf.sign(xOffset)
+            );
+
+            if(shake > 0){
+                Effect.shake(shake, shake, this);
+            }
+
+            curRecoil = 1f;
+            if(recoils > 0){
+                curRecoils[barrelCounter % recoils] = 1f;
+            }
+            heat = 1f;
+            totalShots++;
+
+            if(!consumeAmmoOnce){
+                useAmmo();
+            }
+        }
+
         @Override
         public void drawSelect(){
             Drawf.dashCircle(x, y, rangeField == null ? range : rangeField.fromLevel(level()), team.color);
@@ -389,6 +434,7 @@ public class ExpTurret extends Turret {
         @Override
         public void killed(){
             ExpOrbs.spreadExp(x, y, exp * 0.3f, 3f * size);
+            super.killed();
         }
 
         @Override

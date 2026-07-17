@@ -1,0 +1,18 @@
+# Triangular prism for prism turret (zzw mod)
+# 3-sided prism, height along Y axis, triangle in XZ plane
+# No normals/UVs - flat shaded with lightColor (like cube.obj)
+o Prism
+v 0.800000 -1.000000 0.000000
+v -0.400000 -1.000000 0.692820
+v -0.400000 -1.000000 -0.692820
+v 0.800000 1.000000 0.000000
+v -0.400000 1.000000 0.692820
+v -0.400000 1.000000 -0.692820
+# bottom face (triangle)
+f 3 2 1
+# top face (triangle)
+f 4 5 6
+# side faces (quads)
+f 1 4 5 2
+f 2 5 6 3
+f 3 6 4 1

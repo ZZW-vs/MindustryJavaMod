@@ -8,19 +8,20 @@ import arc.math.Mathf;
 import arc.util.Time;
 import arc.util.io.Reads;
 import arc.util.io.Writes;
-import mindustry.content.Fx;
 import mindustry.entities.Effect;
 import mindustry.entities.bullet.BulletType;
 import mindustry.gen.Bullet;
 import mindustry.gen.Building;
 import mindustry.world.blocks.defense.turrets.PowerTurret;
+import mindustry.world.blocks.defense.turrets.Turret.TurretBuild;
 import mindustry.world.draw.DrawTurret;
+import zzw.content.units.effects.ChargeEffect;
 
 /**
- * PU_V8 EndLaserTurret 移植版 (tenmeikiri) - v158 适配
+ * PU_V8 EndLaserTurret 移植版 (tenmeikiri) - v158/v155.4 适配
  *
- * 完全按原版复制: 主底座用通用 create-block-{size}, tenmeikiri-base 作为炮台底座,
- * tenmeikiri.png 作为旋转炮塔, 7 层灯光叠加渲染.
+ * 完全按原版复制: 主底座用 tenmeikiri-base, tenmeikiri.png 作为旋转炮塔,
+ * tenmeikiri-base-outline 作为叠加层, 7 层灯光叠加渲染.
  *
  * 机制:
  * - 充能后发射持续激光 (chargeTime, chargeEffects, chargeMaxDelay)
@@ -30,11 +31,14 @@ import mindustry.world.draw.DrawTurret;
  * - lastHealth 追踪: 防止外部代码修改 health
  * - 7 层灯光贴图叠加 (加法混合 + 颜色循环), alpha 随 power.status 渐变
  *
- * v158 适配:
- * - 用 DrawTurret 子类作为 drawer, super.draw() 画 base + turret + heat, 再画 7 层灯光
+ * v155.4 适配:
+ * - 用 DrawTurret 子类作为 drawer, super.draw() 画 base + turret + heat
+ * - 再画 tenmeikiri-base-outline 叠加层 (在 recoilOffset 位置, drawrot 旋转)
+ * - 再画 7 层灯光 (在 recoilOffset 位置, 加法混合)
  * - canConsume() 替代 consValid()
- * - 自定义 chargeTime/chargeEffects/chargeMaxDelay/shootLength 字段
+ * - curRecoil = 1f 替代 recoil = recoilAmount (v155.4 curRecoil 是 0~1 计数器)
  * - charging 用 isCharging 标志替代
+ * - Drawf.light 无 Team 参数版本
  *
  * 参考: PU_V8 main/src/unity/world/blocks/defense/turrets/EndLaserTurret.java
  */
@@ -42,29 +46,40 @@ public class EndLaserTurret extends PowerTurret {
     public float minDamage = 170f, minDamageTaken = 600f;
     public float resistScl = 0.25f;
     public TextureRegion[] lightRegions;
+    public TextureRegion baseOutline;
 
-    // 自定义充能参数 (v158 PowerTurret 无这些字段)
+    // 自定义充能参数 (v155.4 PowerTurret 无这些字段)
     public float shootLength = 8f;
     public float chargeTime = 0f;
     public int chargeEffects = 0;
     public float chargeMaxDelay = 0f;
-    public float recoilAmount = 1f;
-    // 充能特效 (v158 Turret 无这些字段, 默认用 lancerLaser 系列替代 PU_V8 ChargeFx)
-    public Effect chargeBeginEffect = Fx.lancerLaserChargeBegin;
-    public Effect chargeEffect = Fx.lancerLaserCharge;
+    // 充能特效 (默认使用 PU_V8 tenmeikiri 专用特效)
+    public Effect chargeBeginEffect = ChargeEffect.tenmeikiriChargeBegin;
+    public Effect chargeEffect = ChargeEffect.tenmeikiriChargeEffect;
 
     protected static float turretRotation = 0f;
 
     public EndLaserTurret(String name) {
         super(name);
-        // drawer: 继承 DrawTurret, super.draw() 画 base + turret + heat, 再画 7 层灯光
-        // 原版用 lambda 覆写只画 outline + lights, v158 中需自己画 base + turret
+        // drawer: 继承 DrawTurret, super.draw() 画 base + turret + heat,
+        // 再画 tenmeikiri-base-outline 叠加层 + 7 层灯光
         drawer = new DrawTurret() {
             @Override
             public void draw(Building build) {
-                // 1. 画 base (create-block-{size}) + turret (tenmeikiri.png) + heat
+                // 1. 画 base (tenmeikiri-base) + turret (tenmeikiri.png) + heat
                 super.draw(build);
-                // 2. 画 7 层灯光 (加法混合 + 颜色循环)
+
+                TurretBuild tb = (TurretBuild) build;
+                float ox = build.x + tb.recoilOffset.x;
+                float oy = build.y + tb.recoilOffset.y;
+                float rot = tb.drawrot();
+
+                // 2. 画 tenmeikiri-base-outline 叠加层 (关键修复: 之前缺失此层)
+                if (baseOutline != null && baseOutline.found()) {
+                    Draw.rect(baseOutline, ox, oy, rot);
+                }
+
+                // 3. 画 7 层灯光 (加法混合 + 颜色循环)
                 if (lightRegions == null || lightRegions.length == 0) return;
                 float alpha = build instanceof EndLaserTurretBuild ? ((EndLaserTurretBuild) build).lightsAlpha : 0f;
                 if (alpha <= 0.001f) return;
@@ -73,11 +88,12 @@ public class EndLaserTurret extends PowerTurret {
                     TextureRegion r = lightRegions[i];
                     if (r == null || !r.found()) continue;
                     float offset = Time.time + ((360f / lightRegions.length) * i);
+                    // PU_V8 原版颜色: 90f * Mathf.radDeg 作为蓝通道相位偏移
                     Draw.color(1f,
                         Mathf.absin(offset, 5f, 0.5f) + 0.5f,
-                        Mathf.absin(offset + 90f, 5f, 0.5f) + 0.5f,
+                        Mathf.absin(offset + (90f * Mathf.radDeg), 5f, 0.5f) + 0.5f,
                         alpha);
-                    Draw.rect(r, build.x, build.y, build.drawrot());
+                    Draw.rect(r, ox, oy, rot);
                 }
                 Draw.blend();
                 Draw.color();
@@ -95,6 +111,8 @@ public class EndLaserTurret extends PowerTurret {
         for (int i = 0; i < 7; i++) {
             lightRegions[i] = arc.Core.atlas.find(name + "-lights-" + i);
         }
+        // 加载底座叠加层 (tenmeikiri-base-outline)
+        baseOutline = arc.Core.atlas.find(name + "-base-outline");
     }
 
     public class EndLaserTurretBuild extends PowerTurretBuild {
@@ -105,7 +123,7 @@ public class EndLaserTurret extends PowerTurret {
         boolean isCharging = false;
         Bullet bullet;
         private float invFrame = 0f;
-        // 自定义 Vec2 (v158 TurretBuild 无 tr 字段)
+        // 自定义 Vec2 (v155.4 TurretBuild 无 tr 字段)
         private final arc.math.geom.Vec2 tr = new arc.math.geom.Vec2();
 
         @Override
@@ -132,11 +150,13 @@ public class EndLaserTurret extends PowerTurret {
                 Time.run(chargeTime, () -> {
                     if (!isValid()) return;
                     tr.trns(rotation, shootLength);
-                    curRecoil = recoilAmount;
+                    // v155.4: curRecoil 是 0~1 计数器, 设为 1f 触发后坐力
+                    // 视觉后坐距离由 Turret.recoil 字段控制 (Z_AdvTurrets 中设置)
+                    curRecoil = 1f;
                     heat = 1f;
                     // 直接创建子弹并跟踪
                     bullet = type.create(this, team, x + tr.x, y + tr.y, rotation + Mathf.range(inaccuracy));
-                    // 手动触发发射特效 (v158 无 effects() 方法)
+                    // 手动触发发射特效 (v155.4 无 effects() 方法)
                     (shootEffect == null ? type.shootEffect : shootEffect).at(x + tr.x, y + tr.y, rotation, type.hitColor);
                     (smokeEffect == null ? type.smokeEffect : smokeEffect).at(x + tr.x, y + tr.y, rotation, type.hitColor);
                     (type.shootSound != mindustry.gen.Sounds.none ? type.shootSound : shootSound)
@@ -168,7 +188,7 @@ public class EndLaserTurret extends PowerTurret {
                 bullet.rotation(rotation);
                 bullet.set(x + tr.x, y + tr.y);
                 heat = 1f;
-                curRecoil = recoilAmount;
+                curRecoil = 1f;
                 if (bullet.time >= bullet.lifetime || bullet.owner != this) bullet = null;
             } else {
                 rotate = true;

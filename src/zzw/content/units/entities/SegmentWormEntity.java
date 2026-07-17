@@ -420,15 +420,6 @@ public class SegmentWormEntity extends UnitEntity {
             vel.setZero();
         }
 
-        // ★ 每秒回血 (仅服务端)
-        if (!Vars.net.client() && type != null && health < maxHealth) {
-            SegmentConfig cfg = configs.get(type.name);
-            if (cfg != null && cfg.healPerSecond > 0f) {
-                float healAmount = cfg.healPerSecond / 60f * Time.delta;
-                heal(healAmount);
-            }
-        }
-
         // ★ 大招期间减速 2: super.update() 后再次减速 vel + 减速旋转
         // speedMultiplier 在 super.update() 中由 StatusComp 重置为 1f, 所以这里设置才有效
         // PU132 原版: speedMultiplier *= 0.075f, 影响 rotateMove 中的旋转速度

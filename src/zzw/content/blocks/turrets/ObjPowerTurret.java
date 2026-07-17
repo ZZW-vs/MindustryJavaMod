@@ -46,10 +46,11 @@ public class ObjPowerTurret extends PowerTurret {
         public void updateTile() {
             super.updateTile();
             if (Float.isNaN(time)) time = 0f;
-            // 立方体旋转速度随 reload 进度变化 (reload 是当前计数器, block.reload 是最大值)
-            // 原 PU_V8 公式: efficiency() * (1f + ((reload * 2.5f) / reloadTime)) * Time.delta
-            // v155.4: efficiency() → efficiency (字段), reloadTime → block.reload
-            time += efficiency * (1f + ((reload * 2.5f) / reload)) * Time.delta;
+            // 立方体旋转速度随 reload 进度变化
+            // PU_V8: efficiency() * (1f + ((reload * 2.5f) / reloadTime)) * Time.delta
+            // v155.4: efficiency() → efficiency (字段), reloadTime → reload (Block 字段),
+            //         PU_V8 reload (Build 计数器) → reloadCounter
+            time += efficiency * (1f + ((reloadCounter * 2.5f) / reload)) * Time.delta;
             distortionTime = Math.max(0f, distortionTime - (Time.delta * 0.2f));
         }
 

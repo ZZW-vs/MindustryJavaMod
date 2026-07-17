@@ -24,51 +24,63 @@ import mindustry.gen.Entityc;
 import mindustry.gen.Groups;
 import mindustry.gen.Healthc;
 import mindustry.gen.Posc;
-import mindustry.gen.Sounds;
 import mindustry.gen.Unit;
 import mindustry.world.blocks.defense.turrets.PowerTurret;
+import mindustry.world.consumers.Consume;
+import mindustry.world.consumers.ConsumeItems;
 
 /**
- * PU_V8 EndGameTurret 移植版 (endgame) - v158 适配
+ * EndGameTurret 移植自 PU_V8 unity/world/blocks/defense/turrets/EndGameTurret.java
  *
- * 核心机制:
- * - 三层旋转环渲染 (ring1/ring2/ring3, 各自方向和速度)
- * - 16 个眼睛位置追踪射击 (8 外圈 + 8 内圈, 不同间隔)
- * - 威胁等级系统 (基于范围内敌方单位)
- * - 防作弊伤害系统 (resist 抗性, charge 充能)
- * - 反子弹系统 (拦截范围内高伤害子弹)
- * - 主射击 (范围摧毁所有敌方建筑和单位)
- * - 慢闪电 (持续随机闪电)
- * - 碰撞反弹 (受击反弹给范围外攻击者)
- *
- * 简化:
- * - 用 v158 原生 Lightning 替代 SlowLightningType
- * - 用简单 Effect 替代 UnityFx.endgameLaser / vapourizeTile / endgameVapourize / endGameShoot
- * - 移除 Unity.antiCheat 系统, 直接调用 entity.damage() + remove()
- * - 移除 ParentEffect, 用普通 Effect
- *
- * 参考: PU_V8 main/src/unity/world/blocks/defense/turrets/EndGameTurret.java
+ * v155.4 适配要点:
+ * - consValid() -> canConsume()
+ * - efficiency() 方法 -> efficiency 字段
+ * - reload / reloadTime -> reloadCounter / reload (Block.reload 是总时长, Build.reloadCounter 是当前计数器)
+ * - timers++ -> 整数常量 (v155.4 无 timers++ 字段)
+ * - AntiCheat.annihilateEntity -> entity.damage(Float.MAX_VALUE) + remove()
+ * - Unity.antiCheat.addBuilding/removeBuilding -> 忽略
+ * - UnityFx.endgameLaser/vapourizeTile/SpecialFx.endgameVapourize/ShootFx.endGameShoot -> 自定义 Effect
+ * - UnitySounds.endgameActive/Shoot/SmallShoot -> Z_Sounds
+ * - Utils.offsetSin -> Mathf.absin(Time.time + offset, period, 0.5f) + 0.5f
+ * - Utils.trueEachBlock -> Vars.indexer.eachBlock
+ * - Utils.nearbyEnemySorted -> Units.nearbyEnemies 收集后排序
+ * - Utils.getBulletDamage -> 递归累加 fragBullet 伤害 + splashDamage
+ * - SlowLightningType -> Lightning.create (紫色 bf92f9)
+ * - added (private) -> isAdded()
  */
 public class EndGameTurret extends PowerTurret {
-    private static final float[] RING_PROGRESSES = {0.013f, 0.035f, 0.024f};
-    private static final int[] RING_DIRECTIONS = {1, -1, 1};
-    private static final Seq<Entityc> ENTITY_SEQ = new Seq<>(512);
+    private static int shouldLaser = 0;
+    protected static float damageFull;
+    protected static float damageB;
+    protected static int totalFrags;
+    private static final float[] ringProgresses = {0.013f, 0.035f, 0.024f};
+    private static final int[] ringDirections = {1, -1, 1};
+    private static final Seq<Entityc> entitySeq = new Seq<>(512);
 
-    public TextureRegion baseRegion, baseLightsRegion, bottomLightsRegion, eyeMainRegion,
+    // v155.4 无 timers++ 字段, 用整数常量代替 PU_V8 的 timer id
+    protected static final int eyeTime = 0;
+    protected static final int bulletTime = 1;
+
+    // 慢闪电颜色 (原版 SlowLightningType red/black, 简化版用紫色 purpleLightning)
+    private static final Color slowLightningColor = Color.valueOf("bf92f9");
+
+    public TextureRegion
+        baseRegion, baseLightsRegion, bottomLightsRegion, eyeMainRegion,
         ringABottomRegion, ringAEyesRegion, ringARegion, ringALightsRegion,
         ringBBottomRegion, ringBEyesRegion, ringBRegion, ringBLightsRegion,
         ringCRegion, ringCLightsRegion;
 
-    // 简化版特效
+    // 简化等效特效: 替代 PU_V8 UnityFx.endgameLaser
     public static final Effect endgameLaserEffect = new Effect(22f, 400f, e -> {
         if (!(e.data instanceof Object[])) return;
         Object[] data = (Object[]) e.data;
         if (data.length < 3) return;
         Vec2 from = (Vec2) data[0];
         Object target = data[1];
-        float width = ((Float) data[2]);
+        float width = (Float) data[2];
         if (target instanceof Posc) {
             Posc p = (Posc) target;
+            // 红色渐变到白色激光束
             Draw.color(Color.valueOf("f53036"), Color.white, e.fout());
             Lines.stroke(width * 2f * e.fout());
             Lines.line(from.x, from.y, p.getX(), p.getY(), false);
@@ -77,8 +89,8 @@ public class EndGameTurret extends PowerTurret {
         }
     });
 
+    // 简化等效特效: 替代 PU_V8 SpecialFx.endgameVapourize
     public static final Effect endgameVapourizeEffect = new Effect(60f, 400f, e -> {
-        // 简化蒸发特效: 红色粒子环爆开
         Draw.color(Color.valueOf("f53036"), Color.valueOf("ff786e"), e.fin());
         Lines.stroke(2f * e.fout());
         Lines.circle(e.x, e.y, e.rotation + e.fin() * 60f);
@@ -91,8 +103,8 @@ public class EndGameTurret extends PowerTurret {
         }
     });
 
+    // 简化等效特效: 替代 PU_V8 ShootFx.endGameShoot
     public static final Effect endGameShootEffect = new Effect(80f, 800f, e -> {
-        // 主射击大型爆炸: 红色冲击波 + 中心闪光
         Draw.color(Color.valueOf("f53036"), Color.white, e.fin());
         Lines.stroke(8f * e.fout());
         Lines.circle(e.x, e.y, e.fin() * 400f);
@@ -109,6 +121,8 @@ public class EndGameTurret extends PowerTurret {
     public EndGameTurret(String name) {
         super(name);
         health = 68000;
+        // 原版 powerUse = 320f (v155.4 用 consumePower 替代)
+        consumePower(320f);
         reload = 430f;
         range = 820f;
         size = 14;
@@ -117,8 +131,6 @@ public class EndGameTurret extends PowerTurret {
         shake = 2.2f;
         outlineIcon = false;
         noUpdateDisabled = false;
-        // 原版 powerUse = 320f (v158 用 consumePower 替代 v7 powerUse 字段)
-        consumePower(320f);
         // loopSound / shootSound 由外部注册时设置
     }
 
@@ -145,7 +157,7 @@ public class EndGameTurret extends PowerTurret {
     }
 
     public class EndGameTurretBuild extends PowerTurretBuild {
-        protected float chargeValue = 0f;
+        protected float charge = 0f;
         protected float resist = 1f;
         protected float resistTime = 10f;
         protected float threatLevel = 1f;
@@ -166,19 +178,14 @@ public class EndGameTurret extends PowerTurret {
 
         protected Posc[] targets = new Posc[16];
 
-        public EndGameTurretBuild() {
-            for (int i = 0; i < 16; i++) {
-                eyesVecArray[i] = new Vec2();
-                targets[i] = null;
-            }
-        }
-
         @Override
         public void damage(float damage) {
             if (verify()) return;
-            if (damage > 10000) chargeValue += Mathf.clamp(damage - 10000f, 0f, 2000000f) / 150f;
-            if (chargeValue > 15) chargeValue = 15f;
+            // 防作弊: 大伤害累积 charge (受击 > 10000 时累积, 最大 15)
+            if (damage > 10000) charge += Mathf.clamp(damage - 10000f, 0f, 2000000f) / 150f;
+            if (charge > 15) charge = 15f;
 
+            // 抗性: clamp damage/resist 到 410, 受击增加 resist
             float trueAmount = Mathf.clamp(damage / resist, 0f, 410f);
             super.damage(trueAmount);
 
@@ -189,50 +196,50 @@ public class EndGameTurret extends PowerTurret {
 
         @Override
         protected float baseReloadSpeed() {
-            return Mathf.clamp(efficiency + chargeValue, 0f, 1.2f);
+            return Mathf.clamp(efficiency + charge, 0f, 1.2f);
         }
 
         float trueEfficiency() {
-            return Mathf.clamp(efficiency + chargeValue);
-        }
-
-        /**
-         * 原版 consValid 逻辑: (电力 OR 蓄能) AND 物品
-         * 电力缺失时若被攻击累积了 chargeValue, 仍可发射 (但需有 terminum 弹药)
-         * v158 用 canConsume() 替代 v7 consValid()
-         */
-        @Override
-        public boolean canConsume() {
-            boolean valid = false;
-            if (power != null) {
-                valid = power.status > 0.0001f;
-            }
-            valid |= chargeValue > 0.001f;
-            // 检查物品消耗 (terminum)
-            if (items == null) return false;
-            for (var cons : block.consumers) {
-                if (cons instanceof mindustry.world.consumers.ConsumeItems ci && !ci.booster) {
-                    if (!items.has(ci.items, 1f)) return false;
-                }
-            }
-            return valid;
+            return Mathf.clamp(efficiency + charge);
         }
 
         float deltaB() {
             return delta() * baseReloadSpeed();
         }
 
+        /**
+         * 原版 consValid() 逻辑: (电力 OR 蓄能) AND 物品
+         * 电力缺失时若被攻击累积了 charge, 仍可发射 (但需有 terminum 弹药)
+         * v155.4 用 canConsume() 替代 v7 consValid()
+         */
+        @Override
+        public boolean canConsume() {
+            boolean valid = false;
+            // 电力检查 (原版 block.consumes.getPower().valid(this))
+            if (power != null) {
+                valid = power.status > 0.0001f;
+            }
+            // 蓄能检查 (charge > 0.001 时也认为有效)
+            valid |= charge > 0.001f;
+            // 物品检查 (terminum): AND 逻辑
+            Consume itemCons = block.findConsumer(c -> c instanceof ConsumeItems && !c.booster);
+            if (itemCons != null) {
+                valid &= itemCons.efficiency(self()) > 0f;
+            }
+            return valid;
+        }
+
         @Override
         public void read(Reads read, byte revision) {
             super.read(read, revision);
-            chargeValue = read.f();
+            charge = read.f();
             resist = read.f();
         }
 
         @Override
         public void write(Writes write) {
             super.write(write);
-            write.f(chargeValue);
+            write.f(charge);
             write.f(resist);
         }
 
@@ -242,21 +249,21 @@ public class EndGameTurret extends PowerTurret {
             Draw.rect(baseRegion, x, y);
 
             Draw.z(oz + 0.01f);
-            if (ringABottomRegion.found()) Draw.rect(ringABottomRegion, x, y, ringProgress[0]);
-            if (ringBBottomRegion.found()) Draw.rect(ringBBottomRegion, x, y, ringProgress[1]);
+            Draw.rect(ringABottomRegion, x, y, ringProgress[0]);
+            Draw.rect(ringBBottomRegion, x, y, ringProgress[1]);
 
             Draw.z(oz + 0.02f);
-            if (ringARegion.found()) mindustry.graphics.Drawf.spinSprite(ringARegion, x, y, ringProgress[0]);
-            if (ringBRegion.found()) mindustry.graphics.Drawf.spinSprite(ringBRegion, x, y, ringProgress[1]);
-            if (ringCRegion.found()) mindustry.graphics.Drawf.spinSprite(ringCRegion, x, y, ringProgress[2]);
+            mindustry.graphics.Drawf.spinSprite(ringARegion, x, y, ringProgress[0]);
+            mindustry.graphics.Drawf.spinSprite(ringBRegion, x, y, ringProgress[1]);
+            mindustry.graphics.Drawf.spinSprite(ringCRegion, x, y, ringProgress[2]);
 
             Draw.blend(Blending.additive);
 
             Draw.z(oz + 0.005f);
             Draw.color(1f, offsetSin(0f, 5f), offsetSin(90f, 5f), eyesAlpha);
-            if (bottomLightsRegion.found()) Draw.rect(bottomLightsRegion, x, y);
+            Draw.rect(bottomLightsRegion, x, y);
             Draw.color(1f, offsetSin(0f, 5f), offsetSin(90f, 5f), lightsAlpha * offsetSin(0f, 12f));
-            if (baseLightsRegion.found()) Draw.rect(baseLightsRegion, x, y);
+            Draw.rect(baseLightsRegion, x, y);
 
             TextureRegion[] regions = {ringAEyesRegion, ringBEyesRegion, eyeMainRegion};
             TextureRegion[] regionsB = {ringALightsRegion, ringBLightsRegion, ringCLightsRegion};
@@ -266,13 +273,11 @@ public class EndGameTurret extends PowerTurret {
                 int h = i + 1;
                 Draw.z(oz + 0.015f);
                 Draw.color(1f, offsetSin(10f * h, 5f), offsetSin(90f + (10f * h), 5f), eyesAlpha);
-                if (regions[i].found()) {
-                    Draw.rect(regions[i], x + (eyeOffset.x * trnsScl[i]), y + (eyeOffset.y * trnsScl[i]), ringProgress[i]);
-                }
+                Draw.rect(regions[i], x + (eyeOffset.x * trnsScl[i]), y + (eyeOffset.y * trnsScl[i]), ringProgress[i]);
 
                 Draw.z(oz + 0.025f);
                 Draw.color(1f, offsetSin(10f * h, 5f), offsetSin(90f + (10f * h), 5f), lightsAlpha * offsetSin(5 * h, 12f));
-                if (regionsB[i].found()) Draw.rect(regionsB[i], x, y, ringProgress[i]);
+                Draw.rect(regionsB[i], x, y, ringProgress[i]);
             }
 
             Draw.blend();
@@ -286,49 +291,61 @@ public class EndGameTurret extends PowerTurret {
         }
 
         void killUnits() {
-            ENTITY_SEQ.clear();
+            entitySeq.clear();
             mindustry.entities.Units.nearbyEnemies(team, x - range, y - range, range * 2f, range * 2f, e -> {
                 if (Mathf.within(x, y, e.x, e.y, range) && !e.dead) {
                     Object[] data = {new Vec2(x + eyeOffset.x, y + eyeOffset.y), e, 1f};
                     endgameLaserEffect.at(x, y, 0f, data);
-                    ENTITY_SEQ.add(e);
+                    entitySeq.add(e);
                 }
             });
-            for (Entityc e : ENTITY_SEQ) {
+            for (Entityc e : entitySeq) {
                 if (e instanceof Unit) {
                     Unit u = (Unit) e;
+                    // v155.4 无 AntiCheat.annihilateEntity, 用 damage(MAX) + remove() 替代
                     u.damage(Float.MAX_VALUE);
                     endgameVapourizeEffect.at(u.x, u.y, angleTo(u));
+                    u.remove();
                 }
             }
-            ENTITY_SEQ.clear();
+            entitySeq.clear();
         }
 
         void killTiles() {
-            ENTITY_SEQ.clear();
+            entitySeq.clear();
+            damageB = 0f;
+            shouldLaser = 0;
+            // v155.4: Utils.trueEachBlock -> Vars.indexer.eachBlock
             Vars.indexer.eachBlock(null, x, y, range + 5f,
                 build -> build.team != team && !build.dead && build != this,
                 build -> {
                     if (build.block.size >= 3) {
-                        // 简化: 不渲染 vapourizeTile 特效, 仅用 endgameVapourizeEffect
+                        // 简化: 用 endgameVapourizeEffect 替代 UnityFx.vapourizeTile
                         endgameVapourizeEffect.at(build.x, build.y, build.block.size);
                     }
-                    Object[] data = {new Vec2(x + (eyeOffset.x * 2f), y + (eyeOffset.y * 2f)), build, 1f};
-                    endgameLaserEffect.at(x, y, 0f, data);
-                    ENTITY_SEQ.add(build);
+                    if ((shouldLaser % 5) == 0 || build.block.size >= 5) {
+                        Object[] data = {new Vec2(x + (eyeOffset.x * 2f), y + (eyeOffset.y * 2f)), build, 1f};
+                        endgameLaserEffect.at(x, y, 0f, data);
+                    }
+                    entitySeq.add(build);
+                    shouldLaser++;
                 });
-            for (Entityc e : ENTITY_SEQ) {
+            for (Entityc e : entitySeq) {
+                damageB = Math.max(((Posc) e).dst2(this), damageB);
                 if (e instanceof Building) {
                     Building b = (Building) e;
                     b.damage(Float.MAX_VALUE);
+                    b.remove();
                 }
             }
-            endGameShootEffect.at(x, y, 0f);
-            ENTITY_SEQ.clear();
+            damageB = Mathf.sqrt(damageB) * 2f;
+            endGameShootEffect.at(x, y, damageB);
+            entitySeq.clear();
         }
 
         @Override
         public void kill() {
+            // 防作弊: lastHealth < 10 才真正死亡
             if (lastHealth < 10f) super.kill();
         }
 
@@ -354,21 +371,24 @@ public class EndGameTurret extends PowerTurret {
                     e.damage(490f * threatLevel);
                     if (e.dead) {
                         endgameVapourizeEffect.at(e.x, e.y, angleTo(e));
+                        e.remove();
                     }
                     Object[] data = {new Vec2(ux, uy), e, 0.525f};
                     endgameLaserEffect.at(x, y, 0f, data);
                 }
             });
 
-            Vec2 eyePos = eyesVecArray[index];
-            Object[] dataB = {eyePos, new Vec2(ux, uy), 0.625f};
-            endgameLaserEffect.at((eyePos.x + ux) / 2f, (eyePos.y + uy) / 2f, 0f, dataB);
+            Tmp.v1.set(eyesVecArray[index]);
+            Tmp.v1.add(ux, uy);
+            Tmp.v1.scl(0.5f);
+
+            Object[] dataB = {eyesVecArray[index], new Vec2(ux, uy), 0.625f};
+            endgameLaserEffect.at(Tmp.v1.x, Tmp.v1.y, 0f, dataB);
         }
 
         void eyeShoot(int index) {
-            Posc target = targets[index];
-            if (target != null && target instanceof Healthc) {
-                Healthc e = (Healthc) target;
+            Healthc e = (Healthc) targets[index];
+            if (e != null) {
                 e.damage(350f * threatLevel);
                 if (e.dead()) {
                     if (e instanceof Unit) {
@@ -378,6 +398,7 @@ public class EndGameTurret extends PowerTurret {
                         Building build = (Building) e;
                         endgameVapourizeEffect.at(build.x, build.y, build.block.size);
                     }
+                    if (e instanceof Entityc) ((Entityc) e).remove();
                 }
                 Object[] data = {eyesVecArray[index], e, 0.625f};
                 endgameLaserEffect.at(x, y, 0f, data);
@@ -404,13 +425,12 @@ public class EndGameTurret extends PowerTurret {
                 }
             }
             updateThreats();
-            if (timer.get(0, 15) && target != null && !isControlled()) {
-                // 简化: 取最近 8 个敌方目标
+            if (timer.get(eyeTime, 15) && target != null && !isControlled()) {
+                // v155.4 无 Utils.nearbyEnemySorted, 自己实现: 收集后按距离排序
                 Seq<Healthc> nTargets = new Seq<>();
                 mindustry.entities.Units.nearbyEnemies(team, x, y, range, e -> {
                     if (!e.dead) nTargets.add(e);
                 });
-                // 按距离排序
                 nTargets.sort(h -> h instanceof Posc ? ((Posc) h).dst2(this) : Float.MAX_VALUE);
                 if (!nTargets.isEmpty()) {
                     int max = Math.min(nTargets.size, 8);
@@ -425,8 +445,10 @@ public class EndGameTurret extends PowerTurret {
             for (int i = 0; i < 16; i++) {
                 float angleC = ((360f / 8f) * (i % 8f));
                 if (i >= 8) {
+                    // 内圈 8 个眼睛 (跟随 ring2 旋转)
                     Tmp.v1.trns(angleC + 22.5f + ringProgress[1], 25.75f);
                 } else {
+                    // 外圈 8 个眼睛 (跟随 ring1 旋转)
                     Tmp.v1.trns(angleC + ringProgress[0], 36.75f);
                 }
                 eyesVecArray[i].set(Tmp.v1.x, Tmp.v1.y).add(x, y);
@@ -434,33 +456,62 @@ public class EndGameTurret extends PowerTurret {
         }
 
         void updateAntiBullets() {
-            if (trueEfficiency() > 0.0001f && timer.get(1, 4f / Math.max(trueEfficiency(), 0.001f))) {
-                ENTITY_SEQ.clear();
+            entitySeq.clear();
+            // 反子弹: 拦截范围内高伤害子弹
+            if (trueEfficiency() > 0.0001f && timer.get(bulletTime, 4f / Math.max(trueEfficiency(), 0.001f))) {
+                damageFull = 0f;
+                // 第一遍: 累加所有敌方子弹伤害
                 Groups.bullet.intersect(x - range, y - range, range * 2f, range * 2f, b -> {
                     if (within(b, range) && b.team != team) {
-                        float bulletDamage = getBulletDamage(b.type);
-                        boolean shouldRemove = bulletDamage > 1600f
-                            || b.type.splashDamageRadius > 120f
-                            || (b.owner != null && !within((Posc) b.owner, range));
-                        if (shouldRemove) {
-                            ENTITY_SEQ.add(b);
-                            Object[] data = {
-                                new Vec2(x + (eyeOffset.x * 2f), y + (eyeOffset.y * 2f)),
-                                new Vec2(b.x, b.y),
-                                0.625f
-                            };
+                        damageFull += getBulletDamage(b.type);
+                        BulletType current = b.type;
+                        totalFrags = 1;
+
+                        for (int i = 0; i < 16; i++) {
+                            if (current.fragBullet == null) break;
+                            BulletType frag = current.fragBullet;
+                            totalFrags *= current.fragBullets;
+                            damageFull += getBulletDamage(frag) * totalFrags;
+                            current = frag;
+                        }
+                    }
+                });
+                // 第二遍: 标记需移除的子弹 (满足任一条件)
+                Groups.bullet.intersect(x - range, y - range, range * 2f, range * 2f, b -> {
+                    if (within(b, range) && b.team != team) {
+                        damageB = getBulletDamage(b.type);
+                        BulletType current = b.type;
+                        totalFrags = 1;
+                        for (int i = 0; i < 16; i++) {
+                            if (current.fragBullet == null) break;
+                            BulletType frag = current.fragBullet;
+                            totalFrags *= current.fragBullets;
+                            damageB += getBulletDamage(frag) * totalFrags;
+                            current = frag;
+                        }
+                        if (damageB > 1600f || b.type.splashDamageRadius > 120f
+                            || damageFull + damageB > 13000f
+                            || (b.owner != null && !within((Posc) b.owner, range))) {
+                            entitySeq.add(b);
+                            Object[] data = {new Vec2(x + (eyeOffset.x * 2f), y + (eyeOffset.y * 2f)),
+                                new Vec2(b.x, b.y), 0.625f};
                             endgameLaserEffect.at(x, y, 0f, data);
                         }
                     }
                 });
-                for (Entityc e : ENTITY_SEQ) {
-                    if (e instanceof Bullet) ((Bullet) e).remove();
+                if (!entitySeq.isEmpty()) {
+                    // v155.4 用 Sounds 或 Z_Sounds 替代 UnitySounds.endgameSmallShoot
+                    shootSound.at(x, y);
                 }
-                ENTITY_SEQ.clear();
+                for (Entityc e : entitySeq) {
+                    e.remove();
+                }
+                entitySeq.clear();
             }
         }
 
         boolean verify() {
+            // 防作弊: 检测 health 异常 (突然下降超过 860 或 NaN)
             return (health < lastHealth - 860f) || Float.isNaN(health);
         }
 
@@ -469,7 +520,8 @@ public class EndGameTurret extends PowerTurret {
             eyeOffsetB.lerpDelta(eyeTargetOffset, 0.12f);
 
             eyeOffset.set(eyeOffsetB);
-            eyeOffset.add(Mathf.range(reload / reload) / 2, Mathf.range(reload / reload) / 2);
+            // 关键: reloadCounter / reload (0-1 之间的进度), 不是 reload / reload
+            eyeOffset.add(Mathf.range(reloadCounter / reload) / 2, Mathf.range(reloadCounter / reload) / 2);
             eyeOffset.limit(2);
 
             boolean hasTarget = ((target != null && !isControlled()) || (isControlled() && unit.isShooting()));
@@ -482,6 +534,7 @@ public class EndGameTurret extends PowerTurret {
                 updateEyesTargeting();
             }
 
+            // 外圈眼睛 (间隔 15tick)
             if (eyeReloads[0] >= 15f) {
                 eyeReloads[0] = 0f;
                 if (!isControlled()) {
@@ -491,6 +544,7 @@ public class EndGameTurret extends PowerTurret {
                 }
                 eyeSequenceA = (eyeSequenceA + 1) % 8;
             }
+            // 内圈眼睛 (间隔 5tick)
             if (eyeReloads[1] >= 5f) {
                 eyeReloads[1] = 0f;
                 if (!isControlled()) {
@@ -506,8 +560,10 @@ public class EndGameTurret extends PowerTurret {
         public void updateTile() {
             enabled = true;
             lastHealth = health;
-            chargeValue = Math.max(0f, chargeValue - (Time.delta / 20f));
+            // charge 衰减
+            charge = Math.max(0f, charge - (Time.delta / 20f));
 
+            // resist 衰减 (15tick 后开始衰减)
             if (resistTime >= 15) {
                 resist = Math.max(1f, resist - Time.delta);
             } else {
@@ -516,6 +572,7 @@ public class EndGameTurret extends PowerTurret {
 
             updateEyes();
 
+            // 眼睛透明度 (有 trueEfficiency 时渐显)
             if (trueEfficiency() > 0.0001f) {
                 float value = eyesAlpha > trueEfficiency() ? 1f : trueEfficiency();
                 eyesAlpha = Mathf.lerpDelta(eyesAlpha, trueEfficiency(), 0.06f * value);
@@ -523,11 +580,13 @@ public class EndGameTurret extends PowerTurret {
                 eyesAlpha = Mathf.lerpDelta(eyesAlpha, 0f, 0.06f);
             }
 
+            // 主攻击 gate: 仅 canConsume (有电/蓄能 + 有 terminum) 时才更新 super
             if (canConsume()) {
                 updateAntiBullets();
                 super.updateTile();
             }
 
+            // 眼睛目标偏移计算
             if (isControlled()) {
                 mindustry.gen.Player con = (mindustry.gen.Player) unit.controller();
                 eyeTargetOffset.trns(angleTo(con.mouseX, con.mouseY), dst(con.mouseX, con.mouseY) / (range / 3f));
@@ -543,24 +602,30 @@ public class EndGameTurret extends PowerTurret {
                 float value = lightsAlpha > trueEfficiency() ? 1f : trueEfficiency();
                 lightsAlpha = Mathf.lerpDelta(lightsAlpha, trueEfficiency(), 0.07f * value);
 
+                // 三层环旋转
                 for (int i = 0; i < 3; i++) {
-                    ringProgress[i] = Mathf.lerpDelta(ringProgress[i], 360f * RING_DIRECTIONS[i], RING_PROGRESSES[i] * trueEfficiency());
+                    ringProgress[i] = Mathf.lerpDelta(ringProgress[i], 360f * ringDirections[i],
+                        ringProgresses[i] * trueEfficiency());
                 }
 
-                // 慢闪电
-                float chance = (((reload / reload) * 0.90f) + (1f - 0.90f)) * trueEfficiency();
+                // 慢闪电: 关键 reloadCounter / reload (不是 reload / reload)
+                float chance = (((reloadCounter / reload) * 0.90f) + (1f - 0.90f)) * trueEfficiency();
                 float randomAngle = Mathf.random(360f);
-                Tmp.v1.trns(randomAngle, 18.5f).add(x, y);
+                // 慢闪电发射位置: 炮台中心 + 18.5f 半径随机偏移 (不是从炮台中心)
+                Tmp.v1.trns(randomAngle, 18.5f);
+                Tmp.v1.add(x, y);
 
                 if (Mathf.chanceDelta(0.75f * chance)) {
-                    Lightning.create(team, Color.valueOf("f53036"), 520f * trueEfficiency(),
+                    // v155.4 简化版: Lightning.create 替代 SlowLightningType, 紫色 bf92f9
+                    Lightning.create(team, slowLightningColor, 520f * trueEfficiency(),
                         Tmp.v1.x, Tmp.v1.y, randomAngle, 25);
                 }
             } else {
                 if (eyeResetTime >= 60f) {
                     lightsAlpha = Mathf.lerpDelta(lightsAlpha, 0f, 0.07f);
                     for (int i = 0; i < 3; i++) {
-                        ringProgress[i] = Mathf.lerpDelta(ringProgress[i], 0f, RING_PROGRESSES[i] * trueEfficiency());
+                        ringProgress[i] = Mathf.lerpDelta(ringProgress[i], 0f,
+                            ringProgresses[i] * trueEfficiency());
                     }
                 } else {
                     eyeResetTime += Time.delta;
@@ -580,6 +645,7 @@ public class EndGameTurret extends PowerTurret {
 
         @Override
         public boolean collision(Bullet other) {
+            // 碰撞反弹: 范围外攻击者不受伤, 反弹给攻击者
             float amount = other.owner != null && !within((Posc) other.owner, range) ? 0f
                 : other.damage() * other.type.buildingDamageMultiplier;
             damage(amount);
@@ -592,7 +658,8 @@ public class EndGameTurret extends PowerTurret {
 
         @Override
         public void add() {
-            if (added) return;
+            // v155.4 用 isAdded() 替代 added 字段检查 (added 为 private)
+            if (isAdded()) return;
             for (int i = 0; i < 16; i++) {
                 eyesVecArray[i] = new Vec2();
                 targets[i] = null;
@@ -600,26 +667,23 @@ public class EndGameTurret extends PowerTurret {
             super.add();
         }
 
-        /** 简化版 offsetSin (PU132 Utils.offsetSin) */
+        @Override
+        public void remove() {
+            // v155.4 用 isAdded() 替代 added 字段检查
+            if (!isAdded()) return;
+            // v155.4 无 Unity.antiCheat, 直接 super.remove
+            super.remove();
+        }
+
+        /** 简化版 offsetSin (PU_V8 Utils.offsetSin) */
         private float offsetSin(float offset, float period) {
             return Mathf.absin(Time.time + offset, period, 0.5f) + 0.5f;
         }
 
-        /** 简化版 getBulletDamage (PU132 Utils.getBulletDamage) */
+        /** 简化版 getBulletDamage (PU_V8 Utils.getBulletDamage): 递归累加 fragBullet 伤害 + splashDamage */
         private float getBulletDamage(BulletType type) {
             if (type == null) return 0f;
             float dmg = type.damage;
-            // 递归累加 fragBullet 伤害
-            BulletType current = type;
-            int totalFrags = 1;
-            for (int i = 0; i < 16; i++) {
-                if (current.fragBullet == null) break;
-                BulletType frag = current.fragBullet;
-                totalFrags *= current.fragBullets;
-                dmg += frag.damage * totalFrags;
-                current = frag;
-            }
-            // 累加 splashDamage
             if (type.splashDamageRadius > 0) {
                 dmg += type.splashDamage;
             }

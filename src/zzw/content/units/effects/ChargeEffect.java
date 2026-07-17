@@ -4,10 +4,13 @@ import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
+import arc.math.Angles;
 import arc.math.Interp;
 import arc.math.Mathf;
+import arc.util.Time;
 import arc.util.Tmp;
 import mindustry.entities.Effect;
+import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
 
 /**
@@ -29,6 +32,42 @@ public class ChargeEffect {
     private static float slope(float fin, float bias) {
         return (fin < bias ? (fin / bias) : 1f - (fin - bias) / (1f - bias));
     }
+
+    /**
+     * Tenmeikiri 充能粒子特效 (40tick, 2个辐射线粒子)
+     * PU_V8 ChargeFx.tenmeikiriChargeEffect
+     * 颜色从 scarColor 渐变到 endColor, 线段随 fout 缩短
+     */
+    public static final Effect tenmeikiriChargeEffect = new Effect(40f, e -> {
+        // v155.4 Angles.randLenVectors 4 参数版本 (无 rotation 参数, 粒子全方向随机)
+        // PU_V8 原版 5 参数版本 (seed, amount, length, rotation=90f, cons) 在 v155.4 不存在
+        Angles.randLenVectors(e.id, 2, 10f, (x, y) -> {
+            float angle = Mathf.angle(x, y);
+            Draw.color(SCAR_COLOR, END_COLOR, e.fin());
+            Lines.stroke(1.5f);
+            Lines.lineAngleCenter(e.x + (x * e.fout()), e.y + (y * e.fout()), angle, e.fslope() * 13f);
+        });
+    }).followParent(true).rotWithParent(true);
+
+    /**
+     * Tenmeikiri 充能起始特效 (158tick, 3层三角形叠加)
+     * PU_V8 ChargeFx.tenmeikiriChargeBegin
+     * 宽度随时间增长 (clamp(time/80)), 3 层颜色 scarColor→endColor→white
+     */
+    public static final Effect tenmeikiriChargeBegin = new Effect(158f, e -> {
+        Color[] colors = {SCAR_COLOR, END_COLOR, Color.white};
+        for(int ii = 0; ii < 3; ii++){
+            float s = (3 - ii) / 3f;
+            float width = Mathf.clamp(e.time / 80f) * (20f + Mathf.absin(Time.time + (ii * 1.4f), 1.1f, 7f)) * s;
+            float length = e.fin() * (100f + Mathf.absin(Time.time + (ii * 1.4f), 1.1f, 11f)) * s;
+            Draw.color(colors[ii]);
+            for(int i : Mathf.signs){
+                float rotation = e.rotation + (i * 90f);
+                Drawf.tri(e.x, e.y, width, length * 0.5f, rotation);
+            }
+            Drawf.tri(e.x, e.y, width, length * 1.25f, e.rotation);
+        }
+    }).followParent(true).rotWithParent(true);
 
     /**
      * Devourer 充能特效 (41tick, 3层光环)

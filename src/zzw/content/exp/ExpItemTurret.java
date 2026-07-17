@@ -10,6 +10,7 @@ import mindustry.content.*;
 import mindustry.entities.bullet.*;
 import mindustry.game.*;
 import mindustry.gen.*;
+import mindustry.graphics.*;
 import mindustry.type.*;
 import mindustry.ui.*;
 import mindustry.world.consumers.*;
@@ -87,8 +88,8 @@ public class ExpItemTurret extends ExpTurret {
             super.onProximityAdded();
 
             //add first ammo item to cheaty blocks so they can shoot properly
-            if(!hasAmmo() && cheating() && ammoTypes.size > 0){
-                handleItem(this, ammoTypes.keys().next());
+            if(cheating() && ammo.size > 0){
+                handleItem(this, ammoTypes.entries().next().key);
             }
         }
 
@@ -97,6 +98,14 @@ public class ExpItemTurret extends ExpTurret {
             unit.ammo((float)unit.type().ammoCapacity * totalAmmo / maxAmmo);
 
             super.updateTile();
+        }
+
+        @Override
+        public void displayBars(Table bars){
+            super.displayBars(bars);
+
+            bars.add(new Bar("stat.ammo", Pal.ammo, () -> (float)totalAmmo / maxAmmo)).growX();
+            bars.row();
         }
 
         @Override

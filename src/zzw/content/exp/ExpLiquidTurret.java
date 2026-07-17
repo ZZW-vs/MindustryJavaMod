@@ -2,6 +2,7 @@ package zzw.content.exp;
 
 import arc.graphics.g2d.*;
 import arc.math.Angles;
+import arc.math.Mathf;
 import arc.struct.*;
 import mindustry.content.*;
 import mindustry.core.*;
@@ -30,6 +31,8 @@ public class ExpLiquidTurret extends ExpTurret {
 
     public ExpLiquidTurret(String name){
         super(name);
+        // v155.4: 无 acceptCoolant 字段, 通过设 coolant=null 禁用 (init 中会重新查找)
+        // 实际等效: 液体炮台不使用 coolant 消费器, 直接用液体作 ammo
         hasLiquids = true;
         loopSound = V7Sounds.spray;
         shootSound = Sounds.none;
@@ -52,6 +55,13 @@ public class ExpLiquidTurret extends ExpTurret {
     @Override
     public void init(){
         consume(new ConsumeLiquidFilter(i -> ammoTypes.containsKey(i), 1f){
+            @Override
+            public float efficiency(Building build){
+                //PU_V8 valid(): liquids.total() > 0.001f
+                // v155.4: liquids.total() 不存在, 用 currentAmount() 替代
+                return build.liquids.currentAmount() > 0.001f ? 1f : 0f;
+            }
+
             @Override
             public void update(Building build){
             }
@@ -99,7 +109,9 @@ public class ExpLiquidTurret extends ExpTurret {
 
         @Override
         public void updateTile(){
-            unit.ammo(1);
+            //PU_V8: unit.ammo(unit.type().ammoCapacity * liquids.currentAmount() / liquidCapacity)
+            unit.ammo(unit.type().ammoCapacity * liquids.currentAmount() / liquidCapacity);
+
             super.updateTile();
         }
 
@@ -115,6 +127,7 @@ public class ExpLiquidTurret extends ExpTurret {
                         Tile other = world.tile(x + tx, y + ty);
                         var fire = Fires.get(x + tx, y + ty);
                         float dst = fire == null ? 0 : dst2(fire);
+                        //do not extinguish fires on other team blocks
                         if(other != null && fire != null && Fires.has(other.x, other.y) && dst <= range * range && (result == null || dst < mindst) && (other.build == null || other.team() == team)){
                             result = fire;
                             mindst = dst;
@@ -124,11 +137,56 @@ public class ExpLiquidTurret extends ExpTurret {
 
                 if(result != null){
                     target = result;
+                    //don't run standard targeting
                     return;
                 }
             }
 
             super.findTarget();
+        }
+
+        /** v158 无 effects() 方法, 通过覆写 bullet() 实现 PU_V8 effects() 的液体颜色特效 */
+        @Override
+        protected void bullet(BulletType type, float xOffset, float yOffset, float angleOffset, Mover mover){
+            queuedBullets--;
+            if(dead || (!consumeAmmoOnce && !hasAmmo())) return;
+
+            float
+            xSpread = Mathf.range(xRand),
+            bulletX = x + Angles.trnsx(rotation - 90, shootX + xOffset + xSpread, shootY + yOffset),
+            bulletY = y + Angles.trnsy(rotation - 90, shootX + xOffset + xSpread, shootY + yOffset),
+            shootAngle = rotation + angleOffset + Mathf.range(inaccuracy + type.inaccuracy);
+
+            float lifeScl = type.scaleLife ? Mathf.clamp((1 + scaleLifetimeOffset) * Mathf.dst(bulletX, bulletY, targetPos.x, targetPos.y) / type.range, minRange() / type.range, range() / type.range) : 1f;
+
+            handleBullet(type.create(this, team, bulletX, bulletY, shootAngle, -1f, (1f - velocityRnd) + Mathf.random(velocityRnd), lifeScl, null, mover, targetPos.x, targetPos.y), xOffset, yOffset, shootAngle - rotation);
+
+            //PU_V8: 使用 liquids.current().color 替代 type.hitColor
+            arc.graphics.Color liquidColor = liquids.current().color;
+            (shootEffect == null ? type.shootEffect : shootEffect).at(bulletX, bulletY, rotation + angleOffset, liquidColor);
+            (smokeEffect == null ? type.smokeEffect : smokeEffect).at(bulletX, bulletY, rotation + angleOffset, liquidColor);
+            (type.shootSound != Sounds.none ? type.shootSound : shootSound).at(bulletX, bulletY, Mathf.random(soundPitchMin, soundPitchMax), shootSoundVolume);
+
+            ammoUseEffect.at(
+                x - Angles.trnsx(rotation, ammoEjectBack),
+                y - Angles.trnsy(rotation, ammoEjectBack),
+                rotation * Mathf.sign(xOffset)
+            );
+
+            if(shake > 0){
+                Effect.shake(shake, shake, this);
+            }
+
+            curRecoil = 1f;
+            if(recoils > 0){
+                curRecoils[barrelCounter % recoils] = 1f;
+            }
+            heat = 1f;
+            totalShots++;
+
+            if(!consumeAmmoOnce){
+                useAmmo();
+            }
         }
 
         @Override

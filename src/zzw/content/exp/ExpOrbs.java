@@ -117,7 +117,8 @@ public class ExpOrbs {
 
         @Override
         public void update(Bullet b){
-            if(!b.vel.isZero(0.01F)) b.time(0f);
+            // v155.4: Bullet 无 moving() 方法, 用 vel.len() > 0 判断
+            if(b.vel.len() > 0.001f) b.time(0f);
 
             Tile tile = world.tileWorld(b.x, b.y);
             if(tile == null || tile.build == null) return;
@@ -126,7 +127,11 @@ public class ExpOrbs {
                 b.remove();
             }
             else if(tile.block() instanceof Conveyor conv){
-                conveyor(b, conv, (ConveyorBuild)tile.build);
+                if(conv.absorbLasers){ //this will be used as a flag for exp conveyors
+                    expConveyor(b, conv, (ConveyorBuild)tile.build);
+                }else{
+                    conveyor(b, conv, (ConveyorBuild)tile.build);
+                }
             }
             else if(tile.block() instanceof Incinerator && ((IncineratorBuild)tile.build).heat > 0.5f){
                 b.remove();
@@ -140,6 +145,14 @@ public class ExpOrbs {
         private void conveyor(Bullet b, Conveyor block, ConveyorBuild build){
             if(build.clogHeat > 0.5f || !build.enabled) return;
             float speed = block.speed / 3f;
+            b.vel.add(d4x[build.rotation] * speed * build.delta(), d4y[build.rotation] * speed * build.delta());
+        }
+
+        /** PU_V8: 经验传送带 (absorbLasers=true 标记), 速度更快 + 阻尼 */
+        private void expConveyor(Bullet b, Conveyor block, ConveyorBuild build){
+            if(build.clogHeat > 0.5f || !build.enabled) return;
+            float speed = block.speed * 2f;
+            b.vel.scl(0.7f);
             b.vel.add(d4x[build.rotation] * speed * build.delta(), d4y[build.rotation] * speed * build.delta());
         }
     }

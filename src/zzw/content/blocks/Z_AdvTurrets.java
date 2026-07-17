@@ -20,24 +20,26 @@ import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
 import mindustry.type.Category;
 import mindustry.type.ItemStack;
-import mindustry.world.blocks.defense.turrets.LaserTurret;
-import mindustry.world.blocks.defense.turrets.PowerTurret;
 import mindustry.world.blocks.defense.turrets.Turret;
 import zzw.content.Z_Items;
 import zzw.content.Z_Sounds;
 import zzw.content.blocks.soul.SoulAbsorberTurret;
 import zzw.content.blocks.soul.SoulBurstPowerTurret;
+import zzw.content.blocks.soul.SoulHeatRayTurret;
 import zzw.content.blocks.soul.SoulItemTurret;
 import zzw.content.blocks.soul.SoulLifeStealerTurret;
 import zzw.content.blocks.soul.SoulTractorBeamTurret;
 import zzw.content.blocks.soul.SoulTurretPowerTurret;
+import zzw.content.blocks.soul.SupernovaTurret;
 import zzw.content.blocks.turrets.EndLaserTurret;
 import zzw.content.blocks.turrets.EndGameTurret;
 import zzw.content.blocks.turrets.ObjPowerTurret;
+import zzw.content.blocks.turrets.PrismTurret;
 import zzw.content.blocks.turrets.WavefrontTurret;
 import zzw.content.units.bullets.EndCutterLaserBulletType;
 import zzw.content.units.bullets.PointBlastLaserBulletType;
 import zzw.content.units.bullets.WavefrontLaserBulletType;
+import zzw.content.units.effects.ChargeEffect;
 import zzw.util.ZObjs;
 
 import static mindustry.Vars.tilesize;
@@ -52,30 +54,30 @@ import static mindustry.Vars.tilesize;
  * - incandescence (SoulHeatRayTurret → SoulTractorBeamTurret)
  * - oracle (SoulTurretBurstPowerTurret → SoulTurretPowerTurret 简化)
  * - recluse (SoulTurretItemTurret → SoulItemTurret)
- * - prism (PrismTurret → PowerTurret 简化, 无3D模型)
+ * - prism (PrismTurret → PrismTurret + WavefrontObject 伪3D)
  * - supernova (SupernovaTurret → LaserTurret 简化)
  *
  * 简化策略:
  * - PU_V8 自定义 Build 类 (SoulLifeStealerTurretBuild 等) → 用通用 SoulTractorBeamTurret
  * - PU_V8 自定义特效 (UnityFx.oracleCharge 等) → Fx.chargeLancer/Fx.none
  * - PU_V8 不存在的 Sounds (spark/shotgun/laser) → v158 替代音效
- * - PU_V8 3D 模型 (PrismTurret.model) → 简化为 2D 贴图
+ * - PU_V8 3D 模型 (PrismTurret.model) → WavefrontObject 伪3D (prism.obj)
  * - PU_V8 复杂充能系统 (oracle chargeTime/supernova charge) → 简化为 reloadTime
- * - PU_V8 多目标攻击 (PrismTurret maxShots) → 简化为单目标
+ * - PU_V8 多目标攻击 (PrismTurret maxShots) → 保留多目标
  */
 public class Z_AdvTurrets {
 
     // ===== TractorBeam 炮台 (持续激光) =====
     public static SoulLifeStealerTurret lifeStealer;
     public static SoulAbsorberTurret absorberAura;
-    public static SoulTractorBeamTurret heatRay, incandescence;
+    public static SoulHeatRayTurret heatRay, incandescence;
     // ===== 爆发炮台 =====
     public static SoulBurstPowerTurret oracle;
     // ===== 物品炮台 =====
     public static SoulItemTurret recluse;
-    // ===== 3D 模型炮台 (简化为 2D) =====
-    public static PowerTurret prism;
-    public static LaserTurret supernova;
+    // ===== 3D 模型炮台 (伪 3D, WavefrontObject) =====
+    public static PrismTurret prism;
+    public static SupernovaTurret supernova;
     // ===== End 阵营非 3D 炮台 =====
     public static EndLaserTurret tenmeikiri;
     public static EndGameTurret endGame;
@@ -86,7 +88,7 @@ public class Z_AdvTurrets {
     public static void load() {
         // ===== lifeStealer (PU_V8 L2462-2475) =====
         // SoulLifeStealerTurret: 持续激光+吸血蓄能+范围治疗
-        // ★ 修复: 默认 TractorBeamTurret 只攻击空中, 需显式设 targetGround=true 才能攻击地面
+        // ★ 完整移植 PU_V8: laserAlpha 回调基于 power.status 和 soulf
         lifeStealer = new SoulLifeStealerTurret("life-stealer") {{
             requirements(Category.turret, ItemStack.with(Items.silicon, 50, Z_Items.monolite, 25));
             size = 1;
@@ -99,13 +101,15 @@ public class Z_AdvTurrets {
             force = 0.3f;
             scaledForce = 0f;
             targetAir = true;
-            targetGround = true;  // ★ 修复: 默认 false 导致只攻击空中单位
+            targetGround = true;
             laserColor = Pal.lancerLaser;
             status = mindustry.content.StatusEffects.none;
             shootSound = Sounds.beamParallax;
             requireSoul = false;
             efficiencyFrom = 0.8f;
             efficiencyTo = 1.5f;
+            // PU_V8 原版: laserAlpha = power.status * (0.7 + soulf * 0.3)
+            laserAlpha(b -> b.power.status * (0.7f + b.soulf() * 0.3f));
             // ★ 吸血机制参数 (PU_V8 LifeStealerTurret)
             maxContain = 600f;       // 蓄能阈值: 累积 600 伤害触发范围治疗
             healPercent = 0.05f;     // 治疗 5% maxHealth
@@ -115,7 +119,7 @@ public class Z_AdvTurrets {
 
         // ===== absorberAura (PU_V8 L2505-2521) =====
         // SoulAbsorberTurret: 持续激光+吸收敌方单位能量产电
-        // ★ 修复: 默认 TractorBeamTurret 只攻击空中, 需显式设 targetGround=true 才能攻击地面
+        // ★ 完整移植 PU_V8: targetBullets=true + laserAlpha 回调
         absorberAura = new SoulAbsorberTurret("absorber-aura") {{
             requirements(Category.turret, ItemStack.with(Items.silicon, 75, Z_Items.monolite, 125));
             size = 2;
@@ -128,22 +132,27 @@ public class Z_AdvTurrets {
             force = 0.3f;
             scaledForce = 0f;
             targetAir = true;
-            targetGround = true;  // ★ 修复
+            targetGround = true;
             laserColor = Pal.lancerLaser;
             shootSound = Sounds.beamParallax;
             requireSoul = false;
             efficiencyFrom = 0.8f;
             efficiencyTo = 1.6f;
+            // PU_V8 原版: laserAlpha = power.status * (0.7 + soulf * 0.3)
+            laserAlpha(b -> b.power.status * (0.7f + b.soulf() * 0.3f));
             // ★ 灵魂吸收产电参数 (PU_V8 AbsorberTurret)
             powerProduction = 2.5f;   // 基础产电倍率
             resistance = 0.8f;       // 抵抗强度
             damageScale = 18f;        // 伤害缩放
             speedScale = 3.5f;        // 速度缩放
+            // PU_V8 原版: targetBullets=true (吸收子弹产电)
+            targetBullets = true;
         }};
 
         // ===== heatRay (PU_V8 L2624-2641) =====
         // SoulHeatRayTurret: 持续热射线, damage=240, 仅对地, 施加 melting 状态
-        heatRay = new SoulTractorBeamTurret("heat-ray") {{
+        // ★ 完整移植 PU_V8: laserAlpha 回调基于 power.status 和 soulf
+        heatRay = new SoulHeatRayTurret("heat-ray") {{
             requirements(Category.turret, ItemStack.with(Items.copper, 75, Items.lead, 50, Items.graphite, 25, Items.titanium, 45, Z_Items.monolite, 50));
             size = 2;
             range = 120f;
@@ -164,11 +173,13 @@ public class Z_AdvTurrets {
             maxSouls = 5;
             efficiencyFrom = 0.8f;
             efficiencyTo = 1.6f;
+            // PU_V8 原版: laserAlpha = power.status * (0.7 + soulf * 0.3)
+            laserAlpha(b -> b.power.status * (0.7f + b.soulf() * 0.3f));
         }};
 
         // ===== incandescence (PU_V8 L2712-2732) =====
         // SoulHeatRayTurret: 强化热射线, damage=480, 对空对地, 施加 melting 状态
-        incandescence = new SoulTractorBeamTurret("incandescence") {{
+        incandescence = new SoulHeatRayTurret("incandescence") {{
             requirements(Category.turret, ItemStack.with(Z_Items.monolite, 250, Items.phaseFabric, 45, Z_Items.monolithAlloy, 100));
             size = 3;
             health = 1680;
@@ -192,11 +203,13 @@ public class Z_AdvTurrets {
             maxSouls = 7;
             efficiencyFrom = 0.7f;
             efficiencyTo = 1.67f;
+            // PU_V8 原版: laserAlpha = power.status * (0.7 + soulf * 0.3)
+            laserAlpha(b -> b.power.status * (0.7f + b.soulf() * 0.3f));
         }};
 
         // ===== oracle (PU_V8 L2643-2686) =====
         // SoulBurstPowerTurret: 充能+主弹幕(闪电8连发)+副弹幕(激光)
-        // ★ 完整移植 PU_V8 BurstPowerTurret: 主弹幕由 shoot.shots/shotDelay 处理, 副弹幕由 SoulBurstPowerTurret.shoot() 重写处理
+        // ★ 完整移植 PU_V8 BurstPowerTurret.shoot: chargeTime阶段 + 主弹幕shots连发 + 副弹幕subShots连发
         oracle = new SoulBurstPowerTurret("oracle") {{
             requirements(Category.turret, ItemStack.with(Items.silicon, 175, Items.titanium, 150, Z_Items.monolithAlloy, 75));
             size = 3;
@@ -212,6 +225,13 @@ public class Z_AdvTurrets {
             recoil = 2.5f;
             rotateSpeed = 8f;
             shake = 3f;
+            // ★ PU_V8 BurstPowerTurret 充能参数 (chargeTime>0 触发完整充能流程)
+            chargeTime = 30f;
+            chargeMaxDelay = 4f;
+            chargeEffects = 12;
+            chargeEffect = Fx.lancerLaserCharge;        // PU_V8 UnityFx.oracleCharge 简化替代
+            chargeBeginEffect = Fx.lancerLaserChargeBegin; // PU_V8 UnityFx.oracleChargeBegin 简化替代
+            chargeSound = Sounds.shootArc;        // PU_V8 Sounds.spark 简化替代
             shootType = new LightningBulletType() {{
                 lightningLength = 25;
                 damage = 192f;
@@ -222,20 +242,22 @@ public class Z_AdvTurrets {
             efficiencyFrom = 0.7f;
             efficiencyTo = 1.67f;
             // ★ 副弹幕: 激光 (PU_V8 BurstPowerTurret.subShootType)
-            subShootType = new LaserBulletType(35f) {{
+            subShootType = new LaserBulletType(288f) {{  // PU_V8 原版 damage=288f
+                length = 180f;
+                sideAngle = 45f;
+                inaccuracy = 8f;
                 colors = new Color[]{Pal.lancerLaser.cpy().a(0.4f), Pal.lancerLaser, Color.white};
                 hitEffect = Fx.hitLancer;
                 hitSize = 4;
                 lifetime = 16f;
                 drawSize = 400f;
-                length = 180f;
                 ammoMultiplier = 1f;
             }};
-            subShots = 1;             // 副弹幕发射 1 次
-            subBurstSpacing = 0f;     // 副弹幕间隔 (单发无意义)
-            subShootEffect = Fx.lancerLaserShoot;
-            subShootSound = Sounds.shootLancer;
-            subShootSoundVolume = 0.8f;
+            subShots = 3;             // PU_V8 原版 subShots=3
+            subBurstSpacing = 1f;     // PU_V8 原版 subBurstSpacing=1
+            subShootEffect = Fx.hitLancer;  // PU_V8 原版 Fx.hitLancer
+            subShootSound = Sounds.shootLancer;  // PU_V8 原版 Sounds.laser 简化替代
+            subShootSoundVolume = 1f;
         }};
 
         // ===== recluse (PU_V8 L2477-2503) =====
@@ -285,12 +307,13 @@ public class Z_AdvTurrets {
             efficiencyTo = 1.5f;
         }};
 
-        // ===== prism (PU_V8 L2734-2763) =====
-        // PrismTurret: 3D 棱镜炮台, 多目标攻击
-        // ★ 修复: 原版用 speed=0.0001f 模拟即时命中, 但在 v158 中子弹过快或过短会导致不显示/不命中
-        //         改用合理的速度 + 较长的 lifetime 实现可见的激光样子弹
-        prism = new PowerTurret("prism") {{
-            requirements(Category.turret, ItemStack.with(Items.copper, 1));  // ★ 原版占位需求
+        // ===== prism (PU_V8 L2734-2763, PrismTurret + ModelInstance) =====
+        // 3D 棱镜炮台: 伪 3D 渲染 + 多目标攻击 + 颜色渐变
+        // ★ v155.4 适配: ModelInstance → WavefrontObject; SoulPowerTurret → SoulTurretPowerTurret
+        // ★ shoot() 在目标位置创建子弹 (speed≈0), 用 chainLightning 连接炮台与目标
+        // ★ 完整移植 PU_V8: maxSouls=7, efficiencyFrom=0.7, efficiencyTo=1.67 (灵魂影响伤害)
+        prism = new PrismTurret("prism") {{
+            requirements(Category.turret, ItemStack.with(Items.copper, 1));  // 原版占位需求
             size = 4;
             health = 2800;
             range = 320f;
@@ -301,27 +324,30 @@ public class Z_AdvTurrets {
             targetGround = true;
             targetAir = true;
             consumePower(8f);
-            shootSound = Sounds.shootScatter;  // ★ v158 无 Sounds.shotgun, 用 shootScatter 替代
+            shootSound = Sounds.shootScatter;  // v155.4 无 Sounds.shotgun, 用 shootScatter 替代
             shootEffect = Fx.hitLaserBlast;
-            shootType = new BasicBulletType(80f, 320f) {{  // ★ BasicBulletType 才有 width/height/backColor/frontColor
-                lifetime = 4f;  // 4 ticks 内飞行 320f 单位 (即时感)
+            object = ZObjs.prism;
+            prismOffset = 6f;
+            // PU_V8 原版灵魂系统字段 (progression.linear 等效于 SoulTurretPowerTurret.updateSoulDamage)
+            requireSoul = false;
+            maxSouls = 7;
+            efficiencyFrom = 0.7f;
+            efficiencyTo = 1.67f;
+            shootType = new BulletType(0.0001f, 320f) {{  // 原版 speed=0.0001f 模拟即时命中
+                lifetime = 50f;
                 pierce = true;
                 pierceBuilding = true;
                 hitEffect = Fx.hitLancer;
-                despawnEffect = Fx.hitLancer;
+                despawnEffect = Fx.none;
                 hittable = false;
-                // 视觉: 短促激光样
-                width = 6f;
-                height = 12f;
-                backColor = Pal.lancerLaser;
-                frontColor = Color.white;
             }};
         }};
 
-        // ===== supernova (PU_V8 L2765-2797) =====
-        // SupernovaTurret: 大型激光炮台, 充能后持续射击
-        // 简化: 用 LaserTurret + ContinuousLaserBulletType (supernovaLaser)
-        supernova = new LaserTurret("supernova") {{
+        // ===== supernova (PU_V8 L2765-2797, SupernovaTurret) =====
+        // SupernovaTurret: 大型激光炮台, 充能后持续射击 + 单位吸引 + 闪电特效
+        // ★ 完整移植 PU_V8: 充能(charge/phase/starHeat) + attractUnits + 闪电 + 6部件动画
+        // ★ 简化替代: UnityFx.supernovaXxx → v158 Fx 等效特效; UnityDrawf.shiningCircle 用项目已有实现
+        supernova = new SupernovaTurret("supernova") {{
             requirements(Category.turret, ItemStack.with(Items.surgeAlloy, 500, Items.silicon, 650, Z_Items.archDebris, 350, Z_Items.monolithAlloy, 325));
             size = 7;
             health = 8100;
@@ -334,6 +360,11 @@ public class Z_AdvTurrets {
             loopSound = Z_Sounds.supernovaActive;
             loopSoundVolume = 1f;
             shootDuration = 480f;
+            // PU_V8 原版灵魂系统字段 (progression.linear 等效于 SoulLaserTurret.updateSoulDamage)
+            requireSoul = false;
+            maxSouls = 12;
+            efficiencyFrom = 0.7f;
+            efficiencyTo = 1.8f;
             // ★ supernovaLaser: 持续激光, 3200 伤害, 长度 280, 多色叠加 + 闪电
             shootType = new ContinuousLaserBulletType(3200f) {{
                 length = 280f;
@@ -355,7 +386,7 @@ public class Z_AdvTurrets {
 
         // ===== tenmeikiri (PU_V8 L3542-3584, EndLaserTurret + EndCutterLaserBulletType) =====
         // 持续激光炮台, 充能后发射超长激光 (防作弊伤害, 4 色叠加 + 闪电)
-        // ★ 完整移植: 防作弊系统 + 持续激光跟踪 + 7 层灯光渲染
+        // ★ 完整移植: 防作弊系统 + 持续激光跟踪 + 7 层灯光渲染 + 底座叠加层
         tenmeikiri = new EndLaserTurret("tenmeikiri") {{
             requirements(Category.turret, ItemStack.with(
                 Items.phaseFabric, 3000, Items.surgeAlloy, 4000,
@@ -366,14 +397,16 @@ public class Z_AdvTurrets {
             shootCone = 1.5f;
             reload = 5f * 60f;
             coolantMultiplier = 0.5f;
-            recoilAmount = 15f;
+            recoil = 15f;  // v155.4: recoil 字段控制视觉后坐距离 (PU_V8 recoilAmount)
             consumePower(350f);
             absorbLasers = true;
             shootLength = 8f;
             chargeTime = 158f;
             chargeEffects = 12;
             chargeMaxDelay = 80f;
-            // 充能特效 (使用 v158 原生 lancerLaserCharge / lancerLaserChargeBegin)
+            // 充能特效 (PU_V8 ChargeFx.tenmeikiriChargeEffect / tenmeikiriChargeBegin)
+            chargeEffect = ChargeEffect.tenmeikiriChargeEffect;
+            chargeBeginEffect = ChargeEffect.tenmeikiriChargeBegin;
             chargeSound = Z_Sounds.tenmeikiriCharge;
             shootSound = Z_Sounds.tenmeikiriShoot;
             shake = 4f;
@@ -383,6 +416,7 @@ public class Z_AdvTurrets {
                 width = 30f;
                 laserSpeed = 80f;
                 status = mindustry.content.StatusEffects.melting;
+                antiCheatScl = 5f;  // PU_V8 原版值
                 statusDuration = 200f;
                 lightningColor = Color.valueOf("f53036");  // scarColor
                 lightningDamage = 85f;
@@ -393,12 +427,10 @@ public class Z_AdvTurrets {
                 overDamage = 350000f;
                 bleedDuration = 5f * 60f;
             }};
-            // 冷却液体 (可选 boost, 非必需): 参考 v158 原版 consumeCoolant + BaseTurret.checkInitCoolant
-            // 用 ConsumeCoolant 子类并设 maxTemp=0.25f 匹配原版过滤条件
-            // BaseTurret.init() 会自动设 update=false + booster=true + optional=true
-            coolant = new mindustry.world.consumers.ConsumeCoolant(3.1f) {{
-                maxTemp = 0.25f;
-            }};
+            // 冷却液体 (可选 booster, 非必需): 加快射速, 不影响攻击
+            // consumeCoolant 会添加到 consumes 列表, BaseTurret.init() 自动设 optional=true + booster=true
+            // maxTemp=0.25f 匹配 PU_V8 原版过滤条件 (低温不易燃液体)
+            consumeCoolant(3.1f).maxTemp = 0.25f;
         }};
 
         // ===== endGame (PU_V8 L3586-3607, EndGameTurret) =====
@@ -409,15 +441,22 @@ public class Z_AdvTurrets {
                 Z_Items.darkAlloy, 2300, Z_Items.lightAlloy, 2300, Z_Items.advanceAlloy, 2300,
                 Z_Items.plagueAlloy, 2300, Z_Items.sparkAlloy, 2300, Z_Items.monolithAlloy, 2300,
                 Z_Items.superAlloy, 2300, Z_Items.terminum, 1600, Z_Items.terminaAlloy, 800, Z_Items.terminationFragment, 100));
+            // PU_V8 L3593-3600: shootCone=360, reloadTime=430, range=820, size=14, coolantMultiplier=0.6
+            // shootCone/reload/range/size 已在 EndGameTurret 构造函数中设置
+            coolantMultiplier = 0.6f;
             hasItems = true;
             itemCapacity = 10;
             loopSoundVolume = 0.2f;
             loopSound = Z_Sounds.endgameActive;
             shootSound = Z_Sounds.endgameShoot;
+            // PU_V8 原版: damage = (float)Double.MAX_VALUE (不是 Float.MAX_VALUE!)
             shootType = new BulletType() {{
-                damage = Float.MAX_VALUE;
+                damage = (float)Double.MAX_VALUE;
             }};
             consumeItem(Z_Items.terminum, 2);
+            // 冷却液作为可选 booster (非必需, BaseTurret.init 会自动设 optional/booster/update=false)
+            coolant = consumeCoolant(0.6f);
+            coolant.boost();
         }};
 
         // ===== cube (PU_V8 L3411-3429, ObjPowerTurret + PointBlastLaserBulletType) =====

@@ -2,11 +2,15 @@ package zzw.content.blocks.soul;
 
 import arc.Core;
 import arc.func.Func;
+import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
+import arc.math.Angles;
 import arc.math.Mathf;
 import arc.util.io.Reads;
 import arc.util.io.Writes;
 import mindustry.gen.Building;
+import mindustry.graphics.Drawf;
+import mindustry.graphics.Layer;
 import mindustry.world.blocks.defense.turrets.TractorBeamTurret;
 import mindustry.world.meta.Stat;
 
@@ -20,7 +24,7 @@ import mindustry.world.meta.Stat;
  * - laserAlpha 回调: 控制激光透明度 (基于 power.status 和 soulf)
  * - 加载时若无自定义激光贴图, 使用 parallax 的激光贴图作为占位
  *
- * 参考: PU_V8 unity/content/UnityBlocks.java L2462-2732
+ * 参考: PU_V8 unity/world/blocks/defense/turrets/GenericTractorBeamTurret.java
  *       PU_V8 SoulLifeStealerTurretBuild/SoulAbsorberTurretBuild/SoulHeatRayTurretBuild (注解生成)
  */
 public class SoulTractorBeamTurret extends TractorBeamTurret implements ISoulTurret {
@@ -32,7 +36,7 @@ public class SoulTractorBeamTurret extends TractorBeamTurret implements ISoulTur
     /** 基础伤害 (会按灵魂比例缩放) */
     public float baseDamage = 0f;
 
-    /** 激光透明度回调 (基于 power.status 和 soulf) */
+    /** 激光透明度回调 (基于 power.status 和 soulf), 为 null 时激光使用全不透明 */
     public transient Func<SoulTractorBeamTurretBuild, Float> laserAlphaFunc = null;
 
     public SoulTractorBeamTurret(String name) {
@@ -137,13 +141,45 @@ public class SoulTractorBeamTurret extends TractorBeamTurret implements ISoulTur
             damage = baseDamage * soulEfficiency();
         }
 
+        /** 激光透明度 (PU_V8 laserAlpha), 回调未设置时返回 1f */
+        public float laserAlpha() {
+            return laserAlphaFunc == null ? 1f : laserAlphaFunc.get(this);
+        }
+
         @Override
         public void updateTile() {
-            // 灵魂影响伤害
+            // 灵魂影响伤害 (在 super.updateTile 之前更新 damage 字段)
             if (baseDamage > 0f) {
                 damage = baseDamage * soulEfficiency();
             }
+            // 调用父类 updateTile 处理目标查找、激光渲染、伤害施加
             super.updateTile();
+        }
+
+        @Override
+        public void draw() {
+            // 复刻 PU_V8 GenericTractorBeamTurret.draw() 风格:
+            // 不直接调用 super.draw() 以避免父类以全不透明绘制激光, 改由本方法用 laserAlpha 控制透明度
+            // 仍按父类顺序绘制 baseRegion + 阴影 + region (炮塔)
+            Draw.rect(baseRegion, x, y);
+            Drawf.shadow(region, x - (size / 2f), y - (size / 2f), rotation - 90);
+            Draw.rect(region, x, y, rotation - 90);
+
+            // 激光渲染 (与父类一致, 但增加 Draw.alpha(laserAlpha()) 以支持透明度回调)
+            if (any && !isPayload()) {
+                Draw.z(Layer.bullet);
+                float ang = angleTo(lastX, lastY);
+
+                Draw.mixcol(laserColor, Mathf.absin(4f, 0.6f));
+                Draw.alpha(laserAlpha());
+
+                Drawf.laser(laser, laserStart, laserEnd,
+                    x + Angles.trnsx(ang, shootLength), y + Angles.trnsy(ang, shootLength),
+                    lastX, lastY, strength * efficiency * laserWidth);
+
+                Draw.mixcol();
+                Draw.alpha(1f);
+            }
         }
 
         @Override

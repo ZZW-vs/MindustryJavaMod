@@ -49,8 +49,12 @@ public class GeyserLaserBulletType extends LaserBulletType {
         this.absorbable = false;
     }
 
-    /** 从 b.owner (OmniLiquidTurretBuild) 读取当前液体类型 */
+    /** PU_V8: 从 b.data 读取液体类型 (bullet 创建时由 OmniLiquidTurret.bullet() 传入),
+     *  回退到 b.owner 读取 (兼容旧调用方式) */
     public Liquid getLiquid(Bullet b) {
+        if (b.data instanceof Liquid l) {
+            return l;
+        }
         if (b.owner instanceof OmniLiquidTurret.OmniLiquidTurretBuild build) {
             return build.liquids.current();
         }

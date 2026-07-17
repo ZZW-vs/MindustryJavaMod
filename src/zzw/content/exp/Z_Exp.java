@@ -302,7 +302,9 @@ public class Z_Exp {
             // ★ v158 简化: 用 BulletType 替代 ExpBulletType, 用自定义 Effect 替代 ShootFx
             ammo(
                 mindustry.content.Items.scrap, new mindustry.entities.bullet.LiquidBulletType(mindustry.content.Liquids.slag) {{
-                    // slagShot 等效
+                    // ★ PU_V8 Bullets.slagShot 等效 (来自 PU特供v132版): damage=4.0f, drag=0.01f
+                    damage = 4.0f;
+                    drag = 0.01f;
                 }},
                 mindustry.content.Items.coal, new mindustry.entities.bullet.BulletType(3.35f, 32f) {{
                     ammoMultiplier = 3;

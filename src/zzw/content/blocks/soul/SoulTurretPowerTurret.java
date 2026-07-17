@@ -2,6 +2,8 @@ package zzw.content.blocks.soul;
 
 import arc.func.Boolf;
 import arc.math.Mathf;
+import arc.util.io.Reads;
+import arc.util.io.Writes;
 import mindustry.entities.bullet.BulletType;
 import mindustry.gen.Building;
 import mindustry.world.blocks.defense.turrets.PowerTurret;
@@ -132,6 +134,19 @@ public class SoulTurretPowerTurret extends PowerTurret implements ISoulTurret {
                 baseDamage = shootType.damage;
                 updateSoulDamage();
             }
+        }
+
+        @Override
+        public void write(Writes write) {
+            super.write(write);
+            write.i(souls);
+        }
+
+        @Override
+        public void read(Reads read, byte revision) {
+            super.read(read, revision);
+            souls = read.i();
+            updateSoulDamage();
         }
     }
 }

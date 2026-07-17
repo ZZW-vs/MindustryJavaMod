@@ -3572,7 +3572,11 @@ public class Z_Units {
         }};
 
         // ===== sedec (T6 Payload, 力场+修复+治疗锥) =====
+        // 完全复制 PU_V8 UnityUnitTypes.java L1807-1855 (sedec)
+        // v158 适配: 用 vanilla UnitType 替代 UnityUnitType (添加 outlines=false), status=sapped 替代 weaken
         sedec = new UnitType("sedec") {{
+            // PU_V8: defaultController = HealingDefenderAI::new (v158 用 aiController 等效)
+            aiController = () -> new zzw.content.units.ai.HealingDefenderAI();
             health = 45000f;
             armor = 20f;
             speed = 0.7f;
@@ -3582,40 +3586,42 @@ public class Z_Units {
             flying = true;
             engineOffset = 48f;
             engineSize = 7.8f;
+            // PU_V8: rotateShooting = false (v158 无此字段, 跳过)
             hitSize = 85f;
             payloadCapacity = (6.2f * 6.2f) * mindustry.Vars.tilePayload;
             buildSpeed = 5f;
+            // PU_V8: drawShields = false
+            drawShields = false;
+            // PU_V8: commandLimit = 8 (v158 无此字段, 跳过)
             buildBeamOffset = 29.5f;
-            outlineColor = Color.valueOf("2e3142");
-            constructor = mindustry.gen.UnitEntity::create;
-            range = 300f;
-            // PU132 原版: HealingDefenderAI 主动找受伤友军并射击治疗锥
-            aiController = () -> new zzw.content.units.ai.HealingDefenderAI();
+            // PU_V8: UnityUnitType 构造器 outlines = false
+            outlines = false;
 
-            // 力场 + 修复能力
+            // PU_V8: abilities.add(ForceFieldAbility, RepairFieldAbility)
             abilities.add(
                 new mindustry.entities.abilities.ForceFieldAbility(190f, 6f, 8000f, 60f * 12),
                 new mindustry.entities.abilities.RepairFieldAbility(180f, 60f * 2, 160f)
             );
 
-            // 武器: 治疗锥 (HealingConeBulletType, cone=45°, healPercent, continuous)
-            // PU132 原版: cone 默认 45°, scanAccuracy 默认 30, allyStatus=overclock, status=weaken(用 sapped 替代)
+            // PU_V8: weapons.add(new Weapon(name + "-laser"){{ bottomWeapons.add(this); ... }})
+            // v158: bottomWeapons.add(this) 等价于 top = false
             weapons.add(new Weapon("create-sedec-laser") {{
                 top = false;
                 x = 0f;
                 y = 0f;
-                shootY = 39f;
+                shootY = 42f - 3f;  // PU_V8 原值 (= 39f)
                 reload = 260f;
                 recoil = 3f;
-                continuous = true;
-                rotate = true;
+
+                continuous = rotate = true;
                 mirror = false;
                 rotateSpeed = 1.5f;
+
                 bullet = new HealingConeBulletType(3f) {{
                     healPercent = 6f;
                     allyStatus = mindustry.content.StatusEffects.overclock;
                     allyStatusDuration = 9f * 60f;
-                    status = mindustry.content.StatusEffects.sapped;
+                    status = mindustry.content.StatusEffects.sapped;  // v158 替代 UnityStatusEffects.weaken
                     statusDuration = 40f;
                     lifetime = 6f * 60f;
                 }};
@@ -3623,7 +3629,11 @@ public class Z_Units {
         }};
 
         // ===== trigintaduo (T7 Payload, 治疗锥+核弹) =====
+        // 完全复制 PU_V8 UnityUnitTypes.java L1857-1931 (trigintaduo)
+        // v158 适配: 用 vanilla UnitType 替代 UnityUnitType (添加 outlines=false), status 替代 weaken/disabled
         trigintaduo = new UnitType("trigintaduo") {{
+            // PU_V8: defaultController = HealingDefenderAI::new (v158 用 aiController 等效)
+            aiController = () -> new zzw.content.units.ai.HealingDefenderAI();
             health = 52500f;
             armor = 22f;
             speed = 0.6f;
@@ -3633,18 +3643,19 @@ public class Z_Units {
             flying = true;
             engineOffset = 41.25f;
             engineSize = 6.5f;
+            // PU_V8: rotateShooting = false (v158 无此字段, 跳过)
             hitSize = 92.5f;
             payloadCapacity = (8.1f * 8.1f) * mindustry.Vars.tilePayload;
             buildSpeed = 6f;
+            // PU_V8: drawShields = false
+            drawShields = false;
+            // PU_V8: commandLimit = 12 (v158 无此字段, 跳过)
             buildBeamOffset = 47.75f;
-            outlineColor = Color.valueOf("2e3142");
-            constructor = mindustry.gen.UnitEntity::create;
-            range = 300f;
-            // PU132 原版: HealingDefenderAI 主动找受伤友军并射击治疗锥
-            aiController = () -> new zzw.content.units.ai.HealingDefenderAI();
+            // PU_V8: UnityUnitType 构造器 outlines = false
+            outlines = false;
 
-            // 武器1: 治疗锥 (HealingConeBulletType, cone=15°, scanAccuracy=25, healPercent, continuous)
-            // PU132 原版: cone=15f, scanAccuracy=25, allyStatus=overclock, status=weaken(用 sapped 替代)
+            // PU_V8: weapons.add(heal-mount, energy-charge-nuke)
+            // 武器1: 治疗锥 (cone=15°, scanAccuracy=25, healPercent=3)
             weapons.add(new Weapon("create-trigintaduo-heal-mount") {{
                 x = 33.5f;
                 y = -7.75f;
@@ -3652,33 +3663,33 @@ public class Z_Units {
                 reload = 220f;
                 recoil = 3f;
                 shadow = 22f;
-                continuous = true;
-                rotate = true;
+
+                continuous = rotate = true;
                 alternate = false;
                 rotateSpeed = 3.5f;
-                mirror = true;
+                // mirror 默认 true (v158 Weapon.mirror 默认值), PU_V8 未显式设置
+
                 bullet = new HealingConeBulletType(3f) {{
                     healPercent = 3f;
                     cone = 15f;
                     scanAccuracy = 25;
                     allyStatus = mindustry.content.StatusEffects.overclock;
                     allyStatusDuration = 9f * 60f;
-                    status = mindustry.content.StatusEffects.sapped;
+                    status = mindustry.content.StatusEffects.sapped;  // v158 替代 UnityStatusEffects.weaken
                     statusDuration = 40f;
                     lifetime = 6f * 60f;
                 }};
-            }});
-
-            // 武器2: 治疗核弹 (EnergyChargeWeapon + HealingNukeBulletType, 大范围, 蓄力光球)
-            // PU132 原版: drawCharge 用 UnityDrawf.shiningCircle 绘制中心光球, bullet=HealingNukeBulletType radius=650f
-            weapons.add(new EnergyChargeWeapon("") {{
+            }}, new EnergyChargeWeapon("") {{
                 mirror = false;
                 x = 0f;
                 y = 10.75f;
                 shootY = 0f;
+
                 reload = 30f * 60f;
                 shootCone = 360f;
                 ignoreRotation = true;
+
+                // PU_V8: drawCharge 用 UnityDrawf.shiningCircle 绘制蓄力光球
                 drawCharge = (unit, mount, charge) -> {
                     float rotation = unit.rotation - 90f,
                         wx = unit.x + Angles.trnsx(rotation, x, y),
@@ -3689,10 +3700,11 @@ public class Z_Units {
                     Draw.color(Color.white);
                     zzw.content.units.effects.UnityDrawf.shiningCircle(unit.id, Time.time, wx, wy, 6.5f * charge, 5, 70f, 15f, 4f * charge, 360f);
                 };
+
                 bullet = new HealingNukeBulletType() {{
                     allyStatus = mindustry.content.StatusEffects.overclock;
                     allyStatusDuration = 15f * 60f;
-                    status = mindustry.content.StatusEffects.unmoving;
+                    status = mindustry.content.StatusEffects.unmoving;  // v158 替代 UnityStatusEffects.disabled
                     statusDuration = 120f;
                     healPercent = 20f;
                 }};
