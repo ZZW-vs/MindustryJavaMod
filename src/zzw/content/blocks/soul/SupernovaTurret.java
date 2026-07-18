@@ -27,14 +27,14 @@ import zzw.content.Z_Sounds;
 import zzw.content.units.effects.UnityDrawf;
 
 /**
- * Supernova 超新星激光炮台 (v155.4 完整重写)
+ * Supernova 超新星激光炮台 (v155.4 严格按 PU132 原版重写)
  *
  * 基于 PU132 unity.world.blocks.defense.turrets.SupernovaTurret 完整移植
  *
  * 原版机制 (完全照搬):
  * - drawer: 绘制 6 部件 (core/wings/bottom/head) + outline 两层
  * - heatDrawer: heat region 加法混合渲染
- * - charge/phase/starHeat 三阶段充能
+ * - charge/phase/starHeat 三阶段充能 (chargeWarmup=0.002f 原版值)
  * - attractUnits: 吸引范围内单位 + 持续伤害 + 拉拽特效
  * - 充能满后 (charge >= 1 && phase >= 1): shoot(type)
  * - 激光期间: 持续闪电 + 星辰衰减特效 + 热浪特效
@@ -53,15 +53,15 @@ import zzw.content.units.effects.UnityDrawf;
  *
  * 关键修复 (相对于之前版本):
  * 1. 移除 efficiency *= soulEfficiency() 副作用 (在 SoulLaserTurret 中重写不调用 super 即可)
- * 2. 充能速率加大: chargeWarmup 0.002 → 0.015 (8秒 → 1秒充满)
- * 3. phase 累积用 edelta() 而非 chargeWarmup * edelta() (与原版一致但更快)
- * 4. 修复 drawer 绘制底座逻辑
+ * 2. ★ chargeWarmup 保持原版 0.002f (之前改 0.015 太快, 充能动画错乱)
+ * 3. ★ phase 累积用 chargeWarmup * edelta() (原版公式, 之前直接写 0.015 错误)
+ * 4. ★ 完全按原版顺序: charge 衰减 → attractUnits → phase 累积 → super.updateTile → charge 累积
  *
  * 参考: PU132 main/src/unity/world/blocks/defense/turrets/SupernovaTurret.java
  */
 public class SupernovaTurret extends SoulLaserTurret {
-    /** 充能速率: 0.015 让 charge 在约 1 秒内充满 (原版 0.002 太慢) */
-    public float chargeWarmup = 0.015f;
+    /** 充能速率: 原版 0.002f (8 秒充满 phase, 约 8.3 秒) */
+    public float chargeWarmup = 0.002f;
     public float chargeCooldown = 0.01f;
 
     public float chargeSoundVolume = 1f;
@@ -254,34 +254,51 @@ public class SupernovaTurret extends SoulLaserTurret {
         public float phase;
         public float starHeat;
 
+        /**
+         * PU132 updateTile 完整移植 - 严格按原版顺序
+         *
+         * 原版顺序:
+         * 1. 不射击/无效目标/无消耗时 charge 衰减
+         * 2. attractUnits (射击中且无子弹时)
+         * 3. phase 累积 (射击中或有子弹时)
+         * 4. super.updateTile()
+         * 5. charge 累积 (射击中且无子弹时, 用液体消耗)
+         * 6. 音效/特效 (starHeat/chargeStar/chargeStar2/chargeBegin)
+         * 7. 持续闪电 (Lightning.create)
+         */
         @Override
         public void updateTile() {
-            // 调用 SoulLaserTurret.updateTile (已移除 efficiency *= soulEfficiency() 副作用)
-            super.updateTile();
-
+            // 1. 不射击/无效目标/无消耗时 charge 衰减 (原版第一行)
             if (!isShooting() || !validateTarget() || !canConsume()) {
                 novaCharge = Mathf.lerpDelta(novaCharge, 0f, chargeCooldown);
                 novaCharge = novaCharge > 0.001f ? novaCharge : 0f;
             }
 
+            // 2. attractUnits (射击中且无子弹时)
             if (isShooting() && bullets.isEmpty()) attractUnits();
 
+            // 3. phase 累积 (射击中或有子弹时, 用 chargeWarmup * edelta())
             if (isShooting() || !bullets.isEmpty()) {
-                // ★ phase 累积用 edelta() 直接 (不乘 chargeWarmup), 让 1 秒内充满
-                phase = Mathf.clamp(phase + 0.015f * edelta(), 0f, 1f);
+                phase = Mathf.clamp(phase + chargeWarmup * edelta(), 0f, 1f);
             } else {
                 phase = Mathf.lerpDelta(phase, 0f, chargeCooldown);
                 phase = phase > 0.001f ? phase : 0f;
             }
 
+            // 4. super.updateTile() (原版在 phase 累积之后调用)
+            super.updateTile();
+
+            // 5. charge 累积 (射击中且无子弹时, 用液体消耗)
+            // v155.4 无 ConsumeLiquidBase 直接访问, 简化为 baseReloadSpeed() * Time.delta
+            // 原版公式: charge = Mathf.clamp(charge + 120f * chargeWarmup * used)
+            // 其中 used = baseReloadSpeed() * (liquid.amount * heatCapacity * coolantMultiplier)
             if (isShooting() && bullets.isEmpty()) {
-                // 累积 novaCharge
                 float used = baseReloadSpeed() * Time.delta;
                 novaCharge = Mathf.clamp(novaCharge + 120f * chargeWarmup * used);
             }
 
+            // 6. 音效 + 特效
             float prog = novaCharge * 1.5f + 0.5f;
-
             boolean notShooting = bullets.isEmpty();
             boolean tick = Mathf.chanceDelta(1f);
             boolean tickCharge = Mathf.chanceDelta(novaCharge);
@@ -332,6 +349,7 @@ public class SupernovaTurret extends SoulLaserTurret {
                 }
             }
 
+            // 7. 持续闪电 (Lightning.create)
             if (Mathf.chanceDelta(notShooting ? novaCharge : 1f)) {
                 Tmp.v1
                     .trns(rotation, -recoil + starOffset + Mathf.curve(phase, 0f, 0.3f) * -2f)

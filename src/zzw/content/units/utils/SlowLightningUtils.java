@@ -51,10 +51,11 @@ public class SlowLightningUtils {
         float len = (float) Math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
         if (len < 1f) return;
 
-        // 检测单位
+        // 检测单位 (★ 移除 checkTarget(true,true) 检查 - 该方法对 air=true/ground=true 永远返回 true
+        // 导致所有单位都被跳过, 慢闪电无法造成伤害)
         mindustry.entities.Units.nearbyEnemies(team, x1, y1, len + 50f, unit -> {
             if (!unit.hittable()) return;
-            if (unit.checkTarget(true, true)) return;
+            if (unit.dead) return;
             if (Intersector.distanceSegmentPoint(x1, y1, x2, y2, unit.x, unit.y) > width + unit.hitSize / 2f) return;
             unitCons.get(unit);
             hitCons.get(unit.x, unit.y);
