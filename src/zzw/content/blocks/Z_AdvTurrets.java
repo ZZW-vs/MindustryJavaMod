@@ -346,7 +346,10 @@ public class Z_AdvTurrets {
         // ===== supernova (PU_V8 L2765-2797, SupernovaTurret) =====
         // SupernovaTurret: 大型激光炮台, 充能后持续射击 + 单位吸引 + 闪电特效
         // ★ 完整移植 PU_V8: 充能(charge/phase/starHeat) + attractUnits + 闪电 + 6部件动画
-        // ★ 简化替代: UnityFx.supernovaXxx → v158 Fx 等效特效; UnityDrawf.shiningCircle 用项目已有实现
+        // ★ 简化替代: UnityDrawf.shiningCircle 用项目已有实现
+        // ★ v155.4 适配: LaserTurret 不再自动添加 ConsumeCoolant, 需手动调用 consumeCoolant(0.01f)
+        //   原版 PU_V8 v132 LaserTurret 构造函数自动 consumes.add(new ConsumeCoolant(0.01f)).update(false)
+        //   v155.4 移除该自动添加, ReloadTurret.init() 中 coolant = findConsumer(c -> c instanceof ConsumeLiquidBase)
         supernova = new SupernovaTurret("supernova") {{
             requirements(Category.turret, ItemStack.with(Items.surgeAlloy, 500, Items.silicon, 650, Z_Items.archDebris, 350, Z_Items.monolithAlloy, 325));
             size = 7;
@@ -360,6 +363,11 @@ public class Z_AdvTurrets {
             loopSound = Z_Sounds.supernovaActive;
             loopSoundVolume = 1f;
             shootDuration = 480f;
+            // ★ v155.4 关键修复: 手动添加 ConsumeCoolant (原版 v132 LaserTurret 自动添加)
+            // BaseTurret.init() 会自动将该 consumer 设为 optional=true + booster=true + update=false
+            // ReloadTurret.init() 中 coolant = findConsumer(c -> c instanceof ConsumeLiquidBase) 会找到它
+            // SupernovaTurret.updateTile() 中通过 coolant.amount 访问冷却液消耗量
+            consumeCoolant(0.01f);
             // PU_V8 原版灵魂系统字段 (progression.linear 等效于 SoulLaserTurret.updateSoulDamage)
             requireSoul = false;
             maxSouls = 12;
@@ -473,6 +481,7 @@ public class Z_AdvTurrets {
             range = 320f;
             reload = 240f;
             consumePower(260f);
+            consumeCoolant(0.01f);
             coolantMultiplier = 1.1f;
             shootSound = Sounds.shootLancer;  // ★ v155.4 替代 UnitySounds.cubeBlast (无 shootBig)
             shootType = new PointBlastLaserBulletType(580f) {{

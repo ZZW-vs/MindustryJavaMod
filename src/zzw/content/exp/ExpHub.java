@@ -211,28 +211,8 @@ public class ExpHub extends ExpTank{
         public void updateTile(){
             reload += edelta();
 
-            // v155.4 适配: 主动从链接的 ExpTank/ExpChest 抽取经验 (取出机制)
-            // 原 PU_V8 中储罐经验只能进不能出; 此处让 exp-output 主动调用 unloadExp 从储罐抽取
-            // 注意: 只对 ExpTank 抽取, 不抽取 ExpTurret (炮台需要经验升级, 由其 incExp 主动 push)
-            if(links.size > 0){
-                int pullTarget = ExpOrbs.oneOrb(exp);  // 试图凑够一个经验球
-                if(pullTarget > 0){
-                    for(int i = 0; i < links.size; i++){
-                        Building b = world.build(links.get(i));
-                        // 仅对 ExpTank/ExpChest (ExpTank.ExpTankBuild) 主动抽取, 跳过炮台/其他
-                        if(b instanceof ExpTank.ExpTankBuild tank && tank.exp > 0){
-                            int got = tank.unloadExp(pullTarget);
-                            if(got > 0){
-                                handleExp(got);
-                                transferEffect.at(x, y, 0f, Color.white, b);
-                                pullTarget -= got;
-                                if(pullTarget <= 0) break;
-                            }
-                        }
-                    }
-                }
-            }
-
+            // PU_V8 原版: exp-output 不主动抽取, 只负责定时发射经验球
+            // 经验来源是链接的炮塔(ExpTurret)调用 hub.takeAmount() 抽成 30%
             if(reload >= reloadTime && ExpOrbs.orbs(exp) > 0){
                 int a = handleExp(-ExpOrbs.oneOrb(exp));
                 if(a < 0) ExpOrbs.dropExp(x, y, rotation * 90f, 4f, -a);

@@ -28,6 +28,7 @@ import mindustry.graphics.Layer;
 import mindustry.world.blocks.defense.turrets.PowerTurret;
 import mindustry.world.consumers.Consume;
 import mindustry.world.consumers.ConsumeItems;
+import zzw.content.Z_Sounds;
 import zzw.content.units.effects.SlowLightningType;
 
 /**
@@ -163,6 +164,13 @@ public class EndGameTurret extends PowerTurret {
         } else if (drawObj instanceof Building b) {
             if (b.block.region.found()) {
                 Draw.rect(b.block.region, e.x, e.y, b.rotation - 90f);
+            }
+        } else if (drawObj instanceof Building[] builds) {
+            // killTiles 末期爆炸: 渲染所有被汽化的建筑 (替代原版 VapourizeShader 数组分支)
+            for (Building d : builds) {
+                if (d.block.region.found()) {
+                    Draw.rect(d.block.region, d.x, d.y, d.rotation - 90f);
+                }
             }
         }
 
@@ -419,7 +427,8 @@ public class EndGameTurret extends PowerTurret {
                 }
             }
             damageB = Mathf.sqrt(damageB) * 2f;
-            endGameShootEffect.at(x, y, damageB);
+            // PU_V8: SpecialFx.endgameVapourize.at(x, y, damageB, new Object[]{this, entitySeq.toArray(Building.class), hitSize() / 4f})
+            endgameVapourizeEffect.at(x, y, damageB, new Object[]{this, entitySeq.toArray(Building.class), hitSize() / 4f});
             entitySeq.clear();
         }
 
@@ -464,6 +473,8 @@ public class EndGameTurret extends PowerTurret {
 
             Object[] dataB = {eyesVecArray[index], new Vec2(ux, uy), 0.625f};
             endgameLaserEffect.at(Tmp.v1.x, Tmp.v1.y, 0f, dataB);
+            // PU_V8: UnitySounds.endgameSmallShoot.at(x, y)
+            Z_Sounds.endgameSmallShoot.at(x, y);
         }
 
         void eyeShoot(int index) {
@@ -482,6 +493,8 @@ public class EndGameTurret extends PowerTurret {
                 }
                 Object[] data = {eyesVecArray[index], e, 0.625f};
                 endgameLaserEffect.at(x, y, 0f, data);
+                // PU_V8: UnitySounds.endgameSmallShoot.at(x, y)
+                Z_Sounds.endgameSmallShoot.at(x, y);
             }
         }
 
@@ -580,8 +593,8 @@ public class EndGameTurret extends PowerTurret {
                     }
                 });
                 if (!entitySeq.isEmpty()) {
-                    // v155.4 用 Sounds 或 Z_Sounds 替代 UnitySounds.endgameSmallShoot
-                    shootSound.at(x, y);
+                    // PU_V8: UnitySounds.endgameSmallShoot.at(x, y)
+                    Z_Sounds.endgameSmallShoot.at(x, y);
                 }
                 for (Entityc e : entitySeq) {
                     e.remove();

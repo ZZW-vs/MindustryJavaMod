@@ -12,8 +12,10 @@ import arc.util.Time;
 import arc.util.Tmp;
 import mindustry.content.Fx;
 import mindustry.entities.Effect;
+import mindustry.gen.Groups;
 import mindustry.gen.Unit;
 import mindustry.graphics.Layer;
+import mindustry.type.UnitType;
 
 /**
  * 单位被切割效果 (v155.4 完整移植版, 使用 Draw.stencil 实现真正的切割)
@@ -36,6 +38,9 @@ import mindustry.graphics.Layer;
 public class UnitCutEffect {
     static Vec2 tmpPoint = new Vec2(), tmpPoint2 = new Vec2();
 
+    /** 切割特效持续时间 (与 cutEffectEntity 的 lifetime 一致, 用于延迟 remove unit) */
+    public static final float CUT_DURATION = 80f;
+
     /** 切割数据 (每次切割创建 2 个, 分别代表上下两半) */
     public static class CutData {
         public Unit unit;
@@ -48,6 +53,11 @@ public class UnitCutEffect {
         public float startX, startY;
         public float lifetime;
         public boolean exploded = false;
+        // ★ 深拷贝 unit 的关键渲染数据, 避免 unit 被 remove 后访问失败
+        public float hitSize;
+        public float drag;
+        public float elevation;
+        public UnitType type;
     }
 
     /**
@@ -72,6 +82,12 @@ public class UnitCutEffect {
 
         unit.hitTime = 0f;
 
+        // ★ 从 Groups.draw 中移除单位, 防止引擎自动绘制 (避免与切割特效重叠)
+        // 类似 PU_V8 的 AntiCheat.annihilateEntity(unit, true) 移除 Groups.draw
+        // 不调用 unit.remove() 以保持 added = true, 让 unit.draw() 仍可正常工作
+        // unit.remove() 由 EndCutterLaserBulletType 延迟调用 (Time.run)
+        Groups.draw.remove(unit);
+
         // PU132: 创建两半效果 (cutDirection.z = rot + (i * 180f))
         for (int i = 0; i < 2; i++) {
             CutData d = new CutData();
@@ -87,6 +103,12 @@ public class UnitCutEffect {
             d.vel.trns(rot + 180f + (i * 180f), unit.hitSize / 60f);
             // 实际持续 40 + hitSize/20, 保存到 CutData 用于判断爆炸时机
             d.lifetime = 40f + (unit.hitSize / 20f) + Mathf.range(2f, 5f);
+
+            // ★ 深拷贝 unit 的关键渲染数据, 避免 unit 被 remove 后访问失败
+            d.hitSize = unit.hitSize;
+            d.drag = Math.min(unit.drag, 0.07f);
+            d.elevation = unit.elevation;
+            d.type = unit.type;
 
             cutEffectEntity.at(unit.x, unit.y, 0f, d);
         }
@@ -144,18 +166,19 @@ public class UnitCutEffect {
         CutData d = (CutData) e.data;
 
         // === PU132 update() 逻辑同步更新 (因 Effect 无 update 钩子) ===
-        if (d.unit != null && d.unit.isValid()) {
+        // ★ 使用深拷贝数据 d.drag/d.hitSize, 避免 unit 被 remove 后访问失败
+        if (d.unit != null) {
             d.unit.hitTime = 0f;
         }
         d.offset.add(d.vel.x * Time.delta, d.vel.y * Time.delta);
         d.rotationOffset += Time.delta * d.rotationVelocity;
-        float drag = d.unit != null ? Math.min(d.unit.drag, 0.07f) : 0.07f;
+        float drag = d.drag;
         d.vel.scl(1f - drag);
         d.rotationVelocity *= 1f - drag;
 
         // 持续烟尘 (PU132: Fx.fallSmoke, chanceDelta(0.4f * hitSize/45))
-        if (d.unit != null && Mathf.chanceDelta(0.4f * (d.unit.hitSize / 45f))) {
-            tmpPoint2.trns(d.cutRotation + d.rotationOffset, 0f, Mathf.range(d.unit.hitSize / 2f))
+        if (d.unit != null && Mathf.chanceDelta(0.4f * (d.hitSize / 45f))) {
+            tmpPoint2.trns(d.cutRotation + d.rotationOffset, 0f, Mathf.range(d.hitSize / 2f))
                 .add(d.cutDirection.x + d.offset.x, d.cutDirection.y + d.offset.y)
                 .add(d.startX, d.startY);
             Fx.fallSmoke.at(tmpPoint2.x, tmpPoint2.y);
@@ -167,25 +190,24 @@ public class UnitCutEffect {
             if (d.unit != null) {
                 float ex = d.startX + d.cutDirection.x + d.offset.x;
                 float ey = d.startY + d.cutDirection.y + d.offset.y;
-                Effect.shake(d.unit.hitSize / 3f, d.unit.hitSize / 3f, ex, ey);
-                Fx.dynamicExplosion.at(ex, ey, (d.unit.bounds() / 2f) / 8f);
-                Effect.scorch(ex, ey, (int) (d.unit.hitSize / 5));
+                Effect.shake(d.hitSize / 3f, d.hitSize / 3f, ex, ey);
+                Fx.dynamicExplosion.at(ex, ey, d.hitSize / 8f);
+                Effect.scorch(ex, ey, (int) (d.hitSize / 5));
                 Fx.explosion.at(ex, ey);
-                if (d.unit.type != null) d.unit.type.deathSound.at(ex, ey);
+                if (d.type != null) d.type.deathSound.at(ex, ey);
             }
         }
 
-        // === PU132 draw() 完整移植 ===
-        if (d.unit == null) return;
+        // ★ 爆炸后不再渲染 (PU132 在 update() 中 time >= lifetime 时 remove, 立即停止)
+        if (d.exploded || d.unit == null || d.type == null) return;
 
-        float s = d.unit.hitSize;
-        // PU132: unit instanceof LegsUnit ? hitSize + legLength*2 : hitSize
-        float size = s;  // 简化: 不处理 LegsUnit
+        // === PU132 draw() 完整移植 ===
+        float size = d.hitSize;
 
         // PU132: z = unit.elevation > 0.5 ? (lowAltitude ? flyingUnitLow : flyingUnit) : groundLayer + clamp
-        float z = d.unit.elevation > 0.5f
-            ? (d.unit.type.lowAltitude ? Layer.flyingUnitLow : Layer.flyingUnit)
-            : d.unit.type.groundLayer + Mathf.clamp(d.unit.type.hitSize / 4000f, 0f, 0.01f);
+        float z = d.elevation > 0.5f
+            ? (d.type.lowAltitude ? Layer.flyingUnitLow : Layer.flyingUnit)
+            : d.type.groundLayer + Mathf.clamp(d.type.hitSize / 4000f, 0f, 0.01f);
 
         // ★ PU132 Draw.draw(z, () -> {...}) - 在指定 z 层渲染
         Draw.draw(z, () -> {

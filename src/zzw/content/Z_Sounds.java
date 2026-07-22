@@ -26,6 +26,7 @@ public class Z_Sounds {
         heatRay,          // fmonolith heat-ray 持续激光音效
         supernovaShoot,   // fmonolith supernova 射击音效
         supernovaActive,  // fmonolith supernova 激活循环音效
+        supernovaCharge,  // fmonolith supernova 充能音效 (PU_V8 UnitySounds.supernovaCharge)
         // light/ 目录炮台音效
         gluonShoot,       // gluon 炮台射击音效
         muonShoot,        // muon 炮台射击音效
@@ -62,6 +63,7 @@ public class Z_Sounds {
         heatRay = loadSound("heat-ray");
         supernovaShoot = loadSound("monolith/supernova-shoot");
         supernovaActive = loadSound("monolith/supernova-active");
+        supernovaCharge = loadSound("monolith/supernova-charge");
 
         // light/ 目录: light/gluon-shoot.ogg 等
         gluonShoot = loadSound("light/gluon-shoot");

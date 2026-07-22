@@ -276,8 +276,15 @@ public class EndCutterLaserBulletType extends AntiCheatBulletTypeBase {
                     // 激光延伸方向 (用于切割方向计算)
                     Tmp.v2.trns(b.rotation(), maxLength * 1.5f).add(b);
                     UnitCutEffect.createCut(u, b.x, b.y, Tmp.v2.x, Tmp.v2.y);
-                    // 移除单位 (避免单位本身绘制与切割效果重叠)
-                    u.remove();
+                    // ★ 延迟 remove, 让切割特效有时间渲染 unit
+                    // PU_V8 用 AntiCheat.annihilateEntity(unit, true) 仅移除 groups 但不调用 unit.remove()
+                    // 此处标记 dead 并用 Time.run 延迟 remove (特效持续时间内保持可绘制)
+                    // createCut 已将 unit 从 Groups.draw 移除, 防止引擎自动绘制与特效重叠
+                    u.health = 0f;
+                    u.dead = true;
+                    Time.run(UnitCutEffect.CUT_DURATION, () -> {
+                        if (u != null && u.isAdded()) u.remove();
+                    });
                 }
             }
         }

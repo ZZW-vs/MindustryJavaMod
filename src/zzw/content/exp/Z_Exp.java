@@ -26,7 +26,7 @@ import static zzw.content.exp.EField.*;
 public class Z_Exp {
     // 经验存储运输
     public static Block expTank, expChest, expRouter, expTower, expTowerDiagonal, bufferTower,
-            expHub, expNode, expNodeLarge, expFountain, expVoid;
+            expHub, expUnloader, expNode, expNodeLarge, expFountain, expVoid;
 
     // 经验炮台 (电力)
     public static ExpPowerTurret laserTurret, chargeLaserTurret, fractalLaserTurret, btLaserTurret;
@@ -81,6 +81,13 @@ public class Z_Exp {
         expHub = new ExpHub("exp-output"){{
             requirements(Category.effect, ItemStack.with(Z_Items.stone, 30, Items.copper, 15));
             expCapacity = 100;
+        }};
+
+        // 经验卸载器: 从相邻经验储罐/塔抽取经验, 沿朝向发射经验球到传送带
+        expUnloader = new ExpUnloader("exp-unloader"){{
+            requirements(Category.effect, ItemStack.with(Z_Items.denseAlloy, 30, Items.copper, 20, Items.silicon, 10));
+            expCapacity = 100;
+            reloadTime = 30f;
         }};
 
         expNode = new ExpNode("exp-node"){{

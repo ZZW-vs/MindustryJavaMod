@@ -56,6 +56,7 @@ public class Z_Distribution {
             ));
             health = 250;
             speed = 0.1f;
+            displayedSpeed = 10f;
         }};
 
         // ===== dirium-conveyor 迪里姆合金传送带 (PU_V8 L1694-1702) =====

@@ -64,8 +64,8 @@ public class ZObjs {
         // prism.obj 已添加法线 (vn), 用默认 normalAngle 着色
         // ★ cullBackfaces 默认 false - 伪3D俯视相机中屏幕 Z 轴剔除会错误移除大量面
 
-        Events.on(EventType.FileTreeInitEvent.class, e -> {
-            // 延迟到下一帧, 确保 atlas 已就绪 (PU_V8 同样用 Core.app.post 包裹)
+        Events.on(EventType.ClientLoadEvent.class, e -> {
+            // ClientLoadEvent 时 atlas 贴图区域已注册, 避免 wavefront 等 hasTexture=true 对象加载失败
             Core.app.post(ZObjs::load);
         });
     }

@@ -11,7 +11,6 @@ import arc.math.Mathf;
 import arc.math.geom.Vec2;
 import arc.util.Time;
 import arc.util.Tmp;
-import mindustry.content.Fx;
 import mindustry.entities.Effect;
 import mindustry.entities.Lightning;
 import mindustry.entities.Units;
@@ -19,11 +18,14 @@ import mindustry.entities.bullet.BulletType;
 import mindustry.gen.Sounds;
 import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
+import mindustry.type.Liquid;
 import mindustry.world.Block;
+import mindustry.world.consumers.ConsumeLiquidBase;
 import mindustry.world.draw.DrawBlock;
 import mindustry.gen.Building;
 import mindustry.gen.Unit;
 import zzw.content.Z_Sounds;
+import zzw.content.exp.UnityFx;
 import zzw.content.units.effects.UnityDrawf;
 
 /**
@@ -76,13 +78,13 @@ public class SupernovaTurret extends SoulLaserTurret {
 
     public final int timerChargeStar = timers++;
 
-    // PU132 UnityFx.supernovaXxx → v155.4 Fx.* 等效替代
-    public Effect chargeStarEffect = Fx.lightningShoot;
-    public Effect chargeStar2Effect = Fx.sparkShoot;
-    public Effect starDecayEffect = Fx.smoke;
-    public Effect heatWaveEffect = Fx.ripple;
-    public Effect pullEffect = Fx.healBlockFull;
-    public Effect chargeBeginEffect = Fx.lightningShoot;
+    // PU_V8 UnityFx.supernovaXxx 完整移植 (位于 zzw.content.exp.UnityFx)
+    public Effect chargeStarEffect = UnityFx.supernovaChargeStar;
+    public Effect chargeStar2Effect = UnityFx.supernovaChargeStar2;
+    public Effect starDecayEffect = UnityFx.supernovaStarDecay;
+    public Effect heatWaveEffect = UnityFx.supernovaStarHeatwave;
+    public Effect pullEffect = UnityFx.supernovaPullEffect;
+    public Effect chargeBeginEffect = UnityFx.supernovaChargeBegin;
 
     /** v155.4 Turret 无 shootLength 字段, 自定义 */
     public float shootLength = 8f;
@@ -105,7 +107,9 @@ public class SupernovaTurret extends SoulLaserTurret {
     public SupernovaTurret(String name) {
         super(name);
 
-        chargeSound = Z_Sounds.supernovaActive;
+        // PU_V8 原版: chargeSound = UnitySounds.supernovaCharge (充能音效)
+        // loopSound 保持 supernovaActive (激活循环音效)
+        chargeSound = Z_Sounds.supernovaCharge;
         loopSound = Z_Sounds.supernovaActive;
         loopSoundVolume = chargeSoundVolume;
 
@@ -289,11 +293,18 @@ public class SupernovaTurret extends SoulLaserTurret {
             super.updateTile();
 
             // 5. charge 累积 (射击中且无子弹时, 用液体消耗)
-            // v155.4 无 ConsumeLiquidBase 直接访问, 简化为 baseReloadSpeed() * Time.delta
-            // 原版公式: charge = Mathf.clamp(charge + 120f * chargeWarmup * used)
-            // 其中 used = baseReloadSpeed() * (liquid.amount * heatCapacity * coolantMultiplier)
-            if (isShooting() && bullets.isEmpty()) {
-                float used = baseReloadSpeed() * Time.delta;
+            // PU_V8 原版公式 (完整恢复):
+            //   Liquid liquid = liquids.current();
+            //   float maxUsed = consumes.<ConsumeLiquidBase>get(ConsumeType.liquid).amount;
+            //   float used = baseReloadSpeed() * ((cheating() ? maxUsed : Math.min(liquids.get(liquid), maxUsed * Time.delta)) * liquid.heatCapacity * coolantMultiplier);
+            //   charge = Mathf.clamp(charge + 120f * chargeWarmup * used);
+            // v155.4 适配: ConsumeType.liquid 不存在, 改用 BaseTurret.coolant 字段 (ConsumeLiquidBase 类型)
+            //   - 由 consumeCoolant(0.01f) 添加, BaseTurret.init() 自动赋值给 coolant 字段
+            //   - cheating() 方法可用, liquids.get(liquid) 可用, liquid.heatCapacity 可用
+            if (isShooting() && bullets.isEmpty() && coolant != null) {
+                Liquid liquid = liquids.current();
+                float maxUsed = coolant.amount;
+                float used = baseReloadSpeed() * ((cheating() ? maxUsed : Math.min(liquids.get(liquid), maxUsed * Time.delta)) * liquid.heatCapacity * coolantMultiplier);
                 novaCharge = Mathf.clamp(novaCharge + 120f * chargeWarmup * used);
             }
 

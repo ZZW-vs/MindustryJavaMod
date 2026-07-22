@@ -51,10 +51,6 @@ public class ExpTank extends Block {
     public class ExpTankBuild extends Building implements ExpHolder{
         public int exp = 0;
 
-        // v155.4 适配: 经验储罐现在可被 exp-output (ExpHub) 链接并主动抽取经验
-        // 原 PU_V8 中储罐 hubbable() 默认返回 false, 无法被链接; 此处改为 true 以支持取出经验
-        public @Nullable ExpHub.ExpHubBuild hub = null;
-
         @Override
         public int getExp(){
             return exp;
@@ -93,28 +89,6 @@ public class ExpTank extends Block {
         @Override
         public boolean handleOrb(int orbExp){
             return handleExp(orbExp) > 0;
-        }
-
-        // ===== Hub linkage (允许 exp-output 链接并抽取经验) =====
-        @Override
-        public boolean hubbable(){
-            return true;
-        }
-
-        @Override
-        public boolean canHub(Building build){
-            return !hubValid() || (build != null && build == hub);
-        }
-
-        @Override
-        public void setHub(ExpHub.ExpHubBuild hub){
-            this.hub = hub;
-        }
-
-        public boolean hubValid(){
-            boolean val = hub != null && hub.isValid() && !hub.dead && hub.links.contains(pos());
-            if(!val) hub = null;
-            return val;
         }
 
         @Override
