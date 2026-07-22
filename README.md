@@ -195,6 +195,21 @@
 
 ## 更新日志
 
+### v1.7.0 (扭矩系统 + 传送器/传送带移植 + 经验储罐取出机制)
+- **完整移植动力扭矩系统（PU_V8）**：32 个文件（22 核心类 + 10 方块类），三层架构完整还原
+  - 配置层（`graphs/`）：`Graph` + `GraphTorque` 系列，定义转速/扭矩/摩擦等参数
+  - 运行时层（`graph/`）：`BaseGraph` + `TorqueGraph`，BFS 转速传播 + 应力分配
+  - 连接器层（`modules/`）：`GraphModule` + `GraphTorqueModule` 系列，处理端口连接与扩展更新
+  - 11 个方块：手摇曲柄 / 风力涡轮机 / 水轮机 / 电动机 / 无限扭矩 / 传动轴 / 内联变速箱 / 轴路由器 / 简单传动 / 螺旋钻机 / 机械提取器
+  - v155.4 适配：`Buildingc` 接口不暴露 `Building` 类方法，通过 `GraphBuildBase.asBuilding()` 桥接模式转换；`block`/`rotation`/`tile`/`enabled` 在 v155.4 中是字段而非方法；`drawRequestRegion` → `drawPlanRegion`；`liquids.total()` → `liquids.currentAmount()`；`Styles.clearTransi` → `Styles.clearTogglei`
+- **经验储罐取出经验机制**：修改 exp-output（ExpHub）主动从链接的经验储罐抽取经验
+  - `ExpTank.hubbable()` 从原版 `false` 改为 `true`，使储罐可被 exp-output 链接
+  - `ExpHub.updateTile()` 主动调用 `ExpTank.unloadExp()` 抽取经验，凑够一个经验球后发射
+  - 仅对 ExpTank 主动抽取，不抽取 ExpTurret（炮台需要经验升级）
+- **Teleporter 移植（PU_V8）**：12 颜色频道传送器，玩家可配置频道进行双向传送
+- **3 种传送带移植（PU_V8）**：含经验系统的传送带完美还原（DrawOver 分层渲染 + 经验球沿传送带流动）
+- **exp 系列物品用法说明**：在物品介绍中写清楚经验系列物品的用法
+
 ### v1.6.1 (5炮台修复 - 严格按PU132原版)
 - **create-supernova 完全重写**：修复之前重写失败的问题（不转向/不显示底座/不发射/无蓄力动画）
   - 移除 `SoulLaserTurret.updateTile()` 中的 `efficiency *= soulEfficiency()` 副作用（导致 LaserTurret.updateShooting 检查失败，炮台无法发射）

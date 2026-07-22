@@ -18,10 +18,10 @@ import arc.scene.ui.layout.Table;
  * - baseCapacity → 此源在 1 RPM 下的容量
  */
 public class MechanicalBuilds {
-    private static final float STRESS_THRESHOLD = 0.5f;
+    // private static final float STRESS_THRESHOLD = 0.5f;
     private static final int SNAP_INTERVAL = 32;
-    private static final Color STRESS_COLOR = new Color(1f, 0.7f, 0.4f, 1f);
-    private static final Color OVERLOAD_COLOR = new Color(1f, 0.3f, 0.2f, 1f);
+    // private static final Color STRESS_COLOR = new Color(1f, 0.7f, 0.4f, 1f);
+    // private static final Color OVERLOAD_COLOR = new Color(1f, 0.3f, 0.2f, 1f);
 
     // ===================== 齿轮 =====================
     public static class CogwheelBuild extends MechanicalComponentBuild {
@@ -45,23 +45,23 @@ public class MechanicalBuilds {
         public void draw() {
             Draw.rect(block.region, x, y, rotation);
 
-            if (stress > STRESS_THRESHOLD) {
-                // 过载时显示红色, 正常时显示橙色
-                Draw.color(overStressed ? OVERLOAD_COLOR : STRESS_COLOR);
-                Lines.stroke(2f);
-                float lineLen = 6f + Math.min(Math.abs(getSpeed()), 30f);
-                for (int i = 0; i < 4; i++) {
-                    Lines.lineAngle(x, y, rotation + i * 90f, lineLen);
-                }
-                Fill.circle(x, y, 3f);
-                Draw.color();
-            }
+        //     if (stress > STRESS_THRESHOLD) {
+        //         // 过载时显示红色, 正常时显示橙色
+        //         Draw.color(overStressed ? OVERLOAD_COLOR : STRESS_COLOR);
+        //         Lines.stroke(2f);
+        //         float lineLen = 6f + Math.min(Math.abs(getSpeed()), 30f);
+        //         for (int i = 0; i < 4; i++) {
+        //             Lines.lineAngle(x, y, rotation + i * 90f, lineLen);
+        //         }
+        //         Fill.circle(x, y, 3f);
+        //         Draw.color();
+        //     }
 
-            if (block.teamRegion.found()) {
-                Draw.color(team.color);
-                Draw.rect(block.teamRegion, x, y, rotation);
-                Draw.color();
-            }
+        //     if (block.teamRegion.found()) {
+        //         Draw.color(team.color);
+        //         Draw.rect(block.teamRegion, x, y, rotation);
+        //         Draw.color();
+        //     }
         }
 
         @Override

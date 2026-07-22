@@ -8,6 +8,7 @@ import mindustry.ui.dialogs.BaseDialog;
 
 import zzw.content.blocks.Z_Blocks;
 import zzw.content.blocks.Z_Turrets;
+import zzw.content.blocks.distribution.Z_Distribution;
 import zzw.content.Z_Items;
 import zzw.content.Z_Factory;
 import zzw.content.Z_Liquids;
@@ -15,6 +16,7 @@ import zzw.content.Z_Mine;
 import zzw.content.Z_Sounds;
 import zzw.content.exp.Z_Exp;
 import zzw.content.mechanics.Z_Mechanics;
+import zzw.content.mechanics.torque.Z_Torque;
 import zzw.content.units.Z_Units;
 import zzw.util.ZObjs;
 
@@ -53,8 +55,14 @@ public class TestMod extends Mod{
         // 加载机械系统（需要物品和工厂）
         Z_Mechanics.load();
 
+        // 加载 PU_V8 扭矩系统 (需要物品)
+        Z_Torque.load();
+
         // 加载自定义方块（可能需要物品和工厂）
         Z_Blocks.load();
+
+        // 加载 PU_V8 物品运输方块 (传送器 + 3 种传送带)
+        Z_Distribution.load();
 
         // 加载 PU 炮台 (需要物品)
         Z_Turrets.load();
