@@ -61,8 +61,9 @@ public class WavefrontObject{
                 try{
                     String line = matR.readLine();
                     if(line == null) break;
+                    if(line.startsWith("#")) continue;
 
-                    if(line.contains("newmtl ")){
+                    if(line.startsWith("newmtl ")){
                         current = new Material();
                         current.name = line.replaceFirst("newmtl ", "");
 
@@ -144,8 +145,12 @@ public class WavefrontObject{
             try{
                 String line = reader.readLine();
                 if(line == null) break;
+                // 跳过注释行, 避免 contains("vt ") 等误匹配注释中的文本
+                if(line.startsWith("#")) continue;
+                // 跳过空行
+                if(line.trim().isEmpty()) continue;
 
-                if(line.contains("v ")){
+                if(line.startsWith("v ")){
                     String[] pos = line.replaceFirst("v ", "").split("\\s+");
                     if(pos.length != 3) throw new IllegalStateException("'v' must define all 3 vector points");
 
@@ -158,7 +163,7 @@ public class WavefrontObject{
                     vertices.add(new Vec3(vec[0], vec[1], vec[2]));
                 }
 
-                if(line.contains("vt ")){
+                if(line.startsWith("vt ")){
                     if(!hasTexture) hasTexture = true;
                     String[] pos = line.replaceFirst("vt ", "").split("\\s+");
                     Vec2 uv = new Vec2();
@@ -167,7 +172,7 @@ public class WavefrontObject{
                     uvs.add(uv);
                 }
 
-                if(line.contains("vn ")){
+                if(line.startsWith("vn ")){
                     if(!hasNormal) hasNormal = true;
                     String[] pos = line.replaceFirst("vn ", "").split("\\s+");
                     if(pos.length != 3) throw new IllegalStateException("'v' must define all 3 vector points");
@@ -181,12 +186,12 @@ public class WavefrontObject{
                     normals.add(new Vec3(vec[0], vec[1], vec[2]));
                 }
 
-                if(hasMaterial && line.contains("usemtl ")){
+                if(hasMaterial && line.startsWith("usemtl ")){
                     String key = line.replace("usemtl ", "");
                     current = materials.get(key);
                 }
 
-                if(line.contains("f ")){
+                if(line.startsWith("f ")){
                     String[] segments = line.replace("f ", "").split("\\s+");
                     Face face = new Face();
                     face.verts = new Vertex[segments.length];

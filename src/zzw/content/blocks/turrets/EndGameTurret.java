@@ -88,7 +88,7 @@ public class EndGameTurret extends PowerTurret {
     // 原版: Color[] colors = {f53036, ff786e, white}, float[] strokes = {2, 1.3, 0.6}
     // 每层不同 z (oz + i/1000) + 头部从 a 到 lerp(a, b, curve(fin, 0, 0.09)) 渐进
     // ★ 颜色调制: colors[i].mul(1, 1+offsetSinB(0,5), 1+offsetSinB(90,5), 1) - 红绿蓝脉动
-    public static final Effect endgameLaserEffect = new Effect(76f, 820f * 2f, e -> {
+    public static final Effect endgameLaserEffect = new Effect(76f, 900f * 2f, e -> {
         if (!(e.data instanceof Object[])) return;
         Object[] data = (Object[]) e.data;
         if (data.length < 3) return;
@@ -200,8 +200,8 @@ public class EndGameTurret extends PowerTurret {
         health = 68000;
         // 原版 powerUse = 320f (v155.4 用 consumePower 替代)
         consumePower(320f);
-        reload = 300f;  // ★ PU_V8 原版 reloadTime = 300f
-        range = 820f;
+        reload = 210f;  // ★ 用户调整: 300f - 90f (减少 1.5 秒 = 90 tick)
+        range = 900f;   // ★ 用户调整: 820f + 80f (加大 10 格半径 = 80 单位)
         size = 14;
         shootCone = 360f;
         absorbLasers = true;

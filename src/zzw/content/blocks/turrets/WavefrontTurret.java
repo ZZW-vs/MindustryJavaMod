@@ -3,9 +3,11 @@ package zzw.content.blocks.turrets;
 import arc.Core;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
+import mindustry.graphics.Drawf;
 import arc.math.Angles;
 import arc.math.Mathf;
 import arc.util.Time;
+import mindustry.graphics.Layer;
 import mindustry.world.blocks.defense.turrets.PowerTurret;
 import zzw.util.WavefrontObject;
 
@@ -101,9 +103,17 @@ public class WavefrontTurret extends PowerTurret {
             }
             Draw.color();
 
+            // 阴影层 (在模型之下, 与 DrawTurret.shadowLayer 一致)
+            Draw.z(Layer.blockBuilding - 1f);
+            // 3D 模型无 2D 贴图, 使用圆形阴影代替
+            Drawf.shadow(x, y, size * 12f);
+
             if (object != null && object.faces != null && object.faces.size > 0) {
-                // 模型绕 Z 轴旋转 (跟随炮台朝向), 原 PU_V8: rotation - 90f
-                float rZ = rotation - 90f;
+                // 模型绕 Z 轴旋转 (跟随炮台朝向)
+                // 修正: rotation + 90f (原 rotation - 90f 会导致模型朝向与炮台相反)
+                // 原因: WavefrontObject 的 Vec3.rotate 在伪 3D 投影下, 旋转方向与 Mindustry 炮台朝向约定相反,
+                // 需 +180° 偏移补偿 (rotation + 90f = rotation - 90f + 180f)
+                float rZ = rotation + 90f;
                 // gap 作为轻微 X 轴倾斜 (间隙效果)
                 float rX = gap * 30f;
                 // angle 旋转转为 Y 轴摆动

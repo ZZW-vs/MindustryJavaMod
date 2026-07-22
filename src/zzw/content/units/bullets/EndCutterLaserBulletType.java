@@ -272,7 +272,9 @@ public class EndCutterLaserBulletType extends AntiCheatBulletTypeBase {
                 hitUnitAntiCheat(b, u);
                 // ★ PU_V8 切割效果: 大单位被击杀时触发切割动画
                 // 原版条件: (unit.dead || unit.health >= Float.MAX_VALUE) && (hitSize >= 30 || health >= MAX_VALUE)
-                if ((u.dead || u.health >= Float.MAX_VALUE) && (u.hitSize >= 30f || u.health >= Float.MAX_VALUE)) {
+                // ★ 修复: unit.damage() → kill() → remove() 后 isValid() 返回 false, 但 dead=true 或 health<=0 仍可判断
+                // ★ 修复: 移除 createCut 中的 isValid() 检查, 改用 unit.type != null
+                if ((u.dead || u.health <= 0f) && u.hitSize >= 30f) {
                     // 激光延伸方向 (用于切割方向计算)
                     Tmp.v2.trns(b.rotation(), maxLength * 1.5f).add(b);
                     UnitCutEffect.createCut(u, b.x, b.y, Tmp.v2.x, Tmp.v2.y);

@@ -21,7 +21,7 @@ import mindustry.graphics.Pal;
 import mindustry.type.Liquid;
 import mindustry.world.Block;
 import mindustry.world.consumers.ConsumeLiquidBase;
-import mindustry.world.draw.DrawBlock;
+import mindustry.world.draw.DrawTurret;
 import mindustry.gen.Building;
 import mindustry.gen.Unit;
 import zzw.content.Z_Sounds;
@@ -150,7 +150,7 @@ public class SupernovaTurret extends SoulLaserTurret {
      * v155.4: 合并到单个 DrawBlock.draw() 中
      * ★ 必须手动绘制底座 (v155.4 TurretBuild.draw() 只调用 drawer.draw(this))
      */
-    public class SupernovaDrawer extends DrawBlock {
+    public class SupernovaDrawer extends DrawTurret {
         @Override
         public void draw(Building build) {
             if (!(build instanceof SupernovaTurretBuild)) {

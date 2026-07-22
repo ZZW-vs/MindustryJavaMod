@@ -195,6 +195,17 @@
 
 ## 更新日志
 
+### v1.7.1 (5项炮台渲染/特效修复)
+- **create-prism 3D 模型不显示**：WavefrontObject `.obj` 解析器误将注释中的 `vt ` 子串识别为纹理坐标行，导致 `hasTexture=true` 后纹理查找失败。所有行类型检测从 `contains()` 改为 `startsWith()`，并跳过注释行和空行
+- **create-supernova 放置预览不显示**：`SupernovaDrawer` 继承 `DrawBlock`（其 `drawPlan()` 为空），改为继承 `DrawTurret`（有完整的放置预览渲染）
+- **create-wavefront 阴影缺失 + 旋转方向相反**：draw 方法无阴影渲染代码，添加 `Drawf.shadow()` 圆形阴影；旋转公式从 `rotation - 90f` 改为 `rotation + 90f` 修正模型朝向与炮台瞄准方向一致
+- **create-endgame 参数调整**：攻击范围 820→900（+10 格半径），发射间隔 300→210（-1.5 秒），激光特效 clipSize 同步调整
+- **create-tenmeikiri 分割单位特效修复**：
+  - 根因：`hitUnitAntiCheat` 调用 `unit.damage()` → `kill()` → `remove()` 后 `isValid()` 返回 false，导致 `createCut` 直接返回，分割效果从未创建
+  - 移除 `createCut` 中的 `isValid()` 检查，改用 `unit.type != null`
+  - 改用 `Draw.rect(region)` 替代 `unit.draw()`：unit 被 remove 后 `draw()` 可能不渲染，改用深拷贝的 `unit.type.region` + `unitRotation` 渲染，不依赖 unit 内部状态
+  - 触发条件从 `(u.dead || u.health >= MAX_VALUE)` 改为 `(u.dead || u.health <= 0f)`，更可靠检测单位被击杀
+
 ### v1.7.0 (扭矩系统 + 传送器/传送带移植 + 经验储罐取出机制)
 - **完整移植动力扭矩系统（PU_V8）**：32 个文件（22 核心类 + 10 方块类），三层架构完整还原
   - 配置层（`graphs/`）：`Graph` + `GraphTorque` 系列，定义转速/扭矩/摩擦等参数

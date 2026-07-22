@@ -5,6 +5,7 @@ import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
+import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
 import arc.math.geom.Intersector;
 import arc.math.geom.Vec2;
@@ -30,6 +31,8 @@ import mindustry.type.UnitType;
  * - Draw.stencil(mask, content): mask 是半平面 quad, content 是单位贴图
  * - 两半效果分别创建, 各自飞出 + 旋转
  * - 末期: Fx.dynamicExplosion + Effect.scorch + Fx.explosion + deathSound
+ * - ★ 改用 region 渲染替代 unit.draw(): 避免 unit 被 remove() 后 draw() 不渲染
+ * - ★ 移除 isValid() 检查: unit 被 kill() → remove() 后 isValid() 返回 false, 但仍需创建效果
  *
  * 触发位置: 当 EndCutterLaserBulletType 击杀大单位时调用 createCut()
  *
@@ -44,6 +47,8 @@ public class UnitCutEffect {
     /** 切割数据 (每次切割创建 2 个, 分别代表上下两半) */
     public static class CutData {
         public Unit unit;
+        public TextureRegion region;  // ★ 保存 unit.type.region, 避免 unit 被 remove 后访问失败
+        public float unitRotation;     // ★ 保存 unit.rotation, 避免 unit 被 remove 后访问失败
         public Vec2 cutDirection = new Vec2();  // 切割方向 (单位中心 → 切割线)
         public float cutRotation = 0f;            // 切割方向角度 (cutDirection.z 在 PU132)
         public float rotationVelocity = 0f;
@@ -53,7 +58,6 @@ public class UnitCutEffect {
         public float startX, startY;
         public float lifetime;
         public boolean exploded = false;
-        // ★ 深拷贝 unit 的关键渲染数据, 避免 unit 被 remove 后访问失败
         public float hitSize;
         public float drag;
         public float elevation;
@@ -71,7 +75,9 @@ public class UnitCutEffect {
      * @param y2 激光终点 y
      */
     public static void createCut(Unit unit, float x, float y, float x2, float y2) {
-        if (unit == null || !unit.isValid()) return;
+        // ★ 移除 isValid() 检查: unit 可能已被 kill() → remove(), isValid() 返回 false
+        // 但仍需创建切割效果 (使用深拷贝的 region 数据)
+        if (unit == null || unit.type == null) return;
 
         // PU132: Intersector.nearestSegmentPoint(x, y, x2, y2, unit.x, unit.y, tmpPoint);
         // tmpPoint.sub(unit); tmpPoint.limit(unit.hitSize / 4f);
@@ -92,6 +98,9 @@ public class UnitCutEffect {
         for (int i = 0; i < 2; i++) {
             CutData d = new CutData();
             d.unit = unit;
+            // ★ 深拷贝渲染数据, 避免 unit 被 remove 后访问失败
+            d.region = unit.type.region;
+            d.unitRotation = unit.rotation;
             d.cutDirection.set(tmpPoint);
             d.cutRotation = rot + (i * 180f);
             // PU132: l.rotationVelocity = -(Mathf.signs[i] * 1.2f) + Mathf.range(0.7f)
@@ -104,7 +113,6 @@ public class UnitCutEffect {
             // 实际持续 40 + hitSize/20, 保存到 CutData 用于判断爆炸时机
             d.lifetime = 40f + (unit.hitSize / 20f) + Mathf.range(2f, 5f);
 
-            // ★ 深拷贝 unit 的关键渲染数据, 避免 unit 被 remove 后访问失败
             d.hitSize = unit.hitSize;
             d.drag = Math.min(unit.drag, 0.07f);
             d.elevation = unit.elevation;
@@ -156,20 +164,19 @@ public class UnitCutEffect {
      * 1. 摄像机偏移 (offset)
      * 2. Draw.stencil(mask, content):
      *    - mask: Fill.quad (半平面, 显示切割线一侧)
-     *    - content: unit.draw() (渲染单位贴图)
+     *    - content: Draw.rect(region) (渲染单位贴图)
      * 3. 摄像机恢复
      *
-     * 这样单位只会显示在 mask 内的部分, 实现真正的切割效果
+     * ★ 改用 Draw.rect(region) 替代 unit.draw():
+     *    - unit 被 remove() 后 draw() 可能不渲染
+     *    - region 是深拷贝的 TextureRegion, 不依赖 unit 状态
+     *    - region 渲染只画主体贴图 (不含武器/腿), 但足以展示切割效果
      */
     public static final Effect cutEffectEntity = new Effect(80f, 400f, e -> {
         if (!(e.data instanceof CutData)) return;
         CutData d = (CutData) e.data;
 
         // === PU132 update() 逻辑同步更新 (因 Effect 无 update 钩子) ===
-        // ★ 使用深拷贝数据 d.drag/d.hitSize, 避免 unit 被 remove 后访问失败
-        if (d.unit != null) {
-            d.unit.hitTime = 0f;
-        }
         d.offset.add(d.vel.x * Time.delta, d.vel.y * Time.delta);
         d.rotationOffset += Time.delta * d.rotationVelocity;
         float drag = d.drag;
@@ -177,7 +184,7 @@ public class UnitCutEffect {
         d.rotationVelocity *= 1f - drag;
 
         // 持续烟尘 (PU132: Fx.fallSmoke, chanceDelta(0.4f * hitSize/45))
-        if (d.unit != null && Mathf.chanceDelta(0.4f * (d.hitSize / 45f))) {
+        if (d.hitSize > 0 && Mathf.chanceDelta(0.4f * (d.hitSize / 45f))) {
             tmpPoint2.trns(d.cutRotation + d.rotationOffset, 0f, Mathf.range(d.hitSize / 2f))
                 .add(d.cutDirection.x + d.offset.x, d.cutDirection.y + d.offset.y)
                 .add(d.startX, d.startY);
@@ -187,19 +194,17 @@ public class UnitCutEffect {
         // 末期爆炸 (PU132 update(): time >= lifetime 时触发)
         if (!d.exploded && e.time >= d.lifetime - 1f) {
             d.exploded = true;
-            if (d.unit != null) {
-                float ex = d.startX + d.cutDirection.x + d.offset.x;
-                float ey = d.startY + d.cutDirection.y + d.offset.y;
-                Effect.shake(d.hitSize / 3f, d.hitSize / 3f, ex, ey);
-                Fx.dynamicExplosion.at(ex, ey, d.hitSize / 8f);
-                Effect.scorch(ex, ey, (int) (d.hitSize / 5));
-                Fx.explosion.at(ex, ey);
-                if (d.type != null) d.type.deathSound.at(ex, ey);
-            }
+            float ex = d.startX + d.cutDirection.x + d.offset.x;
+            float ey = d.startY + d.cutDirection.y + d.offset.y;
+            Effect.shake(d.hitSize / 3f, d.hitSize / 3f, ex, ey);
+            Fx.dynamicExplosion.at(ex, ey, d.hitSize / 8f);
+            Effect.scorch(ex, ey, (int) (d.hitSize / 5));
+            Fx.explosion.at(ex, ey);
+            if (d.type != null) d.type.deathSound.at(ex, ey);
         }
 
-        // ★ 爆炸后不再渲染 (PU132 在 update() 中 time >= lifetime 时 remove, 立即停止)
-        if (d.exploded || d.unit == null || d.type == null) return;
+        // ★ 爆炸后或 region 无效时不再渲染
+        if (d.exploded || d.region == null || !d.region.found() || d.type == null) return;
 
         // === PU132 draw() 完整移植 ===
         float size = d.hitSize;
@@ -219,7 +224,7 @@ public class UnitCutEffect {
 
             // ★ 使用 Draw.stencil 实现真正的切割
             // mask: 半平面 quad (切割线一侧)
-            // content: 渲染单位贴图 (旋转 rotationOffset)
+            // content: 渲染单位 region (旋转 rotationOffset)
             Draw.stencil(
                 () -> {
                     // === mask: 绘制 quad 作为 stencil mask ===
@@ -247,12 +252,12 @@ public class UnitCutEffect {
                 },
                 () -> {
                     // === content: 渲染单位贴图 (旋转 rotationOffset) ===
+                    // ★ 改用 Draw.rect(region) 替代 unit.draw()
                     // PU132: float lastRotation = unit.rotation; unit.rotation = lastRotation + rotationOffset;
                     //        unit.draw(); unit.rotation = lastRotation;
-                    float lastRotation = d.unit.rotation;
-                    d.unit.rotation = lastRotation + d.rotationOffset;
-                    d.unit.draw();
-                    d.unit.rotation = lastRotation;
+                    // v155.4: 直接用 Draw.rect(region, x, y, rotation - 90)
+                    // rotation - 90: Mindustry 单位贴图默认旋转 -90° (朝右为 0°)
+                    Draw.rect(d.region, d.startX, d.startY, d.unitRotation + d.rotationOffset - 90f);
                     Draw.reset();
                 }
             );
