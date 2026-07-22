@@ -308,11 +308,9 @@ public class WavefrontObject{
 
             updateFace(face, color, mColor);
 
-            if(!odd || face.verts.length == 4){
-                face.draw();
-            }else{
-                Draw.draw(z, face::draw);
-            }
+            // ★ 直接渲染, 不用 Draw.draw(z, ...) 延迟
+            // 延迟渲染会导致多个 WavefrontObject 实例的 face 在同一 z 队列中混合排序, 互相穿插 (拉丝)
+            face.draw();
         }
         Draw.reset();
         Draw.z(oz);

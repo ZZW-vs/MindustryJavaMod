@@ -151,8 +151,11 @@ public class PrismTurret extends SoulTurretPowerTurret {
                 float px = x + Angles.trnsx(rotation, prismOffset - recoil);
                 float py = y + Angles.trnsy(rotation, prismOffset - recoil);
 
-                // 模型旋转: 绕 Z 轴 rotation - 90f, 绕 Y 轴 prismRotation
-                float rZ = rotation - 90f;
+                // 模型旋转: 绕 Z 轴旋转, 绕 Y 轴 prismRotation
+                // ★ 修正: Vec3.mul(Mat) 是行向量乘矩阵, rotate(Vec3.Z, +deg) = 顺时针 (非逆时针)
+                // prism.obj 默认朝上 (顶点 v3=(0,1,0) 是顶部)
+                // 炮台 rotation=0 朝右, 需模型顺时针转 90° → rZ = 90 - rotation
+                float rZ = 90f - rotation;
                 float rY = prismRotation;
 
                 object.draw(px, py, 0f, rY, rZ);

@@ -1,38 +1,40 @@
 package zzw.content.units.effects;
 
+import arc.Core;
 import arc.graphics.Blending;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
 import arc.graphics.g2d.TextureRegion;
+import arc.graphics.gl.FrameBuffer;
 import arc.math.Mathf;
 import arc.math.geom.Intersector;
 import arc.math.geom.Vec2;
 import arc.util.Time;
 import arc.util.Tmp;
+import mindustry.Vars;
 import mindustry.content.Fx;
 import mindustry.entities.Effect;
 import mindustry.gen.Groups;
 import mindustry.gen.Unit;
 import mindustry.graphics.Layer;
+import mindustry.graphics.Shaders;
 import mindustry.type.UnitType;
 
 /**
- * 单位被切割效果 (v155.4 完整移植版, 使用 Draw.stencil 实现真正的切割)
+ * 单位被切割效果 (v155.4 完整移植版, 使用 FrameBuffer + erase blending 实现真正的切割)
  *
  * 原版机制 (PU132 unity.entities.effects.UnitCutEffect):
  * - 创建两个 EffectState, 沿切割方向将单位分为两半
- * - 每半以单位贴图渲染, 用 stencilShader 切割显示一半
+ * - 每半以单位贴图渲染, 用 stencilShader + effectBuffer 切割显示一半
  * - 持续 40f + hitSize/20f, 末期爆炸 + 烟尘
  *
  * v155.4 实现:
- * - 使用 arc 内置 Draw.stencil() (替代 PU132 UnityShaders.stencilShader)
- * - Draw.stencil(mask, content): mask 是半平面 quad, content 是单位贴图
- * - 两半效果分别创建, 各自飞出 + 旋转
- * - 末期: Fx.dynamicExplosion + Effect.scorch + Fx.explosion + deathSound
- * - ★ 改用 region 渲染替代 unit.draw(): 避免 unit 被 remove() 后 draw() 不渲染
- * - ★ 移除 isValid() 检查: unit 被 kill() → remove() 后 isValid() 返回 false, 但仍需创建效果
+ * - 使用 FrameBuffer (Vars.renderer.effectBuffer) + erase blending 替代 stencilShader
+ * - 原理: 将单位渲染到 FrameBuffer, 再用 erase blending 擦除半平面 (切割线一侧)
+ * - 用 Shaders.screenspace 将 FrameBuffer blit 到屏幕
+ * - ★ Draw.stencil() 在 Mindustry GL 上下文中无效 (无 stencil buffer), 改用此方案
  *
  * 触发位置: 当 EndCutterLaserBulletType 击杀大单位时调用 createCut()
  *
@@ -43,6 +45,9 @@ public class UnitCutEffect {
 
     /** 切割特效持续时间 (与 cutEffectEntity 的 lifetime 一致, 用于延迟 remove unit) */
     public static final float CUT_DURATION = 80f;
+
+    /** erase blending: GL_ZERO(0), GL_ONE_MINUS_SRC_ALPHA(771) — 擦除目标像素 */
+    private static final Blending eraseBlending = new Blending(0, 771);
 
     /** 切割数据 (每次切割创建 2 个, 分别代表上下两半) */
     public static class CutData {
@@ -89,9 +94,7 @@ public class UnitCutEffect {
         unit.hitTime = 0f;
 
         // ★ 从 Groups.draw 中移除单位, 防止引擎自动绘制 (避免与切割特效重叠)
-        // 类似 PU_V8 的 AntiCheat.annihilateEntity(unit, true) 移除 Groups.draw
         // 不调用 unit.remove() 以保持 added = true, 让 unit.draw() 仍可正常工作
-        // unit.remove() 由 EndCutterLaserBulletType 延迟调用 (Time.run)
         Groups.draw.remove(unit);
 
         // PU132: 创建两半效果 (cutDirection.z = rot + (i * 180f))
@@ -150,7 +153,7 @@ public class UnitCutEffect {
     });
 
     /**
-     * 切割实体效果 (使用 Draw.stencil 实现真正的切割)
+     * 切割实体效果 (使用 FrameBuffer + erase blending 实现真正的切割)
      *
      * PU132 原版 draw():
      * 1. 摄像机偏移 (offset)
@@ -160,17 +163,17 @@ public class UnitCutEffect {
      * 5. effectBuffer.end()
      * 6. Draw.blit(effectBuffer, stencilShader)
      *
-     * v155.4 实现:
-     * 1. 摄像机偏移 (offset)
-     * 2. Draw.stencil(mask, content):
-     *    - mask: Fill.quad (半平面, 显示切割线一侧)
-     *    - content: Draw.rect(region) (渲染单位贴图)
-     * 3. 摄像机恢复
+     * v155.4 实现 (FrameBuffer + erase blending):
+     * 1. effectBuffer.begin() — 清空为透明
+     * 2. Draw.rect(region) — 用 normal blending 渲染单位贴图到 FrameBuffer
+     * 3. Draw.blend(eraseBlending) — 切换到擦除混合
+     * 4. Fill.quad — 绘制半平面 mask, 擦除切割线一侧
+     * 5. Draw.blend() — 恢复 normal blending
+     * 6. effectBuffer.end()
+     * 7. Draw.blit(effectBuffer, Shaders.screenspace) — blit 到屏幕
      *
-     * ★ 改用 Draw.rect(region) 替代 unit.draw():
-     *    - unit 被 remove() 后 draw() 可能不渲染
-     *    - region 是深拷贝的 TextureRegion, 不依赖 unit 状态
-     *    - region 渲染只画主体贴图 (不含武器/腿), 但足以展示切割效果
+     * ★ 不使用 Draw.stencil(): Mindustry GL 上下文无 stencil buffer, stencil 操作无效
+     * ★ 不使用摄像机偏移: 直接将单位绘制到视觉位置 (startX + offset.x), 效果相同
      */
     public static final Effect cutEffectEntity = new Effect(80f, 400f, e -> {
         if (!(e.data instanceof CutData)) return;
@@ -206,7 +209,7 @@ public class UnitCutEffect {
         // ★ 爆炸后或 region 无效时不再渲染
         if (d.exploded || d.region == null || !d.region.found() || d.type == null) return;
 
-        // === PU132 draw() 完整移植 ===
+        // === PU132 draw() 完整移植 (FrameBuffer + erase blending) ===
         float size = d.hitSize;
 
         // PU132: z = unit.elevation > 0.5 ? (lowAltitude ? flyingUnitLow : flyingUnit) : groundLayer + clamp
@@ -214,58 +217,55 @@ public class UnitCutEffect {
             ? (d.type.lowAltitude ? Layer.flyingUnitLow : Layer.flyingUnit)
             : d.type.groundLayer + Mathf.clamp(d.type.hitSize / 4000f, 0f, 0.01f);
 
-        // ★ PU132 Draw.draw(z, () -> {...}) - 在指定 z 层渲染
+        // 单位视觉位置 (startX + offset, 替代 PU132 的摄像机偏移)
+        float ux = d.startX + d.offset.x;
+        float uy = d.startY + d.offset.y;
+
         Draw.draw(z, () -> {
-            // PU132: 摄像机偏移 (让单位看起来在 offset 位置)
-            tmpPoint.set(arc.Core.camera.position);
-            arc.Core.camera.position.set(tmpPoint).sub(d.offset.x, d.offset.y);
-            arc.Core.camera.update();
-            Draw.proj(arc.Core.camera);
+            // === 渲染到 FrameBuffer ===
+            FrameBuffer buffer = Vars.renderer.effectBuffer;
+            buffer.begin(Color.clear);
+            Draw.proj(Core.camera);
 
-            // ★ 使用 Draw.stencil 实现真正的切割
-            // mask: 半平面 quad (切割线一侧)
-            // content: 渲染单位 region (旋转 rotationOffset)
-            Draw.stencil(
-                () -> {
-                    // === mask: 绘制 quad 作为 stencil mask ===
-                    // PU132: verts[8], dx={-1,-1,1,1}, dy={0,1,1,0}
-                    // tmpPoint2.trns(cutDirection.z + rotationOffset, dy[i] * size * 1.5f, dx[i] * size * 1.5f)
-                    //   .add(cutDirection.x, cutDirection.y).add(unit)
-                    // Fill.quad(verts[0..7])
-                    float[] vx = new float[4];
-                    float[] vy = new float[4];
-                    int[] dx = {-1, -1, 1, 1};
-                    int[] dy = {0, 1, 1, 0};
-                    for (int i = 0; i < 4; i++) {
-                        tmpPoint2.trns(d.cutRotation + d.rotationOffset,
-                                dy[i] * size * 1.5f,
-                                dx[i] * size * 1.5f)
-                            .add(d.cutDirection.x, d.cutDirection.y)
-                            .add(d.startX, d.startY);
-                        vx[i] = tmpPoint2.x;
-                        vy[i] = tmpPoint2.y;
-                    }
-                    // mask 使用任意颜色 (stencil 只关心形状)
-                    Draw.color(Color.green);
-                    Fill.quad(vx[0], vy[0], vx[1], vy[1], vx[2], vy[2], vx[3], vy[3]);
-                    Draw.color();
-                },
-                () -> {
-                    // === content: 渲染单位贴图 (旋转 rotationOffset) ===
-                    // ★ 改用 Draw.rect(region) 替代 unit.draw()
-                    // PU132: float lastRotation = unit.rotation; unit.rotation = lastRotation + rotationOffset;
-                    //        unit.draw(); unit.rotation = lastRotation;
-                    // v155.4: 直接用 Draw.rect(region, x, y, rotation - 90)
-                    // rotation - 90: Mindustry 单位贴图默认旋转 -90° (朝右为 0°)
-                    Draw.rect(d.region, d.startX, d.startY, d.unitRotation + d.rotationOffset - 90f);
-                    Draw.reset();
-                }
-            );
+            // 1. 绘制单位贴图 (normal blending)
+            Draw.blend();
+            Draw.rect(d.region, ux, uy, d.unitRotation + d.rotationOffset - 90f);
+            Draw.flush();
 
-            // PU132: 摄像机恢复
-            arc.Core.camera.position.set(tmpPoint);
-            arc.Core.camera.update();
-            Draw.proj(arc.Core.camera);
+            // 2. 擦除切割线一侧 (erase blending: GL_ZERO, GL_ONE_MINUS_SRC_ALPHA)
+            //    PU132 原版: 绘制绿色 quad, stencilShader 将绿色像素设为透明
+            //    v155.4: 用 erase blending 直接擦除
+            Draw.blend(eraseBlending);
+            Draw.color(Color.white);  // alpha=1 → 完全擦除
+
+            // mask quad: 半平面, 覆盖切割线一侧 (与 PU132 相同的顶点计算)
+            // PU132: dx={-1,-1,1,1}, dy={0,1,1,0}
+            // tmpPoint2.trns(cutDirection.z + rotationOffset, dy[i] * size * 1.5f, dx[i] * size * 1.5f)
+            //   .add(cutDirection.x, cutDirection.y).add(unit)
+            float[] vx = new float[4];
+            float[] vy = new float[4];
+            int[] dx = {-1, -1, 1, 1};
+            int[] dy = {0, 1, 1, 0};
+            for (int i = 0; i < 4; i++) {
+                tmpPoint2.trns(d.cutRotation + d.rotationOffset,
+                        dy[i] * size * 1.5f,
+                        dx[i] * size * 1.5f)
+                    .add(d.cutDirection.x, d.cutDirection.y)
+                    .add(ux, uy);
+                vx[i] = tmpPoint2.x;
+                vy[i] = tmpPoint2.y;
+            }
+            Fill.quad(vx[0], vy[0], vx[1], vy[1], vx[2], vy[2], vx[3], vy[3]);
+
+            // 3. 恢复 normal blending
+            Draw.flush();
+            Draw.blend();
+            Draw.color();
+
+            buffer.end();
+
+            // === blit FrameBuffer 到屏幕 ===
+            Draw.blit(buffer, Shaders.screenspace);
         });
     });
 }

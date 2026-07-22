@@ -110,10 +110,9 @@ public class WavefrontTurret extends PowerTurret {
 
             if (object != null && object.faces != null && object.faces.size > 0) {
                 // 模型绕 Z 轴旋转 (跟随炮台朝向)
-                // 修正: rotation + 90f (原 rotation - 90f 会导致模型朝向与炮台相反)
-                // 原因: WavefrontObject 的 Vec3.rotate 在伪 3D 投影下, 旋转方向与 Mindustry 炮台朝向约定相反,
-                // 需 +180° 偏移补偿 (rotation + 90f = rotation - 90f + 180f)
-                float rZ = rotation + 90f;
+                // ★ 修正: Vec3.mul(Mat) 是行向量乘矩阵, rotate(Vec3.Z, +deg) = 顺时针 (非逆时针)
+                // 所以 rotation 系数必须取负: rZ = 90f - rotation
+                float rZ = 90f - rotation;
                 // gap 作为轻微 X 轴倾斜 (间隙效果)
                 float rX = gap * 30f;
                 // angle 旋转转为 Y 轴摆动
