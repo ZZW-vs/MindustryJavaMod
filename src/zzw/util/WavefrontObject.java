@@ -54,6 +54,10 @@ public class WavefrontObject{
      *  ★ 设为 true 时所有 face 用同一 z 值, 避免多个实例的 face 在 batch 中交叉穿插
      *  适用于: 多个同类方块同时存在时的展示模型 */
     public boolean singleZLayer = false;
+    /** ★ 实例间 Z 轴偏移 (由调用方在 draw 前设置, draw 后重置)
+     *  用于多实例场景: 不同实例用不同 zOffset, 避免 batch 中 face 互相穿插
+     *  推荐值: id * 0.0001f (范围 0~0.1, 不跨层) */
+    public float zOffset = 0f;
     protected int indexerA;
     protected float indexerZ;
 
@@ -258,6 +262,14 @@ public class WavefrontObject{
             texture = Core.atlas.find("create-" + textureName + "-tex");
         }
 
+        // ★ 如果贴图未找到 (obj 有 vt 但 atlas 无对应贴图), 禁用贴图渲染
+        //   避免使用 missing texture (紫黑格) 导致模型颜色错误
+        if(hasTexture && texture != null && !texture.found()){
+            Log.warn("[Create] WavefrontObject: texture 'create-@-tex' not found, disabling texture rendering", textureName);
+            hasTexture = false;
+            texture = null;
+        }
+
         Log.info("[Create] WavefrontObject loaded: " + drawnVertices.size + " verts, " + faces.size + " faces");
     }
 
@@ -285,10 +297,10 @@ public class WavefrontObject{
             }
         }
 
-        // ★ singleZLayer 模式: 整个模型用同一个 z, 避免多实例交叉穿插
+        // ★ singleZLayer 模式: 整个模型用同一个 z + zOffset, 避免多实例交叉穿插
         // 需要按面深度排序 (远的先画, 近的后画), 保证前面覆盖后面
         if(singleZLayer){
-            Draw.z(drawLayer);
+            Draw.z(drawLayer + zOffset);
             // 计算每个面的平均 z (深度), 按 z 降序排序 (z 小=远=先画)
             faces.sort((a, b) -> {
                 float za = 0, zb = 0;
@@ -307,7 +319,7 @@ public class WavefrontObject{
                     indexerA++;
                 }
                 indexerZ /= indexerA;
-                float z = (indexerZ * zScale) + drawLayer;
+                float z = (indexerZ * zScale) + drawLayer + zOffset;
                 Draw.z(z);
             }
 

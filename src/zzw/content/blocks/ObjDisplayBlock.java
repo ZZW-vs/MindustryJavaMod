@@ -120,7 +120,10 @@ public class ObjDisplayBlock extends Block {
                 // 轻微 X 轴倾斜, 增加立体感 (模拟俯视角度)
                 rX += -25f;
 
+                // ★ 多实例 Z 轴偏移: 基于实例 id, 避免不同方块的 face 在 batch 中穿插
+                object.zOffset = (id % 1000) * 0.0001f;
                 object.draw(x, y + baseOffset, rX, rY, rZ);
+                object.zOffset = 0f;  // 重置
             }
         }
     }

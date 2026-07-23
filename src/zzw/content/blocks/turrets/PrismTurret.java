@@ -158,7 +158,10 @@ public class PrismTurret extends SoulTurretPowerTurret {
                 float rZ = 90f - rotation;
                 float rY = prismRotation;
 
+                // ★ 多实例 Z 轴偏移: 基于实例 id, 避免不同炮台的 face 在 batch 中穿插
+                object.zOffset = (id % 1000) * 0.0001f;
                 object.draw(px, py, 0f, rY, rZ);
+                object.zOffset = 0f;  // 重置
 
                 // 恢复原始颜色
                 object.lightColor.set(origLight);
