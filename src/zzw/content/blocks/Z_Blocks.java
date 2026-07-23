@@ -5,6 +5,7 @@ import mindustry.game.EventType;
 import mindustry.type.Category;
 import mindustry.type.ItemStack;
 import mindustry.world.Block;
+import mindustry.world.meta.BuildVisibility;
 import mindustry.world.blocks.defense.Wall;
 import mindustry.world.blocks.environment.Floor;
 import mindustry.world.blocks.environment.OverlayFloor;
@@ -105,13 +106,14 @@ public class Z_Blocks {
     private static void create3DDisplayBlocks() {
         // 飞轮展示方块: MC Create 飞轮模型, 自动旋转
         flywheelDisplay = new ObjDisplayBlock("flywheel-display") {{
-            requirements(Category.effect, ItemStack.with(Items.copper, 20, Items.lead, 10, Z_Items.steel, 5));
+            requirements(Category.effect, ItemStack.with(Items.copper, 20, Items.lead, 10));
             size = 2;
             health = 320;
             rotateSpeed = 1.5f;
             rotateAxis = 'Z';
             baseOffset = 2f;
             object = zzw.util.ZObjs.flywheel;
+            buildVisibility = BuildVisibility.shown;
         }};
     }
 

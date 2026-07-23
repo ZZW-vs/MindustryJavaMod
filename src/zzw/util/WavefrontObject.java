@@ -50,6 +50,10 @@ public class WavefrontObject{
     public float drawLayer = Layer.blockBuilding;
     /** 是否启用屏幕法线背面剔除 (默认 false - 伪3D 中屏幕 Z 轴剔除不适用俯视相机) */
     public boolean cullBackfaces = false;
+    /** 是否用单一 z 层渲染整个模型 (默认 false, 按面 z 排序)
+     *  ★ 设为 true 时所有 face 用同一 z 值, 避免多个实例的 face 在 batch 中交叉穿插
+     *  适用于: 多个同类方块同时存在时的展示模型 */
+    public boolean singleZLayer = false;
     protected int indexerA;
     protected float indexerZ;
 
@@ -281,16 +285,31 @@ public class WavefrontObject{
             }
         }
 
+        // ★ singleZLayer 模式: 整个模型用同一个 z, 避免多实例交叉穿插
+        // 需要按面深度排序 (远的先画, 近的后画), 保证前面覆盖后面
+        if(singleZLayer){
+            Draw.z(drawLayer);
+            // 计算每个面的平均 z (深度), 按 z 降序排序 (z 小=远=先画)
+            faces.sort((a, b) -> {
+                float za = 0, zb = 0;
+                for(Vertex v : a.verts) za += v.source.z;
+                for(Vertex v : b.verts) zb += v.source.z;
+                return Float.compare(za / a.verts.length, zb / b.verts.length);
+            });
+        }
+
         for(Face face : faces){
-            indexerA = 0;
-            indexerZ = 0f;
-            for(Vertex vert : face.verts){
-                indexerZ += vert.source.z;
-                indexerA++;
+            if(!singleZLayer){
+                indexerA = 0;
+                indexerZ = 0f;
+                for(Vertex vert : face.verts){
+                    indexerZ += vert.source.z;
+                    indexerA++;
+                }
+                indexerZ /= indexerA;
+                float z = (indexerZ * zScale) + drawLayer;
+                Draw.z(z);
             }
-            indexerZ /= indexerA;
-            float z = (indexerZ * zScale) + drawLayer;
-            Draw.z(z);
 
             if(cullBackfaces && hasNormal){
                 if(Math.abs(face.normal[0].angle(Vec3.Z)) >= 90f) continue;
@@ -340,7 +359,8 @@ public class WavefrontObject{
         }
 
         float angle = (Math.abs(tmp.angleRad(Vec3.Z)) / (45f * Mathf.degRad)) / shadingSmoothness;
-        Tmp.c1.set(matB ? Tmp.c3 : lightColor).lerp(matB ? Tmp.c2 : shadeColor, Mathf.clamp(angle));
+        // ★ 限制暗化程度 (max 0.75), 避免面完全变成 shadeColor 看起来透明
+        Tmp.c1.set(matB ? Tmp.c3 : lightColor).lerp(matB ? Tmp.c2 : shadeColor, Mathf.clamp(angle, 0f, 0.75f));
         Draw.color(Tmp.c1);
     }
 

@@ -64,7 +64,8 @@ public class ZObjs {
         prism.shadeColor = Color.valueOf("6586b0");
         prism.drawLayer = Layer.turret;
         // prism.obj 已添加法线 (vn), 用默认 normalAngle 着色
-        // ★ cullBackfaces 默认 false - 伪3D俯视相机中屏幕 Z 轴剔除会错误移除大量面
+        // ★ prism 是封闭凸八面体, 启用背面剔除避免背面面被错误渲染导致透明感
+        prism.cullBackfaces = true;
 
         // flywheel: MC Create 飞轮模型 (258顶点/186面, 金属灰色)
         // 顶点范围 ~0~1.5 (1.5单位立方体), size=3f: defaultScl(4)*3=12倍缩放, 模型 ~18单位 (size=2方块占地16单位)
@@ -75,6 +76,8 @@ public class ZObjs {
         flywheel.lightColor = Color.valueOf("b0b8c0");
         flywheel.shadeColor = Color.valueOf("404048");
         flywheel.drawLayer = Layer.block;
+        // ★ singleZLayer=true: 多个飞轮方块同时存在时, 每个实例整体用一个 z 渲染, 避免交叉穿插
+        flywheel.singleZLayer = true;
 
         Events.on(EventType.ClientLoadEvent.class, e -> {
             // ClientLoadEvent 时 atlas 贴图区域已注册, 避免 wavefront 等 hasTexture=true 对象加载失败
