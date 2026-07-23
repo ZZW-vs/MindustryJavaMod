@@ -56,32 +56,32 @@ public class ZObjs {
         // ★ 原版钻石形 (6顶点+8面), 顶点范围 ~2x2x2.5 (高度 2.5)
         // size=2.5f: defaultScl(4) * 2.5 = 10倍缩放, 模型实际高度 2.5 * 10 = 25单位 (匹配炮台size=5占地50单位的1/2)
         // PrismTurret 中 prismOffset=10f (距炮台中心10单位), 模型高度25单位, 总占用35单位 (合理)
+        // ★ 使用 topLight 着色: 法线Y分量决定明暗, 避免旋转时面因法线与Z轴夹角大而变暗(看起来透明)
         prism = new WavefrontObject();
         prism.textureName = "prism";
         prism.size = 2.5f;
-        prism.shadingSmoothness = 1f;
+        prism.shadingType = WavefrontObject.ShadingType.topLight;
         prism.lightColor = Color.valueOf("87ceeb");
         prism.shadeColor = Color.valueOf("6586b0");
+        prism.maxShade = 0.8f;
         prism.drawLayer = Layer.turret;
-        // prism.obj 已添加法线 (vn), 用默认 normalAngle 着色
         // ★ 关闭 cullBackfaces: 旋转后某些面法线朝下会被剔除, 导致"透明"
-        //   伪3D俯视不需要严格背面剔除, 关闭后所有面都渲染
         prism.cullBackfaces = false;
         // ★ singleZLayer=true: 多个棱镜炮台同时存在时, 每个实例整体用一个 z 渲染, 避免交叉穿插
         prism.singleZLayer = true;
 
         // flywheel: MC Create 飞轮模型 (258顶点/186面, 金属灰色)
         // 顶点范围 ~0~1.5 (1.5单位立方体), size=3f: defaultScl(4)*3=12倍缩放, 模型 ~18单位 (size=2方块占地16单位)
-        // ★ 飞轮模型法线朝Y轴(上方向), 俯视倾斜rX后法线与Z轴夹角>45°
-        //   需要增大shadingSmoothness(让暗化更平缓) + maxShade=0.4(限制最大暗化40%)
-        //   + shadeColor用亮色(808088)避免全灰
+        // ★ 使用 topLight 着色: 模拟从上方照射的环境光, 法线Y分量决定明暗
+        //   朝上的面亮(材质Kd), 朝下的面暗(shadeColor), 有强烈3D感
+        //   shadeColor=404048 深灰, maxShade=0.8 允许较大明暗对比
         flywheel = new WavefrontObject();
         flywheel.textureName = "flywheel";
         flywheel.size = 3f;
-        flywheel.shadingSmoothness = 3f;
+        flywheel.shadingType = WavefrontObject.ShadingType.topLight;
         flywheel.lightColor = Color.white;
-        flywheel.shadeColor = Color.valueOf("808088");
-        flywheel.maxShade = 0.4f;
+        flywheel.shadeColor = Color.valueOf("404048");
+        flywheel.maxShade = 0.8f;
         flywheel.drawLayer = Layer.block;
         // ★ singleZLayer=true: 多个飞轮方块同时存在时, 每个实例整体用一个 z 渲染, 避免交叉穿插
         flywheel.singleZLayer = true;

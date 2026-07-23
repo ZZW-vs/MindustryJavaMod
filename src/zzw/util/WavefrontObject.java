@@ -334,6 +334,7 @@ public class WavefrontObject{
                 case zMedian -> zMedianDraw(face);
                 case zDistance -> zDistanceDraw(face);
                 case normalAngle -> normalAngleDraw(face);
+                case topLight -> topLightDraw(face);
                 default -> Draw.color(lightColor);
             }
 
@@ -376,6 +377,39 @@ public class WavefrontObject{
         float angle = (Math.abs(tmp.angleRad(Vec3.Z)) / (45f * Mathf.degRad)) / shadingSmoothness;
         // ★ 限制暗化程度 (max maxShade), 避免面完全变成 shadeColor 看起来透明
         Tmp.c1.set(matB ? Tmp.c3 : lightColor).lerp(matB ? Tmp.c2 : shadeColor, Mathf.clamp(angle, 0f, maxShade));
+        Draw.color(Tmp.c1);
+    }
+
+    /** ★ 顶光着色: 模拟从上方(Y轴正方向)照射的环境光
+     *  法线Y分量决定明暗: 朝上=亮, 朝下=暗, 侧面=中间
+     *  适用于俯视游戏中法线朝Y轴的模型(如飞轮), 有强烈3D感 */
+    protected void topLightDraw(Face face){
+        if(!hasNormal){
+            Draw.color(lightColor);
+            return;
+        }
+        Vec3 tmp = Tmp.v31.setZero();
+        indexerA = 0;
+        for(Vec3 n : face.normal){
+            tmp.add(n);
+            indexerA++;
+        }
+        tmp.scl(1f / indexerA);
+
+        boolean matB = face.mat != null && face.mat.hasColor;
+        if(matB){
+            Tmp.c2.rgba8888(face.mat.ambientCol).mul(shadeColor);
+            Tmp.c3.rgba8888(face.mat.diffuseCol).mul(lightColor);
+            Tmp.c4.rgba8888(face.mat.emitCol);
+            Tmp.c2.r = Mathf.lerp(Tmp.c2.r, Tmp.c3.r, Tmp.c4.r);
+            Tmp.c2.g = Mathf.lerp(Tmp.c2.g, Tmp.c3.g, Tmp.c4.g);
+            Tmp.c2.b = Mathf.lerp(Tmp.c2.b, Tmp.c3.b, Tmp.c4.b);
+        }
+
+        // 法线Y分量: 1=朝上(亮), 0=侧面, -1=朝下(暗)
+        // shade = (1 - Y) / 2, 范围 0~1
+        float shade = Mathf.clamp((1f - tmp.y) * 0.5f, 0f, maxShade);
+        Tmp.c1.set(matB ? Tmp.c3 : lightColor).lerp(matB ? Tmp.c2 : shadeColor, shade);
         Draw.color(Tmp.c1);
     }
 
@@ -504,6 +538,7 @@ public class WavefrontObject{
         zMedian,
         zDistance,
         normalAngle,
+        topLight,
         noShading
     }
 }

@@ -105,10 +105,10 @@ public class Z_Blocks {
 
     // ===== 3D 模型展示方块 (伪3D, 使用 WavefrontObject 渲染 .obj 文件) =====
     private static void create3DDisplayBlocks() {
-        arc.util.Log.info("[Create] create3DDisplayBlocks() start");
         // 飞轮展示方块: MC Create 飞轮模型, 自动旋转
         flywheelDisplay = new ObjDisplayBlock("flywheel-display") {{
-            requirements(Category.effect, ItemStack.with(Items.copper, 20, Items.lead, 10));
+            // ★ alwaysUnlocked=true: 让方块在战役模式无需研究即可使用
+            requirements(Category.effect, ItemStack.with(Items.copper, 20, Items.lead, 10), true);
             size = 2;
             health = 320;
             rotateSpeed = 1.5f;
@@ -117,8 +117,6 @@ public class Z_Blocks {
             object = zzw.util.ZObjs.flywheel;
             buildVisibility = BuildVisibility.shown;
         }};
-        arc.util.Log.info("[Create] flywheelDisplay created: @, buildVisibility=@, category=@",
-            flywheelDisplay.name, flywheelDisplay.buildVisibility, flywheelDisplay.category);
     }
 
     // ===== PU_V8 移植: 墙体 (简化版, 用 vanilla Wall 或 LimitWall) =====
