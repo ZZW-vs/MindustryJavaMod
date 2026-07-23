@@ -25,6 +25,7 @@ public class Z_Blocks {
     public static Block Pumpkin, Carved_Pumpkin;
     // ===== 3D 模型展示方块 =====
     public static Block flywheelDisplay;
+    public static Block wavefrontDisplay;
 
     // ===== PU_V8 移植: 墙体 =====
     // dark-wall (umbrium 暗色墙)
@@ -105,7 +106,7 @@ public class Z_Blocks {
 
     // ===== 3D 模型展示方块 (伪3D, 使用 WavefrontObject 渲染 .obj 文件) =====
     private static void create3DDisplayBlocks() {
-        // 飞轮展示方块: MC Create 飞轮模型, 自动旋转
+        // 飞轮展示方块: MC Create 飞轮模型, 绕 Z 轴俯视旋转
         flywheelDisplay = new ObjDisplayBlock("flywheel-display") {{
             // ★ alwaysUnlocked=true: 让方块在战役模式无需研究即可使用
             requirements(Category.effect, ItemStack.with(Items.copper, 20, Items.lead, 10), true);
@@ -115,6 +116,18 @@ public class Z_Blocks {
             rotateAxis = 'Z';
             baseOffset = 2f;
             object = zzw.util.ZObjs.flywheel;
+            buildVisibility = BuildVisibility.shown;
+        }};
+
+        // 波前展示方块: PU_V8 wavefront.obj 模型, 绕 Y 轴侧视翻转
+        wavefrontDisplay = new ObjDisplayBlock("wavefront-display") {{
+            requirements(Category.effect, ItemStack.with(Items.copper, 20, Items.lead, 10), true);
+            size = 2;
+            health = 320;
+            rotateSpeed = 1.2f;
+            rotateAxis = 'Y';
+            baseOffset = 4f;
+            object = zzw.util.ZObjs.wavefront;
             buildVisibility = BuildVisibility.shown;
         }};
     }
