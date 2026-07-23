@@ -1,0 +1,13 @@
+# Blender MTL File: 'engine.blend'
+# Material Count: 3
+# ★ 简化: 移除 map_Kd 贴图引用 (原版用 Minecraft blockbench 的 #0/#1/#2 格式),
+#   改用 Kd 纯色, 让 WavefrontObject 用 normalAngle 着色
+
+newmtl m_0
+Kd 0.6 0.6 0.7
+
+newmtl m_1
+Kd 0.5 0.5 0.6
+
+newmtl m_2
+Kd 0.4 0.4 0.5

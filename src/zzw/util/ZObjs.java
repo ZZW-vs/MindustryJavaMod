@@ -16,6 +16,7 @@ import mindustry.graphics.Layer;
  * - cube.obj (cube 炮台用)
  * - wavefront.obj (wavefront 炮台用)
  * - prism.obj (prism 炮台用)
+ * - flywheel.obj (飞轮展示方块, MC Create 模型)
  *
  * 加载时机: FileTreeInitEvent 后用 Core.app.post() 延迟一帧,
  * 确保 atlas 已填充模组贴图 (修复 wavefront 贴图加载失败的问题)
@@ -26,6 +27,7 @@ public class ZObjs {
     public static WavefrontObject cube;
     public static WavefrontObject wavefront;
     public static WavefrontObject prism;
+    public static WavefrontObject flywheel;
 
     private static boolean loaded = false;
 
@@ -64,6 +66,16 @@ public class ZObjs {
         // prism.obj 已添加法线 (vn), 用默认 normalAngle 着色
         // ★ cullBackfaces 默认 false - 伪3D俯视相机中屏幕 Z 轴剔除会错误移除大量面
 
+        // flywheel: MC Create 飞轮模型 (258顶点/186面, 金属灰色)
+        // 顶点范围 ~0~1.5 (1.5单位立方体), size=3f: defaultScl(4)*3=12倍缩放, 模型 ~18单位 (size=2方块占地16单位)
+        flywheel = new WavefrontObject();
+        flywheel.textureName = "flywheel";
+        flywheel.size = 3f;
+        flywheel.shadingSmoothness = 1f;
+        flywheel.lightColor = Color.valueOf("b0b8c0");
+        flywheel.shadeColor = Color.valueOf("404048");
+        flywheel.drawLayer = Layer.block;
+
         Events.on(EventType.ClientLoadEvent.class, e -> {
             // ClientLoadEvent 时 atlas 贴图区域已注册, 避免 wavefront 等 hasTexture=true 对象加载失败
             Core.app.post(ZObjs::load);
@@ -76,6 +88,7 @@ public class ZObjs {
         loadObj(cube, "cube");
         loadObj(wavefront, "wavefront");
         loadObj(prism, "prism");
+        loadObj(flywheel, "flywheel");
     }
 
     private static void loadObj(WavefrontObject obj, String name) {

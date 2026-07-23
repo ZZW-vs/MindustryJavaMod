@@ -195,6 +195,11 @@
 
 ## 更新日志
 
+### v1.8.0 (3D模型展示方块)
+- **新增 `ObjDisplayBlock` 通用 3D 模型渲染方块**：可加载并渲染任意 `.obj` 3D 模型文件，支持自动旋转（Z/Y 轴）、缩放、阴影、底座贴图
+- **新增 `flywheel-display` 飞轮展示台**：使用 MC Create 飞轮模型（258顶点/186面），金属灰色 `normalAngle` 着色，自动旋转展示机械之美
+- **技术细节**：基于项目已有 `WavefrontObject` 伪3D渲染器（软件投影），在 v158 原版不支持游戏玩法层真3D的情况下实现3D模型展示
+
 ### v1.7.1 (5项炮台渲染/特效修复)
 - **create-prism 3D 模型不显示**：WavefrontObject `.obj` 解析器误将注释中的 `vt ` 子串识别为纹理坐标行，导致 `hasTexture=true` 后纹理查找失败。所有行类型检测从 `contains()` 改为 `startsWith()`，并跳过注释行和空行
 - **create-supernova 放置预览不显示**：`SupernovaDrawer` 继承 `DrawBlock`（其 `drawPlan()` 为空），改为继承 `DrawTurret`（有完整的放置预览渲染）

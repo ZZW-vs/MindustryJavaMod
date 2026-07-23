@@ -22,6 +22,8 @@ public class Z_Blocks {
     public static Block Iron_Block, Large_Iron_Block;
     // 其他方块
     public static Block Pumpkin, Carved_Pumpkin;
+    // ===== 3D 模型展示方块 =====
+    public static Block flywheelDisplay;
 
     // ===== PU_V8 移植: 墙体 =====
     // dark-wall (umbrium 暗色墙)
@@ -55,6 +57,7 @@ public class Z_Blocks {
     public static void load() {
         createDefenseBlocks();
         createDecorativeBlocks();
+        create3DDisplayBlocks();
         createPUFloors();
         createPUWalls();
         registerEventListeners();
@@ -96,6 +99,20 @@ public class Z_Blocks {
                 ItemStack.with(Z_Items.Copper_Sheet, 4, Items.copper, 3), 380);
         Carved_Pumpkin = decorative("carved_pumpkin",
                 ItemStack.with(Z_Items.Copper_Sheet, 4, Items.copper, 3), 350);
+    }
+
+    // ===== 3D 模型展示方块 (伪3D, 使用 WavefrontObject 渲染 .obj 文件) =====
+    private static void create3DDisplayBlocks() {
+        // 飞轮展示方块: MC Create 飞轮模型, 自动旋转
+        flywheelDisplay = new ObjDisplayBlock("flywheel-display") {{
+            requirements(Category.effect, ItemStack.with(Items.copper, 20, Items.lead, 10, Z_Items.steel, 5));
+            size = 2;
+            health = 320;
+            rotateSpeed = 1.5f;
+            rotateAxis = 'Z';
+            baseOffset = 2f;
+            object = zzw.util.ZObjs.flywheel;
+        }};
     }
 
     // ===== PU_V8 移植: 墙体 (简化版, 用 vanilla Wall 或 LimitWall) =====
