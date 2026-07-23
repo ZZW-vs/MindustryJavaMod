@@ -48,6 +48,9 @@ public class WavefrontObject{
     public float size = 1f;
     public float shadingSmoothness = 2.8f;
     public float drawLayer = Layer.blockBuilding;
+    /** ★ 最大暗化程度 (0~1), 控制 normalAngle 着色中法线垂直时面最多变暗多少
+     *  默认 0.75, 对于法线朝Y轴的模型(如飞轮)建议设为 0.4 避免全灰 */
+    public float maxShade = 0.75f;
     /** 是否启用屏幕法线背面剔除 (默认 false - 伪3D 中屏幕 Z 轴剔除不适用俯视相机) */
     public boolean cullBackfaces = false;
     /** 是否用单一 z 层渲染整个模型 (默认 false, 按面 z 排序)
@@ -371,8 +374,8 @@ public class WavefrontObject{
         }
 
         float angle = (Math.abs(tmp.angleRad(Vec3.Z)) / (45f * Mathf.degRad)) / shadingSmoothness;
-        // ★ 限制暗化程度 (max 0.75), 避免面完全变成 shadeColor 看起来透明
-        Tmp.c1.set(matB ? Tmp.c3 : lightColor).lerp(matB ? Tmp.c2 : shadeColor, Mathf.clamp(angle, 0f, 0.75f));
+        // ★ 限制暗化程度 (max maxShade), 避免面完全变成 shadeColor 看起来透明
+        Tmp.c1.set(matB ? Tmp.c3 : lightColor).lerp(matB ? Tmp.c2 : shadeColor, Mathf.clamp(angle, 0f, maxShade));
         Draw.color(Tmp.c1);
     }
 

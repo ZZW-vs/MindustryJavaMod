@@ -56,9 +56,10 @@ public class Z_Blocks {
     public static Floor stoneFullTiles, stoneFull, stoneHalf, stoneTiles;
 
     public static void load() {
+        // ★ 3D展示方块最先创建, 避免前面方法异常导致无法注册
+        create3DDisplayBlocks();
         createDefenseBlocks();
         createDecorativeBlocks();
-        create3DDisplayBlocks();
         createPUFloors();
         createPUWalls();
         registerEventListeners();
@@ -104,6 +105,7 @@ public class Z_Blocks {
 
     // ===== 3D 模型展示方块 (伪3D, 使用 WavefrontObject 渲染 .obj 文件) =====
     private static void create3DDisplayBlocks() {
+        arc.util.Log.info("[Create] create3DDisplayBlocks() start");
         // 飞轮展示方块: MC Create 飞轮模型, 自动旋转
         flywheelDisplay = new ObjDisplayBlock("flywheel-display") {{
             requirements(Category.effect, ItemStack.with(Items.copper, 20, Items.lead, 10));
@@ -115,6 +117,8 @@ public class Z_Blocks {
             object = zzw.util.ZObjs.flywheel;
             buildVisibility = BuildVisibility.shown;
         }};
+        arc.util.Log.info("[Create] flywheelDisplay created: @, buildVisibility=@, category=@",
+            flywheelDisplay.name, flywheelDisplay.buildVisibility, flywheelDisplay.category);
     }
 
     // ===== PU_V8 移植: 墙体 (简化版, 用 vanilla Wall 或 LimitWall) =====

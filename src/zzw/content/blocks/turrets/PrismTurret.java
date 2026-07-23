@@ -46,7 +46,7 @@ import static mindustry.Vars.tilesize;
  */
 public class PrismTurret extends SoulTurretPowerTurret {
     public WavefrontObject object;
-    public float prismOffset = 6f;
+    public float prismOffset = 10f;
     public float prismRotateSpeed = 20f;
 
     public Color fromColor = Color.valueOf("6586b0");  // UnityPal.monolithDark
@@ -159,7 +159,8 @@ public class PrismTurret extends SoulTurretPowerTurret {
                 float rY = prismRotation;
 
                 // ★ 多实例 Z 轴偏移: 基于实例 id, 避免不同炮台的 face 在 batch 中穿插
-                object.zOffset = (id % 1000) * 0.0001f;
+                // 0.1f 的间距确保 batch z 排序能区分不同实例
+                object.zOffset = (id % 100) * 0.1f;
                 object.draw(px, py, 0f, rY, rZ);
                 object.zOffset = 0f;  // 重置
 
