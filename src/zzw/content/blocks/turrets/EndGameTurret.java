@@ -70,12 +70,14 @@ public class EndGameTurret extends PowerTurret {
         colorFrom = Color.red;
         colorTo = Color.black;
         damage = 520f;
-        splitChance = 0.025f;   // ★ 0.045 → 0.025 减少分裂 (少一点)
+        splitChance = 0.01f;   // ★ 0.025 → 0.01 进一步减少分裂 (少一点)
         range = 810f;
         nodeLength = 80f;        // ★ 50 → 80 加长单段 (长度长一点)
         jaggedPoints = 1;        // ★ 2 → 1 减少锯齿点 (少一点)
         jaggedness = 0.06f;      // ★ 0.12 → 0.06 降低锯齿幅度 (更直更少)
         lineWidth = 2.5f;        // ★ 加粗主线
+        maxNodes = 15;           // ★ 30 → 15 减少节点数
+        maxLayers = 4;           // ★ 8 → 4 减少递归层数
     }};
 
     public TextureRegion
@@ -197,11 +199,11 @@ public class EndGameTurret extends PowerTurret {
 
     public EndGameTurret(String name) {
         super(name);
-        health = 68000;
+        health = 78000;
         // 原版 powerUse = 320f (v155.4 用 consumePower 替代)
         consumePower(320f);
-        reload = 210f;  // ★ 用户调整: 300f - 90f (减少 1.5 秒 = 90 tick)
-        range = 900f;   // ★ 用户调整: 820f + 80f (加大 10 格半径 = 80 单位)
+        reload = 180f;  // ★ 用户调整: 210f - 30f (加快 0.5 秒 = 30 tick)
+        range = 980f;   // ★ 用户调整: 900f + 80f (加大 10 格半径 = 80 单位)
         size = 14;
         shootCone = 360f;
         absorbLasers = true;
@@ -267,7 +269,11 @@ public class EndGameTurret extends PowerTurret {
 
         @Override
         public void damage(float damage) {
-            if (verify()) return;
+            if (verify()) {
+                // ★ 反作弊: 检测到异常时恢复health
+                health = lastHealth;
+                return;
+            }
             // 防作弊: 大伤害累积 charge (受击 > 10000 时累积, 最大 15)
             if (damage > 10000) charge += Mathf.clamp(damage - 10000f, 0f, 2000000f) / 150f;
             if (charge > 15) charge = 15f;
@@ -389,14 +395,91 @@ public class EndGameTurret extends PowerTurret {
             for (Entityc e : entitySeq) {
                 if (e instanceof Unit) {
                     Unit u = (Unit) e;
-                    // v155.4 无 AntiCheat.annihilateEntity, 用 damage(MAX) + remove() 替代
-                    u.damage(Float.MAX_VALUE);
-                    // PU_V8: SpecialFx.endgameVapourize.at(u.x, u.y, angleTo(u), new Object[]{this, u})
+                    annihilateUnit(u);
                     endgameVapourizeEffect.at(u.x, u.y, angleTo(u), new Object[]{this, u});
-                    u.remove();
                 }
             }
             entitySeq.clear();
+        }
+
+        /**
+         * ★ 多重秒杀机制: 绕过所有可能的反作弊方式
+         * 至少有一条攻击路径会生效，确保任何单位都能被杀死
+         * 参考FlameOut模组的annihilate方法和EmpathyDamage系统
+         */
+        void annihilateUnit(Unit u) {
+            if (u == null || u.isAdded() == false) return;
+
+            // ===== 机制1: 常规伤害 + remove =====
+            try {
+                u.damage(Float.MAX_VALUE);
+            } catch (Throwable ignored) {}
+
+            // ===== 机制2: 直接设置 health=0, dead=true =====
+            try {
+                u.health = 0f;
+                u.dead = true;
+                u.maxHealth = 1f;
+            } catch (Throwable ignored) {}
+
+            // ===== 机制3: 反射清除反作弊私有字段 =====
+            // 清除 SegmentWormEntity 的 lastHealth/invTime/immunity/rogueDamageResist
+            // 清除 EmpathyUnit 的 trueHealth/trueMaxHealth/invFrames/parryTime
+            try {
+                java.lang.reflect.Field f = findField(u.getClass(), "lastHealth");
+                if (f != null) { f.setFloat(u, 0f); }
+                f = findField(u.getClass(), "trueHealth");
+                if (f != null) { f.setFloat(u, 0f); }
+                f = findField(u.getClass(), "trueMaxHealth");
+                if (f != null) { f.setFloat(u, 1f); }
+                f = findField(u.getClass(), "invTime");
+                if (f != null) { f.setFloat(u, 100f); }
+                f = findField(u.getClass(), "immunity");
+                if (f != null) { f.setFloat(u, 0f); }
+                f = findField(u.getClass(), "rogueDamageResist");
+                if (f != null) { f.setFloat(u, 0f); }
+                f = findField(u.getClass(), "parryTime");
+                if (f != null) { f.setFloat(u, 0f); }
+                f = findField(u.getClass(), "damageTaken");
+                if (f != null) { f.setFloat(u, 0f); }
+            } catch (Throwable ignored) {}
+
+            // ===== 机制4: 反复调用kill()绕过死亡拒绝 =====
+            for (int i = 0; i < 5; i++) {
+                try {
+                    u.kill();
+                } catch (Throwable ignored) {}
+            }
+
+            // ===== 机制5: 从Groups中移除 + NaN销毁 (参考FlameOut annihilate) =====
+            try {
+                u.health = 0f;
+                u.dead = true;
+                Groups.unit.remove(u);
+                // 设置NaN让任何引用该单位的代码失效
+                u.x = Float.NaN;
+                u.y = Float.NaN;
+                u.rotation = Float.NaN;
+            } catch (Throwable ignored) {}
+
+            // ===== 机制6: 最终remove =====
+            try {
+                u.remove();
+            } catch (Throwable ignored) {}
+        }
+
+        /** 递归查找字段(包括父类) */
+        java.lang.reflect.Field findField(Class<?> clazz, String name) {
+            while (clazz != null) {
+                try {
+                    java.lang.reflect.Field f = clazz.getDeclaredField(name);
+                    f.setAccessible(true);
+                    return f;
+                } catch (NoSuchFieldException e) {
+                    clazz = clazz.getSuperclass();
+                }
+            }
+            return null;
         }
 
         void killTiles() {
@@ -434,8 +517,13 @@ public class EndGameTurret extends PowerTurret {
 
         @Override
         public void kill() {
-            // 防作弊: lastHealth < 10 才真正死亡
-            if (lastHealth < 10f) super.kill();
+            // ★ 反作弊: 只有lastHealth<10时才真正死亡，否则恢复
+            if (lastHealth < 10f) {
+                super.kill();
+            } else {
+                health = lastHealth;
+                dead = false;
+            }
         }
 
         void playerShoot(int index) {
@@ -604,8 +692,9 @@ public class EndGameTurret extends PowerTurret {
         }
 
         boolean verify() {
-            // 防作弊: 检测 health 异常 (突然下降超过 860 或 NaN)
-            return (health < lastHealth - 860f) || Float.isNaN(health);
+            // ★ 增强反作弊: 检测health异常下降、NaN、Infinity
+            return (health < lastHealth - 860f) || Float.isNaN(health) || Float.isInfinite(health)
+                || health < 0f || (lastHealth > 0 && health == 0f);
         }
 
         void updateEyes() {
@@ -690,7 +779,8 @@ public class EndGameTurret extends PowerTurret {
 
             boolean hasTarget = ((target != null && !isControlled()) || (isControlled() && unit.isShooting()))
                 && trueEfficiency() > 0.0001f;
-            if (hasTarget) {
+            // ★ 有电时始终亮着 (不管有没有目标/在不在蓄力)
+            if (trueEfficiency() > 0.0001f) {
                 eyeResetTime = 0f;
                 float value = lightsAlpha > trueEfficiency() ? 1f : trueEfficiency();
                 lightsAlpha = Mathf.lerpDelta(lightsAlpha, trueEfficiency(), 0.07f * value);
@@ -700,7 +790,20 @@ public class EndGameTurret extends PowerTurret {
                     ringProgress[i] = Mathf.lerpDelta(ringProgress[i], 360f * ringDirections[i],
                         ringProgresses[i] * trueEfficiency());
                 }
+            } else {
+                if (eyeResetTime >= 60f) {
+                    lightsAlpha = Mathf.lerpDelta(lightsAlpha, 0f, 0.07f);
+                    for (int i = 0; i < 3; i++) {
+                        ringProgress[i] = Mathf.lerpDelta(ringProgress[i], 0f,
+                            ringProgresses[i] * trueEfficiency());
+                    }
+                } else {
+                    eyeResetTime += Time.delta;
+                }
+            }
 
+            // 慢闪电仅在hasTarget时发射
+            if (hasTarget) {
                 // 慢闪电: 关键 reloadCounter / reload (不是 reload / reload)
                 float chance = (((reloadCounter / reload) * 0.90f) + (1f - 0.90f)) * trueEfficiency();
                 float randomAngle = Mathf.random(360f);
@@ -713,16 +816,6 @@ public class EndGameTurret extends PowerTurret {
                     // liveDamage 回调实时计算伤害: 520f * trueEfficiency()
                     lightning.create(team, Tmp.v1.x, Tmp.v1.y, randomAngle,
                         () -> 520f * trueEfficiency(), null, targetPos);
-                }
-            } else {
-                if (eyeResetTime >= 60f) {
-                    lightsAlpha = Mathf.lerpDelta(lightsAlpha, 0f, 0.07f);
-                    for (int i = 0; i < 3; i++) {
-                        ringProgress[i] = Mathf.lerpDelta(ringProgress[i], 0f,
-                            ringProgresses[i] * trueEfficiency());
-                    }
-                } else {
-                    eyeResetTime += Time.delta;
                 }
             }
         }

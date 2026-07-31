@@ -66,6 +66,11 @@ public class TriJointLegsAbility extends Ability {
     public TriJointLegsAbility() {}
 
     @Override
+    public String localized(){
+        return "三关节腿";
+    }
+
+    @Override
     public void init(UnitType type) {
         super.init(type);
         // 加载中段腿贴图, 不存在时退化为 legRegion (与 PU_V8 行为一致)

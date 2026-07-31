@@ -47,6 +47,11 @@ public class TimeStopAbility extends Ability {
     }
 
     @Override
+    public String localized(){
+        return "时间停止";
+    }
+
+    @Override
     public void update(Unit unit) {
         // ★ 递归保护: 模拟更新期间跳过 (防止 unit.update() → ability.update() → trigger() 递归)
         if (updating) return;

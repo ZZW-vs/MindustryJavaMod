@@ -117,7 +117,7 @@ public class EndLaserTurret extends PowerTurret {
 
     public class EndLaserTurretBuild extends PowerTurretBuild {
         float resistance = 1f;
-        float lastHealth;
+        protected float lastHealth = 0f;
         float lightsAlpha = 0f;
         boolean rotate = true;
         boolean isCharging = false;
@@ -171,9 +171,7 @@ public class EndLaserTurret extends PowerTurret {
 
         @Override
         public void updateTile() {
-            // 防作弊: 防止外部代码恢复 health
-            if (health < lastHealth) health = lastHealth;
-            if (invFrame < 30f) invFrame += Time.delta;
+            lastHealth = health;
 
             super.updateTile();
 
@@ -203,13 +201,25 @@ public class EndLaserTurret extends PowerTurret {
 
         @Override
         public void damage(float damage) {
-            // 防作弊: 大伤害增加抗性
-            if (damage > minDamage) resistance += (damage - minDamage) * resistScl;
-            // 无敌帧内不受伤
-            if (invFrame < 30f) return;
-            float trueDamage = Mathf.clamp(damage, 0f, minDamageTaken) / resistance;
-            lastHealth -= trueDamage;
+            // ★ 反作弊: 检测异常伤害
+            if (Float.isNaN(damage) || Float.isInfinite(damage)) return;
+            if (health < lastHealth - 500f) {
+                health = lastHealth;
+                return;
+            }
+            // 限制单次最大伤害
+            float trueDamage = Mathf.clamp(damage, 0f, 500f);
             super.damage(trueDamage);
+        }
+
+        @Override
+        public void kill() {
+            if (lastHealth < 10f) {
+                super.kill();
+            } else {
+                health = lastHealth;
+                dead = false;
+            }
         }
 
         @Override

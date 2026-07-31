@@ -399,18 +399,19 @@ public class SegmentWormEntity extends UnitEntity {
         lastVelocityD.set(lastVelocityC);
         lastVelocityC.set(vel);
 
-        // ★ 防秒杀: 血量保护 (PU132 EndWormUnit.update L32-36)
-        // 防止外部代码直接修改 health 秒杀, health 不能低于 lastHealth
-        if (lastHealth > health) health = lastHealth;
-        if (lastHealth > 0f) dead = false;
+        // ★ 允许health低于lastHealth（不再强制回滚），但防止NaN/Infinity作弊
+        if (Float.isNaN(health) || Float.isInfinite(health)) {
+            health = lastHealth;
+        }
+        if (lastHealth > 0f && health > 0f) dead = false;
         lastHealth = health;
 
         super.update();
 
         // ★ 防秒杀: 抗性衰减 (PU132 EndWormUnit.update L38-43)
         invTime += Time.delta;
-        immunity = Math.max(1f, immunity - (Time.delta / 4f));
-        rogueDamageResist = Math.max(1f, rogueDamageResist - (Time.delta / 2f));
+        immunity = Math.max(1f, immunity - (Time.delta / 2f));
+        rogueDamageResist = Math.max(1f, rogueDamageResist - Time.delta);
 
         // ★ 待机静止: super.update() 后检查
         // ★ 关键修复: super.update() 前不清零 vel, 否则会抵消 AI 上一帧设置的速度
@@ -618,18 +619,18 @@ public class SegmentWormEntity extends UnitEntity {
         }
 
         // ★ 防秒杀: 无敌帧内免疫 (PU132 EndWormUnit L104)
-        if (invTime < 30f) return;
+        if (invTime < 15f) return;
         invTime = 0f;
 
         // ★ 单次最大伤害 = max(220, 最大血量/700) (PU132 EndWormUnit L106)
-        float max = Math.max(220f, lastHealth / 700f);
+        float max = Math.max(500f, lastHealth / 100f);
 
         // ★ 抗性减免后 clamp 限制 (PU132 EndWormUnit L107)
         float trueDamage = Mathf.clamp((amount / immunity) / rogueDamageResist, 0f, max);
 
         // ★ 抗性递增 (PU132 EndWormUnit L108-110)
-        rogueDamageResist += 1.5f;
-        max *= 1.5f;
+        rogueDamageResist += 0.5f;
+        max *= 1.2f;
         immunity += Math.pow(Math.max(amount - max, 0f) / max, 2) * 2f;
 
         // ★ 扣真实血量
@@ -644,11 +645,14 @@ public class SegmentWormEntity extends UnitEntity {
      */
     @Override
     public void kill() {
-        if (lastHealth > 0f) {
-            immunity += 3500f;
+        if (lastHealth > 100f) {
+            // 还有血量时拒绝死亡，但不再增加大量抗性
+            immunity += 100f;
             dead = false;
             return;
         }
+        // lastHealth <= 100 时允许死亡
+        lastHealth = 0f;
         super.kill();
     }
 
@@ -659,10 +663,11 @@ public class SegmentWormEntity extends UnitEntity {
      */
     @Override
     public void destroy() {
-        if (lastHealth > 0f) {
+        if (lastHealth > 100f) {
             immunity += 3500f;
             return;
         }
+        lastHealth = 0f;
         super.destroy();
         // 销毁所有段身
         for (SegmentUnitEntity seg : segments) {
@@ -931,10 +936,11 @@ public class SegmentWormEntity extends UnitEntity {
      *  ★ 防秒杀: lastHealth > 0 时拒绝移除 (PU132 EndWormUnit.remove L72-85) */
     @Override
     public void remove() {
-        if (lastHealth > 0f) {
+        if (lastHealth > 100f) {
             immunity += 3500f;
             return;
         }
+        lastHealth = 0f;
         super.remove();
         for (SegmentUnitEntity seg : segments) {
             if (seg != null && seg.isAdded()) {

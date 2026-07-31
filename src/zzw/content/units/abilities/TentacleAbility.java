@@ -81,6 +81,11 @@ public class TentacleAbility extends Ability {
     }
 
     @Override
+    public String localized(){
+        return "触手";
+    }
+
+    @Override
     public void init(UnitType type) {
         super.init(type);
         if (regionName != null) {

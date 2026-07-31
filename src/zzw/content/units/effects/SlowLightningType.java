@@ -29,10 +29,10 @@ import mindustry.graphics.Pal;
  */
 public class SlowLightningType {
     private static int seed = 1;
-    /** ★ 优化：减少节点上限，从60降到30，降低渲染开销 */
-    public static final int maxNodes = 30;
-    /** ★ 优化：最大递归层数，防止闪电过度延伸 */
-    public static final int maxLayers = 8;
+    /** ★ 优化：减少节点上限，从60降到30，降低渲染开销 (改为实例字段以支持按实例配置) */
+    public int maxNodes = 30;
+    /** ★ 优化：最大递归层数，防止闪电过度延伸 (改为实例字段以支持按实例配置) */
+    public int maxLayers = 8;
     public static final arc.util.pooling.Pool<SlowLightningNode> nodes =
         new arc.util.pooling.Pool<SlowLightningNode>(8, 300) {
             @Override
@@ -195,7 +195,7 @@ public class SlowLightningType {
                 line(p.getX(), p.getY(), x, y);
             }
             /** ★ 优化：增加层数限制，防止闪电过度延伸 */
-            if (!ended && main.distance < type.range && main.nodes.size < maxNodes && layer < maxLayers) {
+            if (!ended && main.distance < type.range && main.nodes.size < type.maxNodes && layer < type.maxLayers) {
                 main.end(this);
             }
         }

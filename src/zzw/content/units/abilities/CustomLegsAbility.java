@@ -38,6 +38,11 @@ public class CustomLegsAbility extends Ability {
     public CustomLegsAbility() {}
 
     @Override
+    public String localized(){
+        return "自定义腿";
+    }
+
+    @Override
     public void init(UnitType type) {
         super.init(type);
         for (LegGroupType gt : legGroups) {

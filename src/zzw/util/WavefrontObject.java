@@ -23,7 +23,7 @@ import java.util.*;
  * @author GlennFolker
  */
 public class WavefrontObject{
-    protected static final float zScale = 0.01f;
+    protected static final float zScale = 0.001f;
     protected static final float defaultScl = 4f;
     protected static final float perspectiveDistance = 350f;
 
@@ -304,13 +304,26 @@ public class WavefrontObject{
         // 需要按面深度排序 (远的先画, 近的后画), 保证前面覆盖后面
         if(singleZLayer){
             Draw.z(drawLayer + zOffset);
-            // 计算每个面的平均 z (深度), 按 z 降序排序 (z 小=远=先画)
-            faces.sort((a, b) -> {
-                float za = 0, zb = 0;
-                for(Vertex v : a.verts) za += v.source.z;
-                for(Vertex v : b.verts) zb += v.source.z;
-                return Float.compare(za / a.verts.length, zb / b.verts.length);
+            // 稳定排序: 当z值差小于阈值时保持原有顺序，避免帧间翻转导致抽搐
+            int n = faces.size;
+            Float[] zVals = new Float[n];
+            for(int i = 0; i < n; i++){
+                float z = 0;
+                Face f = faces.get(i);
+                for(Vertex v : f.verts) z += v.source.z;
+                zVals[i] = z / f.verts.length;
+            }
+            Integer[] indices = new Integer[n];
+            for(int i = 0; i < n; i++) indices[i] = i;
+            Arrays.sort(indices, (a, b) -> {
+                float diff = zVals[a] - zVals[b];
+                if(Math.abs(diff) < 0.001f) return a - b; // 稳定排序: z值相近时保持原序
+                return Float.compare(zVals[a], zVals[b]);
             });
+            Seq<Face> sorted = new Seq<>(n);
+            for(int idx : indices) sorted.add(faces.get(idx));
+            faces.clear();
+            faces.addAll(sorted);
         }
 
         for(Face face : faces){
