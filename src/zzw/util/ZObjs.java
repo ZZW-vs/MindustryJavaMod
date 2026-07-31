@@ -28,6 +28,8 @@ public class ZObjs {
     public static WavefrontObject wavefront;
     public static WavefrontObject prism;
     public static WavefrontObject flywheel;
+    public static WavefrontObject waterWheel;
+    public static WavefrontObject crushingWheel;
 
     private static boolean loaded = false;
 
@@ -86,6 +88,28 @@ public class ZObjs {
         // ★ singleZLayer=true: 多个飞轮方块同时存在时, 每个实例整体用一个 z 渲染, 避免交叉穿插
         flywheel.singleZLayer = true;
 
+        // waterWheel: MC Create 水车模型 (绕Y轴旋转, 棕色木质)
+        waterWheel = new WavefrontObject();
+        waterWheel.textureName = "water_wheel";
+        waterWheel.size = 3f;
+        waterWheel.shadingType = WavefrontObject.ShadingType.topLight;
+        waterWheel.lightColor = Color.valueOf("8B7355");
+        waterWheel.shadeColor = Color.valueOf("4A3B2A");
+        waterWheel.maxShade = 0.7f;
+        waterWheel.drawLayer = Layer.block;
+        waterWheel.singleZLayer = true;
+
+        // crushingWheel: MC Create 粉碎轮 (绕Z轴旋转, 灰色石质)
+        crushingWheel = new WavefrontObject();
+        crushingWheel.textureName = "crushing_wheel";
+        crushingWheel.size = 3f;
+        crushingWheel.shadingType = WavefrontObject.ShadingType.topLight;
+        crushingWheel.lightColor = Color.valueOf("9E9E9E");
+        crushingWheel.shadeColor = Color.valueOf("404040");
+        crushingWheel.maxShade = 0.7f;
+        crushingWheel.drawLayer = Layer.block;
+        crushingWheel.singleZLayer = true;
+
         Events.on(EventType.ClientLoadEvent.class, e -> {
             // ClientLoadEvent 时 atlas 贴图区域已注册, 避免 wavefront 等 hasTexture=true 对象加载失败
             Core.app.post(ZObjs::load);
@@ -99,6 +123,8 @@ public class ZObjs {
         loadObj(wavefront, "wavefront");
         loadObj(prism, "prism");
         loadObj(flywheel, "flywheel");
+        loadObj(waterWheel, "water_wheel");
+        loadObj(crushingWheel, "crushing_wheel");
     }
 
     private static void loadObj(WavefrontObject obj, String name) {
