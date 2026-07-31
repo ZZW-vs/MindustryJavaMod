@@ -1,0 +1,12 @@
+# Blender MTL File: water_wheel
+newmtl m_axis
+Kd 0.6 0.5 0.4
+
+newmtl m_log
+Kd 0.55 0.43 0.33
+
+newmtl m_plank
+Kd 0.65 0.52 0.40
+
+newmtl m_metal
+Kd 0.5 0.5 0.55

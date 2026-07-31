@@ -106,30 +106,17 @@ public class Z_Blocks {
 
     // ===== 3D 模型展示方块 (伪3D, 使用 WavefrontObject 渲染 .obj 文件) =====
     private static void create3DDisplayBlocks() {
-        // 飞轮展示方块: MC Create 飞轮模型, 绕 Z 轴俯视旋转
-        flywheelDisplay = new ObjDisplayBlock("flywheel-display") {{
-            // ★ alwaysUnlocked=true: 让方块在战役模式无需研究即可使用
-            requirements(Category.effect, ItemStack.with(Items.copper, 20, Items.lead, 10), true);
-            size = 2;
-            health = 320;
-            rotateSpeed = 1.5f;
-            rotateAxis = 'Z';
-            baseOffset = 2f;
-            object = zzw.util.ZObjs.flywheel;
+        // 万能模型展示台: 3x3 尺寸, 支持4种内置模型切换
+        // flywheelDisplay 和 wavefrontDisplay 保留作为兼容, 但实际使用 universalDisplay
+        flywheelDisplay = new ObjDisplayBlock("universal-display") {{
+            requirements(Category.effect, ItemStack.with(Items.copper, 50, Items.lead, 30, Items.silicon, 20), true);
+            health = 800;
             buildVisibility = BuildVisibility.shown;
         }};
-
-        // 波前展示方块: PU_V8 wavefront.obj 模型, 绕 Y 轴侧视翻转
-        wavefrontDisplay = new ObjDisplayBlock("wavefront-display") {{
-            requirements(Category.effect, ItemStack.with(Items.copper, 20, Items.lead, 10), true);
-            size = 2;
-            health = 320;
-            rotateSpeed = 1.2f;
-            rotateAxis = 'Y';
-            baseOffset = 4f;
-            object = zzw.util.ZObjs.wavefront;
-            buildVisibility = BuildVisibility.shown;
-        }};
+        
+        // 为了保持兼容性, 给旧名字起别名 (在Mindustry中通过ContentLoader处理)
+        // 实际上我们只注册一个 "universal-display"
+        wavefrontDisplay = flywheelDisplay; 
     }
 
     // ===== PU_V8 移植: 墙体 (简化版, 用 vanilla Wall 或 LimitWall) =====

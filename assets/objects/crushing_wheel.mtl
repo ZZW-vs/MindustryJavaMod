@@ -1,0 +1,12 @@
+# Blender MTL File: crushing_wheel
+newmtl m_insert
+Kd 0.4 0.35 0.30
+
+newmtl m_plates
+Kd 0.5 0.45 0.40
+
+newmtl m_axis
+Kd 0.6 0.5 0.4
+
+newmtl m_spruce
+Kd 0.45 0.35 0.25

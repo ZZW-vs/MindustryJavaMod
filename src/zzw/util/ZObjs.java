@@ -30,6 +30,8 @@ public class ZObjs {
     public static WavefrontObject flywheel;
     public static WavefrontObject waterWheel;
     public static WavefrontObject crushingWheel;
+    public static WavefrontObject cogwheel;
+    public static WavefrontObject largeCogwheel;
 
     private static boolean loaded = false;
 
@@ -87,6 +89,7 @@ public class ZObjs {
         flywheel.drawLayer = Layer.block;
         // ★ singleZLayer=true: 多个飞轮方块同时存在时, 每个实例整体用一个 z 渲染, 避免交叉穿插
         flywheel.singleZLayer = true;
+        flywheel.cullBackfaces = false;
 
         // waterWheel: MC Create 水车模型 (绕Y轴旋转, 棕色木质)
         waterWheel = new WavefrontObject();
@@ -98,6 +101,7 @@ public class ZObjs {
         waterWheel.maxShade = 0.7f;
         waterWheel.drawLayer = Layer.block;
         waterWheel.singleZLayer = true;
+        waterWheel.cullBackfaces = false;
 
         // crushingWheel: MC Create 粉碎轮 (绕Z轴旋转, 灰色石质)
         crushingWheel = new WavefrontObject();
@@ -109,6 +113,31 @@ public class ZObjs {
         crushingWheel.maxShade = 0.7f;
         crushingWheel.drawLayer = Layer.block;
         crushingWheel.singleZLayer = true;
+        crushingWheel.cullBackfaces = false;
+
+        // cogwheel: 小齿轮 (8齿, 棕色木质, 绕Y轴旋转)
+        cogwheel = new WavefrontObject();
+        cogwheel.textureName = "cogwheel";
+        cogwheel.size = 3f;
+        cogwheel.shadingType = WavefrontObject.ShadingType.topLight;
+        cogwheel.lightColor = Color.white;
+        cogwheel.shadeColor = Color.valueOf("3A2D20");
+        cogwheel.maxShade = 0.75f;
+        cogwheel.drawLayer = Layer.block;
+        cogwheel.singleZLayer = true;
+        cogwheel.cullBackfaces = false;
+
+        // largeCogwheel: 大齿轮 (12齿, 深棕色木质, 绕Y轴旋转)
+        largeCogwheel = new WavefrontObject();
+        largeCogwheel.textureName = "large_cogwheel";
+        largeCogwheel.size = 3f;
+        largeCogwheel.shadingType = WavefrontObject.ShadingType.topLight;
+        largeCogwheel.lightColor = Color.white;
+        largeCogwheel.shadeColor = Color.valueOf("2A2015");
+        largeCogwheel.maxShade = 0.75f;
+        largeCogwheel.drawLayer = Layer.block;
+        largeCogwheel.singleZLayer = true;
+        largeCogwheel.cullBackfaces = false;
 
         Events.on(EventType.ClientLoadEvent.class, e -> {
             // ClientLoadEvent 时 atlas 贴图区域已注册, 避免 wavefront 等 hasTexture=true 对象加载失败
@@ -125,6 +154,8 @@ public class ZObjs {
         loadObj(flywheel, "flywheel");
         loadObj(waterWheel, "water_wheel");
         loadObj(crushingWheel, "crushing_wheel");
+        loadObj(cogwheel, "cogwheel");
+        loadObj(largeCogwheel, "large_cogwheel");
     }
 
     private static void loadObj(WavefrontObject obj, String name) {
