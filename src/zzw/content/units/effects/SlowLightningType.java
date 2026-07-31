@@ -79,6 +79,11 @@ public class SlowLightningType {
         return s;
     }
 
+    /** ★ 返回带有随机变化的节点长度 (60%~140%), 让每条闪电/每段长度不同 */
+    public float randomNodeLength() {
+        return nodeLength * (0.6f + Mathf.random(0.8f));
+    }
+
     public void damageUnit(SlowLightningNode s, Unit unit) {
         Floatp l = s.main.liveDamage;
         unit.damage(l != null ? l.get() : damage);

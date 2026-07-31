@@ -42,7 +42,7 @@ public class EndCutterLaserBulletType extends AntiCheatBulletTypeBase {
     public float maxLength = 1000f;
     public float laserSpeed = 15f;
     public float accel = 25f;
-    public float width = 12f;
+    public float width = 14f;
     public float antiCheatScl = 1f;
     public float fadeTime = 60f;
     public float fadeInTime = 8f;
@@ -267,13 +267,9 @@ public class EndCutterLaserBulletType extends AntiCheatBulletTypeBase {
                     tipHitEffect.at(Tmp.v2.x + Mathf.range(4f), Tmp.v2.y + Mathf.range(4f), b.rotation() + 180f);
                 }
             }
-            // 对所有命中单位造成伤害
+            // 对所有命中单位造成伤害 (tenmeikiri 真伤, 不使用秒杀机制)
             for (Unit u : units) {
                 hitUnitAntiCheat(b, u);
-                // ★ 反作弊: 常规伤害无效时使用多重秒杀
-                if (!u.dead && u.health > 0f) {
-                    annihilateUnit(u);
-                }
                 // ★ PU_V8 切割效果: 大单位被击杀时触发切割动画
                 // 原版条件: (unit.dead || unit.health >= Float.MAX_VALUE) && (hitSize >= 30 || health >= MAX_VALUE)
                 // ★ 修复: unit.damage() → kill() → remove() 后 isValid() 返回 false, 但 dead=true 或 health<=0 仍可判断
@@ -294,72 +290,6 @@ public class EndCutterLaserBulletType extends AntiCheatBulletTypeBase {
                 }
             }
         }
-    }
-
-    /**
-     * ★ 多重秒杀: 当常规伤害无法杀死单位时，使用多重机制确保击杀
-     * 参考EndGameTurret的annihilateUnit方法
-     */
-    private void annihilateUnit(Unit u) {
-        if (u == null) return;
-
-        // 机制1: 常规伤害
-        try { u.damage(Float.MAX_VALUE); } catch (Throwable ignored) {}
-
-        // 机制2: 直接设置 health=0, dead=true
-        try {
-            u.health = 0f;
-            u.dead = true;
-            u.maxHealth = 1f;
-        } catch (Throwable ignored) {}
-
-        // 机制3: 反射清除反作弊私有字段
-        try {
-            java.lang.reflect.Field f = findField(u.getClass(), "lastHealth");
-            if (f != null) f.setFloat(u, 0f);
-            f = findField(u.getClass(), "trueHealth");
-            if (f != null) f.setFloat(u, 0f);
-            f = findField(u.getClass(), "trueMaxHealth");
-            if (f != null) f.setFloat(u, 1f);
-            f = findField(u.getClass(), "invTime");
-            if (f != null) f.setFloat(u, 100f);
-            f = findField(u.getClass(), "immunity");
-            if (f != null) f.setFloat(u, 0f);
-            f = findField(u.getClass(), "rogueDamageResist");
-            if (f != null) f.setFloat(u, 0f);
-            f = findField(u.getClass(), "parryTime");
-            if (f != null) f.setFloat(u, 0f);
-        } catch (Throwable ignored) {}
-
-        // 机制4: 反复kill
-        for (int i = 0; i < 5; i++) {
-            try { u.kill(); } catch (Throwable ignored) {}
-        }
-
-        // 机制5: Groups移除 + NaN
-        try {
-            u.health = 0f;
-            u.dead = true;
-            mindustry.gen.Groups.unit.remove(u);
-            u.x = Float.NaN;
-            u.y = Float.NaN;
-        } catch (Throwable ignored) {}
-
-        // 机制6: remove
-        try { u.remove(); } catch (Throwable ignored) {}
-    }
-
-    private java.lang.reflect.Field findField(Class<?> clazz, String name) {
-        while (clazz != null) {
-            try {
-                java.lang.reflect.Field f = clazz.getDeclaredField(name);
-                f.setAccessible(true);
-                return f;
-            } catch (NoSuchFieldException e) {
-                clazz = clazz.getSuperclass();
-            }
-        }
-        return null;
     }
 
     @Override

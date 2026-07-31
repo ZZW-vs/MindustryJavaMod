@@ -295,15 +295,15 @@ public class SlowLightningEntity implements Drawc {
             float rr = tr + r;
 
             collided = false;
-            float nl = type.nodeLength;
+            float nl = type.randomNodeLength();
             Vec2 v2 = Tmp.v2.set(node == null ? this : node);
-            Vec2 v = Tmp.v1.trns(rr, Math.min(type.nodeLength, type.range - nl)).add(v2);
+            Vec2 v = Tmp.v1.trns(rr, Math.min(nl, type.range - nl)).add(v2);
             float l = SlowLightningUtils.findLaserLength(v2.x, v2.y, v.x, v.y, tile -> {
                 collided |= (tile.team() != team && tile.block() != null && tile.block().absorbLasers);
                 return collided;
             });
             if (l < type.nodeTime) {
-                v.sub(v2).scl(l / type.nodeLength).add(v2);
+                v.sub(v2).scl(l / nl).add(v2);
             }
 
             SlowLightningType.SlowLightningNode n = SlowLightningType.nodes.obtain();

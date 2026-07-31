@@ -403,7 +403,8 @@ public class SegmentWormEntity extends UnitEntity {
         if (Float.isNaN(health) || Float.isInfinite(health)) {
             health = lastHealth;
         }
-        if (lastHealth > 0f && health > 0f) dead = false;
+        // 只有在非主动死亡状态下才设dead=false (防止被外部代码误标dead)
+        if (lastHealth > 0f && health > 0f && lastHealth > 100f) dead = false;
         lastHealth = health;
 
         super.update();
@@ -631,7 +632,8 @@ public class SegmentWormEntity extends UnitEntity {
         // ★ 抗性递增 (PU132 EndWormUnit L108-110)
         rogueDamageResist += 0.5f;
         max *= 1.2f;
-        immunity += Math.pow(Math.max(amount - max, 0f) / max, 2) * 2f;
+        float immunityAdd = (float)Math.pow(Math.max(amount - max, 0f) / max, 2) * 2f;
+        immunity += Math.min(immunityAdd, 50f);  // 限制单次增长上限为50
 
         // ★ 扣真实血量
         lastHealth -= trueDamage;
@@ -734,6 +736,7 @@ public class SegmentWormEntity extends UnitEntity {
      * index=-1 时表示头部自己 (与第 0 段一起平均)
      */
     protected void distributeHealth(int index) {
+        if (dead || health <= 0f) return;  // 头部已死亡时不进行血量分布
         int idx = 0;
         float mHealth = 0f;
         float mMaxHealth = 0f;

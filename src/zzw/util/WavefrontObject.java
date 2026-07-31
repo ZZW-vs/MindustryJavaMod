@@ -302,6 +302,8 @@ public class WavefrontObject{
 
         // ★ singleZLayer 模式: 整个模型用同一个 z + zOffset, 避免多实例交叉穿插
         // 需要按面深度排序 (远的先画, 近的后画), 保证前面覆盖后面
+        // ★ 排序结果存入临时数组 drawOrder, 不修改原始 faces (避免多实例共享模型竞态)
+        Face[] drawOrder;
         if(singleZLayer){
             Draw.z(drawLayer + zOffset);
             // 稳定排序: 当z值差小于阈值时保持原有顺序，避免帧间翻转导致抽搐
@@ -320,13 +322,14 @@ public class WavefrontObject{
                 if(Math.abs(diff) < 0.001f) return a - b; // 稳定排序: z值相近时保持原序
                 return Float.compare(zVals[a], zVals[b]);
             });
-            Seq<Face> sorted = new Seq<>(n);
-            for(int idx : indices) sorted.add(faces.get(idx));
-            faces.clear();
-            faces.addAll(sorted);
+            // ★ 用临时数组绘制，不修改原始faces
+            drawOrder = new Face[n];
+            for(int i = 0; i < n; i++) drawOrder[i] = faces.get(indices[i]);
+        }else{
+            drawOrder = faces.toArray(Face.class);
         }
 
-        for(Face face : faces){
+        for(Face face : drawOrder){
             if(!singleZLayer){
                 indexerA = 0;
                 indexerZ = 0f;
@@ -379,8 +382,11 @@ public class WavefrontObject{
 
         boolean matB = face.mat != null && face.mat.hasColor;
         if(matB){
-            Tmp.c2.rgba8888(face.mat.ambientCol).mul(shadeColor);
-            Tmp.c3.rgba8888(face.mat.diffuseCol).mul(lightColor);
+            // ★ 亮部 = 材质diffuse色 (不乘lightColor，避免过暗)
+            Tmp.c3.rgba8888(face.mat.diffuseCol);
+            // ★ 暗部 = 材质diffuse色的暗色版本 (而非ambientCol×shadeColor)
+            Tmp.c2.set(Tmp.c3.r * 0.3f, Tmp.c3.g * 0.3f, Tmp.c3.b * 0.3f, 1f);
+            // 自发光插值 (emit不为0时暗部接近亮部)
             Tmp.c4.rgba8888(face.mat.emitCol);
             Tmp.c2.r = Mathf.lerp(Tmp.c2.r, Tmp.c3.r, Tmp.c4.r);
             Tmp.c2.g = Mathf.lerp(Tmp.c2.g, Tmp.c3.g, Tmp.c4.g);
@@ -411,8 +417,11 @@ public class WavefrontObject{
 
         boolean matB = face.mat != null && face.mat.hasColor;
         if(matB){
-            Tmp.c2.rgba8888(face.mat.ambientCol).mul(shadeColor);
-            Tmp.c3.rgba8888(face.mat.diffuseCol).mul(lightColor);
+            // ★ 亮部 = 材质diffuse色 (不乘lightColor，避免过暗)
+            Tmp.c3.rgba8888(face.mat.diffuseCol);
+            // ★ 暗部 = 材质diffuse色的暗色版本 (而非ambientCol×shadeColor)
+            Tmp.c2.set(Tmp.c3.r * 0.3f, Tmp.c3.g * 0.3f, Tmp.c3.b * 0.3f, 1f);
+            // 自发光插值 (emit不为0时暗部接近亮部)
             Tmp.c4.rgba8888(face.mat.emitCol);
             Tmp.c2.r = Mathf.lerp(Tmp.c2.r, Tmp.c3.r, Tmp.c4.r);
             Tmp.c2.g = Mathf.lerp(Tmp.c2.g, Tmp.c3.g, Tmp.c4.g);

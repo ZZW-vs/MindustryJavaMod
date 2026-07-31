@@ -102,8 +102,12 @@ public class ObjDisplayBlock extends Block {
                 obj.lightColor.set(currentColor);
                 obj.shadeColor.set(currentColor.r * 0.2f, currentColor.g * 0.2f, currentColor.b * 0.2f);
                 obj.maxShade = 0.85f;
+            } else {
+                // ★ 原色模式: lightColor=白色不调制材质色, shadeColor=黑色
+                obj.lightColor.set(Color.white);
+                obj.shadeColor.set(Color.black);
+                obj.maxShade = 0.75f;
             }
-            // currentColor == null 时使用模型原色 (不修改lightColor/shadeColor)
             obj.size = currentScale;
 
             // 旋转角度

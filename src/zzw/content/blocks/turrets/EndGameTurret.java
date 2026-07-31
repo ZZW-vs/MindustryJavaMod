@@ -762,24 +762,7 @@ public class EndGameTurret extends PowerTurret {
                 eyesAlpha = Mathf.lerpDelta(eyesAlpha, 0f, 0.06f);
             }
 
-            // 主攻击 gate: 仅 canConsume (有电/蓄能 + 有 terminum) 时才更新 super
-            if (canConsume()) {
-                updateAntiBullets();
-                super.updateTile();
-            }
-
-            // 眼睛目标偏移计算
-            if (isControlled()) {
-                mindustry.gen.Player con = (mindustry.gen.Player) unit.controller();
-                eyeTargetOffset.trns(angleTo(con.mouseX, con.mouseY), dst(con.mouseX, con.mouseY) / (range / 3f));
-            } else if (target != null && trueEfficiency() > 0.0001f) {
-                eyeTargetOffset.trns(angleTo(targetPos.x, targetPos.y), dst(targetPos.x, targetPos.y) / (range / 3f));
-            }
-            eyeTargetOffset.limit(2f);
-
-            boolean hasTarget = ((target != null && !isControlled()) || (isControlled() && unit.isShooting()))
-                && trueEfficiency() > 0.0001f;
-            // ★ 有电时始终亮着 (不管有没有目标/在不在蓄力)
+            // ★ 灯光逻辑始终运行 (移到 canConsume 检查之前, 只要有电就亮)
             if (trueEfficiency() > 0.0001f) {
                 eyeResetTime = 0f;
                 float value = lightsAlpha > trueEfficiency() ? 1f : trueEfficiency();
@@ -799,6 +782,33 @@ public class EndGameTurret extends PowerTurret {
                     }
                 } else {
                     eyeResetTime += Time.delta;
+                }
+            }
+
+            // 反子弹和主攻击需要 canConsume
+            if (canConsume()) {
+                updateAntiBullets();
+                super.updateTile();
+            }
+
+            // 眼睛目标偏移计算
+            if (isControlled()) {
+                mindustry.gen.Player con = (mindustry.gen.Player) unit.controller();
+                eyeTargetOffset.trns(angleTo(con.mouseX, con.mouseY), dst(con.mouseX, con.mouseY) / (range / 3f));
+            } else if (target != null && trueEfficiency() > 0.0001f) {
+                eyeTargetOffset.trns(angleTo(targetPos.x, targetPos.y), dst(targetPos.x, targetPos.y) / (range / 3f));
+            }
+            eyeTargetOffset.limit(2f);
+
+            boolean hasTarget = ((target != null && !isControlled()) || (isControlled() && unit.isShooting()))
+                && trueEfficiency() > 0.0001f;
+
+            // ★ 射击后持续红色光束效果 (reloadCounter < reload*0.3f 时显示, 渐弱)
+            if (hasTarget && canConsume() && reloadCounter < reload * 0.3f) {
+                float progress = 1f - (reloadCounter / (reload * 0.3f)); // 0→1 渐弱
+                if (target != null) {
+                    Object[] data = {new Vec2(x + eyeOffset.x, y + eyeOffset.y), target, 0.8f * progress};
+                    endgameLaserEffect.at(x, y, 0f, data);
                 }
             }
 
