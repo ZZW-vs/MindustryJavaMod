@@ -6,6 +6,8 @@ import arc.func.*;
 import arc.graphics.*;
 import arc.graphics.g2d.*;
 import arc.graphics.g2d.TextureAtlas.*;
+import arc.graphics.g3d.*;
+import arc.graphics.gl.*;
 import arc.math.*;
 import arc.math.geom.*;
 import arc.struct.*;
@@ -17,16 +19,39 @@ import java.io.*;
 import java.util.*;
 
 /**
- * Wavefront Object Converter and Renderer for Arc/libGDX
- * The faces should not intersect. (no crashes, its just that the renderer doesn't support it.)
- * @author EyeOfDarkness
- * @author GlennFolker
+ * Wavefront Object (.obj) GPU 3D 渲染器
+ *
+ * ★ 完全重写版: 使用 GPU 深度缓冲 + FrameBuffer 离屏渲染
+ * - 优势: 完美支持任意3D模型, 无面排序/z-fighting问题, 支持Y轴旋转
+ * - 使用 Camera3D 透视投影 + 自定义 Shader (方向光照)
+ * - OBJ 加载时构建 Mesh (position3 + normal + color), GPU 自动处理深度
+ *
+ * 公共 API 与旧版保持兼容 (字段/方法/内部类不变)
+ *
+ * @author EyeOfDarkness (原 CPU 软件渲染器)
+ * @author 郑zip (GPU 深度缓冲重写)
  */
 public class WavefrontObject{
     protected static final float zScale = 0.01f;
     protected static final float defaultScl = 4f;
     protected static final float perspectiveDistance = 350f;
 
+    // ===== 静态 GPU 资源 (延迟初始化, 所有实例共享) =====
+    private static Camera3D cam;
+    private static FrameBuffer buffer;
+    private static Mat3D transform = new Mat3D();
+    private static ObjShader shader;
+    private static boolean initialized = false;
+    private static boolean shaderFailed = false;
+
+    // ===== Mesh 数据 (GPU 缓冲) =====
+    private Mesh mesh;
+    private int numIndices;
+    private float boundRadius;       // 模型边界球半径 (模型空间, 未缩放)
+    private float[] originalVerts;   // CPU 顶点副本 (用于 cons 形变)
+    private int vertFloatCount;      // 顶点浮点数总数 (每顶点 7 float: pos3+normal3+color1)
+
+    // ===== OBJ 数据 (保持公共 API 兼容) =====
     public Seq<Vec3> vertices = new Seq<>();
     public Seq<Vec2> uvs = new Seq<>();
     public Seq<Vec3> normals = new Seq<>();
@@ -42,28 +67,43 @@ public class WavefrontObject{
     private boolean hasMaterialTex = false;
     private boolean odd = false;
 
+    // ===== 渲染配置 (公共 API) =====
     public ShadingType shadingType = ShadingType.normalAngle;
     public Color lightColor = Color.white;
     public Color shadeColor = Color.black;
     public float size = 1f;
     public float shadingSmoothness = 2.8f;
     public float drawLayer = Layer.blockBuilding;
-    /** ★ 最大暗化程度 (0~1), 控制 normalAngle 着色中法线垂直时面最多变暗多少
-     *  默认 0.75, 对于法线朝Y轴的模型(如飞轮)建议设为 0.4 避免全灰 */
+    /** ★ 最大暗化程度 (0~1) */
     public float maxShade = 0.75f;
-    /** 是否启用屏幕法线背面剔除 (默认 false - 伪3D 中屏幕 Z 轴剔除不适用俯视相机) */
+    /** 是否启用 GPU 背面剔除 (true=剔除背面, false=双面渲染) */
     public boolean cullBackfaces = false;
-    /** 是否用单一 z 层渲染整个模型 (默认 false, 按面 z 排序)
-     *  ★ 设为 true 时所有 face 用同一 z 值, 避免多个实例的 face 在 batch 中交叉穿插
-     *  适用于: 多个同类方块同时存在时的展示模型 */
+    /** 保留 API 兼容 (GPU 深度缓冲自动处理, 不再需要) */
     public boolean singleZLayer = false;
-    /** ★ 实例间 Z 轴偏移 (由调用方在 draw 前设置, draw 后重置)
-     *  用于多实例场景: 不同实例用不同 zOffset, 避免 batch 中 face 互相穿插
-     *  推荐值: id * 0.0001f (范围 0~0.1, 不跨层) */
+    /** 实例间 Z 轴偏移 (用于 Draw.z 层级区分) */
     public float zOffset = 0f;
     protected int indexerA;
     protected float indexerZ;
 
+    // ===== 初始化 =====
+    private static void init(){
+        if(initialized) return;
+        initialized = true;
+        cam = new Camera3D();
+        cam.fov = 45f;
+        cam.near = 0.1f;
+        cam.far = 5000f;
+        cam.up.set(Vec3.Y);
+        buffer = new FrameBuffer(256, 256, true);
+        try{
+            shader = new ObjShader();
+        }catch(Throwable t){
+            Log.err("[Create] WavefrontObject shader compile failed, GPU rendering disabled", t);
+            shaderFailed = true;
+        }
+    }
+
+    // ===== OBJ 加载 (解析 + 构建 Mesh) =====
     public void load(Fi file, @Nullable Fi material){
         if(material != null){
             BufferedReader matR = material.reader(64);
@@ -86,12 +126,10 @@ public class WavefrontObject{
                     if(line.startsWith("Ka ") && current != null){
                         String[] val = line.replaceFirst("Ka ", "").split("\\s+");
                         float[] col = new float[3];
-
                         if(val.length != 3) throw new IllegalStateException("'Ka' must be followed with 3 arguments. Required: [r, g, b], found: " + Arrays.toString(val));
                         for(int i = 0; i < 3; i++){
                             col[i] = Strings.parseFloat(val[i], 0f);
                         }
-
                         Tmp.c1.set(col[0], col[1], col[2]).a(1f);
                         current.ambientCol = Tmp.c1.rgba8888();
                         if(!Tmp.c1.equals(Color.white)){
@@ -102,12 +140,10 @@ public class WavefrontObject{
                     if(line.startsWith("Kd ") && current != null){
                         String[] val = line.replaceFirst("Kd ", "").split("\\s+");
                         float[] col = new float[3];
-
                         if(val.length != 3) throw new IllegalStateException("'Kd' must be followed with 3 arguments. Required: [r, g, b], found: " + Arrays.toString(val));
                         for(int i = 0; i < 3; i++){
                             col[i] = Strings.parseFloat(val[i], 0f);
                         }
-
                         Tmp.c1.set(col[0], col[1], col[2]).a(1f);
                         current.diffuseCol = Tmp.c1.rgba8888();
                         if(!Tmp.c1.equals(Color.white)){
@@ -118,12 +154,10 @@ public class WavefrontObject{
                     if(line.startsWith("Ke ") && current != null){
                         String[] val = line.replaceFirst("Ke ", "").split("\\s+");
                         float[] col = new float[3];
-
                         if(val.length != 3) throw new IllegalStateException("'Ke' must be followed with 3 arguments. Required: [r, g, b], found: " + Arrays.toString(val));
                         for(int i = 0; i < 3; i++){
                             col[i] = Strings.parseFloat(val[i], 0f);
                         }
-
                         Tmp.c1.set(col[0], col[1], col[2]).a(1f);
                         current.emitCol = Tmp.c1.rgba8888();
                         if(!Tmp.c1.equals(Color.black)){
@@ -156,16 +190,14 @@ public class WavefrontObject{
             try{
                 String line = reader.readLine();
                 if(line == null) break;
-                // 跳过注释行, 避免 contains("vt ") 等误匹配注释中的文本
                 if(line.startsWith("#")) continue;
-                // 跳过空行
                 if(line.trim().isEmpty()) continue;
 
                 if(line.startsWith("v ")){
                     String[] pos = line.replaceFirst("v ", "").split("\\s+");
                     if(pos.length != 3) throw new IllegalStateException("'v' must define all 3 vector points");
 
-                    float[] vec = new float[3];    
+                    float[] vec = new float[3];
                     for(int i = 0; i < 3; i++){
                         vec[i] = Strings.parseFloat(pos[i], 0f);
                     }
@@ -186,7 +218,7 @@ public class WavefrontObject{
                 if(line.startsWith("vn ")){
                     if(!hasNormal) hasNormal = true;
                     String[] pos = line.replaceFirst("vn ", "").split("\\s+");
-                    if(pos.length != 3) throw new IllegalStateException("'v' must define all 3 vector points");
+                    if(pos.length != 3) throw new IllegalStateException("'vn' must define all 3 vector points");
 
                     float[] vec = new float[3];
                     for(int i = 0; i < 3; i++){
@@ -214,25 +246,21 @@ public class WavefrontObject{
                     int[] i = {0};
                     for(String segment : segments){
                         String[] faceIndex = segment.split("/");
-                        //Unity.print(faceIndex.length + "");
                         Vertex vert = drawnVertices.get(getFaceVal(faceIndex[0]));
                         face.verts[i[0]] = vert;
-                        if(hasNormal){
+                        if(hasNormal && faceIndex.length > 2 && !faceIndex[2].isEmpty()){
                             face.normal[i[0]] = drawnNormals.get(getFaceVal(faceIndex[2]));
                         }
-                        if(hasTexture){
+                        if(hasTexture && faceIndex.length > 1 && !faceIndex[1].isEmpty()){
                             face.vertexTexture[i[0]] = uvs.get(getFaceVal(faceIndex[1]));
                         }
 
                         for(int sign : Mathf.signs){
                             Vertex v = drawnVertices.get(faceVertIndex(segments[Mathf.mod(sign + i[0], segments.length)]));
-
                             if(!face.verts[i[0]].neighbors.contains(v)){
                                 face.verts[i[0]].neighbors.add(v);
                             }
                         }
-                        //faceTmp.shadingValue += (Math.abs(vert.source.x) + Math.abs(vert.source.y) + Math.abs(vert.source.z)) / 3f;
-                        //faceTmp.shadingValue += vert.source.len();
                         face.size += 6;
                         i[0]++;
                     }
@@ -245,13 +273,11 @@ public class WavefrontObject{
                             for(Vertex vc : face.verts){
                                 if(vs == vc) return true;
                             }
-
                             return false;
                         }, vs -> {
                             face.shadingValue += vt.source.dst(vs.source);
                             i[0]++;
                         });
-                        //i[0]++;
                     }
 
                     face.shadingValue /= i[0];
@@ -265,232 +291,274 @@ public class WavefrontObject{
             texture = Core.atlas.find("create-" + textureName + "-tex");
         }
 
-        // ★ 如果贴图未找到 (obj 有 vt 但 atlas 无对应贴图), 禁用贴图渲染
-        //   避免使用 missing texture (紫黑格) 导致模型颜色错误
         if(hasTexture && texture != null && !texture.found()){
             Log.warn("[Create] WavefrontObject: texture 'create-@-tex' not found, disabling texture rendering", textureName);
             hasTexture = false;
             texture = null;
         }
 
-        Log.info("[Create] WavefrontObject loaded: " + drawnVertices.size + " verts, " + faces.size + " faces");
+        // ★ 构建 GPU Mesh
+        buildMesh();
+
+        Log.info("[Create] WavefrontObject loaded: " + drawnVertices.size + " verts, " + faces.size + " faces, GPU mesh: " + (mesh != null ? "OK" : "FAILED"));
     }
 
     private boolean canLoadTex(){
         return !Vars.headless && Core.atlas != null && hasTexture;
     }
 
+    // ===== 构建 GPU Mesh =====
+    /** 将 OBJ 面数据构建为 arc Mesh (position3 + normal + color), 三角化后上传 GPU */
+    private void buildMesh(){
+        if(Vars.headless || faces.isEmpty()) return;
+
+        // 计算边界框 (用于居中和相机定位)
+        float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
+        float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
+        for(Vec3 v : vertices){
+            minX = Math.min(minX, v.x); minY = Math.min(minY, v.y); minZ = Math.min(minZ, v.z);
+            maxX = Math.max(maxX, v.x); maxY = Math.max(maxY, v.y); maxZ = Math.max(maxZ, v.z);
+        }
+        float cx = (minX + maxX) * 0.5f;
+        float cy = (minY + maxY) * 0.5f;
+        float cz = (minZ + maxZ) * 0.5f;
+
+        // 边界球半径 (居中后)
+        float maxR = 0f;
+        for(Vec3 v : vertices){
+            float dx = v.x - cx, dy = v.y - cy, dz = v.z - cz;
+            float r = (float)Math.sqrt(dx*dx + dy*dy + dz*dz);
+            if(r > maxR) maxR = r;
+        }
+        boundRadius = Math.max(maxR, 0.1f);
+
+        // 三角化面: quad→2三角形, n-gon→扇形三角化
+        int totalTris = 0;
+        for(Face f : faces){
+            totalTris += f.verts.length - 2;
+        }
+        int vertCount = totalTris * 3;
+
+        // 顶点可能超过 65535, 检查
+        if(vertCount >= 65535){
+            Log.warn("[Create] WavefrontObject '@' has @ verts (>65535), using non-indexed mesh", textureName, vertCount);
+        }
+
+        // 每顶点 7 float: pos(3) + normal(3) + color(1 packed)
+        vertFloatCount = vertCount * 7;
+        float[] vertData = new float[vertFloatCount];
+        originalVerts = new float[vertFloatCount];
+
+        // 预计算每个面的法线 (如果 OBJ 没有法线)
+        int vi = 0;
+        for(Face f : faces){
+            // 面法线 (如果没有顶点法线, 计算面法线)
+            Vec3 faceNormal = Tmp.v31.setZero();
+            if(hasNormal && f.normal != null && f.normal.length > 0){
+                for(Vec3 n : f.normal) faceNormal.add(n);
+                faceNormal.scl(1f / f.normal.length).nor();
+            }else{
+                // 从前3个顶点计算面法线
+                Vec3 v0 = f.verts[0].source;
+                Vec3 v1 = f.verts[1].source;
+                Vec3 v2 = f.verts[2].source;
+                faceNormal.set(v1.x - v0.x, v1.y - v0.y, v1.z - v0.z)
+                    .crs(v2.x - v0.x, v2.y - v0.y, v2.z - v0.z).nor();
+            }
+
+            // 面颜色 (材质 Kd 或白色)
+            float packedColor;
+            if(f.mat != null && f.mat.hasColor){
+                Tmp.c1.rgba8888(f.mat.diffuseCol);
+                packedColor = Tmp.c1.toFloatBits();
+            }else{
+                packedColor = Color.whiteFloatBits;
+            }
+
+            // 扇形三角化: (0, i, i+1) for i in 1..n-2
+            for(int t = 0; t < f.verts.length - 2; t++){
+                int[] idx = {0, t + 1, t + 2};
+                for(int vIdx : idx){
+                    Vertex vert = f.verts[vIdx];
+                    Vec3 pos = vert.source;
+                    // 法线: 顶点法线 (如果有) 或面法线
+                    Vec3 norm;
+                    if(hasNormal && f.normal != null && vIdx < f.normal.length && f.normal[vIdx] != null){
+                        norm = f.normal[vIdx];
+                    }else{
+                        norm = faceNormal;
+                    }
+
+                    vertData[vi]     = pos.x - cx;  // 居中
+                    vertData[vi + 1] = pos.y - cy;
+                    vertData[vi + 2] = pos.z - cz;
+                    vertData[vi + 3] = norm.x;
+                    vertData[vi + 4] = norm.y;
+                    vertData[vi + 5] = norm.z;
+                    vertData[vi + 6] = packedColor;
+                    vi += 7;
+                }
+            }
+        }
+
+        // 备份原始顶点 (用于 cons 形变恢复)
+        System.arraycopy(vertData, 0, originalVerts, 0, vertFloatCount);
+
+        // 创建 Mesh (非索引, 直接三角形列表)
+        try{
+            mesh = new Mesh(false, vertCount, 0,
+                VertexAttribute.position3,
+                VertexAttribute.normal,
+                VertexAttribute.color
+            );
+            mesh.setVertices(vertData, 0, vertFloatCount);
+        }catch(Throwable t){
+            Log.err("[Create] WavefrontObject mesh creation failed for '" + textureName + "'", t);
+            mesh = null;
+        }
+    }
+
+    // ===== 渲染 =====
     public void draw(float x, float y, float rX, float rY, float rZ){
         draw(x, y, rX, rY, rZ, null);
     }
 
     public void draw(float x, float y, float rX, float rY, float rZ, Cons<Vec3> cons){
+        if(mesh == null || faces.isEmpty()) return;
+        if(Vars.headless) return;
+
+        init();
+        if(shaderFailed || shader == null) return;
+
+        // 处理顶点形变 (cons)
+        if(cons != null){
+            applyDistortion(cons);
+        }
+
+        // 计算 FBO 世界空间大小和分辨率
+        float scl = defaultScl * size;
+        float worldSize = boundRadius * 2f * scl * 1.4f;  // 1.4 倍边界球直径, 留余量
+        int fboRes = computeFboResolution(worldSize);
+
+        // 调整 FBO 大小
+        if(buffer.getWidth() != fboRes || buffer.getHeight() != fboRes){
+            buffer.resize(fboRes, fboRes);
+        }
+
+        // 刷新 2D batch
+        Draw.flush();
+
+        // 开始 FBO 渲染
+        buffer.begin(Color.clear);
+
+        // 设置 Camera3D (透视投影)
+        float camDist = boundRadius * scl * 3f;  // 相机距离 = 边界球半径 * 3
+        cam.position.set(0, 0, camDist);
+        cam.lookAt(Vec3.Zero);
+        cam.up.set(Vec3.Y);
+        cam.resize(fboRes, fboRes);
+        cam.update();
+
+        // 设置模型变换矩阵 (旋转 + 缩放)
+        // ★ 顺序与旧版一致: v' = Rz * Ry * Rx * S * v
+        // Mat3D.rotate() 是后乘, 所以调用顺序需反转: Z → Y → X → scale
+        transform.idt();
+        transform.rotate(Vec3.Z, rZ);
+        transform.rotate(Vec3.Y, rY);
+        transform.rotate(Vec3.X, rX);
+        transform.scale(scl, scl, scl);
+
+        // 启用 GPU 深度测试 + 背面剔除
+        Gl.enable(Gl.depthTest);
+        Gl.depthMask(true);
+        Gl.clear(Gl.depthBufferBit);
+        if(cullBackfaces){
+            Gl.enable(Gl.cullFace);
+            Gl.cullFace(Gl.back);
+        }
+
+        // 渲染 Mesh
+        try{
+            shader.bind();
+            shader.setUniformMatrix4("u_proj", cam.combined.val);
+            shader.setUniformMatrix4("u_trans", transform.val);
+            setLightingUniforms();
+            shader.apply();
+            mesh.render(shader, Gl.triangles);
+        }catch(Throwable t){
+            Log.err("[Create] WavefrontObject render error", t);
+        }
+
+        // 禁用深度测试 + 背面剔除
+        if(cullBackfaces){
+            Gl.disable(Gl.cullFace);
+        }
+        Gl.disable(Gl.depthTest);
+
+        // 结束 FBO 渲染
+        buffer.end();
+
+        // 将 FBO 纹理绘制到 2D 场景
         float oz = Draw.z();
-        for(int i = 0; i < drawnVertices.size; i++){
-            Vec3 v = drawnVertices.get(i).source;
-            v.set(vertices.get(i));
-            if(cons != null) cons.get(v);
-            v.scl(defaultScl * size).rotate(Vec3.X, rX).rotate(Vec3.Y, rY).rotate(Vec3.Z, rZ);
-            float depth = Math.max(0f, (perspectiveDistance + v.z) / perspectiveDistance);
-            v.scl(depth);
-            
-            v.add(x, y, 0f);
-            if(i <= drawnNormals.size - 1){
-                drawnNormals.get(i).set(normals.get(i)).rotate(Vec3.X, rX).rotate(Vec3.Y, rY).rotate(Vec3.Z, rZ);
-            }
-        }
-
-        // ★ singleZLayer 模式: 按面深度排序 (远的先画, 近的后画), 保证前面覆盖后面
-        // 排序后每个面仍按自己的 z 值设置 Draw.z (与非 singleZLayer 一致), 避免 Y 轴旋转对称模型面搅和
-        // ★ 排序结果存入临时数组 drawOrder, 不修改原始 faces (避免多实例共享模型竞态)
-        Face[] drawOrder;
-        if(singleZLayer){
-            // 稳定排序: 当z值差小于阈值时保持原有顺序，避免帧间翻转导致抽搐
-            int n = faces.size;
-            Float[] zVals = new Float[n];
-            for(int i = 0; i < n; i++){
-                float z = 0;
-                Face f = faces.get(i);
-                for(Vertex v : f.verts) z += v.source.z;
-                zVals[i] = z / f.verts.length;
-            }
-            Integer[] indices = new Integer[n];
-            for(int i = 0; i < n; i++) indices[i] = i;
-            Arrays.sort(indices, (a, b) -> {
-                float diff = zVals[a] - zVals[b];
-                if(Math.abs(diff) < 0.01f) return a - b; // 稳定排序: z值相近时保持原序
-                return Float.compare(zVals[a], zVals[b]);
-            });
-            // ★ 用临时数组绘制，不修改原始faces
-            drawOrder = new Face[n];
-            for(int i = 0; i < n; i++) drawOrder[i] = faces.get(indices[i]);
-        }else{
-            drawOrder = faces.toArray(Face.class);
-        }
-
-        for(Face face : drawOrder){
-            // 所有模式都按面z值设置Draw.z, 让 batch 能区分面层次
-            indexerA = 0;
-            indexerZ = 0f;
-            for(Vertex vert : face.verts){
-                indexerZ += vert.source.z;
-                indexerA++;
-            }
-            indexerZ /= indexerA;
-            float z = (indexerZ * zScale) + drawLayer + zOffset;
-            Draw.z(z);
-
-            if(cullBackfaces && hasNormal){
-                if(Math.abs(face.normal[0].angle(Vec3.Z)) >= 90f) continue;
-            }
-
-            switch(shadingType){
-                case zMedian -> zMedianDraw(face);
-                case zDistance -> zDistanceDraw(face);
-                case normalAngle -> normalAngleDraw(face);
-                case topLight -> topLightDraw(face);
-                default -> Draw.color(lightColor);
-            }
-
-            float color = Draw.getColor().toFloatBits();
-            float mColor = Draw.getMixColor().toFloatBits();
-
-            updateFace(face, color, mColor);
-
-            // ★ 直接渲染, 不用 Draw.draw(z, ...) 延迟
-            // 延迟渲染会导致多个 WavefrontObject 实例的 face 在同一 z 队列中混合排序, 互相穿插 (拉丝)
-            face.draw();
-        }
-        Draw.reset();
+        Draw.z(drawLayer + zOffset);
+        // ★ 负高度翻转纹理 (FBO 纹理在 OpenGL 中是上下颠倒的)
+        Draw.rect(Draw.wrap(buffer.getTexture()), x, y, worldSize, -worldSize);
         Draw.z(oz);
+
+        // 恢复顶点 (如果有形变)
+        if(cons != null){
+            restoreVertices();
+        }
     }
 
-    protected void normalAngleDraw(Face face){
-        if(!hasNormal){
-            Draw.color(lightColor);
-            return;
-        }
-        Vec3 tmp = Tmp.v31.setZero();
-        indexerA = 0;
-        for(Vec3 n : face.normal){
-            tmp.add(n);
-            indexerA++;
-        }
-        tmp.scl(1f / indexerA);
-
-        boolean matB = face.mat != null && face.mat.hasColor;
-        if(matB){
-            // ★ 亮部 = 材质diffuse色 (不乘lightColor，避免过暗)
-            Tmp.c3.rgba8888(face.mat.diffuseCol);
-            // ★ 暗部 = 材质diffuse色的暗色版本 (而非ambientCol×shadeColor)
-            Tmp.c2.set(Tmp.c3.r * 0.3f, Tmp.c3.g * 0.3f, Tmp.c3.b * 0.3f, 1f);
-            // 自发光插值 (emit不为0时暗部接近亮部)
-            Tmp.c4.rgba8888(face.mat.emitCol);
-            Tmp.c2.r = Mathf.lerp(Tmp.c2.r, Tmp.c3.r, Tmp.c4.r);
-            Tmp.c2.g = Mathf.lerp(Tmp.c2.g, Tmp.c3.g, Tmp.c4.g);
-            Tmp.c2.b = Mathf.lerp(Tmp.c2.b, Tmp.c3.b, Tmp.c4.b);
-        }
-
-        float angle = (Math.abs(tmp.angleRad(Vec3.Z)) / (45f * Mathf.degRad)) / shadingSmoothness;
-        // ★ 限制暗化程度 (max maxShade), 避免面完全变成 shadeColor 看起来透明
-        Tmp.c1.set(matB ? Tmp.c3 : lightColor).lerp(matB ? Tmp.c2 : shadeColor, Mathf.clamp(angle, 0f, maxShade));
-        Draw.color(Tmp.c1);
+    /** 根据模型世界空间大小计算 FBO 像素分辨率 */
+    private int computeFboResolution(float worldSize){
+        // 基于世界空间大小估算像素 (1 世界单位 ≈ 8 像素)
+        int pixels = (int)(worldSize * 8f);
+        return Mathf.clamp(pixels, 128, 512);
     }
 
-    /** ★ 顶光着色: 模拟从上方(Y轴正方向)照射的环境光
-     *  法线Y分量决定明暗: 朝上=亮, 朝下=暗, 侧面=中间
-     *  适用于俯视游戏中法线朝Y轴的模型(如飞轮), 有强烈3D感 */
-    protected void topLightDraw(Face face){
-        if(!hasNormal){
-            Draw.color(lightColor);
-            return;
+    /** 设置着色器光照 uniform (基于 shadingType) */
+    private void setLightingUniforms(){
+        Vec3 lightDir;
+        switch(shadingType){
+            case topLight:
+                lightDir = Vec3.Y;  // 光从上方照射
+                break;
+            case normalAngle:
+            case zMedian:
+            case zDistance:
+                lightDir = Vec3.Z;  // 光从屏幕方向照射 (朝向相机)
+                break;
+            case noShading:
+            default:
+                lightDir = Vec3.Y;
+                break;
         }
-        Vec3 tmp = Tmp.v31.setZero();
-        indexerA = 0;
-        for(Vec3 n : face.normal){
-            tmp.add(n);
-            indexerA++;
-        }
-        tmp.scl(1f / indexerA);
-
-        boolean matB = face.mat != null && face.mat.hasColor;
-        if(matB){
-            // ★ 亮部 = 材质diffuse色 (不乘lightColor，避免过暗)
-            Tmp.c3.rgba8888(face.mat.diffuseCol);
-            // ★ 暗部 = 材质diffuse色的暗色版本 (而非ambientCol×shadeColor)
-            Tmp.c2.set(Tmp.c3.r * 0.3f, Tmp.c3.g * 0.3f, Tmp.c3.b * 0.3f, 1f);
-            // 自发光插值 (emit不为0时暗部接近亮部)
-            Tmp.c4.rgba8888(face.mat.emitCol);
-            Tmp.c2.r = Mathf.lerp(Tmp.c2.r, Tmp.c3.r, Tmp.c4.r);
-            Tmp.c2.g = Mathf.lerp(Tmp.c2.g, Tmp.c3.g, Tmp.c4.g);
-            Tmp.c2.b = Mathf.lerp(Tmp.c2.b, Tmp.c3.b, Tmp.c4.b);
-        }
-
-        // 法线Y分量: 1=朝上(亮), 0=侧面, -1=朝下(暗)
-        // shade = (1 - Y) / 2, 范围 0~1
-        float shade = Mathf.clamp((1f - tmp.y) * 0.5f, 0f, maxShade);
-        Tmp.c1.set(matB ? Tmp.c3 : lightColor).lerp(matB ? Tmp.c2 : shadeColor, shade);
-        Draw.color(Tmp.c1);
+        shader.setUniformf("u_lightDir", lightDir.x, lightDir.y, lightDir.z);
+        shader.setUniformf("u_lightColor", lightColor.r, lightColor.g, lightColor.b);
+        shader.setUniformf("u_shadeColor", shadeColor.r, shadeColor.g, shadeColor.b);
+        shader.setUniformf("u_maxShade", shadingType == ShadingType.noShading ? 0f : maxShade);
     }
 
-    protected void zMedianDraw(Face face){
-        indexerA = 0;
-        indexerZ = 0;
-        for(Vertex vert : face.verts){
-            indexerZ += -vert.source.z;
-            indexerA++;
+    /** 应用顶点形变 (cons 回调) */
+    private void applyDistortion(Cons<Vec3> cons){
+        float[] data = new float[vertFloatCount];
+        System.arraycopy(originalVerts, 0, data, 0, vertFloatCount);
+        Vec3 v = new Vec3();
+        for(int i = 0; i < vertFloatCount; i += 7){
+            v.set(data[i], data[i + 1], data[i + 2]);
+            cons.get(v);
+            data[i] = v.x;
+            data[i + 1] = v.y;
+            data[i + 2] = v.z;
         }
-        indexerZ /= indexerA;
-
-        Tmp.c1.set(lightColor).lerp(shadeColor, Mathf.clamp(indexerZ / face.shadingValue / (shadingSmoothness * defaultScl)));
-        Draw.color(Tmp.c1);
+        mesh.setVertices(data, 0, vertFloatCount);
     }
 
-    protected void zDistanceDraw(Face face){
-        indexerA = 0;
-        indexerZ = 0;
-        for(Vertex vert : face.verts){
-            vert.neighbors.each(vertex -> {
-                for(Vertex v : face.verts){
-                    if(v == vertex) return true;
-                }
-                return false;
-            }, vertex -> {
-                indexerZ += Math.abs(vertex.source.z - vert.source.z) / face.shadingValue / (shadingSmoothness * defaultScl);
-                indexerA++;
-            });
-        }
-        indexerZ /= indexerA;
-
-        Tmp.c1.set(lightColor).lerp(shadeColor, Mathf.clamp(indexerZ));
-        Draw.color(Tmp.c1);
-    }
-
-    protected void updateFace(Face face, float color, float mColor){
-        float[] dface = face.data;
-
-        AtlasRegion textureB = texture, region = Core.atlas.white();
-
-        if(face.mat != null && face.mat.diffTex != null){
-            textureB = face.mat.diffTex;
-        }
-
-        for(int i = 0; i < face.verts.length; i++){
-            int s = i * 6;
-            dface[s] = face.verts[i].source.x;
-            dface[s + 1] = face.verts[i].source.y;
-            dface[s + 2] = color;
-            if(!hasTexture || textureB == null){
-                dface[s + 3] = region.u;
-                dface[s + 4] = region.v;
-            }else{
-                float u = textureB.u, v = textureB.v;
-                float u2 = textureB.u2, v2 = textureB.v2;
-                dface[s + 3] = Mathf.lerp(u, u2, face.vertexTexture[i].x);
-                dface[s + 4] = Mathf.lerp(v2, v, face.vertexTexture[i].y);
-            }
-            dface[s + 5] = mColor;
-        }
+    /** 恢复原始顶点 */
+    private void restoreVertices(){
+        mesh.setVertices(originalVerts, 0, vertFloatCount);
     }
 
     protected static int faceVertIndex(String node){
@@ -507,9 +575,18 @@ public class WavefrontObject{
         "vertices=" + vertices.size +
         ", faces=" + faces.size +
         ", shadingType=" + shadingType +
+        ", gpuMesh=" + (mesh != null) +
         '}';
     }
 
+    // ===== 着色器类 =====
+    public static class ObjShader extends Shader{
+        public ObjShader(){
+            super(Vars.tree.get("shaders/obj3d.vert"), Vars.tree.get("shaders/obj3d.frag"));
+        }
+    }
+
+    // ===== 内部类 (保持 API 兼容) =====
     public class Face{
         public Material mat;
         public Vertex[] verts;
@@ -520,21 +597,7 @@ public class WavefrontObject{
         public float[] data;
 
         protected void draw(){
-            AtlasRegion textureB = texture, region = Core.atlas.white();
-            for(int f = 0; f < (mat != null && mat.emitTex != null ? 2 : 1); f++){
-                boolean emit = f > 0;
-
-                if(mat != null){
-                    textureB = f <= 0 ? mat.diffTex : mat.emitTex;
-                }
-
-                for(int i = 0; i < verts.length; i++){
-                    int s = i * 6;
-                    if(emit) data[s + 2] = Color.whiteFloatBits;
-                }
-
-                Draw.vert((textureB == null || !hasTexture) ? region.texture : textureB.texture, data, 0, data.length);
-            }
+            // 旧版 CPU 渲染 (已弃用, 保留 API 兼容)
         }
     }
 

@@ -399,7 +399,7 @@ public class Z_AdvTurrets {
             requirements(Category.turret, ItemStack.with(
                 Items.phaseFabric, 3000, Items.surgeAlloy, 4000,
                 Z_Items.darkAlloy, 1800, Z_Items.terminum, 1200, Z_Items.terminaAlloy, 200));
-            health = 23000;
+            health = 43000;
             range = 900f;
             size = 15;
             shootCone = 1.5f;
@@ -418,21 +418,21 @@ public class Z_AdvTurrets {
             chargeSound = Z_Sounds.tenmeikiriCharge;
             shootSound = Z_Sounds.tenmeikiriShoot;
             shake = 4f;
-            shootType = new EndCutterLaserBulletType(7800f) {{
+            shootType = new EndCutterLaserBulletType(12000f) {{
                 maxLength = 1200f;
                 lifetime = 3f * 60f;
                 width = 30f;
-                laserSpeed = 80f;
+                laserSpeed = 120f;
                 status = mindustry.content.StatusEffects.melting;
                 antiCheatScl = 5f;  // PU_V8 原版值
                 statusDuration = 200f;
                 lightningColor = Color.valueOf("f53036");  // scarColor
-                lightningDamage = 85f;
+                lightningDamage = 150f;
                 lightningLength = 15;
                 // 防作弊参数 (PU132 tenmeikiri 原值)
-                ratioDamage = 1f / 60f;
+                ratioDamage = 1f / 40f;
                 ratioStart = 30000f;
-                overDamage = 350000f;
+                overDamage = 200000f;
                 bleedDuration = 5f * 60f;
             }};
             // 冷却液体 (可选 booster, 非必需): 加快射速, 不影响攻击

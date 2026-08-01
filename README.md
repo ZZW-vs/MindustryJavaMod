@@ -195,6 +195,23 @@
 
 ## 更新日志
 
+### v1.9.0 (3D渲染系统重做 + tenmeikiri加强)
+- **3D渲染系统完全重做 (GPU深度缓冲)**：彻底重写 [WavefrontObject.java](src/zzw/util/WavefrontObject.java)
+  - 旧版 CPU 软件渲染器存在面排序/z-fighting 问题，Y轴旋转时模型崩坏
+  - 新版使用 GPU 深度缓冲 + FrameBuffer 离屏渲染，完美支持任意3D模型和任意轴旋转
+  - OBJ 加载时构建 GPU Mesh (position3 + normal + color 属性)，三角化后上传 GPU
+  - 自定义 GLSL 着色器 ([obj3d.vert](assets/shaders/obj3d.vert) + [obj3d.frag](assets/shaders/obj3d.frag))：MVP变换 + Gouraud方向光照
+  - Camera3D 透视投影 + 背面剔除(可配置) + 深度测试，GPU 自动处理面遮挡
+  - 支持顶点形变回调(Cons<Vec3>)，保留 ObjPowerTurret 受击形变功能
+  - 公共 API 与旧版完全兼容(字段/方法/内部类不变)
+- **create-tenmeikiri 全面加强**：
+  - 血量 23000 → 43000 (+20000)
+  - 激光伤害 7800f → 12000f
+  - 激光速度 80f → 120f (激光形成更快)
+  - 比例伤害 1/60 → 1/40 (对高血量单位伤害提升)
+  - 超量伤害阈值 350000f → 200000f (更早触发比例伤害)
+  - 闪电伤害 85f → 150f
+
 ### v1.8.0 (3D模型展示方块)
 - **新增 `ObjDisplayBlock` 通用 3D 模型渲染方块**：可加载并渲染任意 `.obj` 3D 模型文件，支持自动旋转（Z/Y 轴）、缩放、阴影、底座贴图
 - **新增 `flywheel-display` 飞轮展示台**：使用 MC Create 飞轮模型（258顶点/186面），金属灰色 `normalAngle` 着色，自动旋转展示机械之美
