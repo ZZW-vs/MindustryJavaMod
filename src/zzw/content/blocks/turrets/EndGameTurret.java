@@ -384,87 +384,204 @@ public class EndGameTurret extends PowerTurret {
         }
 
         void killUnits() {
-            entitySeq.clear();
+            // ★ 使用局部 Seq 捕获目标, 避免被 updateAntiBullets() 清空 entitySeq 影响延迟回调
+            Seq<Entityc> toKill = new Seq<>();
             mindustry.entities.Units.nearbyEnemies(team, x - range, y - range, range * 2f, range * 2f, e -> {
                 if (Mathf.within(x, y, e.x, e.y, range) && !e.dead) {
+                    // 先发射光束效果 (立即显示)
                     Object[] data = {new Vec2(x + eyeOffset.x, y + eyeOffset.y), e, 1f};
-                    endgameLaserEffect.at(x, y, 0f, data);
-                    entitySeq.add(e);
+                    endgameLaserEffect.at(x, y, angleTo(e), data);
+                    toKill.add(e);
                 }
             });
-            for (Entityc e : entitySeq) {
-                if (e instanceof Unit) {
-                    Unit u = (Unit) e;
-                    annihilateUnit(u);
-                    endgameVapourizeEffect.at(u.x, u.y, angleTo(u), new Object[]{this, u});
+            // ★ 延迟10tick后杀死单位 (让光束先显示一段时间)
+            Time.run(10f, () -> {
+                for (Entityc e : toKill) {
+                    if (e instanceof Unit) {
+                        Unit u = (Unit) e;
+                        if (!u.dead) {
+                            annihilateUnit(u);
+                            endgameVapourizeEffect.at(u.x, u.y, angleTo(u), new Object[]{this, u});
+                        }
+                    }
                 }
-            }
-            entitySeq.clear();
+                toKill.clear();
+            });
         }
 
         /**
          * ★ 多重秒杀机制: 绕过所有可能的反作弊方式
-         * 至少有一条攻击路径会生效，确保任何单位都能被杀死
-         * 参考FlameOut模组的annihilate方法和EmpathyDamage系统
+         * 能杀死 FlameOut EmpathyUnit、SegmentWormEntity 等反作弊单位
          */
         void annihilateUnit(Unit u) {
-            if (u == null || u.isAdded() == false) return;
+            if (u == null) return;
 
-            // ===== 机制1: 常规伤害 + remove =====
+            // ===== 阶段0: 常规伤害尝试 =====
             try {
                 u.damage(Float.MAX_VALUE);
             } catch (Throwable ignored) {}
 
-            // ===== 机制2: 直接设置 health=0, dead=true =====
+            // ===== 阶段1: 反射清除 FlameOut EmpathyUnit =====
+            try {
+                killEmpathyUnit(u);
+            } catch (Throwable ignored) {}
+
+            // ===== 阶段2: 反射清除 SegmentWormEntity 反作弊字段 =====
+            try {
+                java.lang.reflect.Field f = findField(u.getClass(), "lastHealth");
+                if (f != null) f.setFloat(u, 0f);
+                f = findField(u.getClass(), "trueHealth");
+                if (f != null) f.setFloat(u, 0f);
+                f = findField(u.getClass(), "trueMaxHealth");
+                if (f != null) f.setFloat(u, 1f);
+                f = findField(u.getClass(), "invTime");
+                if (f != null) f.setFloat(u, 100f);
+                f = findField(u.getClass(), "immunity");
+                if (f != null) f.setFloat(u, 0f);
+                f = findField(u.getClass(), "rogueDamageResist");
+                if (f != null) f.setFloat(u, 0f);
+                f = findField(u.getClass(), "parryTime");
+                if (f != null) f.setFloat(u, 0f);
+            } catch (Throwable ignored) {}
+
+            // ===== 阶段3: 直接设置 health=0, dead=true =====
             try {
                 u.health = 0f;
                 u.dead = true;
                 u.maxHealth = 1f;
             } catch (Throwable ignored) {}
 
-            // ===== 机制3: 反射清除反作弊私有字段 =====
-            // 清除 SegmentWormEntity 的 lastHealth/invTime/immunity/rogueDamageResist
-            // 清除 EmpathyUnit 的 trueHealth/trueMaxHealth/invFrames/parryTime
-            try {
-                java.lang.reflect.Field f = findField(u.getClass(), "lastHealth");
-                if (f != null) { f.setFloat(u, 0f); }
-                f = findField(u.getClass(), "trueHealth");
-                if (f != null) { f.setFloat(u, 0f); }
-                f = findField(u.getClass(), "trueMaxHealth");
-                if (f != null) { f.setFloat(u, 1f); }
-                f = findField(u.getClass(), "invTime");
-                if (f != null) { f.setFloat(u, 100f); }
-                f = findField(u.getClass(), "immunity");
-                if (f != null) { f.setFloat(u, 0f); }
-                f = findField(u.getClass(), "rogueDamageResist");
-                if (f != null) { f.setFloat(u, 0f); }
-                f = findField(u.getClass(), "parryTime");
-                if (f != null) { f.setFloat(u, 0f); }
-                f = findField(u.getClass(), "damageTaken");
-                if (f != null) { f.setFloat(u, 0f); }
-            } catch (Throwable ignored) {}
-
-            // ===== 机制4: 反复调用kill()绕过死亡拒绝 =====
+            // ===== 阶段4: 反复kill =====
             for (int i = 0; i < 5; i++) {
-                try {
-                    u.kill();
-                } catch (Throwable ignored) {}
+                try { u.kill(); } catch (Throwable ignored) {}
             }
 
-            // ===== 机制5: 从Groups中移除 + NaN销毁 (参考FlameOut annihilate) =====
+            // ===== 阶段5: Groups移除 + NaN =====
             try {
                 u.health = 0f;
                 u.dead = true;
                 Groups.unit.remove(u);
-                // 设置NaN让任何引用该单位的代码失效
                 u.x = Float.NaN;
                 u.y = Float.NaN;
-                u.rotation = Float.NaN;
             } catch (Throwable ignored) {}
 
-            // ===== 机制6: 最终remove =====
+            // ===== 阶段6: remove =====
+            try { u.remove(); } catch (Throwable ignored) {}
+        }
+
+        /**
+         * ★ 专门杀死 FlameOut EmpathyUnit
+         * 1. 反射获取匿名子类的 d[] 数组并清零 trueHealth
+         * 2. 从 EmpathyDamage 全局注册中移除该单位
+         */
+        void killEmpathyUnit(Unit u) {
+            // 检查是否是 EmpathyUnit (类名包含 empathy)
+            String className = u.getClass().getName();
+            if (!className.contains("empathy") && !className.contains("Empathy")) return;
+
+            // 步骤A: 反射清除匿名子类的 d[] 数组
+            float[] dArray = findFloatArrayField(u);
+            if (dArray != null && dArray.length >= 13) {
+                dArray[0] = -1f;    // trueHealth = -1 (死亡)
+                dArray[1] = 1f;     // trueMaxHealth = 1
+                dArray[5] = 9999f;  // decoyDelay = 9999 (禁止分裂)
+                dArray[6] = 0f;     // damageTaken = 0 (防止分裂触发)
+                dArray[12] = 0f;    // invFrames = 0 (取消无敌帧)
+            }
+
+            // 同时清除基类的 trueHealth 等字段
             try {
+                java.lang.reflect.Field f = findField(u.getClass(), "trueHealth");
+                if (f != null) f.setFloat(u, -1f);
+                f = findField(u.getClass(), "trueMaxHealth");
+                if (f != null) f.setFloat(u, 1f);
+                f = findField(u.getClass(), "invFrames");
+                if (f != null) f.setFloat(u, 0f);
+                f = findField(u.getClass(), "parryTime");
+                if (f != null) f.setFloat(u, 0f);
+                f = findField(u.getClass(), "damageTaken");
+                if (f != null) f.setFloat(u, 0f);
+                f = findField(u.getClass(), "decoyDelay");
+                if (f != null) f.setFloat(u, 9999f);
+            } catch (Throwable ignored) {}
+
+            // 步骤B: 从 EmpathyDamage 全局注册中移除
+            clearEmpathyDamageRegistration(u);
+
+            // 步骤C: 设置 health=0 并调用 remove
+            try {
+                u.health = 0f;
+                u.dead = true;
                 u.remove();
+            } catch (Throwable ignored) {}
+        }
+
+        /**
+         * 查找匿名子类中捕获的 float[] 字段 (EmpathyUnit 的 d 数组)
+         */
+        float[] findFloatArrayField(Object obj) {
+            Class<?> clazz = obj.getClass();
+            while (clazz != null) {
+                try {
+                    for (java.lang.reflect.Field field : clazz.getDeclaredFields()) {
+                        if (field.getType() == float[].class) {
+                            field.setAccessible(true);
+                            float[] arr = (float[]) field.get(obj);
+                            if (arr != null && arr.length >= 13) {
+                                return arr;  // EmpathyUnit 的 d 数组长度为 13
+                            }
+                        }
+                    }
+                } catch (Throwable ignored) {}
+                clazz = clazz.getSuperclass();
+            }
+            return null;
+        }
+
+        /**
+         * 从 EmpathyDamage 的 units 列表和 empathyMap 中移除指定单位
+         */
+        void clearEmpathyDamageRegistration(Unit u) {
+            try {
+                Class<?> empathyDamageClass = null;
+                // 尝试通过类加载器找到 EmpathyDamage
+                try {
+                    empathyDamageClass = Class.forName("flame.unit.empathy.EmpathyDamage");
+                } catch (ClassNotFoundException e) {
+                    return; // FlameOut 模组未安装，无需处理
+                }
+
+                if (empathyDamageClass == null) return;
+
+                // 获取 units 字段 (private static Seq<EmpathyHolder>)
+                java.lang.reflect.Field unitsField = empathyDamageClass.getDeclaredField("units");
+                unitsField.setAccessible(true);
+                Object units = unitsField.get(null);  // static field
+                if (units instanceof Seq) {
+                    Seq<?> seq = (Seq<?>) units;
+                    // 遍历找到匹配的 holder 并移除
+                    for (int i = seq.size - 1; i >= 0; i--) {
+                        Object holder = seq.get(i);
+                        if (holder != null) {
+                            java.lang.reflect.Field unitField = holder.getClass().getDeclaredField("unit");
+                            unitField.setAccessible(true);
+                            Object holderUnit = unitField.get(holder);
+                            if (holderUnit == u) {
+                                seq.remove(i);
+                            }
+                        }
+                    }
+                }
+
+                // 获取 empathyMap 字段 (private static IntMap)
+                java.lang.reflect.Field mapField = empathyDamageClass.getDeclaredField("empathyMap");
+                mapField.setAccessible(true);
+                Object map = mapField.get(null);
+                if (map != null) {
+                    // IntMap.remove(int key)
+                    java.lang.reflect.Method removeMethod = map.getClass().getMethod("remove", int.class);
+                    removeMethod.invoke(map, u.id);
+                }
             } catch (Throwable ignored) {}
         }
 
@@ -826,6 +943,20 @@ public class EndGameTurret extends PowerTurret {
                     // liveDamage 回调实时计算伤害: 520f * trueEfficiency()
                     lightning.create(team, Tmp.v1.x, Tmp.v1.y, randomAngle,
                         () -> 520f * trueEfficiency(), null, targetPos);
+
+                    // ★ 慢闪电额外真伤 (同压迫者激光, 绕过护甲)
+                    // 对范围内单位造成真伤 (伤害值为慢闪电伤害的50%)
+                    float trueDamage = 520f * trueEfficiency() * 0.5f;
+                    mindustry.entities.Units.nearbyEnemies(team, x - range, y - range, range * 2f, range * 2f, e -> {
+                        if (Mathf.within(x, y, e.x, e.y, 810f) && !e.dead) {
+                            // 真伤: 直接扣health
+                            e.health -= trueDamage;
+                            if (e.health <= 0f) {
+                                e.dead = true;
+                                endgameVapourizeEffect.at(e.x, e.y, angleTo(e), new Object[]{this, e});
+                            }
+                        }
+                    });
                 }
             }
         }
@@ -833,6 +964,11 @@ public class EndGameTurret extends PowerTurret {
         @Override
         protected void shoot(BulletType type) {
             consume();
+            // ★ 确保红色光束在射击时立即从炮台发射到主目标
+            if (target != null) {
+                Object[] data = {new Vec2(x + eyeOffset.x, y + eyeOffset.y), target, 1f};
+                endgameLaserEffect.at(x, y, angleTo(target), data);
+            }
             killTiles();
             killUnits();
 

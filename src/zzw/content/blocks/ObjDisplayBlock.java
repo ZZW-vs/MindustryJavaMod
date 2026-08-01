@@ -120,7 +120,7 @@ public class ObjDisplayBlock extends Block {
                 rZ = angle;
             }
 
-            obj.zOffset = (id % 100) * 0.1f;
+            obj.zOffset = (id % 1000) * 1.0f;
             obj.draw(x, y + currentOffset, rX, rY, rZ);
 
             // 恢复原始参数

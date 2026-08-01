@@ -23,7 +23,7 @@ import java.util.*;
  * @author GlennFolker
  */
 public class WavefrontObject{
-    protected static final float zScale = 0.001f;
+    protected static final float zScale = 0.01f;
     protected static final float defaultScl = 4f;
     protected static final float perspectiveDistance = 350f;
 
@@ -300,12 +300,11 @@ public class WavefrontObject{
             }
         }
 
-        // ★ singleZLayer 模式: 整个模型用同一个 z + zOffset, 避免多实例交叉穿插
-        // 需要按面深度排序 (远的先画, 近的后画), 保证前面覆盖后面
+        // ★ singleZLayer 模式: 按面深度排序 (远的先画, 近的后画), 保证前面覆盖后面
+        // 排序后每个面仍按自己的 z 值设置 Draw.z (与非 singleZLayer 一致), 避免 Y 轴旋转对称模型面搅和
         // ★ 排序结果存入临时数组 drawOrder, 不修改原始 faces (避免多实例共享模型竞态)
         Face[] drawOrder;
         if(singleZLayer){
-            Draw.z(drawLayer + zOffset);
             // 稳定排序: 当z值差小于阈值时保持原有顺序，避免帧间翻转导致抽搐
             int n = faces.size;
             Float[] zVals = new Float[n];
@@ -319,7 +318,7 @@ public class WavefrontObject{
             for(int i = 0; i < n; i++) indices[i] = i;
             Arrays.sort(indices, (a, b) -> {
                 float diff = zVals[a] - zVals[b];
-                if(Math.abs(diff) < 0.001f) return a - b; // 稳定排序: z值相近时保持原序
+                if(Math.abs(diff) < 0.01f) return a - b; // 稳定排序: z值相近时保持原序
                 return Float.compare(zVals[a], zVals[b]);
             });
             // ★ 用临时数组绘制，不修改原始faces
@@ -330,17 +329,16 @@ public class WavefrontObject{
         }
 
         for(Face face : drawOrder){
-            if(!singleZLayer){
-                indexerA = 0;
-                indexerZ = 0f;
-                for(Vertex vert : face.verts){
-                    indexerZ += vert.source.z;
-                    indexerA++;
-                }
-                indexerZ /= indexerA;
-                float z = (indexerZ * zScale) + drawLayer + zOffset;
-                Draw.z(z);
+            // 所有模式都按面z值设置Draw.z, 让 batch 能区分面层次
+            indexerA = 0;
+            indexerZ = 0f;
+            for(Vertex vert : face.verts){
+                indexerZ += vert.source.z;
+                indexerA++;
             }
+            indexerZ /= indexerA;
+            float z = (indexerZ * zScale) + drawLayer + zOffset;
+            Draw.z(z);
 
             if(cullBackfaces && hasNormal){
                 if(Math.abs(face.normal[0].angle(Vec3.Z)) >= 90f) continue;
