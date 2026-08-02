@@ -92,7 +92,9 @@ public class KamiAI implements UnitController {
             float range = minRange;
             vec.trns(target.angleTo(unit), range).add(target).sub(unit).scl(0.05f * speed * Time.delta);
             unit.move(vec);
-            unit.lookAt(target);
+            // ★ 直接设置 rotation, 不用 lookAt — v158 lookAt 用 rotateSpeed 步进,
+            // 而 kami rotateSpeed=0f 导致 lookAt 完全失效, 单位永远朝东不旋转
+            unit.rotation = unit.angleTo(target);
             if (patternTime <= 0f) {
                 vec.set(x, y).lerpDelta(target.x(), target.y(), 0.1f * speed);
                 x = vec.x;
