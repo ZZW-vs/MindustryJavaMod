@@ -94,10 +94,11 @@ public class ObjDisplayBlock extends Block {
 
             // 阴影 - 随模型缩放, 位置略低于模型中心补偿旋转偏移
             Draw.z(Layer.blockBuilding - 1f);
-            float shadowSize = size * 10f * Mathf.clamp(currentScale, 0.5f, 3f);
+            // ★ 阴影大小与模型缩放同步 (不再 clamp, 否则大模型阴影太小显得奇怪)
+            float shadowSize = size * 10f * currentScale;
             // ★ 阴影 Y 偏移: 补偿模型 X 轴旋转导致的视觉上浮
             // rX=-25° 时模型顶部后倾, 阴影应略向前偏 (Mindustry 俯视相机 Y 正方向)
-            float shadowOffsetY = -2f * Mathf.clamp(currentScale, 0.5f, 3f);
+            float shadowOffsetY = -2f * currentScale;
             Drawf.shadow(x, y + shadowOffsetY, shadowSize);
             Draw.color(0, 0, 0, 0.25f);
             Draw.rect(Core.atlas.find("circle-shadow"), x, y + shadowOffsetY, shadowSize * 0.8f, shadowSize * 0.5f);
