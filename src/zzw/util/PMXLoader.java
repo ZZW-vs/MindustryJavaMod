@@ -233,6 +233,7 @@ public class PMXLoader{
                 System.arraycopy(vertData, 0, mg.originalVerts, 0, vertCount * FLOATS_PER_VERT);
                 mg.distortData = new float[vertCount * FLOATS_PER_VERT];
                 mg.transparent = transparent;
+                mg.doubleSided = doubleSided;  // 每材质独立双面标志
 
                 // 加载贴图
                 if(texIdx >= 0 && texIdx < texturePaths.length){
@@ -253,7 +254,7 @@ public class PMXLoader{
         // ★ 排序: 不透明在前, 透明在后
         obj.meshGroups.sort((a, b) -> Boolean.compare(a.transparent, b.transparent));
 
-        // ★ 设置背面剔除: 有双面材质则关闭剔除
+        // 全局 cullBackfaces 仅作 API 兼容 (实际渲染按 MeshGroup.doubleSided 处理)
         obj.cullBackfaces = !anyDoubleSided;
 
         // API 兼容: ObjDisplayBlock 检查 faces.size > 0

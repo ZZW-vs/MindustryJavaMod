@@ -195,6 +195,24 @@
 
 ## 更新日志
 
+### v2.1.4 (MMD专用展示台+透视彻底修复)
+- **彻底修复模型透视/面变透明问题**：
+  - 根因：全局 cullBackfaces 导致所有材质统一双面渲染，内部面写入深度缓冲后与外部面深度竞争
+  - 修复：MeshGroup 新增 `doubleSided` 字段，每材质独立处理背面剔除
+  - PMXLoader 读取每个材质的双面标志（drawFlags & 1），独立设置 doubleSided
+  - 渲染时按材质属性调用 `setCullState()`：单面材质启用背面剔除，双面材质禁用
+  - 动态 Z 范围：根据模型实际大小（boundRadius * scl）收紧正交投影 Z 范围，最大化深度缓冲精度，消除 z-fighting
+- **新增 MMD 模型专用展示台**（[MmdDisplayBlock.java](src/zzw/content/blocks/MmdDisplayBlock.java)）：
+  - 方块名 `create-mmd-display`，分类 effect，3x3 尺寸
+  - 专用渲染参数：轻微俯视（rX=-15°）、保留贴图原色（maxShade=0.25）、顶部光照
+  - 汉化配置界面：模型选择、旋转设置（自动旋转开关/速度/轴）、位置（高度/阴影开关）、大小（按钮+输入框+快速滑条）
+  - 支持 Y/Z/X 三轴旋转，旋转速度 0-3 可调
+  - 大小范围 0.1-10，高度范围 -20 到 80
+- **WavefrontObject 渲染逻辑重构**：
+  - 新增 `setCullState()` 方法，每材质独立设置背面剔除状态
+  - 渲染分两遍：不透明组（depthMask=true）→ 透明组（depthMask=false）
+  - 每组内按材质 doubleSided 独立调用 cullFace，避免全局状态干扰
+
 ### v2.1.3 (PMX直接解析+透视修复)
 - **直接渲染 PMX (MMD) 模型文件**：
   - 新增 [PMXLoader.java](src/zzw/util/PMXLoader.java)，直接解析 PMX 2.0/2.1 二进制格式

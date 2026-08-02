@@ -55,7 +55,8 @@ public class WavefrontObject{
         public float[] distortData;     // applyDistortion 复用数组
         public Texture texture;         // 独立 Texture (null = 无贴图, 用顶点色)
         public boolean hasTexture;
-        public boolean transparent;     // ★ 是否含透明材质 (alpha<1), 透明组后渲染且不写入深度
+        public boolean transparent;     // 是否含透明材质 (alpha<1), 透明组后渲染且不写入深度
+        public boolean doubleSided;     // 是否双面渲染 (true=禁用背面剔除)
     }
     public Seq<MeshGroup> meshGroups = new Seq<>();
     /** 兼容旧 API: 指向第一个 MeshGroup (可能为 null) */
@@ -534,6 +535,7 @@ public class WavefrontObject{
                 mg.texture = useIndep ? indepTex : null;
                 mg.hasTexture = useIndep || useAtlas;
                 mg.transparent = groupTransparent.get(texKey, false);
+                mg.doubleSided = !cullBackfaces;  // OBJ 模型: 由全局 cullBackfaces 决定
                 meshGroups.add(mg);
 
                 totalVerts += vertCount;
@@ -631,9 +633,9 @@ public class WavefrontObject{
                 return;
             }
 
-            // ★ 构建正交投影矩阵: 匹配2D相机的可见区域
-            // Z范围收紧到 ±500 提升深度缓冲精度 (避免 z-fighting 产生的马赛克)
-            projMat.setToOrtho(camLeft, camRight, camBottom, camTop, -500f, 500f);
+            // ★ 动态 Z 范围: 根据模型实际大小收紧, 最大化深度缓冲精度, 消除 z-fighting
+            float zRange = Math.max(boundRadius * scl, 10f);
+            projMat.setToOrtho(camLeft, camRight, camBottom, camTop, -zRange, zRange);
 
             // ★ 模型变换矩阵: 平移到世界位置 + 旋转 + 缩放
             transform.idt();
@@ -645,36 +647,32 @@ public class WavefrontObject{
 
             Draw.flush();
 
-            // ★ GL 状态: 保留 alpha 混合
+            // ★ GL 状态: alpha 混合 + 深度测试
             Gl.enable(Gl.blend);
             Gl.blendFunc(Gl.srcAlpha, Gl.oneMinusSrcAlpha);
             Gl.enable(Gl.depthTest);
-            Gl.depthMask(true);
             Gl.clear(Gl.depthBufferBit);
-            if(cullBackfaces){
-                Gl.enable(Gl.cullFace);
-                Gl.cullFace(Gl.back);
-            }
 
-            // ★ 两遍渲染: 不透明组先画写入深度, 透明组后画不写深度
-            // (meshGroups 已在 buildMesh 中按 transparent 排序: false 在前 true 在后)
+            // ★ 渲染: 每材质独立处理双面/剔除, 不透明先写深度, 透明后不写深度
             try{
                 shader.bind();
                 shader.setUniformMatrix4("u_proj", projMat.val);
                 shader.setUniformMatrix4("u_trans", transform.val);
                 setLightingUniformsCaptured(capturedLight, capturedShade, capturedMaxShade);
 
-                // ★ 第一遍: 不透明组 (depthMask=true, 写入深度缓冲)
+                // ★ 第一遍: 不透明组 (写入深度缓冲)
                 Gl.depthMask(true);
                 for(MeshGroup mg : meshGroups){
                     if(mg == null || mg.mesh == null || mg.transparent) continue;
+                    setCullState(mg.doubleSided);
                     renderMeshGroup(mg);
                 }
 
-                // ★ 第二遍: 透明组 (depthMask=false, 只做深度测试不写入, 避免透明面遮挡后面的面)
+                // ★ 第二遍: 透明组 (只测试深度不写入, 避免透明面遮挡后面的面)
                 Gl.depthMask(false);
                 for(MeshGroup mg : meshGroups){
                     if(mg == null || mg.mesh == null || !mg.transparent) continue;
+                    setCullState(mg.doubleSided);
                     renderMeshGroup(mg);
                 }
                 Gl.depthMask(true);
@@ -683,9 +681,7 @@ public class WavefrontObject{
             }
 
             // 恢复 GL 状态
-            if(cullBackfaces){
-                Gl.disable(Gl.cullFace);
-            }
+            Gl.disable(Gl.cullFace);
             Gl.depthMask(false);
             Gl.disable(Gl.depthTest);
             Gl.enable(Gl.blend);
@@ -696,6 +692,16 @@ public class WavefrontObject{
                 restoreVertices();
             }
         });
+    }
+
+    /** 设置背面剔除状态 (每材质独立) */
+    private void setCullState(boolean doubleSided){
+        if(doubleSided){
+            Gl.disable(Gl.cullFace);
+        }else{
+            Gl.enable(Gl.cullFace);
+            Gl.cullFace(Gl.back);
+        }
     }
 
     /** 渲染单个 MeshGroup: bind 贴图后 render mesh */

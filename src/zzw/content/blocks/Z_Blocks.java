@@ -26,6 +26,7 @@ public class Z_Blocks {
     // ===== 3D 模型展示方块 =====
     public static Block flywheelDisplay;
     public static Block wavefrontDisplay;
+    public static Block mmdDisplay;
 
     // ===== PU_V8 移植: 墙体 =====
     // dark-wall (umbrium 暗色墙)
@@ -116,7 +117,14 @@ public class Z_Blocks {
         
         // 为了保持兼容性, 给旧名字起别名 (在Mindustry中通过ContentLoader处理)
         // 实际上我们只注册一个 "universal-display"
-        wavefrontDisplay = flywheelDisplay; 
+        wavefrontDisplay = flywheelDisplay;
+
+        // MMD 模型专用展示台: 直接渲染 PMX 文件, 专用渲染设置
+        mmdDisplay = new MmdDisplayBlock("mmd-display") {{
+            requirements(Category.effect, ItemStack.with(Items.copper, 50, Items.lead, 30, Items.silicon, 20), true);
+            health = 800;
+            buildVisibility = BuildVisibility.shown;
+        }};
     }
 
     // ===== PU_V8 移植: 墙体 (简化版, 用 vanilla Wall 或 LimitWall) =====
