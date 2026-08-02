@@ -637,6 +637,13 @@ public class WavefrontObject{
             float zRange = Math.max(boundRadius * scl, 10f);
             projMat.setToOrtho(camLeft, camRight, camBottom, camTop, -zRange, zRange);
 
+            // ★★★ 核心修复: 反转投影矩阵 Z 轴方向 ★★★
+            // 2D 渲染中 Z 朝向相机 (z 越大越靠前), 但 setToOrtho 默认 OpenGL 约定 (z 越大越远)
+            // 不反转的话, 模型后部面 (z<0) 深度值更小 (更"近"), 会遮挡前部面 → 透视假象
+            // 反转 Z 行后: z>0 (前部) → 深度 0 (最近), z<0 (后部) → 深度 1 (最远), 配合 GL_LESS 正确剔除
+            projMat.val[10] = -projMat.val[10];
+            projMat.val[14] = -projMat.val[14];
+
             // ★ 模型变换矩阵: 平移到世界位置 + 旋转 + 缩放
             transform.idt();
             transform.translate(x, y, 0);
