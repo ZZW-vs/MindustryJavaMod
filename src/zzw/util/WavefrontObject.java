@@ -55,6 +55,7 @@ public class WavefrontObject{
         public float[] distortData;     // applyDistortion 复用数组
         public Texture texture;         // 独立 Texture (null = 无贴图, 用顶点色)
         public boolean hasTexture;
+        public boolean transparent;     // ★ 是否含透明材质 (alpha<1), 透明组后渲染且不写入深度
     }
     public Seq<MeshGroup> meshGroups = new Seq<>();
     /** 兼容旧 API: 指向第一个 MeshGroup (可能为 null) */
@@ -369,9 +370,11 @@ public class WavefrontObject{
         ObjectMap<String, Seq<Face>> faceGroups = new ObjectMap<>();
         ObjectMap<String, Texture> groupTextures = new ObjectMap<>();
         ObjectMap<String, AtlasRegion> groupAtlasRegions = new ObjectMap<>();
+        ObjectMap<String, Boolean> groupTransparent = new ObjectMap<>();
 
         for(Face f : faces){
             String texKey = "__no_texture__";
+            boolean isTransparent = false;
             if(f.mat != null){
                 // 优先 atlas region
                 if(f.mat.diffTex != null && f.mat.diffTex.found()){
@@ -391,6 +394,15 @@ public class WavefrontObject{
                         }
                     }
                 }
+                // ★ 检查材质透明度: d<1 视为透明
+                if(f.mat.alpha < 0.99f){
+                    isTransparent = true;
+                }
+            }
+            // 同组任一面透明则整组透明
+            Boolean cur = groupTransparent.get(texKey);
+            if(cur == null || isTransparent){
+                groupTransparent.put(texKey, isTransparent);
             }
             Seq<Face> group = faceGroups.get(texKey);
             if(group == null){
@@ -521,6 +533,7 @@ public class WavefrontObject{
                 mg.distortData = new float[groupVertFloatCount];
                 mg.texture = useIndep ? indepTex : null;
                 mg.hasTexture = useIndep || useAtlas;
+                mg.transparent = groupTransparent.get(texKey, false);
                 meshGroups.add(mg);
 
                 totalVerts += vertCount;
@@ -528,6 +541,10 @@ public class WavefrontObject{
                 Log.err("[Create] WavefrontObject mesh creation failed for group '" + texKey + "' in '" + textureName + "'", t);
             }
         }
+
+        // ★ 按 transparent 排序: 不透明组(false)在前, 透明组(true)在后
+        // 渲染时先画不透明组写入深度, 再画透明组不写入深度, 避免透明面遮挡后面的不透明面
+        meshGroups.sort((a, b) -> Boolean.compare(a.transparent, b.transparent));
 
         // ★ 兼容旧 API: mesh 指向第一个 MeshGroup
         if(!meshGroups.isEmpty()){
@@ -639,37 +656,28 @@ public class WavefrontObject{
                 Gl.cullFace(Gl.back);
             }
 
-            // ★ 遍历所有 MeshGroup, 每组 bind 对应贴图后 render
+            // ★ 两遍渲染: 不透明组先画写入深度, 透明组后画不写深度
+            // (meshGroups 已在 buildMesh 中按 transparent 排序: false 在前 true 在后)
             try{
                 shader.bind();
                 shader.setUniformMatrix4("u_proj", projMat.val);
                 shader.setUniformMatrix4("u_trans", transform.val);
                 setLightingUniformsCaptured(capturedLight, capturedShade, capturedMaxShade);
 
+                // ★ 第一遍: 不透明组 (depthMask=true, 写入深度缓冲)
+                Gl.depthMask(true);
                 for(MeshGroup mg : meshGroups){
-                    if(mg == null || mg.mesh == null) continue;
-
-                    if(mg.hasTexture){
-                        if(mg.texture != null){
-                            // 独立 Texture (MMD 大贴图)
-                            mg.texture.bind(0);
-                            shader.setUniformi("u_texture", 0);
-                            shader.setUniformi("u_hasTexture", 1);
-                        }else if(hasDiffTexture && diffTexture != null && diffTexture.found()){
-                            // atlas 贴图
-                            diffTexture.texture.bind();
-                            shader.setUniformi("u_texture", 0);
-                            shader.setUniformi("u_hasTexture", 1);
-                        }else{
-                            shader.setUniformi("u_hasTexture", 0);
-                        }
-                    }else{
-                        shader.setUniformi("u_hasTexture", 0);
-                    }
-
-                    shader.apply();
-                    mg.mesh.render(shader, Gl.triangles);
+                    if(mg == null || mg.mesh == null || mg.transparent) continue;
+                    renderMeshGroup(mg);
                 }
+
+                // ★ 第二遍: 透明组 (depthMask=false, 只做深度测试不写入, 避免透明面遮挡后面的面)
+                Gl.depthMask(false);
+                for(MeshGroup mg : meshGroups){
+                    if(mg == null || mg.mesh == null || !mg.transparent) continue;
+                    renderMeshGroup(mg);
+                }
+                Gl.depthMask(true);
             }catch(Throwable t){
                 Log.err("[Create] WavefrontObject render error", t);
             }
@@ -688,6 +696,29 @@ public class WavefrontObject{
                 restoreVertices();
             }
         });
+    }
+
+    /** 渲染单个 MeshGroup: bind 贴图后 render mesh */
+    private void renderMeshGroup(MeshGroup mg){
+        if(mg.hasTexture){
+            if(mg.texture != null){
+                // 独立 Texture (MMD 大贴图)
+                mg.texture.bind(0);
+                shader.setUniformi("u_texture", 0);
+                shader.setUniformi("u_hasTexture", 1);
+            }else if(hasDiffTexture && diffTexture != null && diffTexture.found()){
+                // atlas 贴图
+                diffTexture.texture.bind();
+                shader.setUniformi("u_texture", 0);
+                shader.setUniformi("u_hasTexture", 1);
+            }else{
+                shader.setUniformi("u_hasTexture", 0);
+            }
+        }else{
+            shader.setUniformi("u_hasTexture", 0);
+        }
+        shader.apply();
+        mg.mesh.render(shader, Gl.triangles);
     }
 
     /** 使用捕获的光照参数设置 uniform (用于 Draw.draw 延迟执行) */
