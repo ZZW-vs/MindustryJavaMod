@@ -14,11 +14,7 @@ import arc.util.Tmp;
 import mindustry.entities.Lightning;
 import mindustry.entities.bullet.BulletType;
 import mindustry.gen.Bullet;
-import mindustry.gen.Building;
-import mindustry.gen.Hitboxc;
 import mindustry.gen.Posc;
-import mindustry.gen.Teamc;
-import mindustry.gen.Unit;
 import mindustry.graphics.Drawf;
 
 /**

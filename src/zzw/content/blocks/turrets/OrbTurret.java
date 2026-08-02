@@ -8,7 +8,6 @@ import arc.math.Mathf;
 import arc.struct.Seq;
 import arc.math.Rand;
 import arc.util.Time;
-import mindustry.Vars;
 import mindustry.entities.bullet.BulletType;
 import mindustry.gen.Bullet;
 import mindustry.graphics.Layer;

@@ -5,11 +5,7 @@ import arc.graphics.g2d.Fill;
 import arc.math.Mathf;
 import arc.util.Tmp;
 import mindustry.entities.bullet.BasicBulletType;
-import mindustry.entities.bullet.BulletType;
 import mindustry.gen.Bullet;
-import mindustry.gen.Building;
-import mindustry.gen.Unit;
-
 /**
  * 慢速磁轨炮子弹 (PU_V8 SlowRailBulletType 移植版)
  * - speed > 0, 多 tick 飞行

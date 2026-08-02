@@ -1,8 +1,6 @@
 package zzw.content.units.types;
 
-import arc.Core;
 import arc.graphics.g2d.Draw;
-import arc.graphics.g2d.TextureRegion;
 import arc.math.Angles;
 import arc.math.Mathf;
 import arc.struct.Seq;

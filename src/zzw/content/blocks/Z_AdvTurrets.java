@@ -1,26 +1,18 @@
 package zzw.content.blocks;
 
 import arc.graphics.Color;
-import arc.math.Mathf;
-import arc.struct.Seq;
 import mindustry.content.Fx;
 import mindustry.content.Items;
-import mindustry.entities.Effect;
 import mindustry.entities.bullet.BasicBulletType;
 import mindustry.entities.bullet.BulletType;
 import mindustry.entities.bullet.ContinuousLaserBulletType;
 import mindustry.entities.bullet.LaserBulletType;
 import mindustry.entities.bullet.LightningBulletType;
 import mindustry.entities.pattern.ShootPattern;
-import mindustry.gen.Building;
-import mindustry.gen.Groups;
 import mindustry.gen.Sounds;
-import mindustry.gen.Unit;
-import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
 import mindustry.type.Category;
 import mindustry.type.ItemStack;
-import mindustry.world.blocks.defense.turrets.Turret;
 import zzw.content.Z_Items;
 import zzw.content.Z_Sounds;
 import zzw.content.blocks.soul.SoulAbsorberTurret;
@@ -28,8 +20,6 @@ import zzw.content.blocks.soul.SoulBurstPowerTurret;
 import zzw.content.blocks.soul.SoulHeatRayTurret;
 import zzw.content.blocks.soul.SoulItemTurret;
 import zzw.content.blocks.soul.SoulLifeStealerTurret;
-import zzw.content.blocks.soul.SoulTractorBeamTurret;
-import zzw.content.blocks.soul.SoulTurretPowerTurret;
 import zzw.content.blocks.soul.SupernovaTurret;
 import zzw.content.blocks.turrets.EndLaserTurret;
 import zzw.content.blocks.turrets.EndGameTurret;
@@ -41,8 +31,6 @@ import zzw.content.units.bullets.PointBlastLaserBulletType;
 import zzw.content.units.bullets.WavefrontLaserBulletType;
 import zzw.content.units.effects.ChargeEffect;
 import zzw.util.ZObjs;
-
-import static mindustry.Vars.tilesize;
 
 /**
  * PU_V8 高级炮台注册 (灵魂系统炮台 + 3D模型炮台)

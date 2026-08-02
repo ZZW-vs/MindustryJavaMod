@@ -2,7 +2,6 @@ package zzw.content.exp;
 
 import arc.graphics.Color;
 import mindustry.content.Items;
-import mindustry.content.Liquids;
 import mindustry.content.StatusEffects;
 import mindustry.entities.bullet.BasicBulletType;
 import mindustry.entities.bullet.LaserBulletType;

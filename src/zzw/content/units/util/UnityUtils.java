@@ -9,7 +9,6 @@ import arc.math.Mathf;
 import arc.math.geom.Rect;
 import arc.math.geom.Vec2;
 import arc.struct.IntSet;
-import mindustry.Vars;
 import mindustry.gen.Building;
 import mindustry.world.Tile;
 

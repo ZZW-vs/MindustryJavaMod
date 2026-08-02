@@ -2,7 +2,6 @@ package zzw.content.mechanics.torque;
 
 import mindustry.content.Items;
 import mindustry.type.Category;
-import mindustry.world.Block;
 import mindustry.world.meta.BuildVisibility;
 import zzw.content.Z_Items;
 import zzw.content.mechanics.torque.blocks.GraphBlock;

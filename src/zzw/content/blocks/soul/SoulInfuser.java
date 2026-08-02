@@ -1,19 +1,14 @@
 package zzw.content.blocks.soul;
 
-import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Lines;
 import arc.math.Mathf;
 import arc.util.Time;
-import arc.util.io.Reads;
-import arc.util.io.Writes;
 import mindustry.core.World;
 import mindustry.entities.Effect;
 import mindustry.gen.Building;
 import mindustry.graphics.Drawf;
 import mindustry.graphics.Pal;
-import mindustry.type.Category;
-import mindustry.type.ItemStack;
 import mindustry.world.blocks.production.GenericCrafter;
 import mindustry.world.meta.Stat;
 import mindustry.world.meta.StatUnit;

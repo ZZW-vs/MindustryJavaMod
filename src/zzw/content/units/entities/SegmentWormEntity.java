@@ -12,7 +12,6 @@ import arc.util.Time;
 import arc.util.Log;
 import arc.util.io.Reads;
 import arc.util.io.Writes;
-import mindustry.Vars;
 import mindustry.gen.Unit;
 import mindustry.gen.UnitEntity;
 import mindustry.entities.Effect;

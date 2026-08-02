@@ -17,7 +17,6 @@ import mindustry.type.Category;
 import mindustry.type.ItemStack;
 import zzw.content.Z_Items;
 import zzw.content.Z_Sounds;
-import zzw.content.blocks.soul.ISoulTurret;
 import zzw.content.blocks.soul.RicochetBulletType;
 import zzw.content.blocks.soul.SoulTurretPowerTurret;
 

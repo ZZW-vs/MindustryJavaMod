@@ -20,7 +20,6 @@ import mindustry.graphics.Pal;
 import mindustry.ui.Bar;
 import mindustry.ui.Styles;
 import mindustry.world.meta.Stat;
-import mindustry.world.meta.StatUnit;
 import zzw.content.exp.EField;
 import zzw.content.exp.ExpHub;
 import zzw.content.exp.ExpHolder;
@@ -29,7 +28,6 @@ import zzw.content.exp.LevelHolder;
 import zzw.content.exp.UnityFx;
 import zzw.content.exp.UnityPal;
 
-import static mindustry.Vars.*;
 
 /**
  * ExpLimitWall (手动实现 PU_V8 @Dupe(base=ExpTurret, parent=LimitWall) 的生成结果)

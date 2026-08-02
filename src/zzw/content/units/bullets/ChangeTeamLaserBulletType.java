@@ -4,7 +4,6 @@ import mindustry.content.StatusEffects;
 import mindustry.entities.bullet.ContinuousLaserBulletType;
 import mindustry.gen.Building;
 import mindustry.gen.Bullet;
-import mindustry.gen.Entityc;
 import mindustry.gen.Healthc;
 import mindustry.gen.Hitboxc;
 import mindustry.gen.Statusc;

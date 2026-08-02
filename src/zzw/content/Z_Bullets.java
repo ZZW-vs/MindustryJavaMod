@@ -13,7 +13,6 @@ import arc.util.Tmp;
 import arc.util.Time;
 import mindustry.Vars;
 import mindustry.content.Fx;
-import mindustry.content.StatusEffects;
 import mindustry.entities.Damage;
 import mindustry.entities.Effect;
 import mindustry.entities.Fires;

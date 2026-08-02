@@ -1,10 +1,8 @@
 package zzw.content.blocks.turrets;
 
 import arc.Core;
-import arc.graphics.g2d.Fill;
 import arc.math.Angles;
 import arc.math.Mathf;
-import arc.math.geom.Vec2;
 import arc.struct.Seq;
 import arc.util.Strings;
 import arc.util.Time;

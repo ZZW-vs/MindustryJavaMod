@@ -3,7 +3,6 @@ package zzw.content.units.weapons;
 import arc.math.Angles;
 import arc.math.Mathf;
 import arc.func.Boolf;
-import arc.util.Tmp;
 import mindustry.entities.Units;
 import mindustry.entities.units.WeaponMount;
 import mindustry.gen.Posc;

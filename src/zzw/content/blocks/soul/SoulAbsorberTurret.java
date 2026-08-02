@@ -10,7 +10,6 @@ import arc.util.io.Writes;
 import mindustry.Vars;
 import mindustry.gen.Bullet;
 import mindustry.gen.Groups;
-import mindustry.gen.Unit;
 import mindustry.graphics.Pal;
 import mindustry.type.StatusEffect;
 import mindustry.ui.Bar;

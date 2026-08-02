@@ -3,14 +3,12 @@ package zzw.content.blocks;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
-import arc.graphics.g2d.Lines;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
 import arc.util.Strings;
 import mindustry.content.Fx;
 import mindustry.entities.Effect;
 import mindustry.graphics.Layer;
-import mindustry.graphics.Pal;
 import zzw.content.exp.EField;
 import zzw.content.exp.UnityPal;
 

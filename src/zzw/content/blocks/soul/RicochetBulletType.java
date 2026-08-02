@@ -1,7 +1,6 @@
 package zzw.content.blocks.soul;
 
 import arc.math.geom.Vec2;
-import arc.struct.Seq;
 import mindustry.entities.Predict;
 import mindustry.entities.bullet.BasicBulletType;
 import mindustry.entities.Units;

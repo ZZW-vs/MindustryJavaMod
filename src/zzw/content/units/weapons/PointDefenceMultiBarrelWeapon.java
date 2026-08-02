@@ -4,7 +4,6 @@ import mindustry.entities.units.WeaponMount;
 import mindustry.gen.Bullet;
 import mindustry.gen.Teamc;
 import mindustry.gen.Unit;
-import mindustry.entities.bullet.BulletType;
 
 /**
  * 点防多管武器 (移植自 PU_V8 unity.type.weapons.PointDefenceMultiBarrelWeapon)

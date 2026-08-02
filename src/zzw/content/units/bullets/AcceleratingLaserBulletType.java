@@ -6,14 +6,11 @@ import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
 import arc.math.Mathf;
 import arc.math.geom.Intersector;
-import arc.math.geom.Vec2;
 import arc.util.Tmp;
 import arc.util.Time;
 import mindustry.Vars;
 import mindustry.entities.bullet.BulletType;
 import mindustry.gen.Bullet;
-import mindustry.gen.Building;
-import mindustry.gen.Unit;
 import mindustry.graphics.Drawf;
 
 /**

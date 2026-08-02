@@ -1,6 +1,5 @@
 package zzw.content.blocks;
 
-import arc.Core;
 import arc.util.Time;
 import mindustry.world.blocks.defense.Wall;
 import mindustry.world.meta.Stat;

@@ -1,10 +1,8 @@
 package zzw.content.blocks.soul;
 
 import arc.func.Boolf;
-import arc.math.Mathf;
 import arc.util.io.Reads;
 import arc.util.io.Writes;
-import mindustry.entities.bullet.BulletType;
 import mindustry.gen.Building;
 import mindustry.world.blocks.defense.turrets.PowerTurret;
 import mindustry.world.meta.Stat;
