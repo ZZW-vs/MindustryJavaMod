@@ -21,6 +21,7 @@ import mindustry.entities.bullet.ShrapnelBulletType;
 import mindustry.gen.Bullet;
 import mindustry.gen.Building;
 import mindustry.gen.Sounds;
+import mindustry.gen.UnitEntity;
 import mindustry.graphics.Pal;
 import mindustry.type.UnitType;
 import mindustry.type.Weapon;
@@ -5135,6 +5136,8 @@ public class Z_Units {
             outlineColor = Color.valueOf("464a61");
             clipSize = 1200f;
             drawCell = false;
+            // ★ v158 必须设置 constructor, 否则 createIcons() 抛 IllegalArgumentException
+            constructor = UnitEntity::create;
             // ★ KamiAI 作为控制器, 实现弹幕 AI
             // v158 controller = Func<Unit, UnitController>, 非 Prov
             controller = u -> new KamiAI();
