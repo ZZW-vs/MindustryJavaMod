@@ -48,6 +48,12 @@ public class WavefrontObject{
     private static boolean initialized = false;
     private static boolean shaderFailed = false;
 
+    // ===== FXAA 后处理 (边缘抗锯齿) =====
+    private static FxaaShader fxaaShader;
+    private static boolean fxaaFailed = false;
+    /** 缓存 FBO 纹理区域, 避免每帧 Draw.wrap() 分配 */
+    private static TextureRegion fboRegion;
+
     // ===== Mesh 数据 (GPU 缓冲) =====
     private Mesh mesh;
     private int numIndices;
@@ -91,6 +97,8 @@ public class WavefrontObject{
     public boolean singleZLayer = false;
     /** 实例间 Z 轴偏移 (用于 Draw.z 层级区分) */
     public float zOffset = 0f;
+    /** ★ FXAA 边缘抗锯齿开关 (true=启用, 修复Y轴旋转波浪状锯齿) */
+    public boolean useFxaa = true;
     protected int indexerA;
     protected float indexerZ;
 
@@ -106,11 +114,20 @@ public class WavefrontObject{
         buffer = new FrameBuffer(2048, 2048, true);
         // ★ 设置线性过滤, 减少 FBO 纹理放大时的锯齿
         buffer.getTexture().setFilter(Texture.TextureFilter.linear, Texture.TextureFilter.linear);
+        // 缓存 FBO 纹理区域
+        fboRegion = Draw.wrap(buffer.getTexture());
         try{
             shader = new ObjShader();
         }catch(Throwable t){
             Log.err("[Create] WavefrontObject shader compile failed, GPU rendering disabled", t);
             shaderFailed = true;
+        }
+        // ★ FXAA 后处理着色器 (边缘抗锯齿)
+        try{
+            fxaaShader = new FxaaShader();
+        }catch(Throwable t){
+            Log.err("[Create] FXAA shader compile failed, falling back to bilinear filter", t);
+            fxaaFailed = true;
         }
     }
 
@@ -493,6 +510,7 @@ public class WavefrontObject{
         final Color capturedShade = shadeColor.cpy();
         final float capturedMaxShade = maxShade;
         final float capturedZOffset = zOffset;
+        final boolean capturedUseFxaa = useFxaa;
 
         // ★ 使用 Draw.draw() 参与 SortedSpriteBatch 的排序管线
         // 旧方案 (Draw.z + Draw.flush) 会 flush ALL pending DrawRequests,
@@ -519,10 +537,12 @@ public class WavefrontObject{
             // 不用自适应分辨率: 多实例共享静态 buffer, 不同大小会导致每帧反复 resize 造成内存碎片
             final int fboRes = 2048;
 
-            // 仅在初始化或分辨率变化时 resize (固定 1024 后只执行一次)
+            // 仅在初始化或分辨率变化时 resize (固定 2048 后只执行一次)
             if(buffer.getWidth() != fboRes || buffer.getHeight() != fboRes){
                 buffer.resize(fboRes, fboRes);
                 buffer.getTexture().setFilter(Texture.TextureFilter.linear, Texture.TextureFilter.linear);
+                // ★ resize 后纹理对象可能变化, 更新缓存区域
+                fboRegion = Draw.wrap(buffer.getTexture());
             }
 
             // ===== FBO 离屏渲染 =====
@@ -531,8 +551,9 @@ public class WavefrontObject{
             buffer.begin(Color.clear);
 
             // Camera3D 透视投影
-            // camDist = 3 * boundRadius * scl: 模型占 FBO ~80%, 避免边缘裁剪
-            float camDist = boundRadius * scl * 3f;
+            // ★ camDist = 2.7 * boundRadius * scl: 模型占 FBO ~92%, 提高有效分辨率
+            // 旧值 3f 仅占 ~80%, 降低后边缘锯齿更小, 旋转时波浪纹显著减少
+            float camDist = boundRadius * scl * 2.7f;
             cam.position.set(0, 0, camDist);
             cam.lookAt(Vec3.Zero);
             cam.up.set(Vec3.Y);
@@ -589,14 +610,21 @@ public class WavefrontObject{
 
             buffer.end();
 
-            // 将 FBO 纹理绘制到 2D 场景
-            // ★ 负高度翻转 (FBO 纹理在 OpenGL 中上下颠倒)
+            // ★ 将 FBO 纹理绘制到 2D 场景 (FXAA 后处理边缘抗锯齿)
+            // 负高度翻转 (FBO 纹理在 OpenGL 中上下颠倒)
             // flushing=true 时 Draw.rect() 直接走 super.draw() (绕过队列)
-            Draw.rect(Draw.wrap(buffer.getTexture()), x, y, worldSize, -worldSize);
-
-            // ★ 立即 flush: FBO 是共享静态资源, 必须在下一个模型渲染前提交
-            // flushing=true 时只调用 super.flush() 渲染 mesh buffer
-            Draw.flush();
+            if(capturedUseFxaa && !fxaaFailed && fxaaShader != null){
+                // ★ FXAA 着色器: 采样 FBO 纹理边缘并平滑, 消除Y轴旋转波浪状锯齿
+                // Draw.shader() 设置 batch 自定义着色器, flush 时自动绑定并调用 apply()
+                Draw.shader(fxaaShader);
+                Draw.rect(fboRegion, x, y, worldSize, -worldSize);
+                Draw.flush();
+                Draw.shader(null);
+            }else{
+                // 回退: 无 FXAA, 直接绘制 (双线性过滤)
+                Draw.rect(fboRegion, x, y, worldSize, -worldSize);
+                Draw.flush();
+            }
 
             // 恢复顶点 (如果有形变)
             if(cons != null){
@@ -693,6 +721,23 @@ public class WavefrontObject{
     public static class ObjShader extends Shader{
         public ObjShader(){
             super(Vars.tree.get("shaders/obj3d.vert"), Vars.tree.get("shaders/obj3d.frag"));
+        }
+    }
+
+    /**
+     * FXAA 后处理着色器
+     * 在 FBO 纹理绘制到屏幕时应用边缘抗锯齿
+     * apply() 由 batch.flush() 自动调用, 设置 texel 尺寸 uniform
+     */
+    public static class FxaaShader extends Shader{
+        public FxaaShader(){
+            super(Vars.tree.get("shaders/fxaa.vert"), Vars.tree.get("shaders/fxaa.frag"));
+        }
+
+        @Override
+        public void apply(){
+            setUniformi("u_texture", 0);
+            setUniformf("u_texelSize", 1f / buffer.getWidth(), 1f / buffer.getHeight());
         }
     }
 

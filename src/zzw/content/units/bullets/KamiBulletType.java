@@ -43,6 +43,8 @@ public class KamiBulletType extends BulletType {
         keepVelocity = false;
         hitSize = 6f;
         lifetime = 240f;
+        // ★ collidesTeam=true: 子弹可以打自己方单位 (含 kami 自己)
+        collidesTeam = true;
         despawnEffect = Fx.none;  // ★ 不能为 null, 否则 Bullet.remove 时 NPE
         hitEffect = Fx.none;
     }

@@ -65,8 +65,11 @@ public class KamiAI implements UnitController {
     @Override
     public void updateUnit() {
         // 更新目标 — ★ PU132 原版: 从所有玩家中选最近的, 不依赖敌方单位
+        // ★ 目标玩家死亡(invalidate)时直接自杀
         if (target != null && Units.invalidateTarget(target, unit.team, unit.x, unit.y)) {
-            target = null;
+            // 目标失效 (死亡/离开), kami 自杀
+            unit.kill();
+            return;
         }
         if (target == null) {
             // ★ 原版逻辑: 遍历 Groups.player 找最近玩家单位
@@ -83,6 +86,10 @@ public class KamiAI implements UnitController {
             }
             if (bestPlayer != null) {
                 target = bestPlayer.unit();
+            } else {
+                // 没有玩家目标, 自杀
+                unit.kill();
+                return;
             }
         }
 
