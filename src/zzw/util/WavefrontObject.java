@@ -539,6 +539,8 @@ public class WavefrontObject{
         public float shadingValue = 0f;
         public int size = 0;
         public float[] data;
+        /** ★ 三角形→quad 扩展缓冲 (degenerate quad), 兼容 SortedSpriteBatch 的 24-float 对齐 */
+        private float[] quadBuffer;
 
         protected void draw(){
             AtlasRegion textureB = texture, region = Core.atlas.white();
@@ -576,7 +578,19 @@ public class WavefrontObject{
                 }else{
                     submitTex = region.texture;
                 }
-                Draw.vert(submitTex, data, 0, data.length);
+
+                // ★ 三角形 (3 顶点, 18 floats) 必须扩展为 degenerate quad (4 顶点, 24 floats)
+                // 原因: SortedSpriteBatch.draw(Texture,float[],int,int) 按 24 floats 步长遍历,
+                //   三角形 18 floats 会导致 System.arraycopy 越界 → MMD 模型无法渲染
+                // 方案: 第 4 顶点 = 第 1 顶点 (形成面积为 0 的退化三角形, 不可见)
+                if(data.length == 18){
+                    if(quadBuffer == null) quadBuffer = new float[24];
+                    System.arraycopy(data, 0, quadBuffer, 0, 18);
+                    System.arraycopy(data, 0, quadBuffer, 18, 6);  // 第 4 顶点 = 第 1 顶点
+                    Draw.vert(submitTex, quadBuffer, 0, 24);
+                }else{
+                    Draw.vert(submitTex, data, 0, data.length);
+                }
             }
         }
     }

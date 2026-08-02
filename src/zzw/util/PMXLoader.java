@@ -124,7 +124,8 @@ public class PMXLoader{
                 float er = buf.getFloat(), eg = buf.getFloat(), eb = buf.getFloat(), ea = buf.getFloat();  // edge color RGBA
                 float edgeSize = buf.getFloat();  // edge size
                 int texIdx = readIndex(buf, extTexIdx);  // texture index
-                int subTexIdx = readIndex(buf, extTexIdx);  // sub texture index
+                // ★ 注意: 标准 PMX 规范没有 sub-texture index 字段!
+                //   Texture Index 之后直接是 Sphere Texture Index (76c98da 误加 subTexIdx 导致流错位)
                 int sphereTexIdx = readIndex(buf, extTexIdx);  // sphere texture index
                 int sphereMode = buf.get() & 0xFF;  // sphere mode
                 int toonMode = buf.get() & 0xFF;  // ★ shared toon flag (0=toon texture, 1=shared toon)
