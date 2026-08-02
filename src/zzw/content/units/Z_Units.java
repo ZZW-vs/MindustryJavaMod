@@ -5129,7 +5129,7 @@ public class Z_Units {
         // ═══════════════════════════════════════════════════════════
         kami = new RainbowUnitType("kami") {{
             flying = true;
-            health = 120000f;
+            health = 9178114514f;
             speed = 15f;
             hitSize = 36f;
             rotateSpeed = 0f;
