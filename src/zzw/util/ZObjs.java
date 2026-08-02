@@ -141,18 +141,17 @@ public class ZObjs {
         largeCogwheel.singleZLayer = true;
         largeCogwheel.cullBackfaces = false;
 
-        // ★ gale: MMD 角色模型 (62972顶点, 92322面, 12张贴图)
-        // 顶点范围很小 (MMD单位), 需要 size=8 放大到合理尺寸
-        // 使用 normalAngle 着色 + 白色光照 + 深灰阴影
+        // ★ gale: MMD 角色模型, 直接解析 PMX 二进制格式
+        // PMX 模型尺寸通常 10-20 单位高, size=0.5 使 worldSize ~40 单位 (匹配 3x3 方块)
+        // 使用 topLight 着色 (光从上方照射), 轻微暗化保留贴图原色
         gale = new WavefrontObject();
         gale.textureName = "gale";
-        gale.size = 8f;
-        gale.shadingType = WavefrontObject.ShadingType.normalAngle;
+        gale.size = 0.5f;
+        gale.shadingType = WavefrontObject.ShadingType.topLight;
         gale.lightColor = Color.white;
-        gale.shadeColor = Color.valueOf("606060");
-        gale.maxShade = 0.5f;
+        gale.shadeColor = Color.valueOf("808080");
+        gale.maxShade = 0.3f;
         gale.drawLayer = Layer.flyingUnit;
-        gale.cullBackfaces = false;  // MMD模型有单面面片, 关闭剔除避免破洞
 
         Events.on(EventType.ClientLoadEvent.class, e -> {
             // ClientLoadEvent 时 atlas 贴图区域已注册, 避免 wavefront 等 hasTexture=true 对象加载失败
@@ -171,8 +170,22 @@ public class ZObjs {
         loadObj(crushingWheel, "crushing_wheel");
         loadObj(cogwheel, "cogwheel");
         loadObj(largeCogwheel, "large_cogwheel");
-        // ★ MMD 模型从 blander/text_g/ 目录加载 (OBJ+MTL 在此目录, 贴图也在同目录)
-        loadObj(gale, "blander/text_g/gale");
+        // ★ MMD 模型直接解析 PMX 二进制, 无需 Blender 导出
+        loadPMX(gale, "blander/text_g/Sakurako_Idol_1.0.pmx");
+    }
+
+    /** 加载 PMX (MMD) 模型文件 */
+    private static void loadPMX(WavefrontObject obj, String path) {
+        Fi file = Vars.tree.get(path);
+        if (!file.exists()) {
+            Log.err("[Create] PMX file not found: " + path);
+            return;
+        }
+        try {
+            PMXLoader.load(obj, file);
+        } catch (Throwable t) {
+            Log.err("[Create] Failed to load PMX: " + path, t);
+        }
     }
 
     private static void loadObj(WavefrontObject obj, String name) {

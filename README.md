@@ -195,6 +195,24 @@
 
 ## 更新日志
 
+### v2.1.3 (PMX直接解析+透视修复)
+- **直接渲染 PMX (MMD) 模型文件**：
+  - 新增 [PMXLoader.java](src/zzw/util/PMXLoader.java)，直接解析 PMX 2.0/2.1 二进制格式
+  - 解析顶点(位置/法线/UV)、面索引、材质(diffuse颜色/贴图/双面标志)、贴图路径
+  - 跳过骨骼/形变/物理（静态 bind-pose 渲染），按材质分组构建 MeshGroup
+  - PMX 坐标系适配：反转三角形绕序（MMD顺时针→OpenGL逆时针）+ V轴翻转
+  - 贴图路径自动解析（尝试 mod 文件树多种路径）
+  - 无需 Blender 导出 OBJ，直接放 .pmx + 贴图到 assets/ 即可
+- **修复 MMD 模型透视/面变透明问题**：
+  - 根因1：OBJ 导出时面绕序未反转，导致背面被剔除看到内部
+  - 根因2：cullBackfaces=false 渲染双面，内部面与外面深度竞争导致透视
+  - 修复：PMX 加载时反转绕序 + 根据材质双面标志自动设置 cullBackfaces
+  - 透明材质（d<1）按透明度排序，不透明先渲染写深度，透明后渲染不写深度
+- **修复 MMD 模型贴图上色问题**：
+  - 着色参数调整：shadeColor 606060→808080，maxShade 0.5→0.3，保留贴图原色
+  - 着色方式改用 topLight（光从上方），角色模型更自然
+  - 材质 diffuse 颜色直接作为顶点色，纹理采样与材质色正确混合
+
 ### v2.1.2 (MMD模型渲染支持)
 - **新增 MMD/Blender 模型渲染支持**：
   - 重构 [WavefrontObject.java](src/zzw/util/WavefrontObject.java) 支持多材质多贴图渲染
