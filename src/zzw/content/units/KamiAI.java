@@ -6,6 +6,7 @@ import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Lines;
 import arc.math.Angles;
 import arc.math.Mathf;
+import arc.math.Rand;
 import arc.math.geom.Vec2;
 import arc.struct.FloatSeq;
 import arc.struct.Seq;
@@ -56,6 +57,7 @@ public class KamiAI implements UnitController {
     public float patternTime, waitTime = 2f * 60f;
     public float patternDuration = 20f * 60f;  // 每个模式持续 20 秒
     public float stateTimer = 0f;
+    public Rand rand = new Rand();
 
     // 模式列表 (4 个核心模式循环)
     private static final int PATTERN_COUNT = 4;
@@ -277,8 +279,8 @@ public class KamiAI implements UnitController {
         this.unit = unit;
         x = unit.x;
         y = unit.y;
-        reloads[0] = 1f;
-        reloads[4] = 1f;
+        // ★ 原版: rand.setSeed(unit.id * 9999L)
+        rand.setSeed(unit.id * 9999L);
     }
 
     @Override

@@ -378,6 +378,27 @@ public class WavefrontObject{
             hasDiffTexture = true;
         }
 
+        // ★ 检测 UV 是否已经是 atlas 坐标
+        // wavefront.obj 的 UV (0.027-0.816) 是整个 atlas 的坐标, 不需要映射
+        // cube.obj 等的 UV (0-1) 是归一化坐标, 需要映射到 atlas region
+        boolean uvAlreadyAtlas = false;
+        if(hasTexture && uvs.size > 0 && hasDiffTexture && diffTexture != null && diffTexture.found()){
+            float minU = Float.MAX_VALUE, maxU = -Float.MAX_VALUE;
+            float minV = Float.MAX_VALUE, maxV = -Float.MAX_VALUE;
+            for(Vec2 uv : uvs){
+                minU = Math.min(minU, uv.x); maxU = Math.max(maxU, uv.x);
+                minV = Math.min(minV, uv.y); maxV = Math.max(maxV, uv.y);
+            }
+            // 如果 UV 范围不完全覆盖 [0,1] (有留白), 说明已经是 atlas 坐标
+            // 归一化 UV 通常会恰好覆盖 0.0-1.0 范围
+            boolean spansFullRange = minU <= 0.001f && maxU >= 0.999f && minV <= 0.001f && maxV >= 0.999f;
+            uvAlreadyAtlas = !spansFullRange;
+            if(uvAlreadyAtlas){
+                Log.info("[Create] WavefrontObject '@' UVs already in atlas space (U:{}-{}, V:{}-{}), skipping remap",
+                    textureName, minU, maxU, minV, maxV);
+            }
+        }
+
         // 预计算每个面的法线 (如果 OBJ 没有法线)
         int vi = 0;
         for(Face f : faces){
@@ -425,12 +446,11 @@ public class WavefrontObject{
                         v = f.vertexTexture[vIdx].y;
                     }
 
-                    // ★ 如果使用 atlas region 纹理且模型 UV 在 [0,1] 范围内,
-                    // 将模型 UV 映射到 atlas UV 空间 (因为 texture.bind() 绑定的是整个图集)
-                    // 注意: 部分 OBJ 的 UV 已经是 atlas 坐标 (如 wavefront.obj 的 UV 0.027-0.816),
-                    // 这种情况不需要映射, 直接使用
-                    if(hasDiffTexture && diffTexture != null && diffTexture.found()
-                        && u >= 0f && u <= 1f && v >= 0f && v <= 1f){
+                    // ★ UV 映射规则:
+                    // - 如果 UV 已经是 atlas 坐标 (uvAlreadyAtlas=true), 直接使用
+                    // - 如果 UV 是归一化坐标 [0,1], 映射到 atlas region UV 空间
+                    //   (因为 texture.bind() 绑定的是整个图集纹理)
+                    if(hasDiffTexture && diffTexture != null && diffTexture.found() && !uvAlreadyAtlas){
                         u = u * (diffTexture.u2 - diffTexture.u) + diffTexture.u;
                         v = v * (diffTexture.v2 - diffTexture.v) + diffTexture.v;
                     }
@@ -479,6 +499,15 @@ public class WavefrontObject{
         init();
         if(shaderFailed || shader == null) return;
 
+        // ★ 捕获调用时的 size 值 — Draw.draw() 延迟执行,
+        // 调用者 (如 ObjDisplayBlock) 会在 draw() 返回后恢复 obj.size,
+        // 所以不能在 lambda 内读 this.size, 必须捕获当前值
+        final float capturedSize = size;
+        final Color capturedLight = lightColor.cpy();
+        final Color capturedShade = shadeColor.cpy();
+        final float capturedMaxShade = maxShade;
+        final float capturedZOffset = zOffset;
+
         // ★ 使用 Draw.draw() 参与 SortedSpriteBatch 的排序管线
         // 旧方案 (Draw.z + Draw.flush) 会 flush ALL pending DrawRequests,
         // 包括 bloom capture (z=99.98) 和 render (z=110.02), 导致:
@@ -490,15 +519,17 @@ public class WavefrontObject{
         // - flushRequests() 不会重入 (由 flushing 标志保护)
         // - Draw.flush() 只调用 super.flush() 渲染 mesh buffer (cheap)
         // - Draw.rect() 直接走 super.draw() (绕过队列, 直接写入 mesh)
-        Draw.draw(drawLayer + zOffset, () -> {
+        Draw.draw(drawLayer + capturedZOffset, () -> {
             // 处理顶点形变 (cons)
             if(cons != null){
                 applyDistortion(cons);
             }
 
-            float scl = defaultScl * size;
+            float scl = defaultScl * capturedSize;
             // worldSize = 边界球直径 * 缩放 (旋转后最大投影)
             float worldSize = boundRadius * 2f * scl;
+            // ★ 抗锯齿: 根据模型世界大小自适应 FBO 分辨率
+            // 目标: 每世界单位至少 16 像素, 向上取整到 2 的幂
             int fboRes = computeFboResolution(worldSize);
 
             // 仅在分辨率变化时 resize
@@ -544,7 +575,8 @@ public class WavefrontObject{
                 shader.bind();
                 shader.setUniformMatrix4("u_proj", cam.combined.val);
                 shader.setUniformMatrix4("u_trans", transform.val);
-                setLightingUniforms();
+                // ★ 使用捕获的光照参数
+                setLightingUniformsCaptured(capturedLight, capturedShade, capturedMaxShade);
 
                 if(hasDiffTexture && diffTexture != null && diffTexture.found()){
                     diffTexture.texture.bind();
@@ -587,12 +619,44 @@ public class WavefrontObject{
         });
     }
 
-    /** 根据模型世界空间大小计算 FBO 像素分辨率 (三级: 512/1024/2048) */
+    /** 使用捕获的光照参数设置 uniform (用于 Draw.draw 延迟执行) */
+    private void setLightingUniformsCaptured(Color light, Color shade, float maxSh){
+        Vec3 lightDir;
+        switch(shadingType){
+            case topLight:
+                lightDir = Vec3.Y;
+                break;
+            case normalAngle:
+            case zMedian:
+            case zDistance:
+                lightDir = Vec3.Z;
+                break;
+            case noShading:
+            default:
+                lightDir = Vec3.Y;
+                break;
+        }
+        shader.setUniformf("u_lightDir", lightDir.x, lightDir.y, lightDir.z);
+        shader.setUniformf("u_lightColor", light.r, light.g, light.b);
+        shader.setUniformf("u_shadeColor", shade.r, shade.g, shade.b);
+        shader.setUniformf("u_maxShade", shadingType == ShadingType.noShading ? 0f : maxSh);
+    }
+
+    /** 根据模型世界空间大小自适应计算 FBO 像素分辨率 (抗锯齿) */
     private int computeFboResolution(float worldSize){
-        // ★ 三级分辨率: 大模型(>100单位)用2048, 中模型(>50单位)用1024, 小模型用512
+        // ★ 自适应分辨率: 目标每世界单位至少 16 像素, 向上取整到 2 的幂
+        // 这样小模型用 512 (清晰), 中模型用 1024, 大模型用 2048 (无锯齿)
         // 2048=16MB, 1024=4MB, 512=1MB 显存
-        // 三级足以覆盖大多数场景, resize 次数可控
-        int res = worldSize > 100f ? 2048 : (worldSize > 50f ? 1024 : 512);
+        int res;
+        if(worldSize <= 32f){
+            res = 512;       // 小模型 (≤32单位): 512 足够清晰
+        }else if(worldSize <= 64f){
+            res = 1024;      // 中模型 (≤64单位): 1024
+        }else if(worldSize <= 128f){
+            res = 2048;      // 大模型 (≤128单位): 2048
+        }else{
+            res = 4096;      // 超大模型 (>128单位): 4096 (最大纹理尺寸通常 16384)
+        }
         cachedFboRes = res;
         return res;
     }

@@ -69,6 +69,7 @@ import zzw.content.units.entities.SegmentWormEntity;
 import zzw.content.units.entities.SlowLightningEntity;
 import zzw.content.units.rotor.Rotor;
 import zzw.content.units.types.CopterUnitType;
+import zzw.content.units.types.RainbowUnitType;
 import zzw.content.units.weapons.AcceleratingWeapon;
 import zzw.content.units.weapons.EnergyChargeWeapon;
 import zzw.content.units.weapons.GuidedMissileWeapon;
@@ -5119,13 +5120,14 @@ public class Z_Units {
 
         // ═══════════════════════════════════════════════════════════
         //  PU132 kami 弹幕 Boss (装饰性单位, 4种弹幕模式+屏障)
-        //  - 飞行 Boss, KamiAI 控制弹幕模式
+        //  - 飞行 Boss, RainbowUnitType 渲染主体+6层彩虹
+        //  - KamiAI 控制器实现弹幕 AI
         //  - 无武器, 所有子弹由 AI 生成
-        //  - 屏障: 800 半径, 阻止玩家逃离
+        //  - 屏障: 800 半径, 阻止玩家逃离 (原版行为: 传送玩家回圆内)
         //  - 弹幕: basicPattern1 (双层旋转弹环) + basicPattern2 (交替方向弹环)
         //         + expandPattern (散弹→环形扩张) + flowerPattern (花瓣形双向射击)
         // ═══════════════════════════════════════════════════════════
-        kami = new UnitType("kami") {{
+        kami = new RainbowUnitType("kami") {{
             flying = true;
             health = 120000f;
             speed = 15f;
@@ -5144,6 +5146,7 @@ public class Z_Units {
             // 无武器 — 所有弹幕由 KamiAI 直接生成
 
             // ★ 屏障绘制 Ability: 调用 KamiAI.draw() 绘制屏障圆环和弹幕特效
+            // 这是追加绘制 (不替换默认的 type.draw(unit) 主体渲染)
             abilities.add(new Ability() {
                 @Override
                 public void draw(mindustry.gen.Unit unit) {

@@ -195,6 +195,18 @@
 
 ## 更新日志
 
+### v1.9.4 (模型大小修复+wavefront透明修复+kami贴图+抗锯齿自适应)
+- **修复模型大小无法调整**：`Draw.draw()` 延迟执行，但 `obj.size` 在 lambda 执行前就被恢复
+  - 修复：在 `draw()` 调用时捕获 `size`、`lightColor`、`shadeColor`、`maxShade`、`zOffset` 的快照
+  - lambda 内使用捕获值而非 `this` 字段，确保延迟执行时参数正确
+- **修复wavefront贴图部分透明**：wavefront.obj 的 UV (0.027-0.816) 已是 atlas 坐标，但仍被重复映射到 atlas 子区域，采样到透明 padding
+  - 修复：`buildMesh()` 中检测 UV 范围，若不完全覆盖 [0,1] 则判定为 atlas 坐标，跳过映射
+- **抗锯齿自适应**：FBO 分辨率改为四级自适应 (512/1024/2048/4096)，根据模型世界大小自动选择
+  - ≤32单位→512, ≤64→1024, ≤128→2048, >128→4096
+- **新增 kami 单位贴图**：从 PU132 移植 kami-mkii 全套贴图 (主体+轮廓+6层彩虹+拖尾+残骸)
+- **新增 RainbowUnitType**：kami 使用 RainbowUnitType，`drawBody()` 叠加 6 层彩虹贴图 (色相随时间流动+段偏移15°)
+- **kami 屏障完全还原原版**：800 半径传送玩家回圆内 (PU132 原版行为)
+
 ### v1.9.3 (Bloom光效修复+3D性能优化+kami弹幕单位)
 - **彻底修复光效强度和模糊失效**：根因是 `Draw.z() + Draw.flush()` 会 flush ALL pending DrawRequests，包括 bloom capture (z=99.98) 和 render (z=110.02)，导致 bloom 在 z=25-35 时就 capture，场景内容不完整
   - 修复：改用 `Draw.draw(z, runnable)` 将整个 FBO 操作注册为 DrawRequest 参与 SortedSpriteBatch 排序管线
