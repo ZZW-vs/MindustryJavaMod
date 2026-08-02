@@ -3,11 +3,9 @@ package zzw.content.blocks.turrets;
 import arc.Core;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
-import mindustry.graphics.Drawf;
 import arc.math.Angles;
 import arc.math.Mathf;
 import arc.util.Time;
-import mindustry.graphics.Layer;
 import mindustry.world.blocks.defense.turrets.PowerTurret;
 import zzw.util.WavefrontObject;
 
@@ -103,11 +101,8 @@ public class WavefrontTurret extends PowerTurret {
             }
             Draw.color();
 
-            // 阴影层 (在模型之下, 与 DrawTurret.shadowLayer 一致)
-            Draw.z(Layer.blockBuilding - 1f);
-            // ★ 阴影大小基于模型实际 worldSize (boundRadius * 2 * defaultScl * obj.size)
-            float shadowSize = (object != null) ? object.boundRadius * 2f * 4f * object.size : size * 8f;
-            Drawf.shadow(x, y, shadowSize);
+            // ★ 原版 PU132 WavefrontTurret 不绘制额外阴影 — 阴影烘焙在 -base 贴图中
+            // 之前手动加的 Drawf.shadow() 圆形阴影大小/位置不对, 反而显得乱, 移除
 
             if (object != null && object.faces != null && object.faces.size > 0) {
                 // 模型绕 Z 轴旋转 (跟随炮台朝向)
