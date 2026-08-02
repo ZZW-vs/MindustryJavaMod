@@ -79,10 +79,19 @@ public class WavefrontObject{
                     if(line.startsWith("newmtl ")){
                         current = new Material();
                         current.name = line.replaceFirst("newmtl ", "");
+                        // ★ MMD OFF 开关材质跳过 (穿衣隐藏几何)
+                        if(current.name.contains("OFF") || current.name.contains("off") || current.name.contains("Off")){
+                            current.skip = true;
+                        }
 
                         if(materials == null) materials = new ObjectMap<>();
                         materials.put(current.name, current);
                         hasMaterial = true;
+                    }
+
+                    // ★ d 字段 (不透明度, 0=透明 1=不透明)
+                    if(line.startsWith("d ") && current != null){
+                        current.alpha = Strings.parseFloat(line.replaceFirst("d ", "").trim(), 1f);
                     }
 
                     if(line.startsWith("Ka ") && current != null){
@@ -137,13 +146,17 @@ public class WavefrontObject{
                         hasTexture = true;
                         hasMaterialTex = true;
                         if(canLoadTex()){
-                            String n = line.replaceFirst("map_Kd ", "");
+                            String n = line.replaceFirst("map_Kd ", "").trim();
                             current.diffTex = Core.atlas.find("create-" + n);
+                            // ★ atlas 找不到时, 从文件系统加载独立 Texture (MMD 等非 atlas 贴图)
+                            if(!current.diffTex.found() && material != null){
+                                loadIndependentTexture(current, n, material.parent());
+                            }
                         }
                     }
 
                     if(line.contains("map_Ke ") && current != null && canLoadTex()){
-                        String n = line.replaceFirst("map_Ke ", "");
+                        String n = line.replaceFirst("map_Ke ", "").trim();
                         current.emitTex = Core.atlas.find("create-" + n);
                     }
                 }catch(Throwable e){
@@ -205,6 +218,8 @@ public class WavefrontObject{
                 }
 
                 if(line.startsWith("f ")){
+                    // ★ 跳过 OFF 材质的面 (MMD 穿衣开关)
+                    if(current != null && current.skip) continue;
                     String[] segments = line.replace("f ", "").split("\\s+");
                     Face face = new Face();
                     face.verts = new Vertex[segments.length];
@@ -213,10 +228,13 @@ public class WavefrontObject{
                     if(hasMaterial && current != null) face.mat = current;
                     if(segments.length != 4) odd = true;
 
+                    // ★ neighbors 和 shadingValue 只在 zMedian/zDistance 着色时需要
+                    // topLight/normalAngle 跳过以加速加载 (gale 6万顶点否则卡几十秒)
+                    boolean needNeighbors = shadingType == ShadingType.zMedian || shadingType == ShadingType.zDistance;
+
                     int[] i = {0};
                     for(String segment : segments){
                         String[] faceIndex = segment.split("/");
-                        //Unity.print(faceIndex.length + "");
                         Vertex vert = drawnVertices.get(getFaceVal(faceIndex[0]));
                         face.verts[i[0]] = vert;
                         if(hasNormal){
@@ -226,37 +244,35 @@ public class WavefrontObject{
                             face.vertexTexture[i[0]] = uvs.get(getFaceVal(faceIndex[1]));
                         }
 
-                        for(int sign : Mathf.signs){
-                            Vertex v = drawnVertices.get(faceVertIndex(segments[Mathf.mod(sign + i[0], segments.length)]));
-
-                            if(!face.verts[i[0]].neighbors.contains(v)){
-                                face.verts[i[0]].neighbors.add(v);
+                        if(needNeighbors){
+                            for(int sign : Mathf.signs){
+                                Vertex v = drawnVertices.get(faceVertIndex(segments[Mathf.mod(sign + i[0], segments.length)]));
+                                if(!face.verts[i[0]].neighbors.contains(v)){
+                                    face.verts[i[0]].neighbors.add(v);
+                                }
                             }
                         }
-                        //faceTmp.shadingValue += (Math.abs(vert.source.x) + Math.abs(vert.source.y) + Math.abs(vert.source.z)) / 3f;
-                        //faceTmp.shadingValue += vert.source.len();
                         face.size += 6;
                         i[0]++;
                     }
 
                     face.data = new float[face.size];
 
-                    i[0] = 0;
-                    for(Vertex vt : face.verts){
-                        vt.neighbors.each(vs -> {
-                            for(Vertex vc : face.verts){
-                                if(vs == vc) return true;
-                            }
-
-                            return false;
-                        }, vs -> {
-                            face.shadingValue += vt.source.dst(vs.source);
-                            i[0]++;
-                        });
-                        //i[0]++;
+                    if(needNeighbors){
+                        i[0] = 0;
+                        for(Vertex vt : face.verts){
+                            vt.neighbors.each(vs -> {
+                                for(Vertex vc : face.verts){
+                                    if(vs == vc) return true;
+                                }
+                                return false;
+                            }, vs -> {
+                                face.shadingValue += vt.source.dst(vs.source);
+                                i[0]++;
+                            });
+                        }
+                        face.shadingValue /= i[0];
                     }
-
-                    face.shadingValue /= i[0];
                     faces.add(face);
                 }
             }catch(Throwable e){
@@ -275,7 +291,50 @@ public class WavefrontObject{
             texture = null;
         }
 
-        Log.info("[Create] WavefrontObject loaded: " + drawnVertices.size + " verts, " + faces.size + " faces");
+        // ★ 计算 boundRadius (用于阴影大小和相机定位)
+        if(!vertices.isEmpty()){
+            float minX = Float.MAX_VALUE, maxX = -Float.MAX_VALUE;
+            float minY = Float.MAX_VALUE, maxY = -Float.MAX_VALUE;
+            float minZ = Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
+            for(Vec3 v : vertices){
+                minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x);
+                minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y);
+                minZ = Math.min(minZ, v.z); maxZ = Math.max(maxZ, v.z);
+            }
+            float cx = (minX + maxX) * 0.5f, cy = (minY + maxY) * 0.5f, cz = (minZ + maxZ) * 0.5f;
+            float maxR = 0f;
+            for(Vec3 v : vertices){
+                float dx = v.x - cx, dy = v.y - cy, dz = v.z - cz;
+                float r = (float)Math.sqrt(dx * dx + dy * dy + dz * dz);
+                if(r > maxR) maxR = r;
+            }
+            boundRadius = Math.max(maxR, 0.1f);
+        }
+
+        Log.info("[Create] WavefrontObject loaded: " + drawnVertices.size + " verts, " + faces.size + " faces, boundRadius=" + boundRadius);
+    }
+
+    /** ★ 从 mod 文件树加载独立 Texture (非 atlas 贴图, 用于 MMD 等多贴图模型) */
+    protected void loadIndependentTexture(Material mat, String name, Fi mtlDir){
+        if(name == null || name.isEmpty()) return;
+        String normalized = name.replace('\\', '/');
+        String filename = normalized.contains("/") ? normalized.substring(normalized.lastIndexOf('/') + 1) : normalized;
+        String dir = mtlDir != null ? mtlDir.path().replace('\\', '/') : "";
+        String[] candidates = {normalized, filename, dir + "/" + normalized, dir + "/" + filename};
+        for(String p : candidates){
+            Fi fi = Vars.tree.get(p);
+            if(!fi.exists() && mtlDir != null) fi = mtlDir.child(p);
+            if(fi.exists()){
+                try{
+                    Texture tex = new Texture(fi);
+                    tex.setFilter(Texture.TextureFilter.linear, Texture.TextureFilter.linear);
+                    mat.independentTex = tex;
+                    return;
+                }catch(Throwable t){
+                    Log.err("[Create] Failed to load independent texture: " + p, t);
+                }
+            }
+        }
     }
 
     private boolean canLoadTex(){
@@ -613,6 +672,8 @@ public class WavefrontObject{
         public Texture independentTex;
         /** 材质 alpha (0~1), <1 时半透明渲染 */
         public float alpha = 1f;
+        /** ★ 是否跳过该材质的面 (MMD OFF 开关材质, 穿衣隐藏几何) */
+        public boolean skip = false;
     }
 
     public enum ShadingType{

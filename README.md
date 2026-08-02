@@ -195,6 +195,16 @@
 
 ## 更新日志
 
+### v2.1.7 (MMD模型改用OBJ加载,彻底解决PMX解析问题)
+- **gale MMD模型改用 OBJ+MTL 加载**（放弃 PMX 二进制解析）：PMX 格式复杂且解析易错（材质字段顺序、骨骼权重跳过等），改用 Blender 导出的 OBJ+MTL 更稳定可靠
+- **WavefrontObject.load() 增强**：
+  - 独立 Texture 加载：atlas 找不到贴图时自动从文件系统加载（`loadIndependentTexture`），支持 MMD 多贴图模型
+  - OFF 材质跳过：材质名含 "OFF" 的面跳过（MMD 穿衣隐藏几何）
+  - d 字段 alpha：MTL 的 `d` 字段作为材质透明度
+  - boundRadius 自动计算：所有 OBJ 模型加载后自动计算边界半径，修复阴影大小不准的问题
+- **加载性能优化**：topLight/normalAngle 着色跳过 neighbors 和 shadingValue 计算（gale 6万顶点加载从几十秒降到几秒）
+- **模型脚底居中**：gale 加载后平移顶点使脚底在原点，模型默认站在方块上
+
 ### v2.1.6 (修复MMD无法渲染+三角形面兼容SortedSpriteBatch)
 - **根因1 - PMX材质解析错位**：76c98da 误加 `subTexIdx` 字段，但标准 PMX 规范没有 sub-texture index（Texture Index 后直接是 Sphere Texture Index），导致整个二进制流错位，所有材质和面数据错乱
   - 修复：删除 `subTexIdx` 读取，恢复 459f802 的正确解析顺序

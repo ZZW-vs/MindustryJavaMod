@@ -4,6 +4,7 @@ import arc.Core;
 import arc.Events;
 import arc.files.Fi;
 import arc.graphics.Color;
+import arc.math.geom.Vec3;
 import arc.util.Log;
 import mindustry.Vars;
 import mindustry.game.EventType;
@@ -141,17 +142,20 @@ public class ZObjs {
         largeCogwheel.singleZLayer = true;
         largeCogwheel.cullBackfaces = false;
 
-        // ★ gale: MMD 角色模型, 直接解析 PMX 二进制格式
-        // PMX 模型尺寸通常 10-20 单位高, size=0.5 使 worldSize ~40 单位 (匹配 3x3 方块)
+        // ★ gale: MMD 角色模型, 用 OBJ+MTL 加载 (Blender 导出, 比 PMX 二进制更稳定)
+        // OBJ 顶点范围 ~1.04×1.79×0.71 (米), boundRadius ~1.1
+        // size=3: defaultScl(4)*3=12倍缩放, 模型高度 ~21单位 (3x3方块占地24单位)
         // 使用 topLight 着色 (光从上方照射), 轻微暗化保留贴图原色
         gale = new WavefrontObject();
         gale.textureName = "gale";
-        gale.size = 0.5f;
+        gale.size = 3f;
         gale.shadingType = WavefrontObject.ShadingType.topLight;
         gale.lightColor = Color.white;
         gale.shadeColor = Color.valueOf("808080");
         gale.maxShade = 0.3f;
         gale.drawLayer = Layer.flyingUnit;
+        gale.singleZLayer = true;
+        gale.cullBackfaces = false;
 
         Events.on(EventType.ClientLoadEvent.class, e -> {
             // ClientLoadEvent 时 atlas 贴图区域已注册, 避免 wavefront 等 hasTexture=true 对象加载失败
@@ -170,8 +174,14 @@ public class ZObjs {
         loadObj(crushingWheel, "crushing_wheel");
         loadObj(cogwheel, "cogwheel");
         loadObj(largeCogwheel, "large_cogwheel");
-        // ★ MMD 模型直接解析 PMX 二进制, 无需 Blender 导出
-        loadPMX(gale, "blander/text_g/Sakurako_Idol_1.0.pmx");
+        // ★ gale MMD 角色: 用 OBJ+MTL 加载 (Blender 导出, 比 PMX 二进制更稳定)
+        loadObj(gale, "blander/text_g/gale");
+        // ★ 平移模型使脚底在原点 (OBJ 顶点 minY ~-0.065, 平移后脚底 Y=0)
+        if(gale.vertices.any()){
+            float minY = Float.MAX_VALUE;
+            for(Vec3 v : gale.vertices) minY = Math.min(minY, v.y);
+            for(Vec3 v : gale.vertices) v.y -= minY;
+        }
     }
 
     /** 加载 PMX (MMD) 模型文件 */
