@@ -195,6 +195,25 @@
 
 ## 更新日志
 
+### v2.1.5 (3D渲染回退到CPU软件渲染,彻底解决透视问题)
+- **根因定位**: 18ad7f5 引入的 GPU 深度缓冲渲染与 Mindustry 2D batch 系统冲突
+  - GPU 深度缓冲 + 透明/双面材质混合时产生透视假象
+  - Mindustry 自己的 PlanetRenderer 用 GL 深度是在独立 3D 场景,不嵌入 2D 世界
+  - 用户反馈: "改了高精度优化之后就出现了透明不显示奇怪透视的问题"
+- **彻底回退**: WavefrontObject 恢复到 95db20d 的 CPU 软件渲染 (painter's algorithm)
+  - 顶点 CPU 变换 + 透视缩放
+  - 面排序 (远的先画) + 每面独立 Draw.z
+  - 不使用 GL 深度测试,避免与 2D batch 冲突
+- **PMXLoader 重写**: 保留 PMX 二进制解析,去掉 GPU Mesh 构建
+  - 填充 WavefrontObject 的 faces/vertices/normals/uvs 结构
+  - 每材质独立 Texture (Material.independentTex)
+  - OFF 开关材质跳过, da=0 非 OFF 强制 1.0
+  - 全部双面渲染 (cullBackfaces=false), 面排序 (singleZLayer=true)
+- **Material 增强**: 新增 independentTex (Texture) 和 alpha (float) 字段
+  - updateFace/face.draw 支持独立 Texture UV [0,1] 直接映射
+  - 材质 alpha 调制顶点颜色
+- **删除 GPU shader**: obj3d.vert 和 obj3d.frag 不再需要
+
 ### v2.1.4 (MMD专用展示台+透视彻底修复)
 - **彻底修复模型透视/面变透明问题**：
   - 根因：全局 cullBackfaces 导致所有材质统一双面渲染，内部面写入深度缓冲后与外部面深度竞争

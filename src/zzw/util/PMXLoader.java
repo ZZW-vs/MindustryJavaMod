@@ -1,350 +1,372 @@
 package zzw.util;
 
-import arc.files.Fi;
+import arc.files.*;
 import arc.graphics.*;
-import arc.graphics.gl.*;
+import arc.graphics.g2d.*;
+import arc.math.*;
+import arc.math.geom.*;
 import arc.struct.*;
-import arc.util.Log;
-import arc.util.Strings;
-import mindustry.Vars;
+import arc.util.*;
+import mindustry.*;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
+import java.io.*;
+import java.nio.*;
 import java.nio.charset.Charset;
 
 /**
- * PMX (MMD 模型) 二进制格式加载器
+ * PMX (MMD) 模型加载器
+ * 解析 PMX 二进制格式, 填充 WavefrontObject 的 faces/vertices/normals/uvs 结构
+ * 使用 CPU 软件渲染 (painter's algorithm + 面排序), 不构建 GPU Mesh
  *
- * 直接解析 .pmx 文件, 无需 Blender 导出为 OBJ
- * - 解析顶点(位置/法线/UV)、面索引、材质、贴图
- * - 跳过骨骼/形变/物理 (静态 bind-pose 渲染)
- * - 按材质分组构建 MeshGroup, 支持 MMD 多贴图模型
- *
- * PMX 坐标系: 左手系 Y-up, 面绕序为顺时针 (从外侧看)
- * OpenGL: 右手系, 逆时针为正面
- * → 加载时反转三角形绕序 (i0,i1,i2 → i0,i2,i1), 配合背面剔除
- *
- * @author 郑zip
+ * PMX 格式参考: https://gist.github.com/felixjones/f8a06bd6809f2aa0fc12
  */
 public class PMXLoader{
 
-    private static final int FLOATS_PER_VERT = 9; // pos(3) + normal(3) + color(1) + uv(2)
-
     /**
-     * 加载 PMX 文件到 WavefrontObject
-     * @param obj 目标对象 (meshGroups/boundRadius 等字段会被填充)
+     * 从 PMX 文件加载模型到 WavefrontObject
+     * @param obj 目标 WavefrontObject (会被填充 vertices/uvs/normals/faces/materials)
      * @param file PMX 文件
      */
     public static void load(WavefrontObject obj, Fi file){
-        byte[] data = file.readBytes();
-        ByteBuffer buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
+        try{
+            byte[] bytes = file.readBytes();
+            ByteBuffer buf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
 
-        // ===== Header =====
-        byte[] magic = new byte[4];
-        buf.get(magic);
-        if(magic[0] != 'P' || magic[1] != 'M' || magic[2] != 'X' || magic[3] != ' '){
-            throw new RuntimeException("Not a PMX file: " + file);
-        }
-        float version = buf.getFloat();
-
-        // Globals
-        int globalsCount = buf.get() & 0xFF;
-        byte encoding = buf.get();               // 0=UTF16LE, 1=UTF8
-        int additionalUVCount = buf.get() & 0xFF;
-        int vertexIndexSize = buf.get() & 0xFF;   // 1/2/4
-        int textureIndexSize = buf.get() & 0xFF;
-        int materialIndexSize = buf.get() & 0xFF;
-        int boneIndexSize = buf.get() & 0xFF;
-        int morphIndexSize = buf.get() & 0xFF;
-        int rigidbodyIndexSize = buf.get() & 0xFF;
-
-        Charset charset = encoding == 0 ? Charset.forName("UTF-16LE") : Charset.forName("UTF-8");
-
-        // Skip model name / comment
-        readText(buf, charset); // name JP
-        readText(buf, charset); // name EN
-        readText(buf, charset); // comment JP
-        readText(buf, charset); // comment EN
-
-        // ===== Vertices =====
-        int vertexCount = buf.getInt();
-        float[] positions = new float[vertexCount * 3];
-        float[] normals = new float[vertexCount * 3];
-        float[] uvs = new float[vertexCount * 2];
-
-        for(int i = 0; i < vertexCount; i++){
-            positions[i * 3]     = buf.getFloat();
-            positions[i * 3 + 1] = buf.getFloat();
-            positions[i * 3 + 2] = buf.getFloat();
-            normals[i * 3]       = buf.getFloat();
-            normals[i * 3 + 1]   = buf.getFloat();
-            normals[i * 3 + 2]   = buf.getFloat();
-            uvs[i * 2]           = buf.getFloat();
-            uvs[i * 2 + 1]       = buf.getFloat();
-
-            // Additional UVs
-            for(int a = 0; a < additionalUVCount; a++){
-                buf.getFloat(); buf.getFloat(); buf.getFloat(); buf.getFloat();
+            // ===== Header =====
+            // Magic "PMX "
+            byte[] magic = new byte[4];
+            buf.get(magic);
+            String magicStr = new String(magic);
+            if(!magicStr.equals("PMX ")){
+                throw new RuntimeException("Not a PMX file: magic=" + magicStr);
             }
 
-            // Bone weight (skip, static render)
-            int weightType = buf.get() & 0xFF;
-            skipWeightData(buf, weightType, boneIndexSize);
+            int version = buf.getInt();  // 2.0=0x2000000, 2.1=0x2100000
+            // globals count
+            int globalsCount = buf.get();
+            byte[] globals = new byte[globalsCount];
+            buf.get(globals);
 
-            // Edge scale
-            buf.getFloat();
-        }
+            int textEncoding = globals[0];  // 0=UTF-16LE, 1=UTF-8
+            int extVecIdx = globals[1];     // 1/2/4
+            int extTexIdx = globals[2];     // 1/2/4
+            int extMatIdx = globals[3];     // 1/2/4
+            int extBoneIdx = globals[4];    // 1/2/4
+            int extMorphIdx = globals[5];   // 1/2/4
+            int extRigidIdx = globals[6];   // 1/2/4
 
-        // ===== Faces (vertex indices) =====
-        int faceIndexCount = buf.getInt();
-        int[] indices = new int[faceIndexCount];
-        for(int i = 0; i < faceIndexCount; i++){
-            indices[i] = readUnsignedIndex(buf, vertexIndexSize);
-        }
+            Charset charset = textEncoding == 0 ? Charset.forName("UTF-16LE") : Charset.forName("UTF-8");
 
-        // ===== Textures =====
-        int textureCount = buf.getInt();
-        String[] texturePaths = new String[textureCount];
-        for(int i = 0; i < textureCount; i++){
-            // PMX 贴图路径可能是绝对路径 (C:\...) 或相对路径 (含 ..\, tex\)
-            // → 反斜杠统一为正斜杠
-            String raw = readText(buf, charset);
-            texturePaths[i] = raw.replace('\\', '/');
-            Log.info("[Create] PMX texture[" + i + "]: " + texturePaths[i]);
-        }
+            // ===== Model name =====
+            String nameJp = readText(buf, charset);
+            String nameEn = readText(buf, charset);
+            String commentJp = readText(buf, charset);
+            String commentEn = readText(buf, charset);
 
-        // ===== Bounding box =====
-        float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
-        float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
-        for(int i = 0; i < vertexCount; i++){
-            float px = positions[i * 3], py = positions[i * 3 + 1], pz = positions[i * 3 + 2];
-            minX = Math.min(minX, px); minY = Math.min(minY, py); minZ = Math.min(minZ, pz);
-            maxX = Math.max(maxX, px); maxY = Math.max(maxY, py); maxZ = Math.max(maxZ, pz);
-        }
-        float cx = (minX + maxX) * 0.5f;
-        float cy = (minY + maxY) * 0.5f;
-        float cz = (minZ + maxZ) * 0.5f;
-        float maxR = 0f;
-        for(int i = 0; i < vertexCount; i++){
-            float dx = positions[i * 3] - cx, dy = positions[i * 3 + 1] - cy, dz = positions[i * 3 + 2] - cz;
-            float r = (float)Math.sqrt(dx * dx + dy * dy + dz * dz);
-            if(r > maxR) maxR = r;
-        }
-        obj.boundRadius = Math.max(maxR, 0.1f);
+            Log.info("[Create] PMX model: " + nameJp + " (v" + (version >> 24) + "." + (version >> 16 & 0xFF) + ")");
 
-        // ===== Materials =====
-        int materialCount = buf.getInt();
-        int faceOffset = 0;
-        boolean anyDoubleSided = false;
-        int totalVerts = 0;
+            // ===== Vertices =====
+            int vertexCount = buf.getInt();
+            float[] positions = new float[vertexCount * 3];
+            float[] normals = new float[vertexCount * 3];
+            float[] uvs = new float[vertexCount * 2];
 
-        // 模型目录 (用于贴图路径解析)
-        String modelDir = file.parent().path().replace('\\', '/');
+            for(int i = 0; i < vertexCount; i++){
+                positions[i * 3]     = buf.getFloat();
+                positions[i * 3 + 1] = buf.getFloat();
+                positions[i * 3 + 2] = buf.getFloat();
 
-        for(int m = 0; m < materialCount; m++){
-            String nameJp = readText(buf, charset); // name JP
-            String nameEn = readText(buf, charset); // name EN
-            String matName = (nameJp != null && !nameJp.isEmpty()) ? nameJp : nameEn;
+                normals[i * 3]     = buf.getFloat();
+                normals[i * 3 + 1] = buf.getFloat();
+                normals[i * 3 + 2] = buf.getFloat();
 
-            // Diffuse RGBA
-            float dr = buf.getFloat(), dg = buf.getFloat(), db = buf.getFloat(), da = buf.getFloat();
+                uvs[i * 2]     = buf.getFloat();
+                uvs[i * 2 + 1] = buf.getFloat();
 
-            // Specular
-            buf.getFloat(); buf.getFloat(); buf.getFloat();
-            buf.getFloat(); // specular strength
-
-            // Ambient
-            buf.getFloat(); buf.getFloat(); buf.getFloat();
-
-            // Draw flags
-            int drawFlags = buf.get() & 0xFF;
-            boolean doubleSided = (drawFlags & 1) != 0;
-            if(doubleSided) anyDoubleSided = true;
-
-            // Edge
-            buf.getFloat(); buf.getFloat(); buf.getFloat(); buf.getFloat(); // edge color
-            buf.getFloat(); // edge size
-
-            // Texture index
-            int texIdx = readSignedIndex(buf, textureIndexSize);
-
-            // Sphere texture
-            int sphereIdx = readSignedIndex(buf, textureIndexSize);
-            byte sphereMode = buf.get();
-
-            // Toon
-            byte sharedToon = buf.get();
-            if(sharedToon == 0){
-                readSignedIndex(buf, textureIndexSize);
-            }else{
-                buf.get(); // shared toon index (1 byte, 0-9)
+                // 跳过骨骼权重 (类型 + 数据)
+                int weightType = buf.get() & 0xFF;
+                skipBoneWeight(buf, weightType, extBoneIdx);
             }
 
-            // Memo
-            readText(buf, charset);
-
-            // Face count (vertex count for this material, /3 = triangles)
-            int matFaceCount = buf.getInt();
-
-            if(matFaceCount == 0) continue;
-
-            // 构建该材质的 Mesh
-            int triCount = matFaceCount / 3;
-            int vertCount = triCount * 3;
-            float[] vertData = new float[vertCount * FLOATS_PER_VERT];
-
-            // ★★★ PMX材质特殊处理 (直接解决"透视"问题) ★★★
-            // 1. MMD薄壳几何 (头发/衣服/眼罩/耳尾等) 几乎都只有单面, 不能开背面剔除, 全局强制双面
-            //    (日志: 髪 mat[33] 23042 tris doubleSided=false → 从反面看被cull, 看到头内部 = 透视)
-            doubleSided = true;
-            anyDoubleSided = true;
-
-            // 2. da=0.00 且名称含 OFF 的材质是 MMD 的"穿衣开关"隐藏材质, 直接跳过 (不构建Mesh)
-            //    否则 alpha=0 discard 后不写深度, 干扰深度竞争
-            boolean isOffSwitch = (da <= 0.01f) && (matName.contains("OFF") || matName.contains("off") || matName.contains("Off"));
-            if(isOffSwitch){
-                faceOffset += matFaceCount;
-                Log.info("[Create] PMX mat[" + m + "] " + matName
-                    + " | da=0 OFF开关, 跳过渲染 (tris=" + triCount + ")");
-                continue;
+            // ===== Faces (三角形索引) =====
+            int faceIndexCount = buf.getInt();
+            int[] indices = new int[faceIndexCount];
+            for(int i = 0; i < faceIndexCount; i++){
+                indices[i] = readIndex(buf, extVecIdx);
             }
 
-            // 3. 其他 da=0 材质 (きつね耳/きつね尻尾/靴_黒 etc.) → 强制 da=1.0, 这是PMX导出器
-            //    没正确设置的alpha, 贴图本身有颜色, 不是真透明
-            float realDa = da;
-            if(realDa <= 0.01f) realDa = 1.0f;
+            // ===== Textures =====
+            int textureCount = buf.getInt();
+            String[] texturePaths = new String[textureCount];
+            for(int i = 0; i < textureCount; i++){
+                String raw = readText(buf, charset);
+                texturePaths[i] = raw.replace('\\', '/');
+                Log.info("[Create] PMX texture[" + i + "]: " + texturePaths[i]);
+            }
 
-            // 材质颜色 (diffuse)
-            Color matColor = new Color(dr, dg, db, realDa);
-            float packedColor = matColor.toFloatBits();
-            // 真透明: realDa<0.5 才标记 transparent (深度不写入)
-            boolean transparent = realDa < 0.5f;
+            // ===== Materials =====
+            int materialCount = buf.getInt();
+            WavefrontObject.Material[] mats = new WavefrontObject.Material[materialCount];
+            int[] matFaceCounts = new int[materialCount];
+            String modelDir = file.parent().path().replace('\\', '/');
 
-            final String fm = matName;
-            final float fda = realDa;
-            final float forigDa = da;
-            final boolean fds = doubleSided;
+            for(int m = 0; m < materialCount; m++){
+                String matNameJp = readText(buf, charset);
+                String matNameEn = readText(buf, charset);
+                String matName = (matNameJp != null && !matNameJp.isEmpty()) ? matNameJp : matNameEn;
 
-            int vi = 0;
-            for(int t = 0; t < triCount; t++){
-                int i0 = indices[faceOffset + t * 3];
-                int i1 = indices[faceOffset + t * 3 + 1];
-                int i2 = indices[faceOffset + t * 3 + 2];
+                float dr = buf.getFloat(), dg = buf.getFloat(), db = buf.getFloat(), da = buf.getFloat();
+                float sr = buf.getFloat(), sg = buf.getFloat(), sb = buf.getFloat();
+                int toonMode = buf.get() & 0xFF;  // 0=texture, 1=index
+                int toonIdx = (toonMode == 1) ? (buf.get() & 0xFF) : readIndex(buf, extTexIdx);
+                int edgeFlags = buf.get() & 0xFF;
+                float er = buf.getFloat(), eg = buf.getFloat(), eb = buf.getFloat(), ea = buf.getFloat();
+                float edgeSize = buf.getFloat();
+                int texIdx = readIndex(buf, extTexIdx);
+                int subTexIdx = readIndex(buf, extTexIdx);
+                int sphereTexIdx = readIndex(buf, extTexIdx);
+                int sphereMode = buf.get() & 0xFF;
+                int sharedToon = buf.get() & 0xFF;
+                readText(buf, charset);  // memo
+                int faceCount = buf.getInt();  // 该材质的面数 (索引数)
+                matFaceCounts[m] = faceCount;
 
-                // ★ 反转绕序: MMD 顺时针 → OpenGL 逆时针 (正面朝外)
-                int[] idx = {i0, i2, i1};
-
-                for(int vIdx : idx){
-                    vertData[vi]     = positions[vIdx * 3]     - cx;
-                    vertData[vi + 1] = positions[vIdx * 3 + 1] - cy;
-                    vertData[vi + 2] = positions[vIdx * 3 + 2] - cz;
-                    vertData[vi + 3] = normals[vIdx * 3];
-                    vertData[vi + 4] = normals[vIdx * 3 + 1];
-                    vertData[vi + 5] = normals[vIdx * 3 + 2];
-                    vertData[vi + 6] = packedColor;
-                    vertData[vi + 7] = uvs[vIdx * 2];
-                    // ★ V 翻转: PMX V 朝上, OpenGL V 朝下
-                    vertData[vi + 8] = 1f - uvs[vIdx * 2 + 1];
-                    vi += FLOATS_PER_VERT;
+                // ★ OFF 开关材质跳过 (穿衣隐藏几何)
+                boolean isOffSwitch = (da <= 0.01f) && (matName.contains("OFF") || matName.contains("off") || matName.contains("Off"));
+                if(isOffSwitch){
+                    mats[m] = null;
+                    Log.info("[Create] PMX mat[" + m + "] " + matName + " | da=0 OFF开关, 跳过");
+                    continue;
                 }
-            }
-            faceOffset += matFaceCount;
 
-            try{
-                Mesh mesh = new Mesh(false, vertCount, 0,
-                    VertexAttribute.position3,
-                    VertexAttribute.normal,
-                    VertexAttribute.color,
-                    VertexAttribute.texCoords
-                );
-                mesh.setVertices(vertData, 0, vertCount * FLOATS_PER_VERT);
+                // da=0 但非 OFF → 强制 1.0 (PMX 导出器 alpha 未正确设置)
+                float realDa = da <= 0.01f ? 1.0f : da;
 
-                WavefrontObject.MeshGroup mg = new WavefrontObject.MeshGroup();
-                mg.mesh = mesh;
-                mg.vertFloatCount = vertCount * FLOATS_PER_VERT;
-                mg.originalVerts = new float[vertCount * FLOATS_PER_VERT];
-                System.arraycopy(vertData, 0, mg.originalVerts, 0, vertCount * FLOATS_PER_VERT);
-                mg.distortData = new float[vertCount * FLOATS_PER_VERT];
-                mg.transparent = transparent;
-                mg.doubleSided = doubleSided;  // 全局强制true
+                WavefrontObject.Material mat = new WavefrontObject.Material();
+                mat.name = matName;
+                mat.hasColor = true;
+                // diffuse 颜色
+                Tmp.c1.set(dr, dg, db, 1f);
+                mat.diffuseCol = Tmp.c1.rgba8888();
+                // ambient = diffuse
+                mat.ambientCol = mat.diffuseCol;
+                // emit (Ke) - PMX 没有 emit, 用 edge 颜色模拟
+                mat.emitCol = 0x00000000;
+                mat.alpha = realDa;
 
-                boolean texFound = false;
                 // 加载贴图
                 if(texIdx >= 0 && texIdx < texturePaths.length){
                     Texture tex = loadTexture(texturePaths[texIdx], modelDir);
                     if(tex != null){
-                        mg.texture = tex;
-                        mg.hasTexture = true;
-                        texFound = true;
+                        mat.independentTex = tex;
                     }
                 }
 
-                obj.meshGroups.add(mg);
-                totalVerts += vertCount;
+                mats[m] = mat;
 
-                // 材质诊断日志
-                Log.info("[Create] PMX mat[" + m + "] " + fm
-                    + " | da_orig=" + Strings.fixed(forigDa, 2)
-                    + " | da=" + Strings.fixed(fda, 2)
-                    + " | doubleSided=" + fds
-                    + " | transparent=" + transparent
+                Log.info("[Create] PMX mat[" + m + "] " + matName
+                    + " | da_orig=" + Strings.fixed(da, 2)
+                    + " | da=" + Strings.fixed(realDa, 2)
                     + " | texIdx=" + texIdx
-                    + " | texFound=" + texFound
-                    + " | tris=" + triCount);
-            }catch(Throwable t){
-                Log.err("[Create] PMX mesh creation failed for material " + m, t);
+                    + " | texFound=" + (mat.independentTex != null)
+                    + " | tris=" + (faceCount / 3));
             }
+
+            // ===== 填充 WavefrontObject 数据结构 =====
+            // 计算边界半径
+            float minX = Float.MAX_VALUE, maxX = -Float.MAX_VALUE;
+            float minY = Float.MAX_VALUE, maxY = -Float.MAX_VALUE;
+            float minZ = Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
+            for(int i = 0; i < vertexCount; i++){
+                float px = positions[i * 3], py = positions[i * 3 + 1], pz = positions[i * 3 + 2];
+                minX = Math.min(minX, px); maxX = Math.max(maxX, px);
+                minY = Math.min(minY, py); maxY = Math.max(maxY, py);
+                minZ = Math.min(minZ, pz); maxZ = Math.max(maxZ, pz);
+            }
+            float cx = (minX + maxX) * 0.5f, cy = (minY + maxY) * 0.5f, cz = (minZ + maxZ) * 0.5f;
+            float radius = 0f;
+            for(int i = 0; i < vertexCount; i++){
+                float dx = positions[i * 3] - cx, dy = positions[i * 3 + 1] - cy, dz = positions[i * 3 + 2] - cz;
+                radius = Math.max(radius, dx * dx + dy * dy + dz * dz);
+            }
+            obj.boundRadius = Mathf.sqrt(radius);
+
+            // 填充 vertices, normals, uvs (clear 后 add, 因为 drawnVertices/drawnNormals 是 final)
+            obj.vertices = new Seq<>(vertexCount);
+            obj.normals = new Seq<>(vertexCount);
+            obj.uvs = new Seq<>(vertexCount);
+            obj.drawnVertices.clear();
+            obj.drawnNormals.clear();
+
+            for(int i = 0; i < vertexCount; i++){
+                float px = positions[i * 3] - cx;
+                float py = positions[i * 3 + 1] - cy;
+                float pz = positions[i * 3 + 2] - cz;
+                Vec3 v = new Vec3(px, py, pz);
+                obj.vertices.add(v);
+                obj.drawnVertices.add(new WavefrontObject.Vertex(px, py, pz));
+
+                Vec3 n = new Vec3(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]);
+                obj.normals.add(n);
+                obj.drawnNormals.add(new Vec3(n));
+
+                Vec2 uv = new Vec2(uvs[i * 2], uvs[i * 2 + 1]);
+                obj.uvs.add(uv);
+            }
+
+            // 填充 materials (ObjectMap)
+            obj.materials = new ObjectMap<>();
+            for(int m = 0; m < materialCount; m++){
+                if(mats[m] != null){
+                    obj.materials.put(mats[m].name, mats[m]);
+                }
+            }
+
+            // 填充 faces (三角形)
+            obj.faces = new Seq<>(faceIndexCount / 3);
+            int faceOffset = 0;
+            for(int m = 0; m < materialCount; m++){
+                WavefrontObject.Material mat = mats[m];
+                int matFaceCount = matFaceCounts[m];
+                if(mat == null){
+                    faceOffset += matFaceCount;
+                    continue;
+                }
+
+                for(int t = 0; t < matFaceCount / 3; t++){
+                    int i0 = indices[faceOffset + t * 3];
+                    int i1 = indices[faceOffset + t * 3 + 1];
+                    int i2 = indices[faceOffset + t * 3 + 2];
+
+                    WavefrontObject.Face face = obj.new Face();
+                    face.verts = new WavefrontObject.Vertex[3];
+                    face.normal = new Vec3[3];
+                    face.vertexTexture = new Vec2[3];
+                    face.mat = mat;
+                    face.size = 3 * 6;  // 3 verts * 6 floats per vert
+                    face.data = new float[face.size];
+
+                    int[] idx = {i0, i1, i2};
+                    for(int vi = 0; vi < 3; vi++){
+                        face.verts[vi] = obj.drawnVertices.get(idx[vi]);
+                        face.normal[vi] = obj.drawnNormals.get(idx[vi]);
+                        face.vertexTexture[vi] = obj.uvs.get(idx[vi]);
+                    }
+
+                    obj.faces.add(face);
+                }
+                faceOffset += matFaceCount;
+            }
+
+            // 设置渲染参数
+            obj.hasMaterial = true;
+            obj.hasNormal = true;
+            obj.hasTexture = true;
+            obj.textureName = nameJp;
+            // ★ MMD 模型必须双面渲染 (薄壳几何), 关闭背面剔除
+            obj.cullBackfaces = false;
+            // ★ 启用面排序 (painter's algorithm), 远的先画
+            obj.singleZLayer = true;
+
+            Log.info("[Create] PMX loaded: " + vertexCount + " verts, " + (faceIndexCount / 3) + " tris, "
+                + materialCount + " materials, " + obj.faces.size + " faces, boundRadius=" + obj.boundRadius);
+
+        }catch(Throwable t){
+            Log.err("[Create] PMX load failed: " + file, t);
         }
-
-        // ★ 排序: 不透明在前, 透明在后
-        obj.meshGroups.sort((a, b) -> Boolean.compare(a.transparent, b.transparent));
-
-        // 全局 cullBackfaces 仅作 API 兼容 (实际渲染按 MeshGroup.doubleSided 处理)
-        obj.cullBackfaces = !anyDoubleSided;
-
-        // API 兼容: ObjDisplayBlock 检查 faces.size > 0
-        if(obj.faces.isEmpty()){
-            obj.faces.add(obj.new Face());
-        }
-
-        int texLoadedCount = 0;
-        for(WavefrontObject.MeshGroup mg : obj.meshGroups) if(mg.hasTexture) texLoadedCount++;
-        Log.info("[Create] PMX loaded: " + vertexCount + " verts, " + (faceIndexCount / 3) + " tris, "
-            + materialCount + " materials, " + obj.meshGroups.size + " mesh groups, "
-            + texLoadedCount + "/" + textureCount + " textures, "
-            + "boundRadius=" + obj.boundRadius + ", doubleSided=" + anyDoubleSided);
     }
 
-    /** 从 mod 文件树加载贴图 (尝试多种路径, 处理绝对路径/父目录/盘符前缀) */
+    /** 读取 PMX 变长文本 (4字节长度 + 数据) */
+    private static String readText(ByteBuffer buf, Charset charset){
+        int len = buf.getInt();
+        if(len <= 0) return "";
+        byte[] data = new byte[len];
+        buf.get(data);
+        return new String(data, charset);
+    }
+
+    /** 读取 PMX 变长索引 */
+    private static int readIndex(ByteBuffer buf, int size){
+        switch(size){
+            case 1: return buf.get() & 0xFF;
+            case 2: return buf.getShort() & 0xFFFF;
+            case 4: return buf.getInt();
+            default: throw new RuntimeException("Unknown index size: " + size);
+        }
+    }
+
+    /** 跳过骨骼权重数据 */
+    private static void skipBoneWeight(ByteBuffer buf, int type, int boneIdxSize){
+        switch(type){
+            case 0: // BDEF1
+                readIndex(buf, boneIdxSize);
+                break;
+            case 1: // BDEF2
+                readIndex(buf, boneIdxSize);
+                readIndex(buf, boneIdxSize);
+                buf.getFloat();
+                break;
+            case 2: // BDEF4
+                readIndex(buf, boneIdxSize);
+                readIndex(buf, boneIdxSize);
+                readIndex(buf, boneIdxSize);
+                readIndex(buf, boneIdxSize);
+                buf.getFloat();
+                buf.getFloat();
+                buf.getFloat();
+                buf.getFloat();
+                break;
+            case 3: // SDEF
+                readIndex(buf, boneIdxSize);
+                readIndex(buf, boneIdxSize);
+                buf.getFloat();
+                buf.getFloat();
+                buf.getFloat();
+                buf.getFloat();
+                buf.getFloat();
+                buf.getFloat();
+                break;
+            case 4: // QDEF
+                readIndex(buf, boneIdxSize);
+                readIndex(buf, boneIdxSize);
+                readIndex(buf, boneIdxSize);
+                readIndex(buf, boneIdxSize);
+                buf.getFloat();
+                buf.getFloat();
+                buf.getFloat();
+                buf.getFloat();
+                break;
+            default:
+                throw new RuntimeException("Unknown bone weight type: " + type);
+        }
+    }
+
+    /** 从 mod 文件树加载贴图 */
     private static Texture loadTexture(String path, String modelDir){
         if(path == null || path.isEmpty()) return null;
         String normalized = path.replace('\\', '/');
 
-        // 去掉盘符前缀 (C:/  /C:/ 等)
+        // 去掉盘符前缀
         if(normalized.matches("^[A-Za-z]:/.*")){
             normalized = normalized.substring(normalized.indexOf(':') + 2);
         }
         while(normalized.startsWith("/")) normalized = normalized.substring(1);
-
-        // 去掉 ../ ./ 前缀
         while(normalized.startsWith("../")) normalized = normalized.substring(3);
         while(normalized.startsWith("./")) normalized = normalized.substring(2);
 
-        // 去文件名 (用于候选)
         String filename = normalized.contains("/") ? normalized.substring(normalized.lastIndexOf('/') + 1) : normalized;
-        // 去文件名 (去掉第一层目录后的部分, 用于 xxx/texture.png → texture.png)
-        String afterLastSlash = filename;
 
-        // 尝试多种路径 (按优先级从高到低)
-        Seq<String> candidates = new Seq<>();
-        candidates.add(normalized);
-        candidates.add(modelDir + "/" + normalized);
-        candidates.add("blander/text_g/" + normalized);
-        candidates.add("blander/" + normalized);
-        candidates.add("objects/" + normalized);
-        candidates.add(afterLastSlash);
-        candidates.add("blander/text_g/" + afterLastSlash);
-        candidates.add("blander/" + afterLastSlash);
+        // 候选路径
+        String[] candidates = {
+            normalized,
+            modelDir + "/" + normalized,
+            "blander/text_g/" + normalized,
+            "blander/" + normalized,
+            "objects/" + normalized,
+            filename,
+            "blander/text_g/" + filename,
+            "blander/" + filename
+        };
 
         for(String p : candidates){
             Fi fi = Vars.tree.get(p);
@@ -360,74 +382,7 @@ public class PMXLoader{
             }
         }
 
-        Log.warn("[Create] PMX texture not found (orig=\"" + path + "\", norm=\"" + normalized + "\", file=\"" + afterLastSlash + "\")");
+        Log.warn("[Create] PMX texture not found: " + path + " (norm=" + normalized + ")");
         return null;
-    }
-
-    // ===== 二进制读取工具 =====
-
-    private static String readText(ByteBuffer buf, Charset charset){
-        int len = buf.getInt();
-        if(len <= 0) return "";
-        byte[] bytes = new byte[len];
-        buf.get(bytes);
-        return new String(bytes, charset);
-    }
-
-    /** 无符号索引读取 (顶点索引, 始终 >= 0) */
-    private static int readUnsignedIndex(ByteBuffer buf, int size){
-        switch(size){
-            case 1: return buf.get() & 0xFF;
-            case 2: return buf.getShort() & 0xFFFF;
-            case 4: return buf.getInt();
-            default: throw new RuntimeException("Unknown index size: " + size);
-        }
-    }
-
-    /** 有符号索引读取 (骨骼/贴图/材质索引, -1 = 无) */
-    private static int readSignedIndex(ByteBuffer buf, int size){
-        switch(size){
-            case 1: return buf.get();
-            case 2: return buf.getShort();
-            case 4: return buf.getInt();
-            default: throw new RuntimeException("Unknown index size: " + size);
-        }
-    }
-
-    private static void skipWeightData(ByteBuffer buf, int weightType, int boneIndexSize){
-        switch(weightType){
-            case 0: // BDEF1
-                readSignedIndex(buf, boneIndexSize);
-                break;
-            case 1: // BDEF2
-                readSignedIndex(buf, boneIndexSize);
-                readSignedIndex(buf, boneIndexSize);
-                buf.getFloat();
-                break;
-            case 2: // BDEF4
-                readSignedIndex(buf, boneIndexSize);
-                readSignedIndex(buf, boneIndexSize);
-                readSignedIndex(buf, boneIndexSize);
-                readSignedIndex(buf, boneIndexSize);
-                buf.getFloat(); buf.getFloat(); buf.getFloat(); buf.getFloat();
-                break;
-            case 3: // SDEF
-                readSignedIndex(buf, boneIndexSize);
-                readSignedIndex(buf, boneIndexSize);
-                buf.getFloat();
-                buf.getFloat(); buf.getFloat(); buf.getFloat(); // c
-                buf.getFloat(); buf.getFloat(); buf.getFloat(); // r0
-                buf.getFloat(); buf.getFloat(); buf.getFloat(); // r1
-                break;
-            case 4: // QDEF
-                readSignedIndex(buf, boneIndexSize);
-                readSignedIndex(buf, boneIndexSize);
-                readSignedIndex(buf, boneIndexSize);
-                readSignedIndex(buf, boneIndexSize);
-                buf.getFloat(); buf.getFloat(); buf.getFloat(); buf.getFloat();
-                break;
-            default:
-                throw new RuntimeException("Unknown weight type: " + weightType);
-        }
     }
 }
