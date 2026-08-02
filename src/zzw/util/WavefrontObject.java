@@ -423,6 +423,13 @@ public class WavefrontObject{
                         v = f.vertexTexture[vIdx].y;
                     }
 
+                    // ★ 如果使用 atlas region 纹理, 将模型 UV (0-1) 映射到 atlas UV 空间
+                    // 否则绑定的 texture.bind() 绑定的是整个大图集, UV(0-1) 会采样到错误区域
+                    if(hasDiffTexture && diffTexture != null && diffTexture.found()){
+                        u = u * (diffTexture.u2 - diffTexture.u) + diffTexture.u;
+                        v = v * (diffTexture.v2 - diffTexture.v) + diffTexture.v;
+                    }
+
                     vertData[vi]     = pos.x - cx;  // 居中
                     vertData[vi + 1] = pos.y - cy;
                     vertData[vi + 2] = pos.z - cz;
@@ -474,7 +481,7 @@ public class WavefrontObject{
 
         // 计算 FBO 世界空间大小和分辨率
         float scl = defaultScl * size;
-        float worldSize = boundRadius * 2f * scl * 1.4f;  // 1.4 倍边界球直径, 留余量
+        float worldSize = boundRadius * 2f * scl * 1.15f;  // 1.15 倍边界球直径, 紧凑 fit 减少阴影偏移
         int fboRes = computeFboResolution(worldSize);
 
         // 调整 FBO 大小 (仅在分辨率变化时 resize, 避免每帧开销)
@@ -485,11 +492,8 @@ public class WavefrontObject{
         // ★ 刷新 2D batch (确保之前的 Draw 命令已提交, FBO 不会覆盖正在使用的纹理)
         Draw.flush();
 
-        // ===== 保存 GL 状态 =====
-        boolean depthTestWasEnabled = Gl.isEnabled(Gl.depthTest);
-        boolean cullFaceWasEnabled = Gl.isEnabled(Gl.cullFace);
-
-        // 开始 FBO 渲染
+        // ===== 开始 FBO 渲染 =====
+        // 遵循 PlanetRenderer 模式: 显式设置/恢复所有 GL 状态, 不使用 isEnabled 保存
         buffer.begin(Color.clear);
 
         // 设置 Camera3D (透视投影)
@@ -506,6 +510,10 @@ public class WavefrontObject{
         transform.rotate(Vec3.Y, rY);
         transform.rotate(Vec3.X, rX);
         transform.scale(scl, scl, scl);
+
+        // ★ 禁用混合 (FBO 内 3D 渲染不需要混合, 深度缓冲处理遮挡)
+        // 不禁用混合会导致 FBO 内容被 pre-multiply alpha, 后续 Draw.rect 再次混合造成颜色错误
+        Gl.disable(Gl.blend);
 
         // 启用 GPU 深度测试 + 背面剔除
         Gl.enable(Gl.depthTest);
@@ -524,7 +532,7 @@ public class WavefrontObject{
             setLightingUniforms();
 
             // 绑定纹理 (如果模型有 diffuse 纹理)
-            if(hasDiffTexture && diffTexture != null){
+            if(hasDiffTexture && diffTexture != null && diffTexture.found()){
                 diffTexture.texture.bind();
                 shader.setUniformi("u_texture", 0);
                 shader.setUniformi("u_hasTexture", 1);
@@ -538,23 +546,18 @@ public class WavefrontObject{
             Log.err("[Create] WavefrontObject render error", t);
         }
 
-        // ===== 恢复 GL 状态 (关键: 防止污染 2D 渲染器) =====
+        // ===== 恢复 GL 状态 (遵循 PlanetRenderer 模式: 显式恢复) =====
         if(cullBackfaces){
             Gl.disable(Gl.cullFace);
         }
-        // ★ depthMask 必须恢复为 false, 否则 2D batch 会写入深度缓冲导致渲染异常
         Gl.depthMask(false);
-        if(!depthTestWasEnabled){
-            Gl.disable(Gl.depthTest);
-        }
+        Gl.disable(Gl.depthTest);
+        // ★ 重新启用混合 + 恢复混合函数 (2D batch 依赖混合)
+        Gl.enable(Gl.blend);
+        Gl.blendFunc(Gl.srcAlpha, Gl.oneMinusSrcAlpha);
 
         // 结束 FBO 渲染
         buffer.end();
-
-        // 恢复 cullFace 状态
-        if(cullFaceWasEnabled){
-            Gl.enable(Gl.cullFace);
-        }
 
         // 将 FBO 纹理绘制到 2D 场景
         float oz = Draw.z();
@@ -575,10 +578,9 @@ public class WavefrontObject{
 
     /** 根据模型世界空间大小计算 FBO 像素分辨率 (带缓存) */
     private int computeFboResolution(float worldSize){
-        // 缓存命中: 避免每帧重算
-        // 注意: worldSize 在 size/boundRadius 不变时是恒定的
-        int pixels = (int)(worldSize * 8f);
-        int res = Mathf.clamp(pixels, 256, 1024);
+        // ★ 提高分辨率倍率: 16 像素/世界单位, 最大 2048, 消除放大时的锯齿
+        int pixels = (int)(worldSize * 16f);
+        int res = Mathf.clamp(pixels, 256, 2048);
         // 取 2 的幂对齐 (部分 GPU 对非 2^n 纹理效率低)
         res = Mathf.nextPowerOfTwo(res);
         cachedFboRes = res;

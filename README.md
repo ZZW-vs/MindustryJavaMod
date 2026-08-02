@@ -195,6 +195,18 @@
 
 ## 更新日志
 
+### v1.9.2 (3D渲染纹理+GL状态+精度修复)
+- **修复wavefront贴图乱码**：GPU着色器绑定的 `diffTexture.texture` 是整个图集纹理，模型UV(0-1)采样到了图集错误区域
+  - 修复：`buildMesh()` 中将模型UV映射到atlas区域UV空间: `u*(u2-u)+u, v*(v2-v)+v`
+- **修复光效强度和模糊失效**：3D渲染时未禁用混合，FBO内容被pre-multiply alpha，后续Draw.rect再次混合导致颜色错误，同时GL状态污染影响bloom
+  - 修复：遵循PlanetRenderer模式 — 禁用混合进行3D渲染，渲染后显式恢复 `blendFunc(srcAlpha, oneMinusSrcAlpha)`
+  - 不再使用 `Gl.isEnabled()` 保存状态，改为显式设置/恢复所有GL状态
+- **修复模型放大后阴影偏移和边缘锯齿**：
+  - worldSize因子 1.4 → 1.15 (更紧凑的fit，减少阴影偏移)
+  - FBO分辨率倍率 8 → 16 像素/世界单位
+  - FBO最大分辨率 1024 → 2048 (消除放大时的锯齿)
+- **create-universal-display底座改为3x3炮台底座贴图**：使用vanilla `ripple-base` (3x3炮台底座)
+
 ### v1.9.1 (3D渲染系统修复+纹理支持+性能优化)
 - **修复炮台模型旋转方向相反**：GPU渲染器 Mat3D.rotate(Z,+deg) 是逆时针(标准OpenGL)，与旧CPU渲染器(顺时针)相反
   - PrismTurret/WavefrontTurret: `90f - rotation` → `rotation - 90f`

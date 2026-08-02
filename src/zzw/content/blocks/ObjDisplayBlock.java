@@ -3,6 +3,7 @@ package zzw.content.blocks;
 import arc.Core;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
+import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
 import arc.scene.ui.Button;
 import arc.scene.ui.Label;
@@ -29,6 +30,8 @@ import java.util.Arrays;
  */
 public class ObjDisplayBlock extends Block {
 
+    public TextureRegion baseRegion;
+
     public ObjDisplayBlock(String name) {
         super(name);
         size = 3;
@@ -38,6 +41,18 @@ public class ObjDisplayBlock extends Block {
         allowDiagonal = true;
         configurable = true;
         buildVisibility = BuildVisibility.shown;
+    }
+
+    @Override
+    public void load() {
+        super.load();
+        // 使用 3x3 炮台底座贴图 (vanilla ripple-base 是 3x3 炮台底座)
+        baseRegion = Core.atlas.find("ripple-base");
+    }
+
+    @Override
+    public TextureRegion[] icons() {
+        return new TextureRegion[]{baseRegion};
     }
 
     public class DisplayBuild extends Building {
@@ -72,9 +87,9 @@ public class ObjDisplayBlock extends Block {
 
         @Override
         public void draw() {
-            // 底座
-            if (region.found()) {
-                Draw.rect(region, x, y, size * Vars.tilesize, size * Vars.tilesize);
+            // 底座 (3x3 炮台底座贴图)
+            if (baseRegion.found()) {
+                Draw.rect(baseRegion, x, y);
             }
 
             // 阴影 - 双层增强3D落地感
