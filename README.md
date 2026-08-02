@@ -195,6 +195,20 @@
 
 ## 更新日志
 
+### v1.9.9 (3D锯齿修复+kami汉化+阴影修复)
+- **修复 3D 模型锯齿严重（特别是放大后）**：
+  - FBO 分辨率从 1024 提升到 2048，消除放大时的边缘锯齿
+  - 初始 buffer 大小从 512 改为 2048，避免首次 resize
+  - 显存占用 32MB（16MB色彩+16MB深度），对现代 GPU 可接受
+- **修复 kami 名称未汉化**：
+  - 原因：bundle key 缺少 `create-` 前缀（mod 自动添加前缀）
+  - 修复：`unit.kami.*` → `unit.create-kami.*`，现在显示"神威"
+- **修复波前模型阴影大小错误**：
+  - ObjDisplayBlock：阴影用 `Block.size(3) * 8f` 而非模型实际 worldSize，导致阴影过小
+  - WavefrontTurret：阴影用 `Block.size * 8f` 而非模型实际 worldSize
+  - 修复：阴影大小改为 `obj.boundRadius * 2f * 4f * obj.size`（模型实际 worldSize）
+  - `boundRadius` 字段从 private 改为 public 以供外部访问
+
 ### v1.9.8 (3D模型显示修复+信号删除+单选)
 - **修复所有 3D 模型不能显示**：
   - 原因：内存泄漏修复中将 `capturedLight`/`capturedShade` 从局部 `cpy()` 改为实例字段 `set()`，多个 DisplayBuild 共享同一 ZObjs 静态实例时，实例字段被后续调用覆盖，导致延迟 lambda 读到错误值

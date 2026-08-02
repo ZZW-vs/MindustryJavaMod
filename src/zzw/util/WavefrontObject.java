@@ -51,7 +51,7 @@ public class WavefrontObject{
     // ===== Mesh 数据 (GPU 缓冲) =====
     private Mesh mesh;
     private int numIndices;
-    private float boundRadius;       // 模型边界球半径 (模型空间, 未缩放)
+    public float boundRadius;       // 模型边界球半径 (模型空间, 未缩放)
     private float[] originalVerts;   // CPU 顶点副本 (用于 cons 形变)
     private int vertFloatCount;      // 顶点浮点数总数 (每顶点 9 float)
     private AtlasRegion diffTexture = null;  // 材质 diffuse 纹理 (map_Kd)
@@ -103,7 +103,7 @@ public class WavefrontObject{
         cam.near = 0.1f;
         cam.far = 5000f;
         cam.up.set(Vec3.Y);
-        buffer = new FrameBuffer(512, 512, true);
+        buffer = new FrameBuffer(2048, 2048, true);
         // ★ 设置线性过滤, 减少 FBO 纹理放大时的锯齿
         buffer.getTexture().setFilter(Texture.TextureFilter.linear, Texture.TextureFilter.linear);
         try{
@@ -514,9 +514,10 @@ public class WavefrontObject{
             float scl = defaultScl * capturedSize;
             // worldSize = 边界球直径 * 缩放 (旋转后最大投影)
             float worldSize = boundRadius * 2f * scl;
-            // ★ 固定 FBO 分辨率 1024, 不再自适应 — 避免 multi-instance 场景下反复 resize
-            // (旧方案: 不同大小模型导致每帧 resize, GPU 内存碎片, 帧数越来越低)
-            final int fboRes = 1024;
+            // ★ 固定 FBO 分辨率 2048 — 消除放大时的锯齿
+            // 旧方案 1024 在模型放大时锯齿严重, 2048 显存仅 16MB+16MB(深度)=32MB, 可接受
+            // 不用自适应分辨率: 多实例共享静态 buffer, 不同大小会导致每帧反复 resize 造成内存碎片
+            final int fboRes = 2048;
 
             // 仅在初始化或分辨率变化时 resize (固定 1024 后只执行一次)
             if(buffer.getWidth() != fboRes || buffer.getHeight() != fboRes){

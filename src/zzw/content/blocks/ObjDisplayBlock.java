@@ -92,9 +92,10 @@ public class ObjDisplayBlock extends Block {
                 Draw.rect(baseRegion, x, y);
             }
 
-            // 阴影 - 简单圆形, 随模型缩放
+            // 阴影 - 基于模型实际 worldSize (boundRadius * 2 * defaultScl * obj.size * scale)
             Draw.z(Layer.blockBuilding - 1f);
-            float shadowSize = size * 8f * currentScale;
+            WavefrontObject obj = MODELS[currentModel];
+            float shadowSize = (obj != null) ? obj.boundRadius * 2f * 4f * obj.size * currentScale : size * 8f * currentScale;
             Drawf.shadow(x, y, shadowSize);
 
             drawModel();
