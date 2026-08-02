@@ -584,7 +584,7 @@ public class Z_Turrets {
             recoil = 1f;
             consumePower(9.4f);
             heatColor = Pal.turretHeat;
-            shootSound = Sounds.shootFlame;
+            shootSound = Sounds.shootLancer;
             shootEffect = Fx.none;
             // v158 无 chargeTime/chargeMaxDelay/chargeEffects/chargeEffect 字段, 用 shoot.firstShotDelay 替代
             shoot.firstShotDelay = 51f;
@@ -615,7 +615,7 @@ public class Z_Turrets {
             recoil = 2f;
             consumePower(33.4f);
             heatColor = Pal.turretHeat;
-            shootSound = Sounds.shootFlame;
+            shootSound = Sounds.shootLancer;
             shootEffect = Fx.none;
             // v158 无 chargeTime/chargeMaxDelay/chargeEffects/chargeEffect 字段, 用 shoot.firstShotDelay 替代充能时间
             shoot.firstShotDelay = 51f;
@@ -684,6 +684,8 @@ public class Z_Turrets {
             // v158 无 chargeTime/chargeEffect/chargeBeginEffect 字段, 用 shoot.firstShotDelay 替代充能时间
             shoot.firstShotDelay = 38f;
             chargeSound = Sounds.shootLancer;
+            // ★ 修复: shootSound 之前未设置, 导致充能音结束后子弹静默发射
+            shootSound = Z_Sounds.wbosonShoot;
             consumePower(8.6f);
             shootType = new DecayBasicBulletType(8.5f, 24f) {{
                 drag = 0.026f;

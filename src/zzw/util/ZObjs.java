@@ -50,7 +50,7 @@ public class ZObjs {
         wavefront.textureName = "wavefront";
         // size=15 炮台, defaultScl=4f, wavefront.obj 顶点范围 ~2.5x2.5x0.5
         // 需要更大的 size 使模型可见 (size=15 炮台占地 120 单位, 模型需 ~60 单位)
-        wavefront.size = 8f;  // 4 * 8 = 32 倍缩放, 2.5 * 32 = 80 单位 (合适)
+        wavefront.size = 12f;  // 4 * 12 = 48 倍缩放, 模型更大更显眼
         wavefront.shadingSmoothness = 1f;
         wavefront.lightColor = Color.white;
         wavefront.shadeColor = Color.valueOf("9e9f9f");

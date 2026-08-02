@@ -195,6 +195,26 @@
 
 ## 更新日志
 
+### v1.9.5 (多炮台修复+teleporter自定义频道+模型优化)
+- **修复3D展示台阴影奇怪**：移除椭圆阴影，改为简单圆形阴影，大小 `size * 8f * currentScale`
+- **增大波前炮台3D模型**：wavefront.size 8f → 12f，模型更显眼
+- **修复w-boson开火声音缺失**：`shootSound` 未设置，导致充能音结束后子弹静默发射
+  - 修复：添加 `shootSound = Z_Sounds.wbosonShoot`
+- **修复arc-storm/arc-caster声音不匹配**：`shootSound = Sounds.shootFlame`（火焰喷射声）不适合电弧炮台
+  - 修复：改为 `Sounds.shootLancer`（电弧射击声）
+- **修复arc-caster/arc-storm闪电效果奇怪**：
+  - 闪电从子弹位置随机偏移 `radius` 范围内生成 → 改为从子弹位置直接发射
+  - 第一道闪电沿子弹方向延伸 (`lightningInaccuracy1 = 45f`)，第二道随机方向扩散
+  - 修复第二道闪电颜色 bug：`lightningC1` → `lightningC2`
+  - 弹体增加白色核心圆，增强电弧视觉效果
+- **延长ephemeron分裂放射效果**：EphemeronPairBulletType lifetime 720f → 1500f（25秒）
+- **teleporter加强：自定义频道名称功能**：
+  - 保留原12个颜色频道，新增文本输入框，玩家可输入自定义频道代码
+  - 相同自定义频道名的传送器互相连接，支持任意数量频道
+  - 新增 `config(String.class, ...)` 处理器，`ObjectMap<String, ObjectSet>` 按队伍分桶
+  - 配置界面显示当前频道状态（颜色频道号/自定义频道名/未选择）
+  - 存档支持：`write.str()` / `read.str()` 保存自定义频道名
+
 ### v1.9.4 (模型大小修复+wavefront透明修复+kami贴图+抗锯齿自适应)
 - **修复模型大小无法调整**：`Draw.draw()` 延迟执行，但 `obj.size` 在 lambda 执行前就被恢复
   - 修复：在 `draw()` 调用时捕获 `size`、`lightColor`、`shadeColor`、`maxShade`、`zOffset` 的快照

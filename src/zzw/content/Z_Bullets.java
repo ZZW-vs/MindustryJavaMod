@@ -120,7 +120,7 @@ public class Z_Bullets {
         public Color lightningC1 = Pal.lancerLaser, lightningC2 = Color.valueOf("8494b3");
         public int length1, length2 = 8, lengthRand1, lengthRand2 = 4;
         public float lightningDamage1, lightningDamage2;
-        public float lightningInaccuracy1, lightningInaccuracy2 = 180f;
+        public float lightningInaccuracy1 = 45f, lightningInaccuracy2 = 180f;
         public float radius = 12f;
         public float lightningChance1, lightningChance2;
 
@@ -135,20 +135,29 @@ public class Z_Bullets {
         @Override
         public void update(Bullet b) {
             super.update(b);
+            // ★ 闪电从子弹位置沿子弹方向延伸 (不再随机偏移)
             if (Mathf.chanceDelta(lightningChance1)) {
-                Tmp.v1.trns(b.rotation() + Mathf.range(2f), radius);
-                Lightning.create(b, lightningC1, lightningDamage1, b.x + Tmp.v1.x + Mathf.range(radius), b.y + Tmp.v1.y + Mathf.range(radius), b.rotation() + Mathf.range(lightningInaccuracy1), length1 + Mathf.range(lengthRand1));
+                Lightning.create(b, lightningC1, lightningDamage1,
+                    b.x, b.y,
+                    b.rotation() + Mathf.range(lightningInaccuracy1),
+                    length1 + Mathf.range(lengthRand1));
             }
+            // ★ 第二道闪电: 随机方向 (用于扩散攻击), 修复颜色 bug (lightningC1 → lightningC2)
             if (Mathf.chanceDelta(lightningChance2)) {
-                Tmp.v1.trns(b.rotation() + Mathf.range(2f), radius);
-                Lightning.create(b, lightningC1, lightningDamage2, b.x + Tmp.v1.x + Mathf.range(radius), b.y + Tmp.v1.y + Mathf.range(radius), b.rotation() + Mathf.range(lightningInaccuracy2), length2 + Mathf.range(lengthRand2));
+                Lightning.create(b, lightningC2, lightningDamage2,
+                    b.x, b.y,
+                    b.rotation() + Mathf.range(lightningInaccuracy2),
+                    length2 + Mathf.range(lengthRand2));
             }
         }
 
         @Override
         public void draw(Bullet b) {
+            // ★ 电弧弹体: 双层圆 + 旋转光环
             Draw.color(fromColor, toColor, b.fin());
             Fill.poly(b.x, b.y, 6, 6f + b.fout() * 6.1f, b.rotation());
+            Draw.color(lightningC1, Color.white, b.fout());
+            Fill.circle(b.x, b.y, 3f + b.fout() * 2f);
             Draw.reset();
         }
     }
@@ -501,8 +510,8 @@ public class Z_Bullets {
 
         public EphemeronPairBulletType(float damage) {
             super(0.001f, damage);
-            // ★ 用户反馈小球存在时间过短, 将 lifetime 从 360f 延长至 720f
-            lifetime = 720f;
+            // ★ 分裂放射小球存在时间: 360f → 720f → 1500f (用户要求再久一点)
+            lifetime = 1500f;
             hitEffect = Fx.hitLancer;
             despawnEffect = Fx.none;
             hitSize = 8f;
