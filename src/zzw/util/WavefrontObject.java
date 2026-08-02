@@ -378,27 +378,6 @@ public class WavefrontObject{
             hasDiffTexture = true;
         }
 
-        // ★ 检测 UV 是否已经是 atlas 坐标
-        // wavefront.obj 的 UV (0.027-0.816) 是整个 atlas 的坐标, 不需要映射
-        // cube.obj 等的 UV (0-1) 是归一化坐标, 需要映射到 atlas region
-        boolean uvAlreadyAtlas = false;
-        if(hasTexture && uvs.size > 0 && hasDiffTexture && diffTexture != null && diffTexture.found()){
-            float minU = Float.MAX_VALUE, maxU = -Float.MAX_VALUE;
-            float minV = Float.MAX_VALUE, maxV = -Float.MAX_VALUE;
-            for(Vec2 uv : uvs){
-                minU = Math.min(minU, uv.x); maxU = Math.max(maxU, uv.x);
-                minV = Math.min(minV, uv.y); maxV = Math.max(maxV, uv.y);
-            }
-            // 如果 UV 范围不完全覆盖 [0,1] (有留白), 说明已经是 atlas 坐标
-            // 归一化 UV 通常会恰好覆盖 0.0-1.0 范围
-            boolean spansFullRange = minU <= 0.001f && maxU >= 0.999f && minV <= 0.001f && maxV >= 0.999f;
-            uvAlreadyAtlas = !spansFullRange;
-            if(uvAlreadyAtlas){
-                Log.info("[Create] WavefrontObject '@' UVs already in atlas space (U:{}-{}, V:{}-{}), skipping remap",
-                    textureName, minU, maxU, minV, maxV);
-            }
-        }
-
         // 预计算每个面的法线 (如果 OBJ 没有法线)
         int vi = 0;
         for(Face f : faces){
@@ -446,11 +425,12 @@ public class WavefrontObject{
                         v = f.vertexTexture[vIdx].y;
                     }
 
-                    // ★ UV 映射规则:
-                    // - 如果 UV 已经是 atlas 坐标 (uvAlreadyAtlas=true), 直接使用
-                    // - 如果 UV 是归一化坐标 [0,1], 映射到 atlas region UV 空间
-                    //   (因为 texture.bind() 绑定的是整个图集纹理)
-                    if(hasDiffTexture && diffTexture != null && diffTexture.found() && !uvAlreadyAtlas){
+                    // ★ UV 映射规则 (v1.9.2 还原):
+                    // 如果 UV 在 [0,1] 范围内 (归一化坐标), 映射到 atlas region UV 空间
+                    // 因为 texture.bind() 绑定的是整个图集纹理, 需要用 region 的 [u,u2]x[v,v2] 偏移
+                    // UV 超出 [0,1] 说明已经是 atlas 坐标, 直接使用
+                    if(hasDiffTexture && diffTexture != null && diffTexture.found()
+                        && u >= 0f && u <= 1f && v >= 0f && v <= 1f){
                         u = u * (diffTexture.u2 - diffTexture.u) + diffTexture.u;
                         v = v * (diffTexture.v2 - diffTexture.v) + diffTexture.v;
                     }
