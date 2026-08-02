@@ -374,7 +374,7 @@ public class Teleporter extends Block {
             group.setMaxCheckCount(1);
 
             // 遍历副本, 避免删除时 ConcurrentModificationException
-            for (SignalEntry entry : allSignals.toArray()) {
+            for (SignalEntry entry : allSignals.copy()) {
                 final String signalName = entry.name;
                 final String signalNote = entry.note;
                 final int entryTeamId = entry.teamId;
