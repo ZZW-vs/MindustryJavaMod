@@ -195,6 +195,20 @@
 
 ## 更新日志
 
+### v1.9.7 (teleporter界面重做+kami崩溃修复)
+- **teleporter 界面完全重做**：
+  - 恢复 12 个颜色按钮（取消滑条方案），保留颜色快捷区
+  - 新增标签页切换：颜色频道（默认）/ 自定义信号
+  - 自定义信号区：输入信号名（支持中文）+ 批注 → 添加信号
+  - 场上所有自定义信号显示在面板列表中，玩家可直接选择
+  - 鼠标悬停信号按钮时显示批注 tooltip（自动跟随鼠标）
+  - 信号列表旁显示批注预览（超过12字截断）
+  - 数据结构改为 `ObjectMap<String, SignalInfo>` 存储信号成员+批注
+  - 全局 `allSignals` 列表跨传送器共享信号信息
+- **修复 create-kami 游戏崩溃**：
+  - 原因：`KamiBulletType.despawnEffect` 为 null，子弹消失时 `BulletType.despawned()` 调用 `Effect.at()` 触发 NPE
+  - 修复：设置 `despawnEffect = Fx.none` 和 `hitEffect = Fx.none`
+
 ### v1.9.6 (3D性能优化+teleporter滑条+kami修复+UI实时更新)
 - **修复3D系统内存泄漏导致帧数越来越低**：
   - `buffer.resize()` 在多实例场景下反复触发（不同大小模型每帧 resize）→ 固定 FBO 分辨率 1024

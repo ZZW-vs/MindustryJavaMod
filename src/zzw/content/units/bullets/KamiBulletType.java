@@ -8,6 +8,7 @@ import arc.math.Mathf;
 import arc.struct.FloatSeq;
 import arc.util.Tmp;
 import arc.util.Time;
+import mindustry.content.Fx;
 import mindustry.entities.bullet.BulletType;
 import mindustry.gen.Bullet;
 
@@ -42,8 +43,8 @@ public class KamiBulletType extends BulletType {
         keepVelocity = false;
         hitSize = 6f;
         lifetime = 240f;
-        despawnEffect = null;
-        hitEffect = null;
+        despawnEffect = Fx.none;  // ★ 不能为 null, 否则 Bullet.remove 时 NPE
+        hitEffect = Fx.none;
     }
 
     @Override
