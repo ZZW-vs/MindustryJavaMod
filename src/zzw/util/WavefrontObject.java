@@ -6,7 +6,6 @@ import arc.func.*;
 import arc.graphics.*;
 import arc.graphics.g2d.*;
 import arc.graphics.g2d.TextureAtlas.*;
-import arc.graphics.g3d.*;
 import arc.graphics.gl.*;
 import arc.math.*;
 import arc.math.geom.*;
@@ -21,16 +20,16 @@ import java.util.*;
 /**
  * Wavefront Object (.obj) GPU 3D 渲染器
  *
- * ★ 完全重写版: 使用 GPU 深度缓冲 + FrameBuffer 离屏渲染
- * - 优势: 完美支持任意3D模型, 无面排序/z-fighting问题, 支持Y轴旋转
- * - 使用 Camera3D 透视投影 + 自定义 Shader (方向光照 + 纹理采样)
+ * ★ 直接屏幕渲染版: 无 FBO, 直接渲染到屏幕深度缓冲
+ * - 优势: 全屏幕分辨率, 无 FBO 锯齿/性能开销, 完美支持Y轴旋转
+ * - 使用正交投影匹配2D相机 + 自定义 Shader (方向光照 + 纹理采样)
  * - OBJ 加载时构建 Mesh (position3 + normal + color + texCoords2), GPU 自动处理深度
  * - 支持材质纹理 (map_Kd) 和顶点颜色
  *
  * 公共 API 与旧版保持兼容 (字段/方法/内部类不变)
  *
  * @author EyeOfDarkness (原 CPU 软件渲染器)
- * @author 郑zip (GPU 深度缓冲重写)
+ * @author 郑zip (GPU 深度缓冲重写 → 直接屏幕渲染)
  */
 public class WavefrontObject{
     protected static final float zScale = 0.01f;
@@ -41,18 +40,11 @@ public class WavefrontObject{
     private static final int FLOATS_PER_VERT = 9;
 
     // ===== 静态 GPU 资源 (延迟初始化, 所有实例共享) =====
-    private static Camera3D cam;
-    private static FrameBuffer buffer;
     private static Mat3D transform = new Mat3D();
+    private static Mat3D projMat = new Mat3D();
     private static ObjShader shader;
     private static boolean initialized = false;
     private static boolean shaderFailed = false;
-
-    // ===== FXAA 后处理 (边缘抗锯齿) =====
-    private static FxaaShader fxaaShader;
-    private static boolean fxaaFailed = false;
-    /** 缓存 FBO 纹理区域, 避免每帧 Draw.wrap() 分配 */
-    private static TextureRegion fboRegion;
 
     // ===== Mesh 数据 (GPU 缓冲) =====
     private Mesh mesh;
@@ -97,8 +89,6 @@ public class WavefrontObject{
     public boolean singleZLayer = false;
     /** 实例间 Z 轴偏移 (用于 Draw.z 层级区分) */
     public float zOffset = 0f;
-    /** ★ FXAA 边缘抗锯齿开关 (true=启用, 修复Y轴旋转波浪状锯齿) */
-    public boolean useFxaa = true;
     protected int indexerA;
     protected float indexerZ;
 
@@ -106,28 +96,11 @@ public class WavefrontObject{
     private static void init(){
         if(initialized) return;
         initialized = true;
-        cam = new Camera3D();
-        cam.fov = 45f;
-        cam.near = 0.1f;
-        cam.far = 5000f;
-        cam.up.set(Vec3.Y);
-        buffer = new FrameBuffer(2048, 2048, true);
-        // ★ 设置线性过滤, 减少 FBO 纹理放大时的锯齿
-        buffer.getTexture().setFilter(Texture.TextureFilter.linear, Texture.TextureFilter.linear);
-        // 缓存 FBO 纹理区域
-        fboRegion = Draw.wrap(buffer.getTexture());
         try{
             shader = new ObjShader();
         }catch(Throwable t){
             Log.err("[Create] WavefrontObject shader compile failed, GPU rendering disabled", t);
             shaderFailed = true;
-        }
-        // ★ FXAA 后处理着色器 (边缘抗锯齿)
-        try{
-            fxaaShader = new FxaaShader();
-        }catch(Throwable t){
-            Log.err("[Create] FXAA shader compile failed, falling back to bilinear filter", t);
-            fxaaFailed = true;
         }
     }
 
@@ -510,19 +483,16 @@ public class WavefrontObject{
         final Color capturedShade = shadeColor.cpy();
         final float capturedMaxShade = maxShade;
         final float capturedZOffset = zOffset;
-        final boolean capturedUseFxaa = useFxaa;
+
+        // ★ 捕获相机视界 (Draw.draw 延迟执行时相机可能变化)
+        Rect bounds = Core.camera.bounds(Tmp.r1);
+        final float camLeft = bounds.x;
+        final float camRight = bounds.x + bounds.width;
+        final float camBottom = bounds.y;
+        final float camTop = bounds.y + bounds.height;
 
         // ★ 使用 Draw.draw() 参与 SortedSpriteBatch 的排序管线
-        // 旧方案 (Draw.z + Draw.flush) 会 flush ALL pending DrawRequests,
-        // 包括 bloom capture (z=99.98) 和 render (z=110.02), 导致:
-        // 1. bloom 在 z=25-35 时就 capture, 场景内容不完整 → 光效强度失效
-        // 2. bloom render 在错误时机执行 → 模糊失效
-        //
-        // Draw.draw(z, runnable) 将整个 FBO 操作注册为 DrawRequest,
-        // 在 flushRequests() 回放时执行. 此时 flushing=true:
-        // - flushRequests() 不会重入 (由 flushing 标志保护)
-        // - Draw.flush() 只调用 super.flush() 渲染 mesh buffer (cheap)
-        // - Draw.rect() 直接走 super.draw() (绕过队列, 直接写入 mesh)
+        // 直接渲染到屏幕深度缓冲, 无需 FBO
         Draw.draw(drawLayer + capturedZOffset, () -> {
             // 处理顶点形变 (cons)
             if(cons != null){
@@ -530,44 +500,33 @@ public class WavefrontObject{
             }
 
             float scl = defaultScl * capturedSize;
-            // worldSize = 边界球直径 * 缩放 (旋转后最大投影)
             float worldSize = boundRadius * 2f * scl;
-            // ★ 固定 FBO 分辨率 2048 — 消除放大时的锯齿
-            // 旧方案 1024 在模型放大时锯齿严重, 2048 显存仅 16MB+16MB(深度)=32MB, 可接受
-            // 不用自适应分辨率: 多实例共享静态 buffer, 不同大小会导致每帧反复 resize 造成内存碎片
-            final int fboRes = 2048;
 
-            // 仅在初始化或分辨率变化时 resize (固定 2048 后只执行一次)
-            if(buffer.getWidth() != fboRes || buffer.getHeight() != fboRes){
-                buffer.resize(fboRes, fboRes);
-                buffer.getTexture().setFilter(Texture.TextureFilter.linear, Texture.TextureFilter.linear);
-                // ★ resize 后纹理对象可能变化, 更新缓存区域
-                fboRegion = Draw.wrap(buffer.getTexture());
+            // ★ 视锥裁剪: 模型不在屏幕内则跳过
+            if(x + worldSize < camLeft || x - worldSize > camRight
+                || y + worldSize < camBottom || y - worldSize > camTop){
+                if(cons != null) restoreVertices();
+                return;
             }
 
-            // ===== FBO 离屏渲染 =====
-            // buffer.begin() 内部调用 Draw.flush(), 但 flushing=true 时
-            // flushRequests() 是 no-op, super.flush() 只渲染空 mesh buffer
-            buffer.begin(Color.clear);
+            // ★ 构建正交投影矩阵: 匹配2D相机的可见区域, 宽Z范围支持3D深度
+            // 直接渲染到屏幕, 分辨率 = 屏幕分辨率, 无FBO放大锯齿
+            projMat.setToOrtho(camLeft, camRight, camBottom, camTop, -2000f, 2000f);
 
-            // Camera3D 透视投影
-            // ★ camDist = 2.7 * boundRadius * scl: 模型占 FBO ~92%, 提高有效分辨率
-            // 旧值 3f 仅占 ~80%, 降低后边缘锯齿更小, 旋转时波浪纹显著减少
-            float camDist = boundRadius * scl * 2.7f;
-            cam.position.set(0, 0, camDist);
-            cam.lookAt(Vec3.Zero);
-            cam.up.set(Vec3.Y);
-            cam.resize(fboRes, fboRes);
-            cam.update();
-
-            // 模型变换矩阵 (旋转 + 缩放)
+            // ★ 模型变换矩阵: 平移到世界位置 + 旋转 + 缩放
+            // (旧FBO方案中平移由Draw.rect处理, 现在直接在变换矩阵中处理)
             transform.idt();
+            transform.translate(x, y, 0);
             transform.rotate(Vec3.Z, rZ);
             transform.rotate(Vec3.Y, rY);
             transform.rotate(Vec3.X, rX);
             transform.scale(scl, scl, scl);
 
-            // GL 状态: 禁用混合 (FBO 内 3D 渲染用深度缓冲处理遮挡)
+            // ★ Flush 2D batch 确保正确渲染顺序
+            // Draw.draw 内部 flushing=true, Draw.flush() 只调用 super.flush()
+            Draw.flush();
+
+            // GL 状态: 禁用混合 (3D渲染用深度缓冲处理遮挡)
             Gl.disable(Gl.blend);
             Gl.enable(Gl.depthTest);
             Gl.depthMask(true);
@@ -577,12 +536,11 @@ public class WavefrontObject{
                 Gl.cullFace(Gl.back);
             }
 
-            // 渲染 Mesh
+            // 渲染 Mesh 直接到屏幕
             try{
                 shader.bind();
-                shader.setUniformMatrix4("u_proj", cam.combined.val);
+                shader.setUniformMatrix4("u_proj", projMat.val);
                 shader.setUniformMatrix4("u_trans", transform.val);
-                // ★ 使用捕获的光照参数
                 setLightingUniformsCaptured(capturedLight, capturedShade, capturedMaxShade);
 
                 if(hasDiffTexture && diffTexture != null && diffTexture.found()){
@@ -599,7 +557,7 @@ public class WavefrontObject{
                 Log.err("[Create] WavefrontObject render error", t);
             }
 
-            // 恢复 GL 状态 (遵循 PlanetRenderer 模式)
+            // 恢复 GL 状态
             if(cullBackfaces){
                 Gl.disable(Gl.cullFace);
             }
@@ -607,24 +565,6 @@ public class WavefrontObject{
             Gl.disable(Gl.depthTest);
             Gl.enable(Gl.blend);
             Gl.blendFunc(Gl.srcAlpha, Gl.oneMinusSrcAlpha);
-
-            buffer.end();
-
-            // ★ 将 FBO 纹理绘制到 2D 场景 (FXAA 后处理边缘抗锯齿)
-            // 负高度翻转 (FBO 纹理在 OpenGL 中上下颠倒)
-            // flushing=true 时 Draw.rect() 直接走 super.draw() (绕过队列)
-            if(capturedUseFxaa && !fxaaFailed && fxaaShader != null){
-                // ★ FXAA 着色器: 采样 FBO 纹理边缘并平滑, 消除Y轴旋转波浪状锯齿
-                // Draw.shader() 设置 batch 自定义着色器, flush 时自动绑定并调用 apply()
-                Draw.shader(fxaaShader);
-                Draw.rect(fboRegion, x, y, worldSize, -worldSize);
-                Draw.flush();
-                Draw.shader(null);
-            }else{
-                // 回退: 无 FXAA, 直接绘制 (双线性过滤)
-                Draw.rect(fboRegion, x, y, worldSize, -worldSize);
-                Draw.flush();
-            }
 
             // 恢复顶点 (如果有形变)
             if(cons != null){
@@ -721,23 +661,6 @@ public class WavefrontObject{
     public static class ObjShader extends Shader{
         public ObjShader(){
             super(Vars.tree.get("shaders/obj3d.vert"), Vars.tree.get("shaders/obj3d.frag"));
-        }
-    }
-
-    /**
-     * FXAA 后处理着色器
-     * 在 FBO 纹理绘制到屏幕时应用边缘抗锯齿
-     * apply() 由 batch.flush() 自动调用, 设置 texel 尺寸 uniform
-     */
-    public static class FxaaShader extends Shader{
-        public FxaaShader(){
-            super(Vars.tree.get("shaders/fxaa.vert"), Vars.tree.get("shaders/fxaa.frag"));
-        }
-
-        @Override
-        public void apply(){
-            setUniformi("u_texture", 0);
-            setUniformf("u_texelSize", 1f / buffer.getWidth(), 1f / buffer.getHeight());
         }
     }
 

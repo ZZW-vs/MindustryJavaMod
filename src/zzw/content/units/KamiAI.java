@@ -1,5 +1,6 @@
 package zzw.content.units;
 
+import arc.Core;
 import arc.graphics.Blending;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
@@ -15,6 +16,7 @@ import arc.util.Time;
 import mindustry.entities.Units;
 import mindustry.entities.units.UnitController;
 import mindustry.gen.Bullet;
+import mindustry.gen.Call;
 import mindustry.gen.Groups;
 import mindustry.gen.Player;
 import mindustry.gen.Teamc;
@@ -138,6 +140,15 @@ public class KamiAI implements UnitController {
                 currentPattern = (currentPattern + 1) % PATTERN_COUNT;
                 // 难度随阶段提升
                 if (difficulty < 5 && stages % 3 == 0) difficulty++;
+                // ★ 波次完成提示: 玩家成功抗过一轮, 屏幕中间显示2秒
+                // 最高记录存储在 Core.settings (跨会话全局持久化)
+                int highestWave = Core.settings.getInt("kami-highest-wave", 0);
+                if(stages > highestWave){
+                    highestWave = stages;
+                    Core.settings.put("kami-highest-wave", highestWave);
+                    Core.settings.forceSave();
+                }
+                Call.announce("第 " + stages + " 波已通过！\n最高记录: " + highestWave);
             }
         }
 
