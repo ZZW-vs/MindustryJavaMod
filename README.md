@@ -195,6 +195,18 @@
 
 ## 更新日志
 
+### v2.1.1 (3D马赛克修复)
+- **修复3D模型马赛克/锯齿问题**：
+  - 根因：之前为追求性能禁用了alpha混合 (`Gl.disable(blend)`)，导致贴图透明边缘出现硬边马赛克
+  - 修复：恢复alpha混合 (`srcAlpha/oneMinusSrcAlpha`)，透明边缘平滑过渡
+  - 着色器增加 alpha discard：透明度<0.01的片段直接丢弃，避免写入深度缓冲遮挡后续像素
+  - 正交投影Z范围从 ±2000 收紧到 ±500，提升深度缓冲精度，消除 z-fighting 产生的色块
+  - 默认启用背面剔除 (`cullBackfaces=true`)，减少 overdraw 提升性能
+- **关于Blender/MMD模型渲染**：
+  - 说明：`.blend` 文件是Blender专有二进制格式，运行时解析需重写半个Blender，不可行
+  - 推荐方案：在Blender中 `File → Export → Wavefront (.obj)`，勾选 Apply Modifiers / Write Materials / Write UVs
+  - 导出的 .obj + .mtl + 贴图 放入 `assets/` 即可用现有WavefrontObject系统渲染（高精度）
+
 ### v2.1.0 (直接屏幕渲染+kami波次提示)
 - **3D渲染重构：FBO离屏渲染 → 直接屏幕渲染**：
   - 移除FBO+FXAA方案，改为直接渲染到屏幕深度缓冲，全屏幕分辨率无放大锯齿

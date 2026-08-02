@@ -84,7 +84,7 @@ public class WavefrontObject{
     /** ★ 最大暗化程度 (0~1) */
     public float maxShade = 0.75f;
     /** 是否启用 GPU 背面剔除 (true=剔除背面, false=双面渲染) */
-    public boolean cullBackfaces = false;
+    public boolean cullBackfaces = true;
     /** 保留 API 兼容 (GPU 深度缓冲自动处理, 不再需要) */
     public boolean singleZLayer = false;
     /** 实例间 Z 轴偏移 (用于 Draw.z 层级区分) */
@@ -526,8 +526,10 @@ public class WavefrontObject{
             // Draw.draw 内部 flushing=true, Draw.flush() 只调用 super.flush()
             Draw.flush();
 
-            // GL 状态: 禁用混合 (3D渲染用深度缓冲处理遮挡)
-            Gl.disable(Gl.blend);
+            // ★ GL 状态: 保留 alpha 混合 (避免透明贴图边缘出现马赛克硬边)
+            // 深度测试处理遮挡, 深度写入启用确保正确排序
+            Gl.enable(Gl.blend);
+            Gl.blendFunc(Gl.srcAlpha, Gl.oneMinusSrcAlpha);
             Gl.enable(Gl.depthTest);
             Gl.depthMask(true);
             Gl.clear(Gl.depthBufferBit);

@@ -1,0 +1,6 @@
+修复3D模型马赛克+说明Blender文件渲染限制
+
+- 修复马赛克: 恢复alpha混合, 着色器增加alpha discard
+- 收紧Z范围到±500提升深度精度, 默认启用背面剔除
+- 删除无法解析的girl.blend文件
+- README说明: .blend无法运行时解析, 需在Blender中导出OBJ
