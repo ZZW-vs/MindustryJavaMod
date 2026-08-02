@@ -193,15 +193,36 @@ public class PMXLoader{
             int vertCount = triCount * 3;
             float[] vertData = new float[vertCount * FLOATS_PER_VERT];
 
+            // ★★★ PMX材质特殊处理 (直接解决"透视"问题) ★★★
+            // 1. MMD薄壳几何 (头发/衣服/眼罩/耳尾等) 几乎都只有单面, 不能开背面剔除, 全局强制双面
+            //    (日志: 髪 mat[33] 23042 tris doubleSided=false → 从反面看被cull, 看到头内部 = 透视)
+            doubleSided = true;
+            anyDoubleSided = true;
+
+            // 2. da=0.00 且名称含 OFF 的材质是 MMD 的"穿衣开关"隐藏材质, 直接跳过 (不构建Mesh)
+            //    否则 alpha=0 discard 后不写深度, 干扰深度竞争
+            boolean isOffSwitch = (da <= 0.01f) && (matName.contains("OFF") || matName.contains("off") || matName.contains("Off"));
+            if(isOffSwitch){
+                faceOffset += matFaceCount;
+                Log.info("[Create] PMX mat[" + m + "] " + matName
+                    + " | da=0 OFF开关, 跳过渲染 (tris=" + triCount + ")");
+                continue;
+            }
+
+            // 3. 其他 da=0 材质 (きつね耳/きつね尻尾/靴_黒 etc.) → 强制 da=1.0, 这是PMX导出器
+            //    没正确设置的alpha, 贴图本身有颜色, 不是真透明
+            float realDa = da;
+            if(realDa <= 0.01f) realDa = 1.0f;
+
             // 材质颜色 (diffuse)
-            Color matColor = new Color(dr, dg, db, da);
+            Color matColor = new Color(dr, dg, db, realDa);
             float packedColor = matColor.toFloatBits();
-            // ★ 真透明: da<0.5 才标记 transparent (深度不写入)
-            // da>=0.5 只是边缘羽化或半透明颜色, 照常写入深度避免深度竞争
-            boolean transparent = da < 0.5f;
+            // 真透明: realDa<0.5 才标记 transparent (深度不写入)
+            boolean transparent = realDa < 0.5f;
 
             final String fm = matName;
-            final float fda = da;
+            final float fda = realDa;
+            final float forigDa = da;
             final boolean fds = doubleSided;
 
             int vi = 0;
@@ -245,7 +266,7 @@ public class PMXLoader{
                 System.arraycopy(vertData, 0, mg.originalVerts, 0, vertCount * FLOATS_PER_VERT);
                 mg.distortData = new float[vertCount * FLOATS_PER_VERT];
                 mg.transparent = transparent;
-                mg.doubleSided = doubleSided;  // 每材质独立双面标志
+                mg.doubleSided = doubleSided;  // 全局强制true
 
                 boolean texFound = false;
                 // 加载贴图
@@ -263,6 +284,7 @@ public class PMXLoader{
 
                 // 材质诊断日志
                 Log.info("[Create] PMX mat[" + m + "] " + fm
+                    + " | da_orig=" + Strings.fixed(forigDa, 2)
                     + " | da=" + Strings.fixed(fda, 2)
                     + " | doubleSided=" + fds
                     + " | transparent=" + transparent
