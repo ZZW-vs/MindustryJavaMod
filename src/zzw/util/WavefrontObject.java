@@ -425,14 +425,19 @@ public class WavefrontObject{
                         v = f.vertexTexture[vIdx].y;
                     }
 
-                    // ★ UV 映射规则 (v1.9.2 还原):
-                    // 如果 UV 在 [0,1] 范围内 (归一化坐标), 映射到 atlas region UV 空间
-                    // 因为 texture.bind() 绑定的是整个图集纹理, 需要用 region 的 [u,u2]x[v,v2] 偏移
-                    // UV 超出 [0,1] 说明已经是 atlas 坐标, 直接使用
+                    // ★ UV 映射规则 (PU132 原版还原):
+                    // OBJ UV 范围 [0,1] 是归一化坐标, 需映射到 atlas region UV 空间
+                    // 因为 texture.bind() 绑定的是整个图集纹理
+                    //
+                    // PU132 原版 (WavefrontObject.updateFace):
+                    //   u = Mathf.lerp(u, u2, objU)   // U: 线性映射
+                    //   v = Mathf.lerp(v2, v, objV)   // V: Y翻转! (OBJ V轴朝上, atlas V轴朝下)
+                    //
+                    // 旧代码 v = v*(v2-v)+v 缺少 Y 翻转, 导致贴图上下颠倒/采样到透明 padding
                     if(hasDiffTexture && diffTexture != null && diffTexture.found()
                         && u >= 0f && u <= 1f && v >= 0f && v <= 1f){
-                        u = u * (diffTexture.u2 - diffTexture.u) + diffTexture.u;
-                        v = v * (diffTexture.v2 - diffTexture.v) + diffTexture.v;
+                        u = Mathf.lerp(diffTexture.u, diffTexture.u2, u);   // U: 线性映射
+                        v = Mathf.lerp(diffTexture.v2, diffTexture.v, v);   // V: Y翻转!
                     }
 
                     vertData[vi]     = pos.x - cx;  // 居中
