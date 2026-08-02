@@ -115,18 +115,20 @@ public class PMXLoader{
                 String matNameEn = readText(buf, charset);
                 String matName = (matNameJp != null && !matNameJp.isEmpty()) ? matNameJp : matNameEn;
 
-                float dr = buf.getFloat(), dg = buf.getFloat(), db = buf.getFloat(), da = buf.getFloat();
-                float sr = buf.getFloat(), sg = buf.getFloat(), sb = buf.getFloat();
-                int toonMode = buf.get() & 0xFF;  // 0=texture, 1=index
-                int toonIdx = (toonMode == 1) ? (buf.get() & 0xFF) : readIndex(buf, extTexIdx);
-                int edgeFlags = buf.get() & 0xFF;
-                float er = buf.getFloat(), eg = buf.getFloat(), eb = buf.getFloat(), ea = buf.getFloat();
-                float edgeSize = buf.getFloat();
-                int texIdx = readIndex(buf, extTexIdx);
-                int subTexIdx = readIndex(buf, extTexIdx);
-                int sphereTexIdx = readIndex(buf, extTexIdx);
-                int sphereMode = buf.get() & 0xFF;
-                int sharedToon = buf.get() & 0xFF;
+                // ★ PMX 材质格式 (必须严格按顺序读取, 漏一个字段会导致整个流错位)
+                float dr = buf.getFloat(), dg = buf.getFloat(), db = buf.getFloat(), da = buf.getFloat();  // diffuse RGBA
+                float sr = buf.getFloat(), sg = buf.getFloat(), sb = buf.getFloat();  // specular RGB
+                float specStrength = buf.getFloat();  // ★ specular strength (之前漏了!)
+                float ar = buf.getFloat(), ag = buf.getFloat(), ab = buf.getFloat();  // ★ ambient RGB (之前漏了!)
+                int drawFlags = buf.get() & 0xFF;  // draw flags (双面/地面阴影/自身阴影/边缘)
+                float er = buf.getFloat(), eg = buf.getFloat(), eb = buf.getFloat(), ea = buf.getFloat();  // edge color RGBA
+                float edgeSize = buf.getFloat();  // edge size
+                int texIdx = readIndex(buf, extTexIdx);  // texture index
+                int subTexIdx = readIndex(buf, extTexIdx);  // sub texture index
+                int sphereTexIdx = readIndex(buf, extTexIdx);  // sphere texture index
+                int sphereMode = buf.get() & 0xFF;  // sphere mode
+                int toonMode = buf.get() & 0xFF;  // ★ shared toon flag (0=toon texture, 1=shared toon)
+                int toonIdx = (toonMode == 1) ? (buf.get() & 0xFF) : readIndex(buf, extTexIdx);  // toon index
                 readText(buf, charset);  // memo
                 int faceCount = buf.getInt();  // 该材质的面数 (索引数)
                 matFaceCounts[m] = faceCount;

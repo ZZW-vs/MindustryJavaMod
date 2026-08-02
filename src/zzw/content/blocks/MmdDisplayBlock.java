@@ -128,7 +128,7 @@ public class MmdDisplayBlock extends Block {
                 rX = angle - 15f;
             }
 
-            obj.zOffset = (id % 100) * 0.01f;
+            obj.zOffset = (id % 1000) * 1.0f;
             obj.draw(x, y + currentOffset, rX, rY, rZ);
 
             // 恢复

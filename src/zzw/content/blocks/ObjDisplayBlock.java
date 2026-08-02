@@ -134,10 +134,9 @@ public class ObjDisplayBlock extends Block {
                 rZ = angle;
             }
 
-            // ★ zOffset 用极小值 (0.01 * id), 仅用于多实例间 z 排序
-            // 旧值 (id % 1000) * 1.0f 会使 drawLayer+zOffset 侵入 bloom 窗口 (99.98-110.02),
-            // 导致光效强度和模糊失效
-            obj.zOffset = (id % 100) * 0.01f;
+            // ★ zOffset 用足够大的值区分多实例, 避免面在 batch 中交叉穿插
+            // (0.01f 太小, 不同实例的 face z 值几乎相同, 在 batch 中交叉排序 → 面乱搅和)
+            obj.zOffset = (id % 1000) * 1.0f;
             obj.draw(x, y + currentOffset, rX, rY, rZ);
 
             // 恢复原始参数
