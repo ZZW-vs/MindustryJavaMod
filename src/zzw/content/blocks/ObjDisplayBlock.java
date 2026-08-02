@@ -206,6 +206,12 @@ public class ObjDisplayBlock extends Block {
                     }
                 }).padLeft(4f).padRight(4f).width(60f).get();
                 offsetField.setMessageText("高度");
+                // ★ 实时更新: 按钮改变值后输入框同步显示 (不覆盖正在输入的文本)
+                offsetField.update(() -> {
+                    if (!offsetField.hasKeyboard()) {
+                        offsetField.setText(Strings.fixed(currentOffset, 0));
+                    }
+                });
 
                 posTable.button("+", Styles.flatt, () -> {
                     currentOffset = Mathf.clamp(currentOffset + 2f, -20f, 64f);
@@ -254,6 +260,12 @@ public class ObjDisplayBlock extends Block {
                     }
                 }).padLeft(4f).padRight(4f).width(60f).get();
                 scaleField.setMessageText("大小");
+                // ★ 实时更新: 按钮改变值后输入框同步显示 (不覆盖正在输入的文本)
+                scaleField.update(() -> {
+                    if (!scaleField.hasKeyboard()) {
+                        scaleField.setText(Strings.fixed(currentScale, 1));
+                    }
+                });
 
                 scaleTable.button("+", Styles.flatt, () -> {
                     currentScale = Mathf.clamp(currentScale + 0.5f, 0.1f, 20f);

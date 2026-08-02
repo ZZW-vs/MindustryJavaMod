@@ -195,6 +195,26 @@
 
 ## 更新日志
 
+### v1.9.6 (3D性能优化+teleporter滑条+kami修复+UI实时更新)
+- **修复3D系统内存泄漏导致帧数越来越低**：
+  - `buffer.resize()` 在多实例场景下反复触发（不同大小模型每帧 resize）→ 固定 FBO 分辨率 1024
+  - `Draw.wrap()` 每帧创建新 TextureRegion → 缓存静态 `fboRegion` 复用
+  - `lightColor.cpy()` / `shadeColor.cpy()` 每帧创建新 Color → 用实例字段 `set()` 复用
+  - 删除死代码 `computeFboResolution()` 和 `cachedFboRes`
+- **teleporter 界面优化**：
+  - 去除 12 个分散的颜色按钮，改用滑条（0-999）选择频道
+  - 频道颜色用 HSB 色环生成（`fromHsv(channel * 360 / 1000, 0.7, 0.85)`）
+  - 去除自定义频道文本输入框，滑条支持 1000 个频道
+  - 用 `ObjectMap<Integer, ObjectSet>` 按需创建频道桶，不预分配 1000 个空 Set
+  - 存档用 `write.i()` / `read.i()` 支持 0-999 频道号
+- **修复 create-kami 不会弹幕**：
+  - 原因：`Units.closestTarget` 找不到敌方单位时返回 null，弹幕不执行
+  - 修复：改用 PU132 原版逻辑 — 遍历 `Groups.player` 找最近玩家单位作为目标
+- **修复 create-wavefront 阴影**：阴影大小 `size * 12f` → `size * 8f`，与模型实际大小匹配
+- **修复 create-universal-display 面板数值不实时更新**：
+  - 原因：TextField 只在构建时读取一次值，按钮改变字段后显示不更新
+  - 修复：TextField 添加 `update` 回调，非编辑状态时同步显示当前字段值
+
 ### v1.9.5 (多炮台修复+teleporter自定义频道+模型优化)
 - **修复3D展示台阴影奇怪**：移除椭圆阴影，改为简单圆形阴影，大小 `size * 8f * currentScale`
 - **增大波前炮台3D模型**：wavefront.size 8f → 12f，模型更显眼

@@ -64,14 +64,26 @@ public class KamiAI implements UnitController {
 
     @Override
     public void updateUnit() {
-        // 更新目标
+        // 更新目标 — ★ PU132 原版: 从所有玩家中选最近的, 不依赖敌方单位
         if (target != null && Units.invalidateTarget(target, unit.team, unit.x, unit.y)) {
             target = null;
         }
         if (target == null) {
-            target = Units.closestTarget(unit.team, unit.x, unit.y, 2000f,
-                u -> u.isValid() && !u.dead,
-                b -> true);
+            // ★ 原版逻辑: 遍历 Groups.player 找最近玩家单位
+            Player bestPlayer = null;
+            float bestDst = Float.MAX_VALUE;
+            for (Player p : Groups.player) {
+                if (p.unit() != null && p.unit().isValid()) {
+                    float dst = unit.dst(p.unit());
+                    if (dst < bestDst) {
+                        bestDst = dst;
+                        bestPlayer = p;
+                    }
+                }
+            }
+            if (bestPlayer != null) {
+                target = bestPlayer.unit();
+            }
         }
 
         // 更新位置 (保持在目标附近 minRange 距离)

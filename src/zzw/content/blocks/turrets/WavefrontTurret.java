@@ -105,8 +105,9 @@ public class WavefrontTurret extends PowerTurret {
 
             // 阴影层 (在模型之下, 与 DrawTurret.shadowLayer 一致)
             Draw.z(Layer.blockBuilding - 1f);
-            // 3D 模型无 2D 贴图, 使用圆形阴影代替
-            Drawf.shadow(x, y, size * 12f);
+            // ★ 阴影大小与模型实际大小匹配 (wavefront.size=12f, defaultScl=4f)
+            // worldSize ≈ boundRadius * 2 * defaultScl * size ≈ 120, 阴影用 size*8f=120
+            Drawf.shadow(x, y, size * 8f);
 
             if (object != null && object.faces != null && object.faces.size > 0) {
                 // 模型绕 Z 轴旋转 (跟随炮台朝向)

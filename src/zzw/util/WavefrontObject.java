@@ -59,7 +59,11 @@ public class WavefrontObject{
 
     // ===== 性能优化 (可复用缓冲) =====
     private float[] distortData;     // applyDistortion 复用数组, 避免每帧 GC
-    private int cachedFboRes = -1;   // FBO 分辨率缓存, 避免每帧重新计算
+    /** ★ 缓存 TextureRegion 避免 Draw.wrap() 每帧分配 */
+    private static TextureRegion fboRegion = new TextureRegion();
+    /** ★ 缓存 Color 避免 cpy() 每帧分配 */
+    private final Color capturedLight = new Color();
+    private final Color capturedShade = new Color();
 
     // ===== OBJ 数据 (保持公共 API 兼容) =====
     public Seq<Vec3> vertices = new Seq<>();
@@ -487,9 +491,10 @@ public class WavefrontObject{
         // ★ 捕获调用时的 size 值 — Draw.draw() 延迟执行,
         // 调用者 (如 ObjDisplayBlock) 会在 draw() 返回后恢复 obj.size,
         // 所以不能在 lambda 内读 this.size, 必须捕获当前值
+        // ★ 用实例字段复用 Color 对象, 避免 cpy() 每帧分配
         final float capturedSize = size;
-        final Color capturedLight = lightColor.cpy();
-        final Color capturedShade = shadeColor.cpy();
+        capturedLight.set(lightColor);
+        capturedShade.set(shadeColor);
         final float capturedMaxShade = maxShade;
         final float capturedZOffset = zOffset;
 
@@ -513,14 +518,13 @@ public class WavefrontObject{
             float scl = defaultScl * capturedSize;
             // worldSize = 边界球直径 * 缩放 (旋转后最大投影)
             float worldSize = boundRadius * 2f * scl;
-            // ★ 抗锯齿: 根据模型世界大小自适应 FBO 分辨率
-            // 目标: 每世界单位至少 16 像素, 向上取整到 2 的幂
-            int fboRes = computeFboResolution(worldSize);
+            // ★ 固定 FBO 分辨率 1024, 不再自适应 — 避免 multi-instance 场景下反复 resize
+            // (旧方案: 不同大小模型导致每帧 resize, GPU 内存碎片, 帧数越来越低)
+            final int fboRes = 1024;
 
-            // 仅在分辨率变化时 resize
+            // 仅在初始化或分辨率变化时 resize (固定 1024 后只执行一次)
             if(buffer.getWidth() != fboRes || buffer.getHeight() != fboRes){
                 buffer.resize(fboRes, fboRes);
-                // resize 可能重建纹理, 重新设置线性过滤
                 buffer.getTexture().setFilter(Texture.TextureFilter.linear, Texture.TextureFilter.linear);
             }
 
@@ -591,7 +595,10 @@ public class WavefrontObject{
             // 将 FBO 纹理绘制到 2D 场景
             // ★ 负高度翻转 (FBO 纹理在 OpenGL 中上下颠倒)
             // flushing=true 时 Draw.rect() 直接走 super.draw() (绕过队列)
-            Draw.rect(Draw.wrap(buffer.getTexture()), x, y, worldSize, -worldSize);
+            // ★ 复用静态 fboRegion 避免 Draw.wrap() 每帧分配新 TextureRegion
+            fboRegion.texture = buffer.getTexture();
+            fboRegion.set(0, 0, 1, 1);
+            Draw.rect(fboRegion, x, y, worldSize, -worldSize);
 
             // ★ 立即 flush: FBO 是共享静态资源, 必须在下一个模型渲染前提交
             // flushing=true 时只调用 super.flush() 渲染 mesh buffer
@@ -625,25 +632,6 @@ public class WavefrontObject{
         shader.setUniformf("u_lightColor", light.r, light.g, light.b);
         shader.setUniformf("u_shadeColor", shade.r, shade.g, shade.b);
         shader.setUniformf("u_maxShade", shadingType == ShadingType.noShading ? 0f : maxSh);
-    }
-
-    /** 根据模型世界空间大小自适应计算 FBO 像素分辨率 (抗锯齿) */
-    private int computeFboResolution(float worldSize){
-        // ★ 自适应分辨率: 目标每世界单位至少 16 像素, 向上取整到 2 的幂
-        // 这样小模型用 512 (清晰), 中模型用 1024, 大模型用 2048 (无锯齿)
-        // 2048=16MB, 1024=4MB, 512=1MB 显存
-        int res;
-        if(worldSize <= 32f){
-            res = 512;       // 小模型 (≤32单位): 512 足够清晰
-        }else if(worldSize <= 64f){
-            res = 1024;      // 中模型 (≤64单位): 1024
-        }else if(worldSize <= 128f){
-            res = 2048;      // 大模型 (≤128单位): 2048
-        }else{
-            res = 4096;      // 超大模型 (>128单位): 4096 (最大纹理尺寸通常 16384)
-        }
-        cachedFboRes = res;
-        return res;
     }
 
     /** 设置着色器光照 uniform (基于 shadingType) */
