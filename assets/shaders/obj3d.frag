@@ -11,7 +11,8 @@ void main(){
     if(u_hasTexture == 1){
         col *= texture2D(u_texture, v_uv);
     }
-    // ★ alpha测试: 丢弃几乎透明的片段, 避免写入深度缓冲遮挡后续像素
-    if(col.a < 0.01) discard;
+    // alpha测试: 阈值0.5 (经典alpha clip), 消除贴图半透明边缘导致的深度写入错误
+    // 阈值过小(<0.1)会让半透明像素写入深度, 遮挡后面的像素, 视觉上呈透明效果
+    if(col.a < 0.5) discard;
     gl_FragColor = col;
 }

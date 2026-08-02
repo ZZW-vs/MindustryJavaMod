@@ -5,6 +5,7 @@ import arc.graphics.*;
 import arc.graphics.gl.*;
 import arc.struct.*;
 import arc.util.Log;
+import arc.util.Strings;
 import mindustry.Vars;
 
 import java.nio.ByteBuffer;
@@ -105,7 +106,11 @@ public class PMXLoader{
         int textureCount = buf.getInt();
         String[] texturePaths = new String[textureCount];
         for(int i = 0; i < textureCount; i++){
-            texturePaths[i] = readText(buf, charset);
+            // PMX 贴图路径可能是绝对路径 (C:\...) 或相对路径 (含 ..\, tex\)
+            // → 反斜杠统一为正斜杠
+            String raw = readText(buf, charset);
+            texturePaths[i] = raw.replace('\\', '/');
+            Log.info("[Create] PMX texture[" + i + "]: " + texturePaths[i]);
         }
 
         // ===== Bounding box =====
@@ -137,8 +142,9 @@ public class PMXLoader{
         String modelDir = file.parent().path().replace('\\', '/');
 
         for(int m = 0; m < materialCount; m++){
-            readText(buf, charset); // name JP
-            readText(buf, charset); // name EN
+            String nameJp = readText(buf, charset); // name JP
+            String nameEn = readText(buf, charset); // name EN
+            String matName = (nameJp != null && !nameJp.isEmpty()) ? nameJp : nameEn;
 
             // Diffuse RGBA
             float dr = buf.getFloat(), dg = buf.getFloat(), db = buf.getFloat(), da = buf.getFloat();
@@ -190,7 +196,13 @@ public class PMXLoader{
             // 材质颜色 (diffuse)
             Color matColor = new Color(dr, dg, db, da);
             float packedColor = matColor.toFloatBits();
-            boolean transparent = da < 0.99f;
+            // ★ 真透明: da<0.5 才标记 transparent (深度不写入)
+            // da>=0.5 只是边缘羽化或半透明颜色, 照常写入深度避免深度竞争
+            boolean transparent = da < 0.5f;
+
+            final String fm = matName;
+            final float fda = da;
+            final boolean fds = doubleSided;
 
             int vi = 0;
             for(int t = 0; t < triCount; t++){
@@ -235,17 +247,28 @@ public class PMXLoader{
                 mg.transparent = transparent;
                 mg.doubleSided = doubleSided;  // 每材质独立双面标志
 
+                boolean texFound = false;
                 // 加载贴图
                 if(texIdx >= 0 && texIdx < texturePaths.length){
                     Texture tex = loadTexture(texturePaths[texIdx], modelDir);
                     if(tex != null){
                         mg.texture = tex;
                         mg.hasTexture = true;
+                        texFound = true;
                     }
                 }
 
                 obj.meshGroups.add(mg);
                 totalVerts += vertCount;
+
+                // 材质诊断日志
+                Log.info("[Create] PMX mat[" + m + "] " + fm
+                    + " | da=" + Strings.fixed(fda, 2)
+                    + " | doubleSided=" + fds
+                    + " | transparent=" + transparent
+                    + " | texIdx=" + texIdx
+                    + " | texFound=" + texFound
+                    + " | tris=" + triCount);
             }catch(Throwable t){
                 Log.err("[Create] PMX mesh creation failed for material " + m, t);
             }
@@ -262,22 +285,44 @@ public class PMXLoader{
             obj.faces.add(obj.new Face());
         }
 
-        Log.info("[Create] PMX loaded: " + vertexCount + " verts, " + (faceIndexCount / 3) + " tris, " + materialCount + " materials, " + obj.meshGroups.size + " mesh groups, boundRadius=" + obj.boundRadius + ", doubleSided=" + anyDoubleSided);
+        int texLoadedCount = 0;
+        for(WavefrontObject.MeshGroup mg : obj.meshGroups) if(mg.hasTexture) texLoadedCount++;
+        Log.info("[Create] PMX loaded: " + vertexCount + " verts, " + (faceIndexCount / 3) + " tris, "
+            + materialCount + " materials, " + obj.meshGroups.size + " mesh groups, "
+            + texLoadedCount + "/" + textureCount + " textures, "
+            + "boundRadius=" + obj.boundRadius + ", doubleSided=" + anyDoubleSided);
     }
 
-    /** 从 mod 文件树加载贴图 (尝试多种路径) */
+    /** 从 mod 文件树加载贴图 (尝试多种路径, 处理绝对路径/父目录/盘符前缀) */
     private static Texture loadTexture(String path, String modelDir){
         if(path == null || path.isEmpty()) return null;
         String normalized = path.replace('\\', '/');
 
-        // 尝试多种路径
-        String[] candidates = {
-            normalized,
-            modelDir + "/" + normalized,
-            "blander/text_g/" + normalized,
-            "blander/" + normalized,
-            "objects/" + normalized
-        };
+        // 去掉盘符前缀 (C:/  /C:/ 等)
+        if(normalized.matches("^[A-Za-z]:/.*")){
+            normalized = normalized.substring(normalized.indexOf(':') + 2);
+        }
+        while(normalized.startsWith("/")) normalized = normalized.substring(1);
+
+        // 去掉 ../ ./ 前缀
+        while(normalized.startsWith("../")) normalized = normalized.substring(3);
+        while(normalized.startsWith("./")) normalized = normalized.substring(2);
+
+        // 去文件名 (用于候选)
+        String filename = normalized.contains("/") ? normalized.substring(normalized.lastIndexOf('/') + 1) : normalized;
+        // 去文件名 (去掉第一层目录后的部分, 用于 xxx/texture.png → texture.png)
+        String afterLastSlash = filename;
+
+        // 尝试多种路径 (按优先级从高到低)
+        Seq<String> candidates = new Seq<>();
+        candidates.add(normalized);
+        candidates.add(modelDir + "/" + normalized);
+        candidates.add("blander/text_g/" + normalized);
+        candidates.add("blander/" + normalized);
+        candidates.add("objects/" + normalized);
+        candidates.add(afterLastSlash);
+        candidates.add("blander/text_g/" + afterLastSlash);
+        candidates.add("blander/" + afterLastSlash);
 
         for(String p : candidates){
             Fi fi = Vars.tree.get(p);
@@ -293,24 +338,7 @@ public class PMXLoader{
             }
         }
 
-        // 取文件名重试
-        String filename = normalized.contains("/") ? normalized.substring(normalized.lastIndexOf('/') + 1) : normalized;
-        String[] namePaths = {filename, "blander/text_g/" + filename, "blander/" + filename};
-        for(String p : namePaths){
-            Fi fi = Vars.tree.get(p);
-            if(fi.exists()){
-                try{
-                    Texture tex = new Texture(fi);
-                    tex.setFilter(Texture.TextureFilter.linear, Texture.TextureFilter.linear);
-                    Log.info("[Create] PMX texture loaded (filename): " + p);
-                    return tex;
-                }catch(Throwable t){
-                    Log.err("[Create] PMX texture load failed: " + p, t);
-                }
-            }
-        }
-
-        Log.warn("[Create] PMX texture not found: " + path);
+        Log.warn("[Create] PMX texture not found (orig=\"" + path + "\", norm=\"" + normalized + "\", file=\"" + afterLastSlash + "\")");
         return null;
     }
 
