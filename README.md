@@ -195,6 +195,16 @@
 
 ## 更新日志
 
+### v1.9.8 (3D模型显示修复+信号删除+单选)
+- **修复所有 3D 模型不能显示**：
+  - 原因：内存泄漏修复中将 `capturedLight`/`capturedShade` 从局部 `cpy()` 改为实例字段 `set()`，多个 DisplayBuild 共享同一 ZObjs 静态实例时，实例字段被后续调用覆盖，导致延迟 lambda 读到错误值
+  - 修复：改回局部 `final Color capturedLight = lightColor.cpy()`，确保每次 draw() 调用独立捕获
+  - 同时将 `fboRegion` 静态缓存改回 `Draw.wrap(buffer.getTexture())`，避免静态 TextureRegion 跨实例共享可能的纹理引用问题
+- **teleporter 信号列表增强**：
+  - 信号列表添加删除按钮（×），点击删除信号并移除所有关联传送器
+  - 使用 `ButtonGroup` 保证单选（最多选中一个信号），取消勾选则清除选择
+  - `deleteSignal()` 方法清理全局列表、队伍桶、成员传送器的 customSignal
+
 ### v1.9.7 (teleporter界面重做+kami崩溃修复)
 - **teleporter 界面完全重做**：
   - 恢复 12 个颜色按钮（取消滑条方案），保留颜色快捷区

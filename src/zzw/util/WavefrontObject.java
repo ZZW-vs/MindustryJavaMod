@@ -59,11 +59,6 @@ public class WavefrontObject{
 
     // ===== 性能优化 (可复用缓冲) =====
     private float[] distortData;     // applyDistortion 复用数组, 避免每帧 GC
-    /** ★ 缓存 TextureRegion 避免 Draw.wrap() 每帧分配 */
-    private static TextureRegion fboRegion = new TextureRegion();
-    /** ★ 缓存 Color 避免 cpy() 每帧分配 */
-    private final Color capturedLight = new Color();
-    private final Color capturedShade = new Color();
 
     // ===== OBJ 数据 (保持公共 API 兼容) =====
     public Seq<Vec3> vertices = new Seq<>();
@@ -488,13 +483,14 @@ public class WavefrontObject{
         init();
         if(shaderFailed || shader == null) return;
 
-        // ★ 捕获调用时的 size 值 — Draw.draw() 延迟执行,
-        // 调用者 (如 ObjDisplayBlock) 会在 draw() 返回后恢复 obj.size,
-        // 所以不能在 lambda 内读 this.size, 必须捕获当前值
-        // ★ 用实例字段复用 Color 对象, 避免 cpy() 每帧分配
+        // ★ 捕获调用时的参数值 — Draw.draw() 延迟执行,
+        // 调用者 (如 ObjDisplayBlock) 会在 draw() 返回后恢复 obj 的字段,
+        // 所以不能在 lambda 内读 this 的字段, 必须捕获当前值
+        // ★ 必须用 cpy() 创建副本: 多个 DisplayBuild 共享同一 ZObjs 静态实例,
+        // 实例字段会被后续调用覆盖, 导致延迟 lambda 读到错误值
         final float capturedSize = size;
-        capturedLight.set(lightColor);
-        capturedShade.set(shadeColor);
+        final Color capturedLight = lightColor.cpy();
+        final Color capturedShade = shadeColor.cpy();
         final float capturedMaxShade = maxShade;
         final float capturedZOffset = zOffset;
 
@@ -595,10 +591,7 @@ public class WavefrontObject{
             // 将 FBO 纹理绘制到 2D 场景
             // ★ 负高度翻转 (FBO 纹理在 OpenGL 中上下颠倒)
             // flushing=true 时 Draw.rect() 直接走 super.draw() (绕过队列)
-            // ★ 复用静态 fboRegion 避免 Draw.wrap() 每帧分配新 TextureRegion
-            fboRegion.texture = buffer.getTexture();
-            fboRegion.set(0, 0, 1, 1);
-            Draw.rect(fboRegion, x, y, worldSize, -worldSize);
+            Draw.rect(Draw.wrap(buffer.getTexture()), x, y, worldSize, -worldSize);
 
             // ★ 立即 flush: FBO 是共享静态资源, 必须在下一个模型渲染前提交
             // flushing=true 时只调用 super.flush() 渲染 mesh buffer

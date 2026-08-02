@@ -359,7 +359,7 @@ public class Teleporter extends Block {
             }).growX().pad(4f);
         }
 
-        /** 填充信号列表 (场上所有自定义信号) */
+        /** 填充信号列表 (场上所有自定义信号, 单选, 可删除) */
         private void fillSignalList(Table listTable) {
             listTable.clear();
 
@@ -368,16 +368,31 @@ public class Teleporter extends Block {
                 return;
             }
 
-            for (SignalEntry entry : allSignals) {
+            // ButtonGroup 保证单选 (minCheckCount=0 允许取消选择)
+            ButtonGroup<Button> group = new ButtonGroup<>();
+            group.setMinCheckCount(0);
+            group.setMaxCheckCount(1);
+
+            // 遍历副本, 避免删除时 ConcurrentModificationException
+            for (SignalEntry entry : allSignals.toArray()) {
+                final String signalName = entry.name;
+                final String signalNote = entry.note;
+                final int entryTeamId = entry.teamId;
+
                 Table signalRow = new Table();
                 signalRow.defaults().pad(2f);
 
                 // 信号按钮 (选择该信号)
-                final String signalName = entry.name;
-                final String signalNote = entry.note;
-                Button btn = signalRow.button(signalName, Styles.flatTogglet, () -> {
-                    configure(signalName + "|" + signalNote);
+                final Button[] holder = new Button[1];
+                holder[0] = signalRow.button(signalName, Styles.flatTogglet, () -> {
+                    if (holder[0].isChecked()) {
+                        configure(signalName + "|" + signalNote);
+                    } else {
+                        configure(-1);
+                    }
                 }).size(150f, 30f).get();
+                Button btn = holder[0];
+                group.add(btn);
                 btn.setChecked(customSignal != null && customSignal.equals(signalName));
 
                 // 鼠标悬停显示批注 tooltip
@@ -387,10 +402,30 @@ public class Teleporter extends Block {
                 // 批注预览 (简短)
                 if (!signalNote.isEmpty()) {
                     String preview = signalNote.length() > 12 ? signalNote.substring(0, 12) + "..." : signalNote;
-                    signalRow.label(() -> "[gray]" + preview).padLeft(6f);
+                    signalRow.label(() -> "[gray]" + preview).padLeft(6f).growX();
                 }
 
+                // 删除按钮
+                signalRow.button("×", Styles.flatt, () -> {
+                    deleteSignal(signalName, entryTeamId);
+                    fillSignalList(listTable);
+                }).size(30f, 30f).padLeft(4f).get();
+
                 listTable.add(signalRow).growX().row();
+            }
+        }
+
+        /** 删除自定义信号 (移除全局列表 + 队伍桶中的信号, 并重置使用该信号的传送器) */
+        private void deleteSignal(String signalName, int teamId) {
+            allSignals.removeAll(e -> e.name.equals(signalName) && e.teamId == teamId);
+            if (teamId < customSignals.length) {
+                SignalInfo info = customSignals[teamId].remove(signalName);
+                if (info != null) {
+                    for (TeleporterBuild member : info.members) {
+                        member.customSignal = null;
+                    }
+                    info.members.clear();
+                }
             }
         }
 
