@@ -69,11 +69,12 @@ public class ObjDisplayBlock extends Block {
             zzw.util.ZObjs.crushingWheel,
             zzw.util.ZObjs.cube,
             zzw.util.ZObjs.prism,
-            zzw.util.ZObjs.wavefront
+            zzw.util.ZObjs.wavefront,
+            zzw.util.ZObjs.gale
         };
 
         private final String[] MODEL_NAMES = {
-            "飞轮", "小齿轮", "大齿轮", "水车", "粉碎轮", "方块", "棱镜", "波前"
+            "飞轮", "小齿轮", "大齿轮", "水车", "粉碎轮", "方块", "棱镜", "波前", "MMD角色"
         };
 
         @Override

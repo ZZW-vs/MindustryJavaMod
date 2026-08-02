@@ -47,6 +47,17 @@ public class WavefrontObject{
     private static boolean shaderFailed = false;
 
     // ===== Mesh 数据 (GPU 缓冲) =====
+    /** ★ 多材质 Mesh 组: 按贴图分组, 每组独立 Mesh + Texture, 支持 MMD 等多贴图模型 */
+    public static class MeshGroup{
+        public Mesh mesh;
+        public int vertFloatCount;
+        public float[] originalVerts;   // CPU 顶点副本 (用于 cons 形变)
+        public float[] distortData;     // applyDistortion 复用数组
+        public Texture texture;         // 独立 Texture (null = 无贴图, 用顶点色)
+        public boolean hasTexture;
+    }
+    public Seq<MeshGroup> meshGroups = new Seq<>();
+    /** 兼容旧 API: 指向第一个 MeshGroup (可能为 null) */
     private Mesh mesh;
     private int numIndices;
     public float boundRadius;       // 模型边界球半径 (模型空间, 未缩放)
@@ -169,10 +180,22 @@ public class WavefrontObject{
                     if(line.contains("map_Kd ") && current != null){
                         hasTexture = true;
                         hasMaterialTex = true;
+                        String n = line.replaceFirst("map_Kd ", "").trim();
+                        // ★ 优先用 atlas 查找 (兼容旧模型), 找不到则记录文件名延迟加载独立 Texture
                         if(canLoadTex()){
-                            String n = line.replaceFirst("map_Kd ", "").trim();
                             current.diffTex = Core.atlas.find("create-" + n);
+                            if(!current.diffTex.found()){
+                                current.diffTex = null;
+                            }
                         }
+                        // ★ 记录贴图文件名, buildMesh 时尝试从文件加载独立 Texture (MMD 大贴图)
+                        current.diffTexName = n;
+                    }
+
+                    // ★ 解析 d 值 (透明度): MMD/Blender 导出的 d=0 通常是未设置而非真透明
+                    if((line.startsWith("d ") || line.startsWith("d\t")) && current != null){
+                        String val = line.replaceFirst("d\\s+", "").trim();
+                        current.alpha = Strings.parseFloat(val, 1f);
                     }
 
                     if(line.contains("map_Ke ") && current != null && canLoadTex()){
@@ -333,25 +356,51 @@ public class WavefrontObject{
         }
         boundRadius = Math.max(maxR, 0.1f);
 
-        // 三角化面: quad→2三角形, n-gon→扇形三角化
-        int totalTris = 0;
+        // ★ 回退: 使用 textureName 查找的 texture (兼容旧模型无 mtl 但有贴图的情况)
+        if(materials == null || materials.isEmpty()){
+            if(texture != null && texture.found()){
+                diffTexture = texture;
+                hasDiffTexture = true;
+            }
+        }
+
+        // ★ 按贴图分组面: 同一贴图的面合并到一个 MeshGroup
+        // 贴图 key: 优先用 atlas region, 其次独立 Texture, 最后无贴图
+        ObjectMap<String, Seq<Face>> faceGroups = new ObjectMap<>();
+        ObjectMap<String, Texture> groupTextures = new ObjectMap<>();
+        ObjectMap<String, AtlasRegion> groupAtlasRegions = new ObjectMap<>();
+
         for(Face f : faces){
-            totalTris += f.verts.length - 2;
+            String texKey = "__no_texture__";
+            if(f.mat != null){
+                // 优先 atlas region
+                if(f.mat.diffTex != null && f.mat.diffTex.found()){
+                    texKey = "atlas:" + f.mat.diffTex.name;
+                    groupAtlasRegions.put(texKey, f.mat.diffTex);
+                }
+                // 其次独立 Texture (延迟加载, buildMesh 时尝试加载)
+                else if(f.mat.diffTexName != null && !f.mat.diffTexName.isEmpty()){
+                    texKey = "file:" + f.mat.diffTexName;
+                    // ★ 延迟加载独立 Texture (从 mod 文件树查找)
+                    if(!groupTextures.containsKey(texKey)){
+                        Texture tex = loadIndependentTexture(f.mat.diffTexName);
+                        if(tex != null){
+                            groupTextures.put(texKey, tex);
+                        }else{
+                            texKey = "__no_texture__";  // 加载失败, 回退到无贴图
+                        }
+                    }
+                }
+            }
+            Seq<Face> group = faceGroups.get(texKey);
+            if(group == null){
+                group = new Seq<>();
+                faceGroups.put(texKey, group);
+            }
+            group.add(f);
         }
-        int vertCount = totalTris * 3;
 
-        // 顶点可能超过 65535, 检查
-        if(vertCount >= 65535){
-            Log.warn("[Create] WavefrontObject '@' has @ verts (>65535), using non-indexed mesh", textureName, vertCount);
-        }
-
-        // 每顶点 9 float: pos(3) + normal(3) + color(1 packed) + uv(2)
-        vertFloatCount = vertCount * FLOATS_PER_VERT;
-        float[] vertData = new float[vertFloatCount];
-        originalVerts = new float[vertFloatCount];
-        distortData = new float[vertFloatCount];  // 预分配形变缓冲
-
-        // 查找材质纹理 (取第一个有 diffTex 的材质)
+        // ★ 兼容旧 API: 设置 diffTexture/hasDiffTexture (取第一个 atlas 贴图)
         if(materials != null){
             for(Material mat : materials.values()){
                 if(mat.diffTex != null && mat.diffTex.found()){
@@ -361,104 +410,160 @@ public class WavefrontObject{
                 }
             }
         }
-        // 回退: 使用 textureName 查找的 texture
-        if(!hasDiffTexture && texture != null && texture.found()){
-            diffTexture = texture;
-            hasDiffTexture = true;
+
+        // ★ 为每个贴图分组构建独立 Mesh
+        int totalVerts = 0;
+        for(ObjectMap.Entry<String, Seq<Face>> entry : faceGroups.entries()){
+            Seq<Face> groupFaces = entry.value;
+            String texKey = entry.key;
+
+            // 三角化面计数
+            int totalTris = 0;
+            for(Face f : groupFaces){
+                totalTris += f.verts.length - 2;
+            }
+            int vertCount = totalTris * 3;
+            if(vertCount == 0) continue;
+
+            int groupVertFloatCount = vertCount * FLOATS_PER_VERT;
+            float[] vertData = new float[groupVertFloatCount];
+
+            // 确定该组的贴图
+            AtlasRegion atlasReg = groupAtlasRegions.get(texKey);
+            Texture indepTex = groupTextures.get(texKey);
+            boolean useAtlas = atlasReg != null && atlasReg.found();
+            boolean useIndep = indepTex != null;
+
+            int vi = 0;
+            for(Face f : groupFaces){
+                // 面法线
+                Vec3 faceNormal = Tmp.v31.setZero();
+                if(hasNormal && f.normal != null && f.normal.length > 0){
+                    for(Vec3 n : f.normal) faceNormal.add(n);
+                    faceNormal.scl(1f / f.normal.length).nor();
+                }else{
+                    Vec3 v0 = f.verts[0].source;
+                    Vec3 v1 = f.verts[1].source;
+                    Vec3 v2 = f.verts[2].source;
+                    faceNormal.set(v1.x - v0.x, v1.y - v0.y, v1.z - v0.z)
+                        .crs(v2.x - v0.x, v2.y - v0.y, v2.z - v0.z).nor();
+                }
+
+                // 面颜色 + alpha (材质 Kd + d 透明度)
+                float packedColor;
+                if(f.mat != null && f.mat.hasColor){
+                    Tmp.c1.rgba8888(f.mat.diffuseCol);
+                    Tmp.c1.a = f.mat.alpha;  // ★ 应用 d 透明度
+                    packedColor = Tmp.c1.toFloatBits();
+                }else{
+                    packedColor = Color.whiteFloatBits;
+                }
+
+                // 扇形三角化
+                for(int t = 0; t < f.verts.length - 2; t++){
+                    int[] idx = {0, t + 1, t + 2};
+                    for(int vIdx : idx){
+                        Vertex vert = f.verts[vIdx];
+                        Vec3 pos = vert.source;
+                        Vec3 norm;
+                        if(hasNormal && f.normal != null && vIdx < f.normal.length && f.normal[vIdx] != null){
+                            norm = f.normal[vIdx];
+                        }else{
+                            norm = faceNormal;
+                        }
+
+                        float u = 0f, v = 0f;
+                        if(hasTexture && f.vertexTexture != null && vIdx < f.vertexTexture.length && f.vertexTexture[vIdx] != null){
+                            u = f.vertexTexture[vIdx].x;
+                            v = f.vertexTexture[vIdx].y;
+                        }
+
+                        // ★ UV 映射:
+                        // atlas 贴图: UV[0,1] → atlas region UV (U线性, V翻转)
+                        // 独立 Texture: UV[0,1] → [0,1] 直接映射 (V翻转, OBJ V轴朝上 OpenGL V朝下)
+                        if(useAtlas && u >= 0f && u <= 1f && v >= 0f && v <= 1f){
+                            u = Mathf.lerp(atlasReg.u, atlasReg.u2, u);
+                            v = Mathf.lerp(atlasReg.v2, atlasReg.v, v);
+                        }else if(useIndep){
+                            // 独立 Texture: V 翻转 (OBJ V朝上, OpenGL V朝下)
+                            v = 1f - v;
+                        }
+
+                        vertData[vi]     = pos.x - cx;
+                        vertData[vi + 1] = pos.y - cy;
+                        vertData[vi + 2] = pos.z - cz;
+                        vertData[vi + 3] = norm.x;
+                        vertData[vi + 4] = norm.y;
+                        vertData[vi + 5] = norm.z;
+                        vertData[vi + 6] = packedColor;
+                        vertData[vi + 7] = u;
+                        vertData[vi + 8] = v;
+                        vi += FLOATS_PER_VERT;
+                    }
+                }
+            }
+
+            // 创建 MeshGroup
+            try{
+                Mesh m = new Mesh(false, vertCount, 0,
+                    VertexAttribute.position3,
+                    VertexAttribute.normal,
+                    VertexAttribute.color,
+                    VertexAttribute.texCoords
+                );
+                m.setVertices(vertData, 0, groupVertFloatCount);
+
+                MeshGroup mg = new MeshGroup();
+                mg.mesh = m;
+                mg.vertFloatCount = groupVertFloatCount;
+                mg.originalVerts = new float[groupVertFloatCount];
+                System.arraycopy(vertData, 0, mg.originalVerts, 0, groupVertFloatCount);
+                mg.distortData = new float[groupVertFloatCount];
+                mg.texture = useIndep ? indepTex : null;
+                mg.hasTexture = useIndep || useAtlas;
+                meshGroups.add(mg);
+
+                totalVerts += vertCount;
+            }catch(Throwable t){
+                Log.err("[Create] WavefrontObject mesh creation failed for group '" + texKey + "' in '" + textureName + "'", t);
+            }
         }
 
-        // 预计算每个面的法线 (如果 OBJ 没有法线)
-        int vi = 0;
-        for(Face f : faces){
-            // 面法线 (如果没有顶点法线, 计算面法线)
-            Vec3 faceNormal = Tmp.v31.setZero();
-            if(hasNormal && f.normal != null && f.normal.length > 0){
-                for(Vec3 n : f.normal) faceNormal.add(n);
-                faceNormal.scl(1f / f.normal.length).nor();
-            }else{
-                // 从前3个顶点计算面法线
-                Vec3 v0 = f.verts[0].source;
-                Vec3 v1 = f.verts[1].source;
-                Vec3 v2 = f.verts[2].source;
-                faceNormal.set(v1.x - v0.x, v1.y - v0.y, v1.z - v0.z)
-                    .crs(v2.x - v0.x, v2.y - v0.y, v2.z - v0.z).nor();
-            }
+        // ★ 兼容旧 API: mesh 指向第一个 MeshGroup
+        if(!meshGroups.isEmpty()){
+            mesh = meshGroups.first().mesh;
+            originalVerts = meshGroups.first().originalVerts;
+            vertFloatCount = meshGroups.first().vertFloatCount;
+            distortData = meshGroups.first().distortData;
+        }
 
-            // 面颜色 (材质 Kd 或白色)
-            float packedColor;
-            if(f.mat != null && f.mat.hasColor){
-                Tmp.c1.rgba8888(f.mat.diffuseCol);
-                packedColor = Tmp.c1.toFloatBits();
-            }else{
-                packedColor = Color.whiteFloatBits;
-            }
+        if(totalVerts >= 65535){
+            Log.warn("[Create] WavefrontObject '@' has @ verts (>65535), using non-indexed mesh", textureName, totalVerts);
+        }
 
-            // 扇形三角化: (0, i, i+1) for i in 1..n-2
-            for(int t = 0; t < f.verts.length - 2; t++){
-                int[] idx = {0, t + 1, t + 2};
-                for(int vIdx : idx){
-                    Vertex vert = f.verts[vIdx];
-                    Vec3 pos = vert.source;
-                    // 法线: 顶点法线 (如果有) 或面法线
-                    Vec3 norm;
-                    if(hasNormal && f.normal != null && vIdx < f.normal.length && f.normal[vIdx] != null){
-                        norm = f.normal[vIdx];
-                    }else{
-                        norm = faceNormal;
-                    }
+        Log.info("[Create] WavefrontObject loaded: " + drawnVertices.size + " verts, " + faces.size + " faces, " + meshGroups.size + " mesh groups, " + totalVerts + " GPU verts");
+    }
 
-                    // UV: 顶点 UV (如果有) 或默认 (0,0)
-                    float u = 0f, v = 0f;
-                    if(hasTexture && f.vertexTexture != null && vIdx < f.vertexTexture.length && f.vertexTexture[vIdx] != null){
-                        u = f.vertexTexture[vIdx].x;
-                        v = f.vertexTexture[vIdx].y;
-                    }
-
-                    // ★ UV 映射规则 (PU132 原版还原):
-                    // OBJ UV 范围 [0,1] 是归一化坐标, 需映射到 atlas region UV 空间
-                    // 因为 texture.bind() 绑定的是整个图集纹理
-                    //
-                    // PU132 原版 (WavefrontObject.updateFace):
-                    //   u = Mathf.lerp(u, u2, objU)   // U: 线性映射
-                    //   v = Mathf.lerp(v2, v, objV)   // V: Y翻转! (OBJ V轴朝上, atlas V轴朝下)
-                    //
-                    // 旧代码 v = v*(v2-v)+v 缺少 Y 翻转, 导致贴图上下颠倒/采样到透明 padding
-                    if(hasDiffTexture && diffTexture != null && diffTexture.found()
-                        && u >= 0f && u <= 1f && v >= 0f && v <= 1f){
-                        u = Mathf.lerp(diffTexture.u, diffTexture.u2, u);   // U: 线性映射
-                        v = Mathf.lerp(diffTexture.v2, diffTexture.v, v);   // V: Y翻转!
-                    }
-
-                    vertData[vi]     = pos.x - cx;  // 居中
-                    vertData[vi + 1] = pos.y - cy;
-                    vertData[vi + 2] = pos.z - cz;
-                    vertData[vi + 3] = norm.x;
-                    vertData[vi + 4] = norm.y;
-                    vertData[vi + 5] = norm.z;
-                    vertData[vi + 6] = packedColor;
-                    vertData[vi + 7] = u;
-                    vertData[vi + 8] = v;
-                    vi += FLOATS_PER_VERT;
+    /** ★ 从 mod 文件树加载独立 Texture (不通过 atlas, 用于 MMD 大贴图) */
+    private Texture loadIndependentTexture(String name){
+        if(Vars.headless) return null;
+        // 尝试多种路径: 直接文件名、objects/目录、mtl 同目录
+        String[] paths = {name, "objects/" + name, "blander/text_g/" + name, "blander/" + name};
+        for(String path : paths){
+            Fi fi = Vars.tree.get(path);
+            if(fi.exists()){
+                try{
+                    Texture tex = new Texture(fi);
+                    tex.setFilter(Texture.TextureFilter.linear, Texture.TextureFilter.linear);
+                    Log.info("[Create] Loaded independent texture: " + path + " (" + tex.width + "x" + tex.height + ")");
+                    return tex;
+                }catch(Throwable t){
+                    Log.err("[Create] Failed to load texture: " + path, t);
                 }
             }
         }
-
-        // 备份原始顶点 (用于 cons 形变恢复)
-        System.arraycopy(vertData, 0, originalVerts, 0, vertFloatCount);
-
-        // 创建 Mesh (非索引, 直接三角形列表)
-        try{
-            mesh = new Mesh(false, vertCount, 0,
-                VertexAttribute.position3,
-                VertexAttribute.normal,
-                VertexAttribute.color,
-                VertexAttribute.texCoords
-            );
-            mesh.setVertices(vertData, 0, vertFloatCount);
-        }catch(Throwable t){
-            Log.err("[Create] WavefrontObject mesh creation failed for '" + textureName + "'", t);
-            mesh = null;
-        }
+        Log.warn("[Create] Independent texture not found: " + name);
+        return null;
     }
 
     // ===== 渲染 =====
@@ -467,7 +572,7 @@ public class WavefrontObject{
     }
 
     public void draw(float x, float y, float rX, float rY, float rZ, Cons<Vec3> cons){
-        if(mesh == null || faces.isEmpty()) return;
+        if(meshGroups.isEmpty() || faces.isEmpty()) return;
         if(Vars.headless) return;
 
         init();
@@ -509,12 +614,11 @@ public class WavefrontObject{
                 return;
             }
 
-            // ★ 构建正交投影矩阵: 匹配2D相机的可见区域, 宽Z范围支持3D深度
-            // 直接渲染到屏幕, 分辨率 = 屏幕分辨率, 无FBO放大锯齿
-            projMat.setToOrtho(camLeft, camRight, camBottom, camTop, -2000f, 2000f);
+            // ★ 构建正交投影矩阵: 匹配2D相机的可见区域
+            // Z范围收紧到 ±500 提升深度缓冲精度 (避免 z-fighting 产生的马赛克)
+            projMat.setToOrtho(camLeft, camRight, camBottom, camTop, -500f, 500f);
 
             // ★ 模型变换矩阵: 平移到世界位置 + 旋转 + 缩放
-            // (旧FBO方案中平移由Draw.rect处理, 现在直接在变换矩阵中处理)
             transform.idt();
             transform.translate(x, y, 0);
             transform.rotate(Vec3.Z, rZ);
@@ -522,12 +626,9 @@ public class WavefrontObject{
             transform.rotate(Vec3.X, rX);
             transform.scale(scl, scl, scl);
 
-            // ★ Flush 2D batch 确保正确渲染顺序
-            // Draw.draw 内部 flushing=true, Draw.flush() 只调用 super.flush()
             Draw.flush();
 
-            // ★ GL 状态: 保留 alpha 混合 (避免透明贴图边缘出现马赛克硬边)
-            // 深度测试处理遮挡, 深度写入启用确保正确排序
+            // ★ GL 状态: 保留 alpha 混合
             Gl.enable(Gl.blend);
             Gl.blendFunc(Gl.srcAlpha, Gl.oneMinusSrcAlpha);
             Gl.enable(Gl.depthTest);
@@ -538,23 +639,37 @@ public class WavefrontObject{
                 Gl.cullFace(Gl.back);
             }
 
-            // 渲染 Mesh 直接到屏幕
+            // ★ 遍历所有 MeshGroup, 每组 bind 对应贴图后 render
             try{
                 shader.bind();
                 shader.setUniformMatrix4("u_proj", projMat.val);
                 shader.setUniformMatrix4("u_trans", transform.val);
                 setLightingUniformsCaptured(capturedLight, capturedShade, capturedMaxShade);
 
-                if(hasDiffTexture && diffTexture != null && diffTexture.found()){
-                    diffTexture.texture.bind();
-                    shader.setUniformi("u_texture", 0);
-                    shader.setUniformi("u_hasTexture", 1);
-                }else{
-                    shader.setUniformi("u_hasTexture", 0);
-                }
+                for(MeshGroup mg : meshGroups){
+                    if(mg == null || mg.mesh == null) continue;
 
-                shader.apply();
-                mesh.render(shader, Gl.triangles);
+                    if(mg.hasTexture){
+                        if(mg.texture != null){
+                            // 独立 Texture (MMD 大贴图)
+                            mg.texture.bind(0);
+                            shader.setUniformi("u_texture", 0);
+                            shader.setUniformi("u_hasTexture", 1);
+                        }else if(hasDiffTexture && diffTexture != null && diffTexture.found()){
+                            // atlas 贴图
+                            diffTexture.texture.bind();
+                            shader.setUniformi("u_texture", 0);
+                            shader.setUniformi("u_hasTexture", 1);
+                        }else{
+                            shader.setUniformi("u_hasTexture", 0);
+                        }
+                    }else{
+                        shader.setUniformi("u_hasTexture", 0);
+                    }
+
+                    shader.apply();
+                    mg.mesh.render(shader, Gl.triangles);
+                }
             }catch(Throwable t){
                 Log.err("[Create] WavefrontObject render error", t);
             }
@@ -623,21 +738,27 @@ public class WavefrontObject{
 
     /** 应用顶点形变 (cons 回调), 复用 distortData 数组避免 GC */
     private void applyDistortion(Cons<Vec3> cons){
-        System.arraycopy(originalVerts, 0, distortData, 0, vertFloatCount);
-        Vec3 v = Tmp.v31;  // 复用 Tmp 避免分配
-        for(int i = 0; i < vertFloatCount; i += FLOATS_PER_VERT){
-            v.set(distortData[i], distortData[i + 1], distortData[i + 2]);
-            cons.get(v);
-            distortData[i] = v.x;
-            distortData[i + 1] = v.y;
-            distortData[i + 2] = v.z;
+        Vec3 v = Tmp.v31;
+        for(MeshGroup mg : meshGroups){
+            if(mg == null || mg.mesh == null) continue;
+            System.arraycopy(mg.originalVerts, 0, mg.distortData, 0, mg.vertFloatCount);
+            for(int i = 0; i < mg.vertFloatCount; i += FLOATS_PER_VERT){
+                v.set(mg.distortData[i], mg.distortData[i + 1], mg.distortData[i + 2]);
+                cons.get(v);
+                mg.distortData[i] = v.x;
+                mg.distortData[i + 1] = v.y;
+                mg.distortData[i + 2] = v.z;
+            }
+            mg.mesh.setVertices(mg.distortData, 0, mg.vertFloatCount);
         }
-        mesh.setVertices(distortData, 0, vertFloatCount);
     }
 
     /** 恢复原始顶点 */
     private void restoreVertices(){
-        mesh.setVertices(originalVerts, 0, vertFloatCount);
+        for(MeshGroup mg : meshGroups){
+            if(mg == null || mg.mesh == null) continue;
+            mg.mesh.setVertices(mg.originalVerts, 0, mg.vertFloatCount);
+        }
     }
 
     protected static int faceVertIndex(String node){
@@ -695,6 +816,12 @@ public class WavefrontObject{
         public int ambientCol = 0xffffffff, diffuseCol = 0xffffffff, emitCol = 0x00000000;
         public boolean hasColor = false;
         public AtlasRegion diffTex, emitTex;
+        /** ★ 独立 Texture (不通过 atlas, 用于 MMD 等大贴图模型) */
+        public Texture diffTexture;
+        /** ★ 透明度 (d 值, 0=透明 1=不透明) */
+        public float alpha = 1f;
+        /** ★ 贴图文件名 (map_Kd 行的值, 延迟加载) */
+        public String diffTexName;
     }
 
     public enum ShadingType{

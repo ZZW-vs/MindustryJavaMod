@@ -32,6 +32,8 @@ public class ZObjs {
     public static WavefrontObject crushingWheel;
     public static WavefrontObject cogwheel;
     public static WavefrontObject largeCogwheel;
+    /** ★ MMD 模型 (gale): 多材质多贴图, 从 blander/text_g/ 加载 */
+    public static WavefrontObject gale;
 
     private static boolean loaded = false;
 
@@ -139,6 +141,19 @@ public class ZObjs {
         largeCogwheel.singleZLayer = true;
         largeCogwheel.cullBackfaces = false;
 
+        // ★ gale: MMD 角色模型 (62972顶点, 92322面, 12张贴图)
+        // 顶点范围很小 (MMD单位), 需要 size=8 放大到合理尺寸
+        // 使用 normalAngle 着色 + 白色光照 + 深灰阴影
+        gale = new WavefrontObject();
+        gale.textureName = "gale";
+        gale.size = 8f;
+        gale.shadingType = WavefrontObject.ShadingType.normalAngle;
+        gale.lightColor = Color.white;
+        gale.shadeColor = Color.valueOf("606060");
+        gale.maxShade = 0.5f;
+        gale.drawLayer = Layer.flyingUnit;
+        gale.cullBackfaces = false;  // MMD模型有单面面片, 关闭剔除避免破洞
+
         Events.on(EventType.ClientLoadEvent.class, e -> {
             // ClientLoadEvent 时 atlas 贴图区域已注册, 避免 wavefront 等 hasTexture=true 对象加载失败
             Core.app.post(ZObjs::load);
@@ -156,15 +171,19 @@ public class ZObjs {
         loadObj(crushingWheel, "crushing_wheel");
         loadObj(cogwheel, "cogwheel");
         loadObj(largeCogwheel, "large_cogwheel");
+        // ★ MMD 模型从 blander/text_g/ 目录加载 (OBJ+MTL 在此目录, 贴图也在同目录)
+        loadObj(gale, "blander/text_g/gale");
     }
 
     private static void loadObj(WavefrontObject obj, String name) {
-        Fi file = Vars.tree.get("objects/" + name + ".obj");
+        // ★ 路径解析: name 含 "/" 视为完整相对路径 (如 "blander/text_g/gale"), 否则拼 objects/ 前缀
+        String basePath = name.contains("/") ? name : "objects/" + name;
+        Fi file = Vars.tree.get(basePath + ".obj");
         if (!file.exists()) {
-            Log.err("[Create] WavefrontObject file not found: objects/" + name + ".obj");
+            Log.err("[Create] WavefrontObject file not found: " + basePath + ".obj");
             return;
         }
-        Fi material = Vars.tree.get("objects/" + name + ".mtl");
+        Fi material = Vars.tree.get(basePath + ".mtl");
         if (!material.exists()) material = null;
         try {
             obj.load(file, material);

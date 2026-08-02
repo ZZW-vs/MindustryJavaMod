@@ -195,6 +195,20 @@
 
 ## 更新日志
 
+### v2.1.2 (MMD模型渲染支持)
+- **新增 MMD/Blender 模型渲染支持**：
+  - 重构 [WavefrontObject.java](src/zzw/util/WavefrontObject.java) 支持多材质多贴图渲染
+  - 新增 `MeshGroup` 按材质分组，每个材质独立 Mesh + Texture，支持 MMD 等多贴图模型
+  - 新增 `loadIndependentTexture()` 从 mod 文件树加载独立 Texture（不通过 atlas），支持 MMD 大贴图
+  - MTL 解析增强：支持 `d` 透明度、`map_Kd` 文件名延迟加载、独立 Texture 回退
+  - UV 映射：独立 Texture 采用 V 翻转（OBJ V 朝上 → OpenGL V 朝下），atlas 贴图保持原逻辑
+- **加载 gale MMD 角色模型**：
+  - 模型位于 `assets/blander/text_g/`（含 gale.obj + gale.mtl + 12 张贴图）
+  - 58 个材质，50 个 map_Kd 纹理映射，按贴图分组合并为 ~12 个 MeshGroup
+  - 在 [ZObjs.java](src/zzw/util/ZObjs.java) 注册 gale 模型，`loadObj` 支持完整相对路径（含 `/` 时不再拼 `objects/` 前缀）
+  - 在 [ObjDisplayBlock.java](src/zzw/content/blocks/ObjDisplayBlock.java) 模型列表新增"MMD角色"选项
+- **关于 .blend 文件**：Blender 专有二进制格式无法运行时解析，需在 Blender 中 `File → Export → Wavefront (.obj)` 导出为 .obj + .mtl + 贴图
+
 ### v2.1.1 (3D马赛克修复)
 - **修复3D模型马赛克/锯齿问题**：
   - 根因：之前为追求性能禁用了alpha混合 (`Gl.disable(blend)`)，导致贴图透明边缘出现硬边马赛克
