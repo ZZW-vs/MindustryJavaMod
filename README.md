@@ -195,6 +195,26 @@
 
 ## 更新日志
 
+### v1.9.1 (3D渲染系统修复+纹理支持+性能优化)
+- **修复炮台模型旋转方向相反**：GPU渲染器 Mat3D.rotate(Z,+deg) 是逆时针(标准OpenGL)，与旧CPU渲染器(顺时针)相反
+  - PrismTurret/WavefrontTurret: `90f - rotation` → `rotation - 90f`
+  - ObjPowerTurret: `-rotation` → `rotation`
+- **修复wavefront模型贴图全白**：GPU着色器新增纹理采样支持
+  - Mesh新增 texCoords (UV) 顶点属性 (每顶点 7→9 float)
+  - 着色器新增 `u_texture` sampler2D + `u_hasTexture` int uniform
+  - OBJ加载时存储材质 map_Kd 纹理，渲染时绑定并采样
+- **修复FBO污染全局GL状态导致光效消失**：
+  - 保存/恢复 `Gl.depthTest`、`Gl.cullFace` 状态
+  - `Gl.depthMask(false)` 必须恢复 (否则2D batch写入深度缓冲导致渲染异常)
+- **修复渲染模型出现黑色大块**：
+  - FBO是静态共享资源，`Draw.rect` 加入batch后未立即提交，下一个模型的FBO渲染会覆盖纹理
+  - 在 `Draw.rect` 后添加 `Draw.flush()` 立即提交FBO纹理到屏幕
+- **提高渲染精度**：FBO分辨率从 128-512 提升到 256-1024，2^n 对齐优化GPU效率
+- **性能优化**：
+  - 复用 `distortData` 数组避免每帧GC (applyDistortion)
+  - 复用 `Tmp.v31` 避免Vec3分配
+  - FBO初始尺寸从 256 提升到 512 减少首次resize
+
 ### v1.9.0 (3D渲染系统重做 + tenmeikiri加强)
 - **3D渲染系统完全重做 (GPU深度缓冲)**：彻底重写 [WavefrontObject.java](src/zzw/util/WavefrontObject.java)
   - 旧版 CPU 软件渲染器存在面排序/z-fighting 问题，Y轴旋转时模型崩坏

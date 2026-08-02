@@ -86,7 +86,8 @@ public class ObjPowerTurret extends PowerTurret {
                 }
             };
 
-            object.draw(x, y, Mathf.cos(time, 76f, 120f), Mathf.sin(time, 76f, 120f), -rotation, distort);
+            // ★ GPU渲染器: Mat3D.rotate(Vec3.Z, +deg) = 逆时针 (标准OpenGL), 取反旧公式的 rotation
+            object.draw(x, y, Mathf.cos(time, 76f, 120f), Mathf.sin(time, 76f, 120f), rotation, distort);
         }
     }
 }

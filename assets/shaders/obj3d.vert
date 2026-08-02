@@ -1,8 +1,9 @@
 // WavefrontObject 3D GPU渲染着色器
-// 顶点着色器: MVP变换 + 方向光照 (Gouraud着色)
+// 顶点着色器: MVP变换 + 方向光照 (Gouraud着色) + 纹理UV传递
 attribute vec3 a_position;
 attribute vec3 a_normal;
 attribute vec4 a_color;
+attribute vec2 a_texCoord0;
 
 uniform mat4 u_proj;
 uniform mat4 u_trans;
@@ -12,6 +13,7 @@ uniform vec3 u_shadeColor;
 uniform float u_maxShade;
 
 varying vec4 v_col;
+varying vec2 v_uv;
 
 void main(){
     // 使用模型矩阵的3x3部分变换法线 (均匀缩放时正确)
@@ -20,5 +22,6 @@ void main(){
     float shade = clamp((1.0 - dot(worldNormal, u_lightDir)) * 0.5, 0.0, u_maxShade);
     vec3 baseCol = a_color.rgb * u_lightColor;
     v_col = vec4(mix(baseCol, u_shadeColor, shade), a_color.a);
+    v_uv = a_texCoord0;
     gl_Position = u_proj * u_trans * vec4(a_position, 1.0);
 }

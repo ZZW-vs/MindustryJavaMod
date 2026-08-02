@@ -110,9 +110,9 @@ public class WavefrontTurret extends PowerTurret {
 
             if (object != null && object.faces != null && object.faces.size > 0) {
                 // 模型绕 Z 轴旋转 (跟随炮台朝向)
-                // ★ 修正: Vec3.mul(Mat) 是行向量乘矩阵, rotate(Vec3.Z, +deg) = 顺时针 (非逆时针)
-                // 所以 rotation 系数必须取负: rZ = 90f - rotation
-                float rZ = 90f - rotation;
+                // ★ GPU渲染器: Mat3D.rotate(Vec3.Z, +deg) = 逆时针 (标准OpenGL), 与旧CPU渲染器相反
+                // 所以 rZ = rotation - 90f (取反旧公式)
+                float rZ = rotation - 90f;
                 // gap 作为轻微 X 轴倾斜 (间隙效果)
                 float rX = gap * 30f;
                 // angle 旋转转为 Y 轴摆动

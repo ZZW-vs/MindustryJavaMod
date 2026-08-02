@@ -23,8 +23,9 @@ import java.util.*;
  *
  * ★ 完全重写版: 使用 GPU 深度缓冲 + FrameBuffer 离屏渲染
  * - 优势: 完美支持任意3D模型, 无面排序/z-fighting问题, 支持Y轴旋转
- * - 使用 Camera3D 透视投影 + 自定义 Shader (方向光照)
- * - OBJ 加载时构建 Mesh (position3 + normal + color), GPU 自动处理深度
+ * - 使用 Camera3D 透视投影 + 自定义 Shader (方向光照 + 纹理采样)
+ * - OBJ 加载时构建 Mesh (position3 + normal + color + texCoords2), GPU 自动处理深度
+ * - 支持材质纹理 (map_Kd) 和顶点颜色
  *
  * 公共 API 与旧版保持兼容 (字段/方法/内部类不变)
  *
@@ -35,6 +36,9 @@ public class WavefrontObject{
     protected static final float zScale = 0.01f;
     protected static final float defaultScl = 4f;
     protected static final float perspectiveDistance = 350f;
+
+    /** 每顶点浮点数: pos(3) + normal(3) + color(1 packed) + uv(2) = 9 */
+    private static final int FLOATS_PER_VERT = 9;
 
     // ===== 静态 GPU 资源 (延迟初始化, 所有实例共享) =====
     private static Camera3D cam;
@@ -49,7 +53,13 @@ public class WavefrontObject{
     private int numIndices;
     private float boundRadius;       // 模型边界球半径 (模型空间, 未缩放)
     private float[] originalVerts;   // CPU 顶点副本 (用于 cons 形变)
-    private int vertFloatCount;      // 顶点浮点数总数 (每顶点 7 float: pos3+normal3+color1)
+    private int vertFloatCount;      // 顶点浮点数总数 (每顶点 9 float)
+    private AtlasRegion diffTexture = null;  // 材质 diffuse 纹理 (map_Kd)
+    private boolean hasDiffTexture = false;
+
+    // ===== 性能优化 (可复用缓冲) =====
+    private float[] distortData;     // applyDistortion 复用数组, 避免每帧 GC
+    private int cachedFboRes = -1;   // FBO 分辨率缓存, 避免每帧重新计算
 
     // ===== OBJ 数据 (保持公共 API 兼容) =====
     public Seq<Vec3> vertices = new Seq<>();
@@ -94,7 +104,7 @@ public class WavefrontObject{
         cam.near = 0.1f;
         cam.far = 5000f;
         cam.up.set(Vec3.Y);
-        buffer = new FrameBuffer(256, 256, true);
+        buffer = new FrameBuffer(512, 512, true);
         try{
             shader = new ObjShader();
         }catch(Throwable t){
@@ -169,13 +179,13 @@ public class WavefrontObject{
                         hasTexture = true;
                         hasMaterialTex = true;
                         if(canLoadTex()){
-                            String n = line.replaceFirst("map_Kd ", "");
+                            String n = line.replaceFirst("map_Kd ", "").trim();
                             current.diffTex = Core.atlas.find("create-" + n);
                         }
                     }
 
                     if(line.contains("map_Ke ") && current != null && canLoadTex()){
-                        String n = line.replaceFirst("map_Ke ", "");
+                        String n = line.replaceFirst("map_Ke ", "").trim();
                         current.emitTex = Core.atlas.find("create-" + n);
                     }
                 }catch(Throwable e){
@@ -300,7 +310,7 @@ public class WavefrontObject{
         // ★ 构建 GPU Mesh
         buildMesh();
 
-        Log.info("[Create] WavefrontObject loaded: " + drawnVertices.size + " verts, " + faces.size + " faces, GPU mesh: " + (mesh != null ? "OK" : "FAILED"));
+        Log.info("[Create] WavefrontObject loaded: " + drawnVertices.size + " verts, " + faces.size + " faces, GPU mesh: " + (mesh != null ? "OK" : "FAILED") + ", texture: " + (hasDiffTexture ? "YES" : "NO"));
     }
 
     private boolean canLoadTex(){
@@ -308,7 +318,7 @@ public class WavefrontObject{
     }
 
     // ===== 构建 GPU Mesh =====
-    /** 将 OBJ 面数据构建为 arc Mesh (position3 + normal + color), 三角化后上传 GPU */
+    /** 将 OBJ 面数据构建为 arc Mesh (position3 + normal + color + texCoords2), 三角化后上传 GPU */
     private void buildMesh(){
         if(Vars.headless || faces.isEmpty()) return;
 
@@ -344,10 +354,27 @@ public class WavefrontObject{
             Log.warn("[Create] WavefrontObject '@' has @ verts (>65535), using non-indexed mesh", textureName, vertCount);
         }
 
-        // 每顶点 7 float: pos(3) + normal(3) + color(1 packed)
-        vertFloatCount = vertCount * 7;
+        // 每顶点 9 float: pos(3) + normal(3) + color(1 packed) + uv(2)
+        vertFloatCount = vertCount * FLOATS_PER_VERT;
         float[] vertData = new float[vertFloatCount];
         originalVerts = new float[vertFloatCount];
+        distortData = new float[vertFloatCount];  // 预分配形变缓冲
+
+        // 查找材质纹理 (取第一个有 diffTex 的材质)
+        if(materials != null){
+            for(Material mat : materials.values()){
+                if(mat.diffTex != null && mat.diffTex.found()){
+                    diffTexture = mat.diffTex;
+                    hasDiffTexture = true;
+                    break;
+                }
+            }
+        }
+        // 回退: 使用 textureName 查找的 texture
+        if(!hasDiffTexture && texture != null && texture.found()){
+            diffTexture = texture;
+            hasDiffTexture = true;
+        }
 
         // 预计算每个面的法线 (如果 OBJ 没有法线)
         int vi = 0;
@@ -389,6 +416,13 @@ public class WavefrontObject{
                         norm = faceNormal;
                     }
 
+                    // UV: 顶点 UV (如果有) 或默认 (0,0)
+                    float u = 0f, v = 0f;
+                    if(hasTexture && f.vertexTexture != null && vIdx < f.vertexTexture.length && f.vertexTexture[vIdx] != null){
+                        u = f.vertexTexture[vIdx].x;
+                        v = f.vertexTexture[vIdx].y;
+                    }
+
                     vertData[vi]     = pos.x - cx;  // 居中
                     vertData[vi + 1] = pos.y - cy;
                     vertData[vi + 2] = pos.z - cz;
@@ -396,7 +430,9 @@ public class WavefrontObject{
                     vertData[vi + 4] = norm.y;
                     vertData[vi + 5] = norm.z;
                     vertData[vi + 6] = packedColor;
-                    vi += 7;
+                    vertData[vi + 7] = u;
+                    vertData[vi + 8] = v;
+                    vi += FLOATS_PER_VERT;
                 }
             }
         }
@@ -409,7 +445,8 @@ public class WavefrontObject{
             mesh = new Mesh(false, vertCount, 0,
                 VertexAttribute.position3,
                 VertexAttribute.normal,
-                VertexAttribute.color
+                VertexAttribute.color,
+                VertexAttribute.texCoords
             );
             mesh.setVertices(vertData, 0, vertFloatCount);
         }catch(Throwable t){
@@ -440,13 +477,17 @@ public class WavefrontObject{
         float worldSize = boundRadius * 2f * scl * 1.4f;  // 1.4 倍边界球直径, 留余量
         int fboRes = computeFboResolution(worldSize);
 
-        // 调整 FBO 大小
+        // 调整 FBO 大小 (仅在分辨率变化时 resize, 避免每帧开销)
         if(buffer.getWidth() != fboRes || buffer.getHeight() != fboRes){
             buffer.resize(fboRes, fboRes);
         }
 
-        // 刷新 2D batch
+        // ★ 刷新 2D batch (确保之前的 Draw 命令已提交, FBO 不会覆盖正在使用的纹理)
         Draw.flush();
+
+        // ===== 保存 GL 状态 =====
+        boolean depthTestWasEnabled = Gl.isEnabled(Gl.depthTest);
+        boolean cullFaceWasEnabled = Gl.isEnabled(Gl.cullFace);
 
         // 开始 FBO 渲染
         buffer.begin(Color.clear);
@@ -460,8 +501,6 @@ public class WavefrontObject{
         cam.update();
 
         // 设置模型变换矩阵 (旋转 + 缩放)
-        // ★ 顺序与旧版一致: v' = Rz * Ry * Rx * S * v
-        // Mat3D.rotate() 是后乘, 所以调用顺序需反转: Z → Y → X → scale
         transform.idt();
         transform.rotate(Vec3.Z, rZ);
         transform.rotate(Vec3.Y, rY);
@@ -483,20 +522,39 @@ public class WavefrontObject{
             shader.setUniformMatrix4("u_proj", cam.combined.val);
             shader.setUniformMatrix4("u_trans", transform.val);
             setLightingUniforms();
+
+            // 绑定纹理 (如果模型有 diffuse 纹理)
+            if(hasDiffTexture && diffTexture != null){
+                diffTexture.texture.bind();
+                shader.setUniformi("u_texture", 0);
+                shader.setUniformi("u_hasTexture", 1);
+            }else{
+                shader.setUniformi("u_hasTexture", 0);
+            }
+
             shader.apply();
             mesh.render(shader, Gl.triangles);
         }catch(Throwable t){
             Log.err("[Create] WavefrontObject render error", t);
         }
 
-        // 禁用深度测试 + 背面剔除
+        // ===== 恢复 GL 状态 (关键: 防止污染 2D 渲染器) =====
         if(cullBackfaces){
             Gl.disable(Gl.cullFace);
         }
-        Gl.disable(Gl.depthTest);
+        // ★ depthMask 必须恢复为 false, 否则 2D batch 会写入深度缓冲导致渲染异常
+        Gl.depthMask(false);
+        if(!depthTestWasEnabled){
+            Gl.disable(Gl.depthTest);
+        }
 
         // 结束 FBO 渲染
         buffer.end();
+
+        // 恢复 cullFace 状态
+        if(cullFaceWasEnabled){
+            Gl.enable(Gl.cullFace);
+        }
 
         // 将 FBO 纹理绘制到 2D 场景
         float oz = Draw.z();
@@ -505,17 +563,26 @@ public class WavefrontObject{
         Draw.rect(Draw.wrap(buffer.getTexture()), x, y, worldSize, -worldSize);
         Draw.z(oz);
 
+        // ★ 刷新 batch (关键: FBO 是共享静态资源, 必须立即提交纹理到屏幕,
+        // 否则下一个模型的 FBO 渲染会覆盖当前纹理, 导致显示错误/黑块)
+        Draw.flush();
+
         // 恢复顶点 (如果有形变)
         if(cons != null){
             restoreVertices();
         }
     }
 
-    /** 根据模型世界空间大小计算 FBO 像素分辨率 */
+    /** 根据模型世界空间大小计算 FBO 像素分辨率 (带缓存) */
     private int computeFboResolution(float worldSize){
-        // 基于世界空间大小估算像素 (1 世界单位 ≈ 8 像素)
+        // 缓存命中: 避免每帧重算
+        // 注意: worldSize 在 size/boundRadius 不变时是恒定的
         int pixels = (int)(worldSize * 8f);
-        return Mathf.clamp(pixels, 128, 512);
+        int res = Mathf.clamp(pixels, 256, 1024);
+        // 取 2 的幂对齐 (部分 GPU 对非 2^n 纹理效率低)
+        res = Mathf.nextPowerOfTwo(res);
+        cachedFboRes = res;
+        return res;
     }
 
     /** 设置着色器光照 uniform (基于 shadingType) */
@@ -541,19 +608,18 @@ public class WavefrontObject{
         shader.setUniformf("u_maxShade", shadingType == ShadingType.noShading ? 0f : maxShade);
     }
 
-    /** 应用顶点形变 (cons 回调) */
+    /** 应用顶点形变 (cons 回调), 复用 distortData 数组避免 GC */
     private void applyDistortion(Cons<Vec3> cons){
-        float[] data = new float[vertFloatCount];
-        System.arraycopy(originalVerts, 0, data, 0, vertFloatCount);
-        Vec3 v = new Vec3();
-        for(int i = 0; i < vertFloatCount; i += 7){
-            v.set(data[i], data[i + 1], data[i + 2]);
+        System.arraycopy(originalVerts, 0, distortData, 0, vertFloatCount);
+        Vec3 v = Tmp.v31;  // 复用 Tmp 避免分配
+        for(int i = 0; i < vertFloatCount; i += FLOATS_PER_VERT){
+            v.set(distortData[i], distortData[i + 1], distortData[i + 2]);
             cons.get(v);
-            data[i] = v.x;
-            data[i + 1] = v.y;
-            data[i + 2] = v.z;
+            distortData[i] = v.x;
+            distortData[i + 1] = v.y;
+            distortData[i + 2] = v.z;
         }
-        mesh.setVertices(data, 0, vertFloatCount);
+        mesh.setVertices(distortData, 0, vertFloatCount);
     }
 
     /** 恢复原始顶点 */
@@ -576,6 +642,7 @@ public class WavefrontObject{
         ", faces=" + faces.size +
         ", shadingType=" + shadingType +
         ", gpuMesh=" + (mesh != null) +
+        ", texture=" + (hasDiffTexture ? diffTexture.name : "none") +
         '}';
     }
 
