@@ -6,6 +6,7 @@ import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Angles;
 import arc.util.Time;
+import mindustry.entities.abilities.Ability;
 import mindustry.entities.abilities.UnitSpawnAbility;
 import mindustry.content.Fx;
 import mindustry.entities.bullet.ArtilleryBulletType;
@@ -142,7 +143,9 @@ public class Z_Units {
         seraphim,               // T3 炽天使 (6臂盘旋治疗机)
         // —— PU_V8 海军系列 ——
         fin,                   // 鳍级战列舰 (海军, 导弹+迫击炮)
-        blue;                  // 蓝鲸级旗舰 (海军, 主炮+导弹井+点防+电磁炮)
+        blue,                  // 蓝鲸级旗舰 (海军, 主炮+导弹井+点防+电磁炮)
+        // —— PU132 kami 弹幕 Boss ——
+        kami;                  // kami-mkii (弹幕装饰Boss, 双层弹环+屏障)
 
     // —— PU_V8 共享子弹 (T6/T7 单位引用, 在 load() 中初始化) ——
     public static BulletType
@@ -5111,6 +5114,42 @@ public class Z_Units {
                     trailLength = 15;
                 }};
             }});
+        }};
+
+        // ═══════════════════════════════════════════════════════════
+        //  PU132 kami 弹幕 Boss (装饰性单位, 4种弹幕模式+屏障)
+        //  - 飞行 Boss, KamiAI 控制弹幕模式
+        //  - 无武器, 所有子弹由 AI 生成
+        //  - 屏障: 800 半径, 阻止玩家逃离
+        //  - 弹幕: basicPattern1 (双层旋转弹环) + basicPattern2 (交替方向弹环)
+        //         + expandPattern (散弹→环形扩张) + flowerPattern (花瓣形双向射击)
+        // ═══════════════════════════════════════════════════════════
+        kami = new UnitType("kami") {{
+            flying = true;
+            health = 120000f;
+            speed = 15f;
+            hitSize = 36f;
+            rotateSpeed = 0f;
+            accel = 0f;
+            drag = 0f;
+            outlineColor = Color.valueOf("464a61");
+            clipSize = 1200f;
+            drawCell = false;
+            // ★ KamiAI 作为控制器, 实现弹幕 AI
+            // v158 controller = Func<Unit, UnitController>, 非 Prov
+            controller = u -> new KamiAI();
+            // 无武器 — 所有弹幕由 KamiAI 直接生成
+
+            // ★ 屏障绘制 Ability: 调用 KamiAI.draw() 绘制屏障圆环和弹幕特效
+            abilities.add(new Ability() {
+                @Override
+                public void draw(mindustry.gen.Unit unit) {
+                    mindustry.entities.units.UnitController c = unit.controller();
+                    if (c instanceof KamiAI) {
+                        ((KamiAI) c).draw();
+                    }
+                }
+            });
         }};
 
         // ★ 用反射设置新单位的音效 (v158 字段名可能与 PU_V8 不同) ★

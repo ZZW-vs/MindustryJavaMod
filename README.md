@@ -195,6 +195,23 @@
 
 ## 更新日志
 
+### v1.9.3 (Bloom光效修复+3D性能优化+kami弹幕单位)
+- **彻底修复光效强度和模糊失效**：根因是 `Draw.z() + Draw.flush()` 会 flush ALL pending DrawRequests，包括 bloom capture (z=99.98) 和 render (z=110.02)，导致 bloom 在 z=25-35 时就 capture，场景内容不完整
+  - 修复：改用 `Draw.draw(z, runnable)` 将整个 FBO 操作注册为 DrawRequest 参与 SortedSpriteBatch 排序管线
+  - `flushing=true` 标志防止 re-entrant `flushRequests()`，`Draw.flush()` 只调用 `super.flush()` 渲染 mesh buffer
+  - 参考源码：Mindustry 158.1 Renderer.java `Draw.draw(Layer.bullet - 0.02f, bloom::capture)` 同样使用 Draw.draw() 注册 bloom
+- **修复模型放大后阴影偏移和锯齿**：
+  - FBO 分辨率改为三级 (512/1024/2048)，大模型(>100单位)自动用 2048 消除锯齿
+  - FBO 纹理设置线性过滤 `TextureFilter.linear`，减少放大时的像素感
+  - 阴影 Y 偏移补偿模型 X 轴旋转导致的视觉上浮
+  - camera 距离恢复为 3x boundRadius*scl (模型占 FBO ~80%，避免边缘裁剪)
+- **3D 模型性能优化**：`Draw.draw()` 避免了 premature flush 整个 DrawRequest 队列，多个 3D 模型同屏时不再卡顿
+- **新增 kami 弹幕 Boss 单位 (PU132 移植)**：
+  - 4 种弹幕模式循环：双层旋转弹环 + 交替方向弹环 + 散弹→环形扩张 + 花瓣形双向射击
+  - 弹幕子弹：色相循环红色 + 外层彩色光晕 + 内层白色核心 + 大小脉动 + 拖尾效果 (kamiBullet2)
+  - 屏障：800 半径，加法混合 + 红色 hue-shift + 脉动线宽圆环，阻止玩家逃离
+  - 难度系统：随阶段提升弹幕密度 (difficulty 0-5)
+
 ### v1.9.2 (3D渲染纹理+GL状态+精度修复)
 - **修复wavefront贴图乱码**：GPU着色器绑定的 `diffTexture.texture` 是整个图集纹理，模型UV(0-1)采样到了图集错误区域
   - 修复：`buildMesh()` 中将模型UV映射到atlas区域UV空间: `u*(u2-u)+u, v*(v2-v)+v`

@@ -31,6 +31,8 @@ import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
 
+import zzw.content.units.bullets.KamiBulletType;
+
 import static mindustry.Vars.tilesize;
 
 /**
@@ -39,6 +41,7 @@ import static mindustry.Vars.tilesize;
  *       DecayBasicBulletType, TriangleBulletType, BeamBulletType, ShieldBulletType,
  *       VelocityLaserBoltBulletType, EphemeronBulletType, EphemeronPairBulletType,
  *       SparkingContinuousLaserBulletType, SingularityBulletType
+ *       + kami 弹幕子弹 (kamiBullet2, kamiBullet3)
  *
  * 简化策略:
  * - 移除 UnityFx / UnityPal / HitFx / ChargeFx / ShootFx 依赖, 用 v158 Fx / Pal 替代
@@ -46,6 +49,15 @@ import static mindustry.Vars.tilesize;
  * - 保留核心机制 (伤害/范围/碰撞/闪电/frag)
  */
 public class Z_Bullets {
+
+    // ===== kami 弹幕子弹 (PU132 移植) =====
+    public static BulletType kamiBullet2 = new KamiBulletType();
+    public static BulletType kamiBullet3 = new KamiBulletType();
+
+    static {
+        // kamiBullet2 有拖尾 (PU132 trailLength=12), kamiBullet3 无拖尾
+        ((KamiBulletType) kamiBullet2).hasTrail = true;
+    }
 
     /** ===== SmokeBulletType (PU_V8 celsius/kelvin) ===== */
     public static class SmokeBulletType extends BasicBulletType {

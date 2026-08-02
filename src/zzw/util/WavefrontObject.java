@@ -105,6 +105,8 @@ public class WavefrontObject{
         cam.far = 5000f;
         cam.up.set(Vec3.Y);
         buffer = new FrameBuffer(512, 512, true);
+        // ★ 设置线性过滤, 减少 FBO 纹理放大时的锯齿
+        buffer.getTexture().setFilter(Texture.TextureFilter.linear, Texture.TextureFilter.linear);
         try{
             shader = new ObjShader();
         }catch(Throwable t){
@@ -423,9 +425,12 @@ public class WavefrontObject{
                         v = f.vertexTexture[vIdx].y;
                     }
 
-                    // ★ 如果使用 atlas region 纹理, 将模型 UV (0-1) 映射到 atlas UV 空间
-                    // 否则绑定的 texture.bind() 绑定的是整个大图集, UV(0-1) 会采样到错误区域
-                    if(hasDiffTexture && diffTexture != null && diffTexture.found()){
+                    // ★ 如果使用 atlas region 纹理且模型 UV 在 [0,1] 范围内,
+                    // 将模型 UV 映射到 atlas UV 空间 (因为 texture.bind() 绑定的是整个图集)
+                    // 注意: 部分 OBJ 的 UV 已经是 atlas 坐标 (如 wavefront.obj 的 UV 0.027-0.816),
+                    // 这种情况不需要映射, 直接使用
+                    if(hasDiffTexture && diffTexture != null && diffTexture.found()
+                        && u >= 0f && u <= 1f && v >= 0f && v <= 1f){
                         u = u * (diffTexture.u2 - diffTexture.u) + diffTexture.u;
                         v = v * (diffTexture.v2 - diffTexture.v) + diffTexture.v;
                     }
@@ -474,115 +479,120 @@ public class WavefrontObject{
         init();
         if(shaderFailed || shader == null) return;
 
-        // 处理顶点形变 (cons)
-        if(cons != null){
-            applyDistortion(cons);
-        }
-
-        // 计算 FBO 世界空间大小和分辨率
-        float scl = defaultScl * size;
-        float worldSize = boundRadius * 2f * scl * 1.15f;  // 1.15 倍边界球直径, 紧凑 fit 减少阴影偏移
-        int fboRes = computeFboResolution(worldSize);
-
-        // 调整 FBO 大小 (仅在分辨率变化时 resize, 避免每帧开销)
-        if(buffer.getWidth() != fboRes || buffer.getHeight() != fboRes){
-            buffer.resize(fboRes, fboRes);
-        }
-
-        // ★ 刷新 2D batch (确保之前的 Draw 命令已提交, FBO 不会覆盖正在使用的纹理)
-        Draw.flush();
-
-        // ===== 开始 FBO 渲染 =====
-        // 遵循 PlanetRenderer 模式: 显式设置/恢复所有 GL 状态, 不使用 isEnabled 保存
-        buffer.begin(Color.clear);
-
-        // 设置 Camera3D (透视投影)
-        float camDist = boundRadius * scl * 3f;  // 相机距离 = 边界球半径 * 3
-        cam.position.set(0, 0, camDist);
-        cam.lookAt(Vec3.Zero);
-        cam.up.set(Vec3.Y);
-        cam.resize(fboRes, fboRes);
-        cam.update();
-
-        // 设置模型变换矩阵 (旋转 + 缩放)
-        transform.idt();
-        transform.rotate(Vec3.Z, rZ);
-        transform.rotate(Vec3.Y, rY);
-        transform.rotate(Vec3.X, rX);
-        transform.scale(scl, scl, scl);
-
-        // ★ 禁用混合 (FBO 内 3D 渲染不需要混合, 深度缓冲处理遮挡)
-        // 不禁用混合会导致 FBO 内容被 pre-multiply alpha, 后续 Draw.rect 再次混合造成颜色错误
-        Gl.disable(Gl.blend);
-
-        // 启用 GPU 深度测试 + 背面剔除
-        Gl.enable(Gl.depthTest);
-        Gl.depthMask(true);
-        Gl.clear(Gl.depthBufferBit);
-        if(cullBackfaces){
-            Gl.enable(Gl.cullFace);
-            Gl.cullFace(Gl.back);
-        }
-
-        // 渲染 Mesh
-        try{
-            shader.bind();
-            shader.setUniformMatrix4("u_proj", cam.combined.val);
-            shader.setUniformMatrix4("u_trans", transform.val);
-            setLightingUniforms();
-
-            // 绑定纹理 (如果模型有 diffuse 纹理)
-            if(hasDiffTexture && diffTexture != null && diffTexture.found()){
-                diffTexture.texture.bind();
-                shader.setUniformi("u_texture", 0);
-                shader.setUniformi("u_hasTexture", 1);
-            }else{
-                shader.setUniformi("u_hasTexture", 0);
+        // ★ 使用 Draw.draw() 参与 SortedSpriteBatch 的排序管线
+        // 旧方案 (Draw.z + Draw.flush) 会 flush ALL pending DrawRequests,
+        // 包括 bloom capture (z=99.98) 和 render (z=110.02), 导致:
+        // 1. bloom 在 z=25-35 时就 capture, 场景内容不完整 → 光效强度失效
+        // 2. bloom render 在错误时机执行 → 模糊失效
+        //
+        // Draw.draw(z, runnable) 将整个 FBO 操作注册为 DrawRequest,
+        // 在 flushRequests() 回放时执行. 此时 flushing=true:
+        // - flushRequests() 不会重入 (由 flushing 标志保护)
+        // - Draw.flush() 只调用 super.flush() 渲染 mesh buffer (cheap)
+        // - Draw.rect() 直接走 super.draw() (绕过队列, 直接写入 mesh)
+        Draw.draw(drawLayer + zOffset, () -> {
+            // 处理顶点形变 (cons)
+            if(cons != null){
+                applyDistortion(cons);
             }
 
-            shader.apply();
-            mesh.render(shader, Gl.triangles);
-        }catch(Throwable t){
-            Log.err("[Create] WavefrontObject render error", t);
-        }
+            float scl = defaultScl * size;
+            // worldSize = 边界球直径 * 缩放 (旋转后最大投影)
+            float worldSize = boundRadius * 2f * scl;
+            int fboRes = computeFboResolution(worldSize);
 
-        // ===== 恢复 GL 状态 (遵循 PlanetRenderer 模式: 显式恢复) =====
-        if(cullBackfaces){
-            Gl.disable(Gl.cullFace);
-        }
-        Gl.depthMask(false);
-        Gl.disable(Gl.depthTest);
-        // ★ 重新启用混合 + 恢复混合函数 (2D batch 依赖混合)
-        Gl.enable(Gl.blend);
-        Gl.blendFunc(Gl.srcAlpha, Gl.oneMinusSrcAlpha);
+            // 仅在分辨率变化时 resize
+            if(buffer.getWidth() != fboRes || buffer.getHeight() != fboRes){
+                buffer.resize(fboRes, fboRes);
+                // resize 可能重建纹理, 重新设置线性过滤
+                buffer.getTexture().setFilter(Texture.TextureFilter.linear, Texture.TextureFilter.linear);
+            }
 
-        // 结束 FBO 渲染
-        buffer.end();
+            // ===== FBO 离屏渲染 =====
+            // buffer.begin() 内部调用 Draw.flush(), 但 flushing=true 时
+            // flushRequests() 是 no-op, super.flush() 只渲染空 mesh buffer
+            buffer.begin(Color.clear);
 
-        // 将 FBO 纹理绘制到 2D 场景
-        float oz = Draw.z();
-        Draw.z(drawLayer + zOffset);
-        // ★ 负高度翻转纹理 (FBO 纹理在 OpenGL 中是上下颠倒的)
-        Draw.rect(Draw.wrap(buffer.getTexture()), x, y, worldSize, -worldSize);
-        Draw.z(oz);
+            // Camera3D 透视投影
+            // camDist = 3 * boundRadius * scl: 模型占 FBO ~80%, 避免边缘裁剪
+            float camDist = boundRadius * scl * 3f;
+            cam.position.set(0, 0, camDist);
+            cam.lookAt(Vec3.Zero);
+            cam.up.set(Vec3.Y);
+            cam.resize(fboRes, fboRes);
+            cam.update();
 
-        // ★ 刷新 batch (关键: FBO 是共享静态资源, 必须立即提交纹理到屏幕,
-        // 否则下一个模型的 FBO 渲染会覆盖当前纹理, 导致显示错误/黑块)
-        Draw.flush();
+            // 模型变换矩阵 (旋转 + 缩放)
+            transform.idt();
+            transform.rotate(Vec3.Z, rZ);
+            transform.rotate(Vec3.Y, rY);
+            transform.rotate(Vec3.X, rX);
+            transform.scale(scl, scl, scl);
 
-        // 恢复顶点 (如果有形变)
-        if(cons != null){
-            restoreVertices();
-        }
+            // GL 状态: 禁用混合 (FBO 内 3D 渲染用深度缓冲处理遮挡)
+            Gl.disable(Gl.blend);
+            Gl.enable(Gl.depthTest);
+            Gl.depthMask(true);
+            Gl.clear(Gl.depthBufferBit);
+            if(cullBackfaces){
+                Gl.enable(Gl.cullFace);
+                Gl.cullFace(Gl.back);
+            }
+
+            // 渲染 Mesh
+            try{
+                shader.bind();
+                shader.setUniformMatrix4("u_proj", cam.combined.val);
+                shader.setUniformMatrix4("u_trans", transform.val);
+                setLightingUniforms();
+
+                if(hasDiffTexture && diffTexture != null && diffTexture.found()){
+                    diffTexture.texture.bind();
+                    shader.setUniformi("u_texture", 0);
+                    shader.setUniformi("u_hasTexture", 1);
+                }else{
+                    shader.setUniformi("u_hasTexture", 0);
+                }
+
+                shader.apply();
+                mesh.render(shader, Gl.triangles);
+            }catch(Throwable t){
+                Log.err("[Create] WavefrontObject render error", t);
+            }
+
+            // 恢复 GL 状态 (遵循 PlanetRenderer 模式)
+            if(cullBackfaces){
+                Gl.disable(Gl.cullFace);
+            }
+            Gl.depthMask(false);
+            Gl.disable(Gl.depthTest);
+            Gl.enable(Gl.blend);
+            Gl.blendFunc(Gl.srcAlpha, Gl.oneMinusSrcAlpha);
+
+            buffer.end();
+
+            // 将 FBO 纹理绘制到 2D 场景
+            // ★ 负高度翻转 (FBO 纹理在 OpenGL 中上下颠倒)
+            // flushing=true 时 Draw.rect() 直接走 super.draw() (绕过队列)
+            Draw.rect(Draw.wrap(buffer.getTexture()), x, y, worldSize, -worldSize);
+
+            // ★ 立即 flush: FBO 是共享静态资源, 必须在下一个模型渲染前提交
+            // flushing=true 时只调用 super.flush() 渲染 mesh buffer
+            Draw.flush();
+
+            // 恢复顶点 (如果有形变)
+            if(cons != null){
+                restoreVertices();
+            }
+        });
     }
 
-    /** 根据模型世界空间大小计算 FBO 像素分辨率 (带缓存) */
+    /** 根据模型世界空间大小计算 FBO 像素分辨率 (三级: 512/1024/2048) */
     private int computeFboResolution(float worldSize){
-        // ★ 提高分辨率倍率: 16 像素/世界单位, 最大 2048, 消除放大时的锯齿
-        int pixels = (int)(worldSize * 16f);
-        int res = Mathf.clamp(pixels, 256, 2048);
-        // 取 2 的幂对齐 (部分 GPU 对非 2^n 纹理效率低)
-        res = Mathf.nextPowerOfTwo(res);
+        // ★ 三级分辨率: 大模型(>100单位)用2048, 中模型(>50单位)用1024, 小模型用512
+        // 2048=16MB, 1024=4MB, 512=1MB 显存
+        // 三级足以覆盖大多数场景, resize 次数可控
+        int res = worldSize > 100f ? 2048 : (worldSize > 50f ? 1024 : 512);
         cachedFboRes = res;
         return res;
     }

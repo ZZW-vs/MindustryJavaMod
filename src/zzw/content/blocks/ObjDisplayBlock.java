@@ -92,11 +92,15 @@ public class ObjDisplayBlock extends Block {
                 Draw.rect(baseRegion, x, y);
             }
 
-            // 阴影 - 双层增强3D落地感
+            // 阴影 - 随模型缩放, 位置略低于模型中心补偿旋转偏移
             Draw.z(Layer.blockBuilding - 1f);
-            Drawf.shadow(x, y, size * 14f);
-            Draw.color(0, 0, 0, 0.3f);
-            Draw.rect(Core.atlas.find("circle-shadow"), x, y - Vars.tilesize * 0.5f, size * 10f, size * 6f);
+            float shadowSize = size * 10f * Mathf.clamp(currentScale, 0.5f, 3f);
+            // ★ 阴影 Y 偏移: 补偿模型 X 轴旋转导致的视觉上浮
+            // rX=-25° 时模型顶部后倾, 阴影应略向前偏 (Mindustry 俯视相机 Y 正方向)
+            float shadowOffsetY = -2f * Mathf.clamp(currentScale, 0.5f, 3f);
+            Drawf.shadow(x, y + shadowOffsetY, shadowSize);
+            Draw.color(0, 0, 0, 0.25f);
+            Draw.rect(Core.atlas.find("circle-shadow"), x, y + shadowOffsetY, shadowSize * 0.8f, shadowSize * 0.5f);
             Draw.color();
 
             drawModel();
@@ -123,7 +127,9 @@ public class ObjDisplayBlock extends Block {
                 obj.shadeColor.set(Color.black);
                 obj.maxShade = 0.75f;
             }
-            obj.size = currentScale;
+            // ★ size = 原始size * currentScale, 而非覆盖为 currentScale
+            // 否则 wavefront(size=8) 在 currentScale=1 时会缩小到 1/8
+            obj.size = origSize * currentScale;
 
             // 旋转角度
             float rX = -25f;
@@ -135,7 +141,10 @@ public class ObjDisplayBlock extends Block {
                 rZ = angle;
             }
 
-            obj.zOffset = (id % 1000) * 1.0f;
+            // ★ zOffset 用极小值 (0.01 * id), 仅用于多实例间 z 排序
+            // 旧值 (id % 1000) * 1.0f 会使 drawLayer+zOffset 侵入 bloom 窗口 (99.98-110.02),
+            // 导致光效强度和模糊失效
+            obj.zOffset = (id % 100) * 0.01f;
             obj.draw(x, y + currentOffset, rX, rY, rZ);
 
             // 恢复原始参数
