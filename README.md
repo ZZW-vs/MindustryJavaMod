@@ -195,6 +195,12 @@
 
 ## 更新日志
 
+### v2.1.6 (修复MMD无法渲染+三角形面兼容SortedSpriteBatch)
+- **根因1 - PMX材质解析错位**：76c98da 误加 `subTexIdx` 字段，但标准 PMX 规范没有 sub-texture index（Texture Index 后直接是 Sphere Texture Index），导致整个二进制流错位，所有材质和面数据错乱
+  - 修复：删除 `subTexIdx` 读取，恢复 459f802 的正确解析顺序
+- **根因2 - 三角形面无法渲染**：`SortedSpriteBatch.draw(Texture,float[],int,int)` 按 24 floats 步长遍历，PMX 模型全是三角形（3顶点 18 floats）导致 `System.arraycopy` 越界；OBJ 模型用 quad（4顶点 24 floats）所以没问题
+  - 修复：`Face.draw()` 中三角形扩展为 degenerate quad（第4顶点=第1顶点，形成面积为0的退化三角形不可见），缓存 `quadBuffer` 避免每帧分配
+
 ### v2.1.5 (3D渲染回退到CPU软件渲染,彻底解决透视问题)
 - **根因定位**: 18ad7f5 引入的 GPU 深度缓冲渲染与 Mindustry 2D batch 系统冲突
   - GPU 深度缓冲 + 透明/双面材质混合时产生透视假象
