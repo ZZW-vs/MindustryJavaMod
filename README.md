@@ -195,6 +195,10 @@
 
 ## 更新日志
 
+### v2.1.8 (修复MMD面排序崩溃:比较器违反传递性契约)
+- **崩溃根因**：`Arrays.sort` 的比较器混合两种规则——z 值差 <0.01 时用 `a-b`（索引顺序），z 值差 ≥0.01 时用 `Float.compare`——导致 TimSort 检测到 `a>b, b<c 但 a<c` 的矛盾，抛 `IllegalArgumentException: Comparison method violates its general contract!`
+- **修复**：给每个面 z 值加索引微偏移（`i*1e-6`）保证唯一性，纯用 `Float.compare`（TimSort 是稳定排序，相等时保持原序），同时将 `Float[]` 改为 `float[]` 避免装箱开销
+
 ### v2.1.7 (MMD模型改用OBJ加载,彻底解决PMX解析问题)
 - **gale MMD模型改用 OBJ+MTL 加载**（放弃 PMX 二进制解析）：PMX 格式复杂且解析易错（材质字段顺序、骨骼权重跳过等），改用 Blender 导出的 OBJ+MTL 更稳定可靠
 - **WavefrontObject.load() 增强**：
