@@ -195,6 +195,14 @@
 
 ## 更新日志
 
+### v2.1.9 (MMD性能优化:DrawRequest从78580降到1,修复贴图UV)
+- **性能优化 - DrawRequest 从 78580 降到 1**：
+  - 根因：SortedSpriteBatch 在 sort 模式下，每个 `Draw.vert` 调用都创建一个 `DrawRequest`（[SortedSpriteBatch.java:45](file:///d:/mc/Mindustry/My%20mod/Create/参考/PU特供v132版/arc/graphics/g2d/SortedSpriteBatch.java#L45)），78580 个 DrawRequest 排序巨卡
+  - 修复：用 `Draw.draw(z, runnable)` 包裹整个模型渲染——只创建 1 个 DrawRequest，runnable 在 flush 阶段执行（`flushing=true`），此时 `Draw.vert` 走 `super.draw`（直接渲染，不创建 DrawRequest）
+  - 面的渲染顺序由 `drawBatched` 内部按 z 排序控制（远的先画），不依赖 SortedSpriteBatch 排序
+- **贴图 UV 修复**：OBJ UV V=0 在底部，libGDX Texture V=0 也在底部，不需要 `1f - y` 翻转（之前给 PMX 加的翻转导致 OBJ 贴图错）
+- **三角形预扩展**：load 时三角形 data 预扩展为 24 floats（degenerate quad），避免每帧 78580 次 `System.arraycopy`
+
 ### v2.1.8 (修复MMD面排序崩溃:比较器违反传递性契约)
 - **崩溃根因**：`Arrays.sort` 的比较器混合两种规则——z 值差 <0.01 时用 `a-b`（索引顺序），z 值差 ≥0.01 时用 `Float.compare`——导致 TimSort 检测到 `a>b, b<c 但 a<c` 的矛盾，抛 `IllegalArgumentException: Comparison method violates its general contract!`
 - **修复**：给每个面 z 值加索引微偏移（`i*1e-6`）保证唯一性，纯用 `Float.compare`（TimSort 是稳定排序，相等时保持原序），同时将 `Float[]` 改为 `float[]` 避免装箱开销
