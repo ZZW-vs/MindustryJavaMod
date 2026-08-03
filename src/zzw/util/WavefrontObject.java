@@ -366,23 +366,19 @@ public class WavefrontObject{
         // ★ 排序结果存入临时数组 drawOrder, 不修改原始 faces (避免多实例共享模型竞态)
         Face[] drawOrder;
         if(singleZLayer){
-            // 稳定排序: 当z值差小于阈值时保持原有顺序，避免帧间翻转导致抽搐
             int n = faces.size;
-            Float[] zVals = new Float[n];
+            float[] zVals = new float[n];
             for(int i = 0; i < n; i++){
                 float z = 0;
                 Face f = faces.get(i);
                 for(Vertex v : f.verts) z += v.source.z;
-                zVals[i] = z / f.verts.length;
+                // ★ 加索引微偏移保证 z 值唯一, 避免纯 Float.compare 返回 0 时帧间排序跳变
+                //   (不能用混合比较规则, 否则违反传递性 → TimSort 抛 IllegalArgumentException)
+                zVals[i] = z / f.verts.length + i * 1e-6f;
             }
             Integer[] indices = new Integer[n];
             for(int i = 0; i < n; i++) indices[i] = i;
-            Arrays.sort(indices, (a, b) -> {
-                float diff = zVals[a] - zVals[b];
-                if(Math.abs(diff) < 0.01f) return a - b; // 稳定排序: z值相近时保持原序
-                return Float.compare(zVals[a], zVals[b]);
-            });
-            // ★ 用临时数组绘制，不修改原始faces
+            Arrays.sort(indices, (a, b) -> Float.compare(zVals[a], zVals[b]));
             drawOrder = new Face[n];
             for(int i = 0; i < n; i++) drawOrder[i] = faces.get(indices[i]);
         }else{
