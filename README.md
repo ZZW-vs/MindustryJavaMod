@@ -195,6 +195,19 @@
 
 ## 更新日志
 
+### v2.2.0 (GPU Mesh渲染:真正解决性能问题,兼容手机端GLES2.0)
+- **GPU Mesh 渲染**：高面数模型（>1000面）改用 GPU Mesh + 自定义 Shader 直接渲染，不再走 SortedSpriteBatch
+  - 性能根因：SortedSpriteBatch 每个 `Draw.vert` 创建一个 DrawRequest，78580 面 = 78580 个 DrawRequest，排序巨卡
+  - GPU 方案：按材质分组，每组一个 Mesh，一次 `mesh.render` draw call 提交所有顶点（78580 面 → ~50 次 draw call）
+  - 用 `Draw.draw(z, runnable)` 包裹，只创建 1 个 DrawRequest
+  - CPU 仍做面 z 排序（painter's algorithm），保证远的先画
+- **自定义 Shader（GLES 2.0 兼容）**：
+  - 顶点着色器：`a_position` + `a_color` + `a_texCoord0` → `u_projTrans` 变换
+  - 片段着色器：`v_color * texture2D(u_texture, v_texCoord0)`
+  - 不用 `#version`，arc 自动处理 GLSL 版本和 GLES 兼容
+- **贴图 UV 修复**：独立 Texture UV 翻转 V 轴（libGDX Pixmap Y=0 在顶部，OBJ UV V=0 在底部，需 `1f - y`）
+- **三角形/Quad 统一处理**：GPU Mesh 用 `GL_TRIANGLES`，quad 面拆分成 2 个三角形
+
 ### v2.1.9 (MMD性能优化:DrawRequest从78580降到1,修复贴图UV)
 - **性能优化 - DrawRequest 从 78580 降到 1**：
   - 根因：SortedSpriteBatch 在 sort 模式下，每个 `Draw.vert` 调用都创建一个 `DrawRequest`（[SortedSpriteBatch.java:45](file:///d:/mc/Mindustry/My%20mod/Create/参考/PU特供v132版/arc/graphics/g2d/SortedSpriteBatch.java#L45)），78580 个 DrawRequest 排序巨卡

@@ -6,6 +6,9 @@ import arc.func.*;
 import arc.graphics.*;
 import arc.graphics.g2d.*;
 import arc.graphics.g2d.TextureAtlas.*;
+import arc.graphics.gl.Shader;
+import arc.graphics.Mesh;
+import arc.graphics.VertexAttribute;
 import arc.math.*;
 import arc.math.geom.*;
 import arc.struct.*;
@@ -65,6 +68,25 @@ public class WavefrontObject{
     public float zOffset = 0f;
     protected int indexerA;
     protected float indexerZ;
+
+    // ===== GPU Mesh 渲染 (高面数模型用, 兼容手机端 GLES 2.0) =====
+    /** GPU Shader (所有实例共享, 兼容 GLES 2.0) */
+    protected static Shader gpuShader;
+    /** 按材质分组的 GPU Mesh */
+    protected Seq<GpuMeshGroup> gpuGroups;
+    /** 面 z 值缓存 (排序用, 避免每帧分配) */
+    protected float[] gpuZVals;
+    /** 面排序索引缓存 */
+    protected Integer[] gpuOrder;
+
+    /** GPU Mesh 分组 (一个材质一个 Mesh, 一次 draw call) */
+    protected static class GpuMeshGroup{
+        public Material material;
+        public Mesh mesh;
+        public float[] vertices;
+        public int[] faceIndices;
+        public int vertexCount;
+    }
 
     public void load(Fi file, @Nullable Fi material){
         if(material != null){
@@ -314,6 +336,9 @@ public class WavefrontObject{
         }
 
         Log.info("[Create] WavefrontObject loaded: " + drawnVertices.size + " verts, " + faces.size + " faces, boundRadius=" + boundRadius);
+
+        // ★ 构建 GPU Mesh (高面数模型用 GPU 渲染, 兼容手机端)
+        buildGpuMesh();
     }
 
     /** ★ 从 mod 文件树加载独立 Texture (非 atlas 贴图, 用于 MMD 等多贴图模型) */
@@ -363,12 +388,12 @@ public class WavefrontObject{
             }
         }
 
-        // ★ 高面数模型(>1000面): 按材质分组批量提交
-        //   78580面逐面提交会产生78580个DrawRequest, SortedSpriteBatch排序巨卡
-        //   按材质分组后只有~50个DrawRequest, 性能提升数百倍
-        if(singleZLayer && faces.size > 1000){
-            drawBatched();
-            Draw.reset();
+        // ★ 高面数模型(>1000面): 用 GPU Mesh 渲染 (兼容手机端 GLES 2.0)
+        //   一次 draw call 提交所有顶点到 GPU, 不走 SortedSpriteBatch
+        //   用 Draw.draw(z, runnable) 包裹, 只创建 1 个 DrawRequest
+        if(singleZLayer && faces.size > 1000 && gpuGroups != null){
+            float modelZ = drawLayer + zOffset;
+            Draw.draw(modelZ, () -> drawGpuMesh());
             Draw.z(oz);
             return;
         }
@@ -482,6 +507,191 @@ public class WavefrontObject{
         });
     }
 
+    // ===== GPU Mesh 渲染方法 =====
+
+    /** 获取/创建 GPU Shader (GLES 2.0 兼容, 不用 #version, arc 自动处理) */
+    protected static Shader getGpuShader(){
+        if(gpuShader == null){
+            gpuShader = new Shader(
+                "attribute vec2 a_position;\n" +
+                "attribute vec4 a_color;\n" +
+                "attribute vec2 a_texCoord0;\n" +
+                "uniform mat4 u_projTrans;\n" +
+                "varying vec4 v_color;\n" +
+                "varying vec2 v_texCoord0;\n" +
+                "void main(){\n" +
+                "  v_color = a_color;\n" +
+                "  v_texCoord0 = a_texCoord0;\n" +
+                "  gl_Position = u_projTrans * vec4(a_position, 0.0, 1.0);\n" +
+                "}",
+                "uniform sampler2D u_texture;\n" +
+                "varying vec4 v_color;\n" +
+                "varying vec2 v_texCoord0;\n" +
+                "void main(){\n" +
+                "  gl_FragColor = v_color * texture2D(u_texture, v_texCoord0);\n" +
+                "}"
+            );
+        }
+        return gpuShader;
+    }
+
+    /** 构建 GPU Mesh (load 后调用, 按材质分组) */
+    protected void buildGpuMesh(){
+        if(faces.isEmpty()) return;
+
+        // 按材质分组
+        ObjectMap<Material, IntSeq> groups = new ObjectMap<>();
+        for(int i = 0; i < faces.size; i++){
+            Material m = faces.get(i).mat;
+            IntSeq group = groups.get(m);
+            if(group == null){ group = new IntSeq(); groups.put(m, group); }
+            group.add(i);
+        }
+
+        gpuGroups = new Seq<>();
+        for(ObjectMap.Entry<Material, IntSeq> entry : groups){
+            GpuMeshGroup g = new GpuMeshGroup();
+            g.material = entry.key;
+            g.faceIndices = entry.value.toArray();
+
+            // 计算最大顶点数 (三角形=3顶点, quad拆2个三角形=6顶点)
+            int maxVerts = 0;
+            for(int fi : g.faceIndices){
+                Face f = faces.get(fi);
+                maxVerts += (f.verts.length == 3) ? 3 : 6;
+            }
+            if(maxVerts == 0) continue;
+
+            // 顶点格式: position(2) + color(packed) + texCoord(2) = 5 floats
+            g.mesh = new Mesh(false, maxVerts, 0,
+                VertexAttribute.position, VertexAttribute.color, VertexAttribute.texCoords);
+            g.vertices = new float[maxVerts * 5];
+            gpuGroups.add(g);
+        }
+
+        // 预分配排序数组
+        int n = faces.size;
+        gpuZVals = new float[n];
+        gpuOrder = new Integer[n];
+        for(int i = 0; i < n; i++) gpuOrder[i] = i;
+
+        Log.info("[Create] GPU Mesh built: " + gpuGroups.size + " groups, " + n + " faces");
+    }
+
+    /** GPU Mesh 渲染: 按材质分组, 每组一次 draw call
+     *  用 Draw.draw(z, runnable) 包裹, 只创建 1 个 DrawRequest
+     *  runnable 内部用 Mesh.render 直接渲染 (不走 SortedSpriteBatch) */
+    protected void drawGpuMesh(){
+        if(gpuGroups == null || gpuGroups.isEmpty()) return;
+
+        int n = faces.size;
+
+        // 1. 计算每个面的 z 值
+        for(int i = 0; i < n; i++){
+            float z = 0;
+            Face f = faces.get(i);
+            for(Vertex v : f.verts) z += v.source.z;
+            gpuZVals[i] = z / f.verts.length + i * 1e-6f;
+        }
+
+        // 2. 全局排序 (远的先画, 保证 painter's algorithm)
+        for(int i = 0; i < n; i++) gpuOrder[i] = i;
+        Arrays.sort(gpuOrder, (a, b) -> Float.compare(gpuZVals[a], gpuZVals[b]));
+
+        // 3. 绑定 shader
+        Shader shader = getGpuShader();
+        shader.bind();
+        shader.setUniformMatrix4("u_projTrans", Core.camera.mat);
+        shader.setUniformi("u_texture", 0);
+
+        // 4. 启用混合 (透明材质)
+        Gl.enable(3042); // GL_BLEND
+
+        // 5. 按材质组填充顶点并渲染
+        for(GpuMeshGroup g : gpuGroups){
+            // 填充顶点数据
+            int vi = 0;
+            for(int fi : g.faceIndices){
+                Face f = faces.get(fi);
+
+                // 着色
+                switch(shadingType){
+                    case zMedian -> zMedianDraw(f);
+                    case zDistance -> zDistanceDraw(f);
+                    case normalAngle -> normalAngleDraw(f);
+                    case topLight -> topLightDraw(f);
+                    default -> Draw.color(lightColor);
+                }
+                float colorBits = Draw.getColor().toFloatBits();
+
+                // 材质 alpha 调制
+                if(f.mat != null && f.mat.alpha < 1f){
+                    Tmp.c4.set(Draw.getColor()).a(Draw.getColor().a * f.mat.alpha);
+                    colorBits = Tmp.c4.toFloatBits();
+                }
+
+                // UV 选择
+                boolean useIndep = f.mat != null && f.mat.independentTex != null;
+
+                // 填充顶点 (三角形=3顶点, quad拆2个三角形=6顶点)
+                if(f.verts.length == 3){
+                    for(int i = 0; i < 3; i++){
+                        vi = fillGpuVertex(g.vertices, vi, f, i, colorBits, useIndep);
+                    }
+                }else{
+                    // quad 拆分成 2 个三角形: (0,1,2) 和 (0,2,3)
+                    int[] tri0 = {0, 1, 2};
+                    int[] tri1 = {0, 2, 3};
+                    for(int i : tri0) vi = fillGpuVertex(g.vertices, vi, f, i, colorBits, useIndep);
+                    for(int i : tri1) vi = fillGpuVertex(g.vertices, vi, f, i, colorBits, useIndep);
+                }
+            }
+            g.vertexCount = vi;
+
+            if(g.vertexCount == 0) continue;
+
+            // 更新 Mesh 顶点数据
+            g.mesh.setVertices(g.vertices, 0, vi);
+
+            // 绑定 texture
+            Texture tex = Core.atlas.white().texture;
+            if(g.material != null){
+                if(g.material.independentTex != null){
+                    tex = g.material.independentTex;
+                }else if(g.material.diffTex != null && g.material.diffTex.found()){
+                    tex = g.material.diffTex.texture;
+                }
+            }else if(texture != null && texture.found()){
+                tex = texture.texture;
+            }
+            tex.bind(0);
+
+            // 渲染 (4 = GL_TRIANGLES)
+            g.mesh.render(shader, 4, 0, vi / 5);
+        }
+    }
+
+    /** 填充一个 GPU 顶点到 vertices 数组, 返回新的 vi */
+    protected int fillGpuVertex(float[] vertices, int vi, Face f, int i, float colorBits, boolean useIndep){
+        vertices[vi++] = f.verts[i].source.x;
+        vertices[vi++] = f.verts[i].source.y;
+        vertices[vi++] = colorBits;
+        if(useIndep){
+            // 独立 Texture: UV 翻转 V 轴 (libGDX Pixmap Y=0 在顶部)
+            vertices[vi++] = f.vertexTexture[i].x;
+            vertices[vi++] = 1f - f.vertexTexture[i].y;
+        }else if(hasTexture && texture != null && texture.found()){
+            float u = texture.u, v = texture.v;
+            float u2 = texture.u2, v2 = texture.v2;
+            vertices[vi++] = Mathf.lerp(u, u2, f.vertexTexture[i].x);
+            vertices[vi++] = Mathf.lerp(v2, v, f.vertexTexture[i].y);
+        }else{
+            vertices[vi++] = 0;
+            vertices[vi++] = 0;
+        }
+        return vi;
+    }
+
     protected void normalAngleDraw(Face face){
         if(!hasNormal){
             Draw.color(lightColor);
@@ -497,11 +707,8 @@ public class WavefrontObject{
 
         boolean matB = face.mat != null && face.mat.hasColor;
         if(matB){
-            // ★ 亮部 = 材质diffuse色 (不乘lightColor，避免过暗)
             Tmp.c3.rgba8888(face.mat.diffuseCol);
-            // ★ 暗部 = 材质diffuse色的暗色版本 (而非ambientCol×shadeColor)
             Tmp.c2.set(Tmp.c3.r * 0.3f, Tmp.c3.g * 0.3f, Tmp.c3.b * 0.3f, 1f);
-            // 自发光插值 (emit不为0时暗部接近亮部)
             Tmp.c4.rgba8888(face.mat.emitCol);
             Tmp.c2.r = Mathf.lerp(Tmp.c2.r, Tmp.c3.r, Tmp.c4.r);
             Tmp.c2.g = Mathf.lerp(Tmp.c2.g, Tmp.c3.g, Tmp.c4.g);
@@ -509,14 +716,11 @@ public class WavefrontObject{
         }
 
         float angle = (Math.abs(tmp.angleRad(Vec3.Z)) / (45f * Mathf.degRad)) / shadingSmoothness;
-        // ★ 限制暗化程度 (max maxShade), 避免面完全变成 shadeColor 看起来透明
         Tmp.c1.set(matB ? Tmp.c3 : lightColor).lerp(matB ? Tmp.c2 : shadeColor, Mathf.clamp(angle, 0f, maxShade));
         Draw.color(Tmp.c1);
     }
 
-    /** ★ 顶光着色: 模拟从上方(Y轴正方向)照射的环境光
-     *  法线Y分量决定明暗: 朝上=亮, 朝下=暗, 侧面=中间
-     *  适用于俯视游戏中法线朝Y轴的模型(如飞轮), 有强烈3D感 */
+    /** ★ 顶光着色: 模拟从上方(Y轴正方向)照射的环境光 */
     protected void topLightDraw(Face face){
         if(!hasNormal){
             Draw.color(lightColor);
@@ -532,19 +736,14 @@ public class WavefrontObject{
 
         boolean matB = face.mat != null && face.mat.hasColor;
         if(matB){
-            // ★ 亮部 = 材质diffuse色 (不乘lightColor，避免过暗)
             Tmp.c3.rgba8888(face.mat.diffuseCol);
-            // ★ 暗部 = 材质diffuse色的暗色版本 (而非ambientCol×shadeColor)
             Tmp.c2.set(Tmp.c3.r * 0.3f, Tmp.c3.g * 0.3f, Tmp.c3.b * 0.3f, 1f);
-            // 自发光插值 (emit不为0时暗部接近亮部)
             Tmp.c4.rgba8888(face.mat.emitCol);
             Tmp.c2.r = Mathf.lerp(Tmp.c2.r, Tmp.c3.r, Tmp.c4.r);
             Tmp.c2.g = Mathf.lerp(Tmp.c2.g, Tmp.c3.g, Tmp.c4.g);
             Tmp.c2.b = Mathf.lerp(Tmp.c2.b, Tmp.c3.b, Tmp.c4.b);
         }
 
-        // 法线Y分量: 1=朝上(亮), 0=侧面, -1=朝下(暗)
-        // shade = (1 - Y) / 2, 范围 0~1
         float shade = Mathf.clamp((1f - tmp.y) * 0.5f, 0f, maxShade);
         Tmp.c1.set(matB ? Tmp.c3 : lightColor).lerp(matB ? Tmp.c2 : shadeColor, shade);
         Draw.color(Tmp.c1);
@@ -613,10 +812,11 @@ public class WavefrontObject{
             dface[s + 1] = face.verts[i].source.y;
             dface[s + 2] = color;
             if(useIndep){
-                // ★ 独立 Texture: UV 直接用 [0,1]
-                //   OBJ UV V=0 在底部, libGDX Texture V=0 也在底部, 不需要翻转
+                // ★ 独立 Texture: UV 翻转 V 轴
+                //   libGDX 从 Pixmap 创建 Texture 时, Pixmap Y=0 在顶部 → Texture V=0 在顶部
+                //   OBJ UV V=0 在底部, 需翻转: 1f - y
                 dface[s + 3] = face.vertexTexture[i].x;
-                dface[s + 4] = face.vertexTexture[i].y;
+                dface[s + 4] = 1f - face.vertexTexture[i].y;
             }else if(!hasTexture || textureB == null){
                 dface[s + 3] = region.u;
                 dface[s + 4] = region.v;
