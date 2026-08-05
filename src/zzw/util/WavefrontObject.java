@@ -78,13 +78,14 @@ public class WavefrontObject{
     protected float[] gpuZVals;
     /** 面排序索引缓存 */
     protected Integer[] gpuOrder;
+    /** faceIndex -> groupIndex 映射 (全局排序后按顺序填充到各组) */
+    protected int[] faceToGroup;
 
     /** GPU Mesh 分组 (一个材质一个 Mesh, 一次 draw call) */
     protected static class GpuMeshGroup{
         public Material material;
         public Mesh mesh;
         public float[] vertices;
-        public int[] faceIndices;
         public int vertexCount;
     }
 
@@ -549,14 +550,17 @@ public class WavefrontObject{
         }
 
         gpuGroups = new Seq<>();
+        faceToGroup = new int[faces.size];
+        int gIdx = 0;
         for(ObjectMap.Entry<Material, IntSeq> entry : groups){
             GpuMeshGroup g = new GpuMeshGroup();
             g.material = entry.key;
-            g.faceIndices = entry.value.toArray();
 
             // 计算最大顶点数 (三角形=3顶点, quad拆2个三角形=6顶点)
             int maxVerts = 0;
-            for(int fi : g.faceIndices){
+            for(int i = 0; i < entry.value.size; i++){
+                int fi = entry.value.get(i);
+                faceToGroup[fi] = gIdx;
                 Face f = faces.get(fi);
                 maxVerts += (f.verts.length == 3) ? 3 : 6;
             }
@@ -567,6 +571,7 @@ public class WavefrontObject{
                 VertexAttribute.position, VertexAttribute.color, VertexAttribute.texCoords);
             g.vertices = new float[maxVerts * 5];
             gpuGroups.add(g);
+            gIdx++;
         }
 
         // 预分配排序数组
@@ -579,14 +584,15 @@ public class WavefrontObject{
     }
 
     /** GPU Mesh 渲染: 按材质分组, 每组一次 draw call
-     *  用 Draw.draw(z, runnable) 包裹, 只创建 1 个 DrawRequest
-     *  runnable 内部用 Mesh.render 直接渲染 (不走 SortedSpriteBatch) */
+     *  ★ 关键: 全局排序后按顺序填充到各组的顶点数组, 保证 painter's algorithm
+     *  用 Draw.draw(z, runnable) 包裹, 只创建 1 个 DrawRequest */
     protected void drawGpuMesh(){
         if(gpuGroups == null || gpuGroups.isEmpty()) return;
 
         int n = faces.size;
+        int numGroups = gpuGroups.size;
 
-        // 1. 计算每个面的 z 值
+        // 1. 计算每个面的 z 值 (加微小偏移避免并列, 稳定排序)
         for(int i = 0; i < n; i++){
             float z = 0;
             Face f = faces.get(i);
@@ -598,68 +604,77 @@ public class WavefrontObject{
         for(int i = 0; i < n; i++) gpuOrder[i] = i;
         Arrays.sort(gpuOrder, (a, b) -> Float.compare(gpuZVals[a], gpuZVals[b]));
 
-        // 3. 绑定 shader
+        // 3. 重置每组顶点偏移
+        int[] groupVi = new int[numGroups];
+
+        // 4. 按全局排序顺序遍历所有面, 填充到对应材质组的顶点数组
+        //    这样每组内部的顶点顺序 = 全局 z 排序顺序, 保证远的先画
+        for(int idx : gpuOrder){
+            int g = faceToGroup[idx];
+            GpuMeshGroup group = gpuGroups.get(g);
+            Face f = faces.get(idx);
+            int vi = groupVi[g];
+
+            // 着色
+            switch(shadingType){
+                case zMedian -> zMedianDraw(f);
+                case zDistance -> zDistanceDraw(f);
+                case normalAngle -> normalAngleDraw(f);
+                case topLight -> topLightDraw(f);
+                default -> Draw.color(lightColor);
+            }
+            float colorBits = Draw.getColor().toFloatBits();
+
+            // 材质 alpha 调制
+            if(f.mat != null && f.mat.alpha < 1f){
+                Tmp.c4.set(Draw.getColor()).a(Draw.getColor().a * f.mat.alpha);
+                colorBits = Tmp.c4.toFloatBits();
+            }
+
+            // UV 选择
+            boolean useIndep = f.mat != null && f.mat.independentTex != null;
+
+            // 填充顶点 (三角形=3顶点, quad拆2个三角形=6顶点)
+            if(f.verts.length == 3){
+                for(int i = 0; i < 3; i++){
+                    vi = fillGpuVertex(group.vertices, vi, f, i, colorBits, useIndep);
+                }
+            }else{
+                // quad 拆分成 2 个三角形: (0,1,2) 和 (0,2,3)
+                int[] tri0 = {0, 1, 2};
+                int[] tri1 = {0, 2, 3};
+                for(int i : tri0) vi = fillGpuVertex(group.vertices, vi, f, i, colorBits, useIndep);
+                for(int i : tri1) vi = fillGpuVertex(group.vertices, vi, f, i, colorBits, useIndep);
+            }
+            groupVi[g] = vi;
+        }
+
+        // 5. 绑定 shader
         Shader shader = getGpuShader();
         shader.bind();
         shader.setUniformMatrix4("u_projTrans", Core.camera.mat);
         shader.setUniformi("u_texture", 0);
 
-        // 4. 启用混合 (透明材质)
-        Gl.enable(3042); // GL_BLEND
+        // 6. 设置正确的 alpha 混合 (避免透明面叠加变亮)
+        Gl.enable(Gl.blend);
+        Gl.blendFunc(Gl.srcAlpha, Gl.oneMinusSrcAlpha);
 
-        // 5. 按材质组填充顶点并渲染
-        for(GpuMeshGroup g : gpuGroups){
-            // 填充顶点数据
-            int vi = 0;
-            for(int fi : g.faceIndices){
-                Face f = faces.get(fi);
-
-                // 着色
-                switch(shadingType){
-                    case zMedian -> zMedianDraw(f);
-                    case zDistance -> zDistanceDraw(f);
-                    case normalAngle -> normalAngleDraw(f);
-                    case topLight -> topLightDraw(f);
-                    default -> Draw.color(lightColor);
-                }
-                float colorBits = Draw.getColor().toFloatBits();
-
-                // 材质 alpha 调制
-                if(f.mat != null && f.mat.alpha < 1f){
-                    Tmp.c4.set(Draw.getColor()).a(Draw.getColor().a * f.mat.alpha);
-                    colorBits = Tmp.c4.toFloatBits();
-                }
-
-                // UV 选择
-                boolean useIndep = f.mat != null && f.mat.independentTex != null;
-
-                // 填充顶点 (三角形=3顶点, quad拆2个三角形=6顶点)
-                if(f.verts.length == 3){
-                    for(int i = 0; i < 3; i++){
-                        vi = fillGpuVertex(g.vertices, vi, f, i, colorBits, useIndep);
-                    }
-                }else{
-                    // quad 拆分成 2 个三角形: (0,1,2) 和 (0,2,3)
-                    int[] tri0 = {0, 1, 2};
-                    int[] tri1 = {0, 2, 3};
-                    for(int i : tri0) vi = fillGpuVertex(g.vertices, vi, f, i, colorBits, useIndep);
-                    for(int i : tri1) vi = fillGpuVertex(g.vertices, vi, f, i, colorBits, useIndep);
-                }
-            }
-            g.vertexCount = vi;
-
-            if(g.vertexCount == 0) continue;
+        // 7. 按组渲染 (每组一次 draw call)
+        for(int g = 0; g < numGroups; g++){
+            GpuMeshGroup group = gpuGroups.get(g);
+            int vi = groupVi[g];
+            if(vi == 0) continue;
 
             // 更新 Mesh 顶点数据
-            g.mesh.setVertices(g.vertices, 0, vi);
+            group.mesh.setVertices(group.vertices, 0, vi);
 
             // 绑定 texture
             Texture tex = Core.atlas.white().texture;
-            if(g.material != null){
-                if(g.material.independentTex != null){
-                    tex = g.material.independentTex;
-                }else if(g.material.diffTex != null && g.material.diffTex.found()){
-                    tex = g.material.diffTex.texture;
+            if(group.material != null){
+                if(group.material.independentTex != null){
+                    tex = group.material.independentTex;
+                }else if(group.material.diffTex != null && group.material.diffTex.found()){
+                    tex = group.material.diffTex.texture;
                 }
             }else if(texture != null && texture.found()){
                 tex = texture.texture;
@@ -667,7 +682,7 @@ public class WavefrontObject{
             tex.bind(0);
 
             // 渲染 (4 = GL_TRIANGLES)
-            g.mesh.render(shader, 4, 0, vi / 5);
+            group.mesh.render(shader, 4, 0, vi / 5);
         }
     }
 
