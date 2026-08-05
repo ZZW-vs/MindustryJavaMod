@@ -271,6 +271,9 @@ public class PMXLoader{
             // ★ 启用面排序 (painter's algorithm), 远的先画
             obj.singleZLayer = true;
 
+            // ★ 构建 GPU Mesh (高面数模型用 GPU 渲染, 兼容手机端)
+            obj.buildGpuMesh();
+
             Log.info("[Create] PMX loaded: " + vertexCount + " verts, " + (faceIndexCount / 3) + " tris, "
                 + materialCount + " materials, " + obj.faces.size + " faces, boundRadius=" + obj.boundRadius);
 

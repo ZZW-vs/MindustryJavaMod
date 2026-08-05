@@ -63,13 +63,16 @@ public class MmdDisplayBlock extends Block {
         boolean autoRotate = true;
         boolean groundShadow = true;
 
-        // MMD 模型列表 (可扩展)
+        // MMD 模型列表: 2个人物各2形态
         private final WavefrontObject[] MODELS = {
-            zzw.util.ZObjs.gale
+            zzw.util.ZObjs.mikuBlack,
+            zzw.util.ZObjs.mikuWhite,
+            zzw.util.ZObjs.tetoNormal,
+            zzw.util.ZObjs.tetoYandere
         };
 
         private final String[] MODEL_NAMES = {
-            "樱子 Idol"
+            "初音-黑", "初音-白", "重音-普通", "重音-病娇"
         };
 
         int currentModel = 0;

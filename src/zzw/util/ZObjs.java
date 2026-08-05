@@ -33,8 +33,8 @@ public class ZObjs {
     public static WavefrontObject crushingWheel;
     public static WavefrontObject cogwheel;
     public static WavefrontObject largeCogwheel;
-    /** ★ MMD 模型 (gale): 多材质多贴图, 从 blander/text_g/ 加载 */
-    public static WavefrontObject gale;
+    /** ★ MMD 模型 (PMX): 2个人物各2形态, 从 blander/ 加载 */
+    public static WavefrontObject mikuBlack, mikuWhite, tetoNormal, tetoYandere;
 
     private static boolean loaded = false;
 
@@ -142,20 +142,13 @@ public class ZObjs {
         largeCogwheel.singleZLayer = true;
         largeCogwheel.cullBackfaces = false;
 
-        // ★ gale: MMD 角色模型, 用 OBJ+MTL 加载 (Blender 导出, 比 PMX 二进制更稳定)
-        // OBJ 顶点范围 ~1.04×1.79×0.71 (米), boundRadius ~1.1
-        // size=3: defaultScl(4)*3=12倍缩放, 模型高度 ~21单位 (3x3方块占地24单位)
-        // 使用 topLight 着色 (光从上方照射), 轻微暗化保留贴图原色
-        gale = new WavefrontObject();
-        gale.textureName = "gale";
-        gale.size = 3f;
-        gale.shadingType = WavefrontObject.ShadingType.topLight;
-        gale.lightColor = Color.white;
-        gale.shadeColor = Color.valueOf("808080");
-        gale.maxShade = 0.3f;
-        gale.drawLayer = Layer.flyingUnit;
-        gale.singleZLayer = true;
-        gale.cullBackfaces = false;
+        // ★ MMD 角色 (PMX): 4个模型, 2个人物各2形态
+        // PMX 模型 boundRadius ~10, size=0.3: defaultScl(4)*0.3=1.2倍缩放, 模型高度 ~24单位
+        // topLight 着色 + maxShade=0.3 保留贴图原色
+        mikuBlack = createMmd("mikuBlack");
+        mikuWhite = createMmd("mikuWhite");
+        tetoNormal = createMmd("tetoNormal");
+        tetoYandere = createMmd("tetoYandere");
 
         Events.on(EventType.ClientLoadEvent.class, e -> {
             // ClientLoadEvent 时 atlas 贴图区域已注册, 避免 wavefront 等 hasTexture=true 对象加载失败
@@ -174,14 +167,38 @@ public class ZObjs {
         loadObj(crushingWheel, "crushing_wheel");
         loadObj(cogwheel, "cogwheel");
         loadObj(largeCogwheel, "large_cogwheel");
-        // ★ gale MMD 角色: 用 OBJ+MTL 加载 (Blender 导出, 比 PMX 二进制更稳定)
-        loadObj(gale, "blander/text_g/gale");
-        // ★ 平移模型使脚底在原点 (OBJ 顶点 minY ~-0.065, 平移后脚底 Y=0)
-        if(gale.vertices.any()){
-            float minY = Float.MAX_VALUE;
-            for(Vec3 v : gale.vertices) minY = Math.min(minY, v.y);
-            for(Vec3 v : gale.vertices) v.y -= minY;
-        }
+        // ★ MMD 角色: PMX 加载 (4个模型)
+        loadPMX(mikuBlack, "blander/初音未来/Black.pmx");
+        centerMmd(mikuBlack);
+        loadPMX(mikuWhite, "blander/初音未来/White.pmx");
+        centerMmd(mikuWhite);
+        loadPMX(tetoNormal, "blander/重音teto/Teto normal ver.pmx");
+        centerMmd(tetoNormal);
+        loadPMX(tetoYandere, "blander/重音teto/Teto yandere ver.pmx");
+        centerMmd(tetoYandere);
+    }
+
+    /** 创建 MMD 模型配置 (topLight 着色, 双面渲染, 单 Z 层) */
+    private static WavefrontObject createMmd(String name){
+        WavefrontObject obj = new WavefrontObject();
+        obj.textureName = name;
+        obj.size = 0.3f;
+        obj.shadingType = WavefrontObject.ShadingType.topLight;
+        obj.lightColor = Color.white;
+        obj.shadeColor = Color.valueOf("808080");
+        obj.maxShade = 0.3f;
+        obj.drawLayer = Layer.flyingUnit;
+        obj.singleZLayer = true;
+        obj.cullBackfaces = false;
+        return obj;
+    }
+
+    /** 平移 MMD 模型使脚底在原点 (PMX 模型中心通常在原点, 需下移 boundRadius) */
+    private static void centerMmd(WavefrontObject obj){
+        if(obj.vertices == null || obj.vertices.isEmpty()) return;
+        float minY = Float.MAX_VALUE;
+        for(Vec3 v : obj.vertices) minY = Math.min(minY, v.y);
+        for(Vec3 v : obj.vertices) v.y -= minY;
     }
 
     /** 加载 PMX (MMD) 模型文件 */

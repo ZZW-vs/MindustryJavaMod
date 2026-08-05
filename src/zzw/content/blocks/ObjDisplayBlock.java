@@ -60,7 +60,7 @@ public class ObjDisplayBlock extends Block {
         float currentOffset = 0f;
         int currentModel = 0;
 
-        // 内置模型列表
+        // 内置模型列表 (不含 MMD, MMD 在 MmdDisplayBlock 专用展示台)
         private final WavefrontObject[] MODELS = {
             zzw.util.ZObjs.flywheel,
             zzw.util.ZObjs.cogwheel,
@@ -69,12 +69,11 @@ public class ObjDisplayBlock extends Block {
             zzw.util.ZObjs.crushingWheel,
             zzw.util.ZObjs.cube,
             zzw.util.ZObjs.prism,
-            zzw.util.ZObjs.wavefront,
-            zzw.util.ZObjs.gale
+            zzw.util.ZObjs.wavefront
         };
 
         private final String[] MODEL_NAMES = {
-            "飞轮", "小齿轮", "大齿轮", "水车", "粉碎轮", "方块", "棱镜", "波前", "MMD角色"
+            "飞轮", "小齿轮", "大齿轮", "水车", "粉碎轮", "方块", "棱镜", "波前"
         };
 
         @Override

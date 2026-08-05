@@ -540,18 +540,45 @@ public class WavefrontObject{
     protected void buildGpuMesh(){
         if(faces.isEmpty()) return;
 
-        // 按材质分组
+        // 按材质分组 (mat 为 null 时归到 nullKey 组, ObjectMap 不允许 null key)
         ObjectMap<Material, IntSeq> groups = new ObjectMap<>();
+        IntSeq nullGroup = null;
         for(int i = 0; i < faces.size; i++){
             Material m = faces.get(i).mat;
-            IntSeq group = groups.get(m);
-            if(group == null){ group = new IntSeq(); groups.put(m, group); }
-            group.add(i);
+            if(m == null){
+                if(nullGroup == null) nullGroup = new IntSeq();
+                nullGroup.add(i);
+            }else{
+                IntSeq group = groups.get(m);
+                if(group == null){ group = new IntSeq(); groups.put(m, group); }
+                group.add(i);
+            }
         }
 
         gpuGroups = new Seq<>();
         faceToGroup = new int[faces.size];
         int gIdx = 0;
+
+        // 先处理 null 材质组
+        if(nullGroup != null){
+            GpuMeshGroup g = new GpuMeshGroup();
+            g.material = null;
+            int maxVerts = 0;
+            for(int i = 0; i < nullGroup.size; i++){
+                int fi = nullGroup.get(i);
+                faceToGroup[fi] = gIdx;
+                Face f = faces.get(fi);
+                maxVerts += (f.verts.length == 3) ? 3 : 6;
+            }
+            if(maxVerts > 0){
+                g.mesh = new Mesh(false, maxVerts, 0,
+                    VertexAttribute.position, VertexAttribute.color, VertexAttribute.texCoords);
+                g.vertices = new float[maxVerts * 5];
+                gpuGroups.add(g);
+                gIdx++;
+            }
+        }
+
         for(ObjectMap.Entry<Material, IntSeq> entry : groups){
             GpuMeshGroup g = new GpuMeshGroup();
             g.material = entry.key;

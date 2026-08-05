@@ -195,6 +195,13 @@
 
 ## 更新日志
 
+### v2.2.1 (MMD模型改用PMX加载+修复NPE+4个新模型)
+- **修复 NPE**：buildGpuMesh() 中 `mat` 为 null 时 ObjectMap.get(null) 抛出 NullPointerException，改为 null 材质单独分组
+- **MMD 模型恢复 PMX 加载**：4 个 PMX 模型（初音黑/白、重音普通/病娇），PMXLoader 末尾调用 buildGpuMesh() 构建 GPU Mesh
+- **ObjDisplayBlock 移除 MMD 选项**：MMD 模型在 MmdDisplayBlock 专用展示台渲染
+- **MmdDisplayBlock 更新**：4 个 PMX 模型可选（初音-黑/白、重音-普通/病娇）
+- **ZObjs 新增字段**：mikuBlack, mikuWhite, tetoNormal, tetoYandere
+
 ### v2.2.0 (GPU Mesh渲染:真正解决性能问题,兼容手机端GLES2.0)
 - **GPU Mesh 渲染**：高面数模型（>1000面）改用 GPU Mesh + 自定义 Shader 直接渲染，不再走 SortedSpriteBatch
   - 性能根因：SortedSpriteBatch 每个 `Draw.vert` 创建一个 DrawRequest，78580 面 = 78580 个 DrawRequest，排序巨卡
