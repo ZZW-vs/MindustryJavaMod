@@ -355,7 +355,24 @@ public class PMXLoader{
                 buf.getFloat();
                 break;
             default:
-                throw new RuntimeException("Unknown bone weight type: " + type);
+                // 未知骨骼权重类型，跳过该权重数据
+                Log.warn("[PMXLoader] Unknown bone weight type: " + type + ", skipping this weight data");
+                // 跳过剩余的权重数据
+                int skipBytes = 0;
+                switch(type){
+                    case 0: skipBytes = 24; break;  // BDEF1
+                    case 1: skipBytes = 12; break;  // BDEF2
+                    case 2: skipBytes = 12; break;  // BDEF3
+                    case 4: skipBytes = 8; break;   // SDEF
+                    case 5: skipBytes = 16; break;  // QDEF
+                }
+                if(skipBytes > 0){
+                    buf.position(buf.position() + skipBytes);
+                } else {
+                    // 默认跳过4个字节
+                    buf.position(buf.position() + 4);
+                }
+                break;
         }
     }
 
