@@ -14,6 +14,10 @@ import mindustry.world.meta.*;
 
 import static arc.Core.atlas;
 
+/**
+ * 经验罐 - 存储经验值的容器方块，经验系统的基础存储单元
+ * 继承 Block，为经验网络提供经验值存储与转发能力
+ */
 public class ExpTank extends Block {
     public int expCapacity = 600;
     public TextureRegion topRegion, expRegion;

@@ -5,6 +5,10 @@ import mindustry.entities.bullet.*;
 import mindustry.logic.*;
 import mindustry.world.meta.*;
 
+/**
+ * 经验能量炮塔 - 消耗经验值发射子弹的 PowerTurret 变体
+ * 继承 ExpTurret，支持电力驱动的经验炮台
+ */
 public class ExpPowerTurret extends ExpTurret {
     public BulletType shootType;
     public float powerUse = 1f;

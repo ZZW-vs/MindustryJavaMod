@@ -55,9 +55,9 @@ public class SoulLifeStealerTurret extends SoulTractorBeamTurret {
             cont.table(bt -> {
                 bt.left().defaults().padRight(3).left();
                 bt.row();
-                bt.add("[lightgray]Max Contain: [accent]" + (int)maxContain);
+                bt.add("[lightgray]蓄能上限: [accent]" + (int)maxContain);
                 bt.row();
-                bt.add("[lightgray]Life Steal Heal: [accent]" + (int)(healPercent * 100) + "%");
+                bt.add("[lightgray]吸血治疗: [accent]" + (int)(healPercent * 100) + "%");
             });
         });
     }

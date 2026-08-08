@@ -5,6 +5,10 @@ import mindustry.gen.*;
 import mindustry.world.*;
 import mindustry.world.meta.*;
 
+/**
+ * 经验虚空 - 吞噬经验值的终点方块，消耗经验产生效果
+ * 继承 Block，作为经验系统的经验值吸收点
+ */
 public class ExpVoid extends Block {
     public int produceTimer = timers++;
 

@@ -16,6 +16,10 @@ import static arc.math.geom.Geometry.d4x;
 import static arc.math.geom.Geometry.d4y;
 import static mindustry.Vars.*;
 
+/**
+ * 经验炮塔基类 - 使用经验值作为弹药驱动的炮塔
+ * 继承 ExpTank，为所有经验炮塔提供基础功能（瞄准、射击、经验消耗）
+ */
 public class ExpTower extends ExpTank {
     public int range = 5;
     public float reloadTime = 10f;

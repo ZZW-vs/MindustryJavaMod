@@ -157,11 +157,23 @@ gradle-app.setting
 Thumbs.db
 android/libs/
 
+# 飞书项目管理工具
 .feisuan/
-.trae/
+
+# 开发工具配置
 .vscode/
-/参考
-/mindustry
+.trae/
+
+# 参考文档（如果不需要版本控制）
+/参考/
+
+# 个人文件
 日志*.txt
 任务.txt
 *.log
+
+# Mindustry引擎源代码（已加入.gitignore）
+/mindustry
+
+# 项目结构文档（已加入.gitignore）
+项目结构.md

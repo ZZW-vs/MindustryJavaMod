@@ -50,13 +50,33 @@ import static mindustry.Vars.tilesize;
 /**
  * PU_V8 炮台注册 (非经验系统炮台)
  * 参考: PU132源代码 main/src/unity/content/UnityBlocks.java
- *
+ * 
+ * 主要功能:
+ * 1. PU_V8科技炮台: 完整移植光子科技体系的28个炮台
+ * 2. 自定义炮台系统: 包括吸收器、多管、护盾等特殊炮台
+ * 3. 多样化子弹类型: 支持激光、粒子、重力、护盾等多种效果
+ * 4. 能源系统: 电力炮台、充能炮台、能量炮台等
+ * 
+ * 炮台分类:
+ * - flight faction (光子科技): electron, proton, neutron, gluon, photon, graviton
+ * - 简单炮台 (7个): apparition, electrobomb, celsius, kelvin, current, muon, higgsBoson
+ * - 中级炮台 (7个): positron, pion, kaon, hypernucleus, omega, charm, bottom
+ * - 高级炮台 (7个): tau, neutrino, strange, antimatter, darkMatter, plasma, quark
+ * - 特殊炮台 (7个): wBoson, zBoson, higgsBoson, graviton, photon, neutrino, tau
+ * 
+ * 技术特点:
+ * - 使用Builder模式简化炮台创建
+ * - 支持多种射击模式（交替、散射、连发）
+ * - 集成自定义子弹类型系统
+ * - 支持液体/能源消耗系统
+ * - 兼容v158的特效和声音系统
+ * 
  * 简化策略 (v158 兼容):
- * - PU132 自定义特效 (ShootFx/HitFx/UnityFx) → v158 原生特效
- * - PU132 自定义声音 (UnitySounds) → v158 原生声音
- * - PU132 自定义物品 (UnityItems) → Z_Items (已移植)
- * - PU132 自定义颜色 (UnityPal) → v158 Pal
- * - 复杂子弹类型 (DecayBasicBulletType 等) → BasicBulletType 简化
+ * - PU132 自定义特效 → v158 原生特效
+ * - PU132 自定义声音 → v158 原生声音
+ * - PU132 自定义物品 → Z_Items (已移植)
+ * - PU132 自定义颜色 → v158 Pal
+ * - 复杂子弹类型 → BasicBulletType 简化
  * - "unity-electric-shell" 贴图 → electric-shell.png (已有)
  */
 public class Z_Turrets {

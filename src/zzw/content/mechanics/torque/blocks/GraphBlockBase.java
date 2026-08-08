@@ -8,6 +8,10 @@ import zzw.content.mechanics.torque.graphs.*;
 import zzw.content.mechanics.torque.meta.*;
 import zzw.content.mechanics.torque.modules.*;
 
+/**
+ * 图结构方块接口 - 定义扭矩系统方块的基础行为
+ * 接口，由 GraphBlock 等实现，提供 GraphBuildBase 构建逻辑
+ */
 public interface GraphBlockBase{
     Graphs graphs();
 

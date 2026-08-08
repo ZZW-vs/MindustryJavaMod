@@ -21,6 +21,10 @@ import mindustry.world.meta.*;
 import static arc.Core.atlas;
 import static mindustry.Vars.*;
 
+/**
+ * 经验中枢 - 汇总与分配经验值的枢纽方块
+ * 继承 ExpTank，作为经验系统的核心节点，连接经验源与炮台
+ */
 public class ExpHub extends ExpTank{
     public float ratio = 0.3f;
     public float reloadTime = 30f;

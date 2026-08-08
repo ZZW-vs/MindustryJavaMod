@@ -11,6 +11,10 @@ import static arc.math.geom.Geometry.*;
 import static mindustry.Vars.tilesize;
 import static mindustry.Vars.world;
 
+/**
+ * 对角炮塔 - ExpTower 子类，支持斜向射击
+ * 继承 ExpTower，实现对角线方向的瞄准与射击逻辑
+ */
 public class DiagonalTower extends ExpTower{
     public DiagonalTower(String name){
         super(name);

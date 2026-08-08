@@ -6,6 +6,7 @@ import mindustry.content.Items;
 import mindustry.entities.bullet.BasicBulletType;
 import mindustry.entities.bullet.BulletType;
 import mindustry.entities.bullet.ContinuousLaserBulletType;
+import mindustry.entities.bullet.LaserBoltBulletType;
 import mindustry.entities.bullet.LaserBulletType;
 import mindustry.entities.bullet.LightningBulletType;
 import mindustry.entities.pattern.ShootPattern;
@@ -97,7 +98,11 @@ public class Z_AdvTurrets {
             efficiencyFrom = 0.8f;
             efficiencyTo = 1.5f;
             // PU_V8 原版: laserAlpha = power.status * (0.7 + soulf * 0.3)
-            laserAlpha(b -> b.power.status * (0.7f + b.soulf() * 0.3f));
+            // 修复: 检查 power.status 是否可用
+            laserAlpha(b -> {
+                if (b.power == null || b.power.status <= 0f) return 0f;
+                return b.power.status * (0.7f + b.soulf() * 0.3f);
+            });
             // ★ 吸血机制参数 (PU_V8 LifeStealerTurret)
             maxContain = 600f;       // 蓄能阈值: 累积 600 伤害触发范围治疗
             healPercent = 0.05f;     // 治疗 5% maxHealth
@@ -455,9 +460,10 @@ public class Z_AdvTurrets {
             coolant.boost();
         }};
 
-        // ===== cube (PU_V8 L3411-3429, ObjPowerTurret + PointBlastLaserBulletType) =====
-        // 3D 立方体炮台: 伪 3D 渲染 + 受击形变 + 旋转动画
+        // ===== cube (PU_V8 L3411-3429, ObjPowerTurret + 死星激光攻击) =====
+        // 3D 立方体炮台: 伪 3D 渲染 + 受击形变 + 旋转动画 + 死星激光攻击
         // ★ v155.4 适配: reloadTime → reload; powerUse → consumePower(); UnityObjs.cube → ZObjs.cube
+        // ★ 死星激光攻击: 蓄力2.5秒后发射蓝色激光束 + 蓄力光环特效
         cube = new ObjPowerTurret("the-cube") {{
             requirements(Category.turret, ItemStack.with(
                 Items.copper, 3300, Items.lead, 2900, Items.graphite, 4400,
@@ -472,13 +478,22 @@ public class Z_AdvTurrets {
             consumeCoolant(0.01f);
             coolantMultiplier = 1.1f;
             shootSound = Sounds.shootLancer;  // ★ v155.4 替代 UnitySounds.cubeBlast (无 shootBig)
-            shootType = new PointBlastLaserBulletType(580f) {{
-                length = 320f;
-                lifetime = 17f;
-                pierce = true;
-                auraDamage = 8000f;
-                damageRadius = 120f;
-                laserColors = new Color[]{Color.valueOf("a3e3ff")};  // UnityPal.advance
+            // ★ 死星激光攻击类型
+            shootType = new LaserBoltBulletType(5.2f, 13){{
+                lifetime = 30f;
+                healPercent = 0f;  // 改为攻击而非治疗
+                collidesTeam = false;
+                backColor = Color.valueOf("6586b0");  // 使用立方体炮台原本的蓝色
+                frontColor = Color.valueOf("87ceeb");  // 使用立方体炮台原本的浅蓝色
+                width = 2f;
+                height = 7f;
+                shootEffect = Fx.shootBig;
+                hitEffect = Fx.hitLaser;
+                despawnEffect = Fx.hitLaser;
+                hittable = false;
+                reflectable = false;
+                lightColor = Color.valueOf("6586b0");
+                lightOpacity = 0.6f;
             }};
         }};
 

@@ -6,6 +6,10 @@ import zzw.content.mechanics.torque.blocks.*;
 
 import static arc.Core.*;
 
+/**
+ * 传动轴 - 扭矩传递方块，在网络中传递旋转动力
+ * 继承 GraphBlock，实现扭矩的直线传递
+ */
 public class DriveShaft extends GraphBlock{
     final TextureRegion[] baseRegions = new TextureRegion[4];
     TextureRegion topRegion, overlayRegion, movingRegion;//topsprite,overlaysprite,moving

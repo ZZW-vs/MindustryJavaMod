@@ -7,6 +7,10 @@ import zzw.content.mechanics.torque.blocks.*;
 
 import static arc.Core.*;
 
+/**
+ * 内嵌齿轮箱 - 扭矩变速方块，改变传动比
+ * 继承 GraphBlock，支持扭矩的增速/减速转换
+ */
 public class InlineGearbox extends GraphBlock{
     TextureRegion topRegion, overlayRegion, movingRegion, baseRegion, mbaseRegion, gearRegion;//topsprite,overlaysprite,moving,base,mbase,gear
 

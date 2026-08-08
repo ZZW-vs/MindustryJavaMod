@@ -16,6 +16,10 @@ import mindustry.world.meta.*;
 
 import static mindustry.Vars.*;
 
+/**
+ * 经验节点 - 经验网络的中继节点，转发经验值
+ * 继承 ExpTank，在经验网络中作为连接点传递经验
+ */
 public class ExpNode extends ExpTank {
     public int range = 5;
     public float reloadTime = 600f;

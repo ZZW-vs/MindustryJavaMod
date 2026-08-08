@@ -24,9 +24,31 @@ import zzw.util.WavefrontObject;
 
 /**
  * MMD 模型专用展示台
- * - 专门针对 PMX/MMD 模型的渲染设置
- * - 支持位置/高度/大小/旋转轴/旋转速度调节
- * - 汉化界面
+ * 
+ * 主要功能:
+ * 1. PMX/MMD模型渲染: 专门针对MMD格式模型的渲染优化
+ * 2. 实时参数调节: 支持位置、高度、大小、旋转轴、旋转速度实时调整
+ * 3. 汉化界面: 完整的中文用户界面
+ * 4. 模型预览: 提供模型在游戏中的实时预览效果
+ * 
+ * 技术特点:
+ * - 使用WavefrontObject渲染引擎
+ * - 支持动态参数调整（configurable）
+ * - 3x3尺寸的大型展示台
+ * - 集成UI控制面板
+ * - 支持对角线放置
+ * 
+ * 配置选项:
+ * - position: 模型位置偏移
+ * - height: 模型高度
+ * - scale: 模型大小
+ * - rotateAxis: 旋转轴
+ * - rotateSpeed: 旋转速度
+ * 
+ * 使用场景:
+ * - MMD模型在游戏中的展示
+ * - 模型效果预览
+ * - 自定义模型调节
  */
 public class MmdDisplayBlock extends Block {
 

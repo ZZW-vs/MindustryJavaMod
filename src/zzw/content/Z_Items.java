@@ -3,6 +3,22 @@ package zzw.content;
 import arc.graphics.Color;
 import mindustry.type.Item;
 
+/**
+ * 自定义物品注册 - 包含 ProjectUnity 物品、基础金属、农作物等
+ *
+ * 分类:
+ * 1. ProjectUnity 物品 (faction-alloys, faction items)
+ * 2. 基础金属 (Iron, Gold, Copper 等)
+ * 3. 金属板材 (Iron_Sheet, Gold_Sheet 等)
+ * 4. 农作物 (Pumpkin_Seeds, Pulp)
+ * 5. 特殊物品 (Campfire_Fire 等)
+ *
+ * 属性说明:
+ * - cost: 生产成本 (1.0 = 基础金属)
+ * - hardness: 钻头等级 (1=铜, 3=铅, 5=石墨, 9=钛)
+ * - radioactivity: 放射性 (影响单位免疫)
+ * - flammability: 可燃性 (0~1, 液体燃料)
+ */
 public class Z_Items {
     // ProjectUnity物品 (faction-alloys)
     public static Item advanceAlloy, cupronickel, darkAlloy, dirium, lightAlloy, monolithAlloy, archDebris,

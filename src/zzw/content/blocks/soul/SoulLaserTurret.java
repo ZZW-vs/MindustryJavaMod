@@ -62,7 +62,7 @@ public class SoulLaserTurret extends LaserTurret implements ISoulTurret {
                 bt.add(requireSoul ? "@soul.require" : "@soul.optional");
                 if (maxSouls > 0) {
                     bt.row();
-                    bt.add("[lightgray]Max souls: [accent]" + maxSouls);
+                    bt.add("[lightgray]最大灵魂: [accent]" + maxSouls);
                 }
             });
         });

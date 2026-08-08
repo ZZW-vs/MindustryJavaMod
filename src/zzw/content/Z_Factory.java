@@ -11,6 +11,10 @@ import mindustry.world.consumers.ConsumeItems;
 import zzw.content.blocks.soul.SoulInfuser;
 import zzw.content.mechanics.FactoryBoost;
 
+/**
+ * 自定义工厂方块注册 - 板材制造厂、南瓜钻井、灵魂注入器
+ * 继承自 mindustry 工厂体系，使用 BoostedGenericCrafter 实现可升级工厂
+ */
 public class Z_Factory {
     public static Block Plate_Maker_Iron, Plate_Maker_Gold, Plate_Maker_Copper;
     public static Block Large_Plate_Maker_Iron, Large_Plate_Maker_Gold, Large_Plate_Maker_Copper;

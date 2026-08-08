@@ -11,6 +11,10 @@ import mindustry.world.meta.*;
 
 import static arc.Core.atlas;
 
+/**
+ * 经验源方块 - 产生经验值并注入经验网络
+ * 继承 Block，作为经验系统的经验值产生源头
+ */
 public class ExpSource extends Block {
     public int produceTimer = timers++;
 

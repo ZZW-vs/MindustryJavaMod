@@ -21,6 +21,37 @@ import static zzw.content.exp.EField.*;
 /**
  * PU_V8 经验系统方块注册
  * 参考: PU_V8 main/src/unity/content/UnityBlocks.java L1735-2062
+ * 
+ * 主要功能:
+ * 1. 经验存储运输: 完整的经验存储、运输、处理系统
+ * 2. 经验炮台: 基于经验等级强化的特殊炮台
+ * 3. 经验字段系统: 支持线性、比例、上限等多种经验增长方式
+ * 4. 经验管理: 提供经验的存储、分配、消耗机制
+ * 
+ * 系统组件:
+ * - 存储设备: ExpTank（经验罐）、ExpChest（经验箱）、ExpRouter（经验路由器）
+ * - 运输设备: ExpTower（经验塔）、ExpHub（经验枢纽）、ExpNode（经验节点）
+ * - 处理设备: ExpFountain（经验喷泉）、ExpVoid（经验虚空）
+ * - 特殊设备: BufferTower（缓冲塔）、ExpUnloader（经验卸载器）
+ * 
+ * 经验炮台类型:
+ * - 电力炮台: LaserTurret, ChargeLaserTurret, FractalLaserTurret, BTLaserTurret
+ * - 物品炮台: InfernoTurret
+ * - 液体炮台: FrostLaserTurret, KelvinLaserTurret
+ * - 特殊炮台: SwarmLaserTurret（群体激光）
+ * 
+ * 技术特点:
+ * - 使用EField系统管理经验增长
+ * - 支持多种经验增长模式（线性、比例、上限）
+ * - 集成经验等级系统
+ * - 支持经验运输网络
+ * - 兼容PU_V8的经验机制
+ * 
+ * 经验字段类型:
+ * - ELinear: 线性增长（基础值 + 等级 * 增长率）
+ * - ERational: 比例增长（基础值 * 等数 ^ 系数）
+ * - ELinearCap: 线性增长带上限
+ * - ECeil: 向上取整增长
  */
 public class Z_Exp {
     // 经验存储运输

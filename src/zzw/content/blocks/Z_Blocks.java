@@ -16,6 +16,32 @@ import zzw.content.exp.EField;
 
 import arc.Events;
 
+/**
+ * 自定义方块注册 - 铜/铁方块、南瓜、3D展示台、各类墙体与地板
+ * 
+ * 主要功能:
+ * 1. 基础方块: 铜/铁方块、南瓜等装饰性方块
+ * 2. 3D展示系统: 支持.obj和.pmx模型展示的专用方块
+ * 3. PU_V8移植: 完整的墙体系统，包括：
+ *    - LimitWall: 限制最大伤害的特殊墙体
+ *    - LevelLimitWall: 基于经验等级成长的墙体
+ *    - ShieldWall: 带护盾的强化墙体
+ *    - StaticWall: 环境装饰墙体
+ * 4. 地板系统: 包括发光地板、覆盖层地板等
+ * 
+ * 技术特点:
+ * - 使用Builder模式简化方块创建
+ * - 支持方块合并机制（小块→大块）
+ * - 集成经验系统（LevelLimitWall）
+ * - 3D模型渲染支持（WavefrontObject/PMXLoader）
+ * 
+ * 加载顺序:
+ * 1. 3D展示方块（确保模型加载器可用）
+ * 2. 防御性方块（墙体）
+ * 3. 装饰性方块
+ * 4. PU_V8移植内容
+ * 5. 事件监听器注册
+ */
 public class Z_Blocks {
     // 铜方块
     public static Block Copper_Block, Large_Copper_Block;

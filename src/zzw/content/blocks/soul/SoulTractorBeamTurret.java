@@ -92,7 +92,7 @@ public class SoulTractorBeamTurret extends TractorBeamTurret implements ISoulTur
                 bt.add(requireSoul ? "@soul.require" : "@soul.optional");
                 if (maxSouls > 0) {
                     bt.row();
-                    bt.add("[lightgray]Max souls: [accent]" + maxSouls);
+                    bt.add("[lightgray]最大灵魂: [accent]" + maxSouls);
                 }
             });
         });
@@ -141,7 +141,13 @@ public class SoulTractorBeamTurret extends TractorBeamTurret implements ISoulTur
 
         /** 激光透明度 (PU_V8 laserAlpha), 回调未设置时返回 1f */
         public float laserAlpha() {
-            return laserAlphaFunc == null ? 1f : laserAlphaFunc.get(this);
+            if (laserAlphaFunc == null) return 1f;
+            try {
+                return laserAlphaFunc.get(this);
+            } catch (Exception e) {
+                // 如果回调抛出异常（比如访问 null 的 power.status），返回默认值
+                return 1f;
+            }
         }
 
         @Override

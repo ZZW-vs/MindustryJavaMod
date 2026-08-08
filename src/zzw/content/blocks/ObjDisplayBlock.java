@@ -23,7 +23,42 @@ import java.util.Arrays;
 
 /**
  * 3x3 万能模型展示台
- * 支持8种内置3D模型切换, 玩家可调整位置/颜色/大小
+ * 
+ * 主要功能:
+ * 1. 多模型支持: 内置8种不同的3D模型可供切换
+ * 2. 参数调节: 玩家可实时调整位置、颜色、大小等参数
+ * 3. 通用展示: 支持.obj格式的通用3D模型
+ * 4. 实时预览: 提供模型在游戏中的实时预览效果
+ * 
+ * 技术特点:
+ * - 使用WavefrontObject渲染引擎
+ * - 支持3x3大型展示台
+ * - 可配置参数（configurable）
+ * - 支持对角线放置
+ * - 集成UI控制面板
+ * 
+ * 内置模型类型:
+ * - 飞轮 (flywheel)
+ * - 齿轮 (gear)
+ * - 球体 (sphere)
+ * - 立方体 (cube)
+ * - 圆柱 (cylinder)
+ * - 锥体 (cone)
+ * - 环形 (torus)
+ * - 复杂机械 (complex)
+ * 
+ * 配置选项:
+ * - model: 模型类型选择
+ * - position: 模型位置偏移
+ * - color: 模型颜色
+ * - scale: 模型大小
+ * - rotation: 模型旋转
+ * 
+ * 使用场景:
+ * - 3D模型展示
+ * - 机械结构预览
+ * - 自定义模型调节
+ * - 建筑装饰
  */
 public class ObjDisplayBlock extends Block {
 

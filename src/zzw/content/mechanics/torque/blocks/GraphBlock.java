@@ -10,6 +10,10 @@ import zzw.content.mechanics.torque.graphs.*;
 import zzw.content.mechanics.torque.meta.*;
 import zzw.content.mechanics.torque.modules.*;
 
+/**
+ * 图结构方块 - 扭矩系统的核心方块，管理扭矩网络
+ * 继承 Block 实现 GraphBlockBase，作为扭矩系统的物理节点
+ */
 public class GraphBlock extends Block implements GraphBlockBase{
     protected final Graphs graphs = new Graphs();
     protected boolean preserveDraw;

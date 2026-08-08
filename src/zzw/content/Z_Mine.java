@@ -9,6 +9,10 @@ import mindustry.world.Block;
 import mindustry.world.blocks.environment.OreBlock;
 import mindustry.world.blocks.production.Drill;
 
+/**
+ * 自定义矿物与钻头注册 - 安山岩矿、镍/铟/铝/熔核等矿石
+ * 继承 OreBlock/Drill，使用 PU_V8 矿石生成参数
+ */
 public class Z_Mine {
     public static Block Andesite;
     public static Block Andesite_Drill;

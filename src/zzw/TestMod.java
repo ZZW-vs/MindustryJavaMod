@@ -21,6 +21,16 @@ import zzw.content.units.Z_Units;
 import zzw.util.ZObjs;
 
 
+/**
+ * 模组主入口类 — 所有内容的加载起点
+ *
+ * 工作流程:
+ * 1. 构造函数: 初始化静态数据 (ZObjs等), 注册一次性事件
+ * 2. loadContent(): 按依赖顺序加载所有游戏内容 (物品→液体→方块→单位)
+ *    ★ 加载顺序很重要! 后加载的可以引用先加载的, 反过来会报空指针
+ *
+ * 参考: Mindustry 模组开发指南 — https://github.com/Anuken/MindustryModding
+ */
 public class TestMod extends Mod{
     private static final float WELCOME_DIALOG_DELAY = 3f;
 
