@@ -28,7 +28,7 @@ import java.util.*;
 public class WavefrontObject{
     protected static final float zScale = 0.01f;
     protected static final float defaultScl = 4f;
-    protected static final float perspectiveDistance = 350f;
+    protected static final float perspectiveDistance = 2000f;
 
     public Seq<Vec3> vertices = new Seq<>();
     public Seq<Vec2> uvs = new Seq<>();
@@ -380,7 +380,10 @@ public class WavefrontObject{
             v.set(vertices.get(i));
             if(cons != null) cons.get(v);
             v.scl(defaultScl * size).rotate(Vec3.X, rX).rotate(Vec3.Y, rY).rotate(Vec3.Z, rZ);
-            float depth = Math.max(0f, (perspectiveDistance + v.z) / perspectiveDistance);
+            // ★ 透视投影: depth < 1 远离(缩小), depth > 1 靠近(放大)
+            //   perspectiveDistance=2000 确保大模型旋转后 v.z 不超出范围
+            //   最小值 0.01f 防止极端情况 depth=0 导致顶点坍缩到原点
+            float depth = Math.max(0.01f, (perspectiveDistance + v.z) / perspectiveDistance);
             v.scl(depth);
             
             v.add(x, y, 0f);
@@ -389,12 +392,12 @@ public class WavefrontObject{
             }
         }
 
-        // ★ 高面数模型(>50000面): 用 GPU Mesh 渲染 (兼容手机端 GLES 2.0)
-        //   仅 MMD 级别模型(78000+面)用 GPU, 其他模型走 CPU 渲染
-        //   (CPU 渲染对 1000~10000 面模型足够快, 且兼容性更好)
-        if(singleZLayer && faces.size > 50000 && gpuGroups != null){
-            float modelZ = drawLayer + zOffset;
-            Draw.draw(modelZ, () -> drawGpuMesh());
+        // ★ 高面数模型(>50000面): 用 drawBatched 批量渲染
+        //   Draw.draw(z, runnable) 包裹整个模型, 只创建 1 个 DrawRequest (非78580个)
+        //   runnable 在 flush 阶段执行 (flushing=true), Draw.vert 走 super.draw 直接渲染
+        //   不用 GPU Mesh (GPU Shader 兼容性问题导致 MMD 无法显示, 回退到 CPU 路径)
+        if(singleZLayer && faces.size > 50000){
+            drawBatched();
             Draw.z(oz);
             return;
         }

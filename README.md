@@ -195,6 +195,15 @@
 
 ## 更新日志
 
+### v2.2.3 (MMD无法显示+大模型旋转坍缩修复)
+- **修复 MMD 模型无法显示**：GPU Mesh 渲染路径有兼容性问题，回退到 `drawBatched()` CPU 批量渲染
+  - `drawBatched()` 用 `Draw.draw(z, runnable)` 包裹整个模型，只创建 1 个 DrawRequest（非78580个），性能与 GPU 相当
+  - runnable 在 flush 阶段执行（`flushing=true`），`Draw.vert` 走 `super.draw` 直接渲染
+  - 面 z 排序仍在 CPU 端完成（painter's algorithm），保证远的先画
+- **修复大模型旋转坍缩**：模型很大时旋转后 `v.z` 超出 `perspectiveDistance` 范围，`depth` 被 clamp 到 0 导致顶点全部坍缩到原点
+  - `perspectiveDistance` 从 `350f` 增大到 `2000f`，确保大模型旋转后 z 值不超出范围
+  - `depth` 最小值从 `0f` 改为 `0.01f`，防止极端情况顶点完全坍缩
+
 ### v2.2.2 (水车不显示+炮台旋转方向+GPU无贴图UV修复)
 - **修复水车模型不显示**：水车(1276面)之前误触发 GPU 渲染路径(>1000面阈值)，但 GPU 路径对无贴图模型采样 UV=(0,0) 到 atlas 边界外导致透明不可见
   - 将 GPU 触发阈值从 `>1000面` 提高到 `>50000面`，水车/飞轮/齿轮等 OBJ 模型走 CPU 路径正常显示
