@@ -389,10 +389,10 @@ public class WavefrontObject{
             }
         }
 
-        // ★ 高面数模型(>1000面): 用 GPU Mesh 渲染 (兼容手机端 GLES 2.0)
-        //   一次 draw call 提交所有顶点到 GPU, 不走 SortedSpriteBatch
-        //   用 Draw.draw(z, runnable) 包裹, 只创建 1 个 DrawRequest
-        if(singleZLayer && faces.size > 1000 && gpuGroups != null){
+        // ★ 高面数模型(>50000面): 用 GPU Mesh 渲染 (兼容手机端 GLES 2.0)
+        //   仅 MMD 级别模型(78000+面)用 GPU, 其他模型走 CPU 渲染
+        //   (CPU 渲染对 1000~10000 面模型足够快, 且兼容性更好)
+        if(singleZLayer && faces.size > 50000 && gpuGroups != null){
             float modelZ = drawLayer + zOffset;
             Draw.draw(modelZ, () -> drawGpuMesh());
             Draw.z(oz);
@@ -728,8 +728,10 @@ public class WavefrontObject{
             vertices[vi++] = Mathf.lerp(u, u2, f.vertexTexture[i].x);
             vertices[vi++] = Mathf.lerp(v2, v, f.vertexTexture[i].y);
         }else{
-            vertices[vi++] = 0;
-            vertices[vi++] = 0;
+            // ★ 无贴图: 用 atlas white 区域的 UV, 保证 GPU 采样到白色 (UV=(0,0) 会采样到 atlas 边界外)
+            AtlasRegion white = Core.atlas.white();
+            vertices[vi++] = white.u;
+            vertices[vi++] = white.v;
         }
         return vi;
     }

@@ -41,7 +41,8 @@ public class PMXLoader{
                 throw new RuntimeException("Not a PMX file: magic=" + magicStr);
             }
 
-            int version = buf.getInt();  // 2.0=0x2000000, 2.1=0x2100000
+            // ★ PMX version 是 float (2.0/2.1), 不是 int
+            float version = buf.getFloat();
             // globals count
             int globalsCount = buf.get();
             byte[] globals = new byte[globalsCount];
@@ -63,7 +64,7 @@ public class PMXLoader{
             String commentJp = readText(buf, charset);
             String commentEn = readText(buf, charset);
 
-            Log.info("[Create] PMX model: " + nameJp + " (v" + (version >> 24) + "." + (version >> 16 & 0xFF) + ")");
+            Log.info("[Create] PMX model: " + nameJp + " (v" + Strings.fixed(version, 1) + ")");
 
             // ===== Vertices =====
             int vertexCount = buf.getInt();
@@ -83,9 +84,19 @@ public class PMXLoader{
                 uvs[i * 2]     = buf.getFloat();
                 uvs[i * 2 + 1] = buf.getFloat();
 
+                // ★ Additional UV Count (1 byte, 在 UV 之后 weight type 之前)
+                //   PMX 2.0/2.1 都有此字段, count * 4 floats (16 bytes each)
+                int additionalUVCount = buf.get() & 0xFF;
+                for(int a = 0; a < additionalUVCount; a++){
+                    buf.getFloat(); buf.getFloat(); buf.getFloat(); buf.getFloat();
+                }
+
                 // 跳过骨骼权重 (类型 + 数据)
                 int weightType = buf.get() & 0xFF;
                 skipBoneWeight(buf, weightType, extBoneIdx);
+
+                // ★ Edge scale (1 float, 在 weight data 之后, 每个 vertex 结尾)
+                buf.getFloat();
             }
 
             // ===== Faces (三角形索引) =====

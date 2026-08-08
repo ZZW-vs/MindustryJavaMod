@@ -152,15 +152,15 @@ public class PrismTurret extends SoulTurretPowerTurret {
                 float py = y + Angles.trnsy(rotation, prismOffset - recoil);
 
                 // 模型旋转: 绕 Z 轴旋转, 绕 Y 轴 prismRotation
-                // ★ GPU渲染器: Mat3D.rotate(Vec3.Z, +deg) = 逆时针 (标准OpenGL), 与旧CPU渲染器相反
-                // prism.obj 默认朝上 (顶点 v3=(0,1,0) 是顶部)
-                // 炮台 rotation=0 朝右, 需模型逆时针转 -90° → rZ = rotation - 90
-                float rZ = rotation - 90f;
+                // ★ CPU渲染器: Vec3.rotate(Vec3.Z, +deg) = 逆时针 (右手法则)
+                //   prism.obj 默认朝上 (顶点 v3=(0,1,0) 是顶部)
+                //   炮台 rotation=0 朝右, 需模型转 -(rotation-90) = 90-rotation 对齐炮台方向
+                float rZ = 90f - rotation;
                 float rY = prismRotation;
 
                 // ★ 多实例 Z 轴偏移: 基于实例 id, 避免不同炮台的 face 在 batch 中穿插
-                // 0.1f 的间距确保 batch z 排序能区分不同实例
-                object.zOffset = (id % 100) * 0.1f;
+                // 1.0f 的间距确保 batch z 排序能区分不同实例 (0.1f 太小会穿插)
+                object.zOffset = (id % 1000) * 1.0f;
                 object.draw(px, py, 0f, rY, rZ);
                 object.zOffset = 0f;  // 重置
 

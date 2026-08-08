@@ -195,6 +195,16 @@
 
 ## 更新日志
 
+### v2.2.2 (水车不显示+炮台旋转方向+GPU无贴图UV修复)
+- **修复水车模型不显示**：水车(1276面)之前误触发 GPU 渲染路径(>1000面阈值)，但 GPU 路径对无贴图模型采样 UV=(0,0) 到 atlas 边界外导致透明不可见
+  - 将 GPU 触发阈值从 `>1000面` 提高到 `>50000面`，水车/飞轮/齿轮等 OBJ 模型走 CPU 路径正常显示
+  - 仅 MMD 级别模型(78000+面)用 GPU 渲染
+- **修复炮台旋转方向**：CPU 渲染器下 `Vec3.rotate(Vec3.Z, +deg)` 为逆时针(右手法则)，模型默认朝上(北)需转 `-(rotation-90)=90-rotation` 对齐炮台瞄准方向
+  - WavefrontTurret: `rZ=rotation-90f` → `rZ=90f-rotation`
+  - PrismTurret: 同步修复，zOffset 从 `0.1f` 提升到 `1.0f` 避免多实例面搅和
+- **修复 PMX 加载错误**：PMX version 是 float(2.0/2.1)不是 int；漏读 additionalUVCount(1 byte)和 edge scale(1 float)字段导致骨骼权重类型读取错位
+- **修复 GPU 路径无贴图模型采样**：`fillGpuVertex` 中无贴图分支从 `UV=(0,0)` 改为 `Core.atlas.white()` 的 UV，避免采样到 atlas 边界外
+
 ### v2.2.1 (MMD模型改用PMX加载+修复NPE+4个新模型)
 - **修复 NPE**：buildGpuMesh() 中 `mat` 为 null 时 ObjectMap.get(null) 抛出 NullPointerException，改为 null 材质单独分组
 - **MMD 模型恢复 PMX 加载**：4 个 PMX 模型（初音黑/白、重音普通/病娇），PMXLoader 末尾调用 buildGpuMesh() 构建 GPU Mesh
