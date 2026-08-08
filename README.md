@@ -195,11 +195,11 @@
 
 ## 更新日志
 
-### v2.2.3 (MMD无法显示+大模型旋转坍缩修复)
-- **修复 MMD 模型无法显示**：GPU Mesh 渲染路径有兼容性问题，回退到 `drawBatched()` CPU 批量渲染
-  - `drawBatched()` 用 `Draw.draw(z, runnable)` 包裹整个模型，只创建 1 个 DrawRequest（非78580个），性能与 GPU 相当
-  - runnable 在 flush 阶段执行（`flushing=true`），`Draw.vert` 走 `super.draw` 直接渲染
-  - 面 z 排序仍在 CPU 端完成（painter's algorithm），保证远的先画
+### v2.2.3 (MMD无法显示+大模型旋转坍缩+PMX解析修复)
+- **修复 MMD 模型无法显示**：PMX 文件解析错误导致模型加载失败
+  - `additionalUVCount` 是全局值（globals[1]），不是每个顶点都读 1 字节（之前误读导致解析错位）
+  - SDEF 权重类型(3)少读了 4 个 float（C/R0/R1 共 10 float，之前只读 6）
+  - GPU Mesh 渲染路径有兼容性问题，回退到 `drawBatched()` CPU 批量渲染
 - **修复大模型旋转坍缩**：模型很大时旋转后 `v.z` 超出 `perspectiveDistance` 范围，`depth` 被 clamp 到 0 导致顶点全部坍缩到原点
   - `perspectiveDistance` 从 `350f` 增大到 `2000f`，确保大模型旋转后 z 值不超出范围
   - `depth` 最小值从 `0f` 改为 `0.01f`，防止极端情况顶点完全坍缩

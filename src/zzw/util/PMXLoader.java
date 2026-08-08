@@ -72,6 +72,10 @@ public class PMXLoader{
             float[] normals = new float[vertexCount * 3];
             float[] uvs = new float[vertexCount * 2];
 
+            // ★ Additional UV Count 是全局值 (globals[1]), 不是每个顶点都读 1 字节!
+            //   每个顶点有 additionalUVCount * 4 floats 的额外 UV 数据
+            int additionalUVCount = globals[1] & 0xFF;
+
             for(int i = 0; i < vertexCount; i++){
                 positions[i * 3]     = buf.getFloat();
                 positions[i * 3 + 1] = buf.getFloat();
@@ -84,9 +88,7 @@ public class PMXLoader{
                 uvs[i * 2]     = buf.getFloat();
                 uvs[i * 2 + 1] = buf.getFloat();
 
-                // ★ Additional UV Count (1 byte, 在 UV 之后 weight type 之前)
-                //   PMX 2.0/2.1 都有此字段, count * 4 floats (16 bytes each)
-                int additionalUVCount = buf.get() & 0xFF;
+                // ★ 跳过全局 additionalUVCount * 4 floats (每顶点固定数量)
                 for(int a = 0; a < additionalUVCount; a++){
                     buf.getFloat(); buf.getFloat(); buf.getFloat(); buf.getFloat();
                 }
@@ -333,15 +335,14 @@ public class PMXLoader{
                 buf.getFloat();
                 buf.getFloat();
                 break;
-            case 3: // SDEF
+            case 3: // SDEF (Spherical Deformation)
+                // ★ boneIdx1, boneIdx2, weight, C(vec3), R0(vec3), R1(vec3) = 2 idx + 10 floats
                 readIndex(buf, boneIdxSize);
                 readIndex(buf, boneIdxSize);
-                buf.getFloat();
-                buf.getFloat();
-                buf.getFloat();
-                buf.getFloat();
-                buf.getFloat();
-                buf.getFloat();
+                buf.getFloat();  // weight
+                buf.getFloat(); buf.getFloat(); buf.getFloat();  // C (vec3)
+                buf.getFloat(); buf.getFloat(); buf.getFloat();  // R0 (vec3)
+                buf.getFloat(); buf.getFloat(); buf.getFloat();  // R1 (vec3)
                 break;
             case 4: // QDEF
                 readIndex(buf, boneIdxSize);
