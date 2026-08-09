@@ -23,13 +23,14 @@ import mindustry.world.meta.BuildVisibility;
 import zzw.util.WavefrontObject;
 
 /**
- * MMD 模型专用展示台
+ * 多面模型展示台
  * 
  * 主要功能:
- * 1. PMX/MMD模型渲染: 专门针对MMD格式模型的渲染优化
+ * 1. MMD模型渲染: 支持MMD格式模型的渲染优化
  * 2. 实时参数调节: 支持位置、高度、大小、旋转轴、旋转速度实时调整
  * 3. 汉化界面: 完整的中文用户界面
  * 4. 模型预览: 提供模型在游戏中的实时预览效果
+ * 5. 缩放叠加: 支持默认缩放+用户缩放的叠加效果
  * 
  * 技术特点:
  * - 使用WavefrontObject渲染引擎
@@ -41,7 +42,7 @@ import zzw.util.WavefrontObject;
  * 配置选项:
  * - position: 模型位置偏移
  * - height: 模型高度
- * - scale: 模型大小
+ * - scale: 模型大小（支持15倍默认缩放叠加）
  * - rotateAxis: 旋转轴
  * - rotateSpeed: 旋转速度
  * 
@@ -84,6 +85,11 @@ public class MmdDisplayBlock extends Block {
         float rotateSpeed = 0.5f;
         boolean autoRotate = true;
         boolean groundShadow = true;
+        
+        // 默认缩放倍率（15倍）
+        static final float DEFAULT_SCALE = 15f;
+        // 最大缩放倍率（30倍）
+        static final float MAX_SCALE = 30f;
 
         // MMD 模型列表: 2个人物各2形态
         private final WavefrontObject[] MODELS = {
@@ -139,7 +145,8 @@ public class MmdDisplayBlock extends Block {
             obj.lightColor.set(Color.white);
             obj.shadeColor.set(Color.valueOf("909090"));
             obj.maxShade = 0.25f;
-            obj.size = origSize * currentScale;
+            // 默认缩放（15倍）+ 用户缩放叠加
+            obj.size = origSize * DEFAULT_SCALE * currentScale;
 
             // 旋转角度
             float rX = -15f;  // MMD 模型轻微俯视
@@ -267,12 +274,12 @@ public class MmdDisplayBlock extends Block {
                 scaleTable.defaults().pad(2f);
 
                 scaleTable.button("-", Styles.flatt, () -> {
-                    currentScale = Mathf.clamp(currentScale - 0.2f, 0.1f, 10f);
+                    currentScale = Mathf.clamp(currentScale - 0.2f, 0.1f, 2f);
                 }).size(28f, 26f);
 
                 TextField scaleField = scaleTable.field(Strings.fixed(currentScale, 1), text -> {
                     if (Strings.canParseFloat(text)) {
-                        currentScale = Mathf.clamp(Strings.parseFloat(text), 0.1f, 10f);
+                        currentScale = Mathf.clamp(Strings.parseFloat(text), 0.1f, 2f);
                     }
                 }).width(50f).get();
                 scaleField.setMessageText("大小");
@@ -283,14 +290,22 @@ public class MmdDisplayBlock extends Block {
                 });
 
                 scaleTable.button("+", Styles.flatt, () -> {
-                    currentScale = Mathf.clamp(currentScale + 0.2f, 0.1f, 10f);
+                    currentScale = Mathf.clamp(currentScale + 0.2f, 0.1f, 2f);
                 }).size(28f, 26f);
 
                 // 滑条快速调节
                 scaleTable.add("快速");
-                scaleTable.slider(0.1f, 5f, 0.1f, currentScale, v -> {
-                    currentScale = Mathf.clamp(v, 0.1f, 5f);
+                scaleTable.slider(0.1f, 2f, 0.1f, currentScale, v -> {
+                    currentScale = Mathf.clamp(v, 0.1f, 2f);
                 }).width(100f);
+                
+                // 显示总缩放倍率
+                Label totalScaleLabel = new Label("");
+                totalScaleLabel.update(() -> {
+                    float totalScale = DEFAULT_SCALE * currentScale;
+                    totalScaleLabel.setText("总倍率: " + Strings.fixed(totalScale, 0) + "x");
+                });
+                scaleTable.add(totalScaleLabel).padLeft(6f);
 
                 t.add(scaleTable);
             }).growX();

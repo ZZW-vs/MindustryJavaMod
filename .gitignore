@@ -177,3 +177,5 @@ android/libs/
 
 # 项目结构文档（已加入.gitignore）
 项目结构.md
+
+convert_models.py

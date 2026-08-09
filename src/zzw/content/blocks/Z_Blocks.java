@@ -53,6 +53,8 @@ public class Z_Blocks {
     public static Block flywheelDisplay;
     public static Block wavefrontDisplay;
     public static Block mmdDisplay;
+    // ===== 2D图片展示方块 =====
+    public static Block imageDisplay;
 
     // ===== PU_V8 移植: 墙体 =====
     // dark-wall (umbrium 暗色墙)
@@ -149,6 +151,13 @@ public class Z_Blocks {
         mmdDisplay = new MmdDisplayBlock("mmd-display") {{
             requirements(Category.effect, ItemStack.with(Items.copper, 50, Items.lead, 30, Items.silicon, 20), true);
             health = 800;
+            buildVisibility = BuildVisibility.shown;
+        }};
+
+        // 2D图片展示台: 支持6张内置图片的展示，丰富的参数调节
+        imageDisplay = new ImageDisplayBlock("image-display") {{
+            requirements(Category.effect, ItemStack.with(Items.copper, 80, Items.lead, 50, Items.graphite, 30), true);
+            health = 600;
             buildVisibility = BuildVisibility.shown;
         }};
     }

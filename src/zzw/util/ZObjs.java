@@ -35,6 +35,8 @@ public class ZObjs {
     public static WavefrontObject largeCogwheel;
     /** ★ MMD 模型 (PMX): 2个人物各2形态, 从 blander/ 加载 */
     public static WavefrontObject mikuBlack, mikuWhite, tetoNormal, tetoYandere;
+    /** ★ 初音模型 (OBJ): 2种服装颜色, 从 blander/ 加载 */
+    public static WavefrontObject mikuWhiteObj, mikuBlackObj;
 
     private static boolean loaded = false;
 
@@ -149,6 +151,9 @@ public class ZObjs {
         mikuWhite = createMmd("mikuWhite");
         tetoNormal = createMmd("tetoNormal");
         tetoYandere = createMmd("tetoYandere");
+        // 初音OBJ模型
+        mikuWhiteObj = createMikuObj("mikuWhiteObj");
+        mikuBlackObj = createMikuObj("mikuBlackObj");
 
         Events.on(EventType.ClientLoadEvent.class, e -> {
             // ClientLoadEvent 时 atlas 贴图区域已注册, 避免 wavefront 等 hasTexture=true 对象加载失败
@@ -157,8 +162,13 @@ public class ZObjs {
     }
 
     public static void load() {
-        if (loaded) return;
+        Log.info("[Create] ZObjs.load() 开始调用");
+        if (loaded) {
+            Log.info("[Create] ZObjs.load() 已加载过，跳过");
+            return;
+        }
         loaded = true;
+        Log.info("[Create] ZObjs.load() 开始加载模型");
         loadObj(cube, "cube");
         loadObj(wavefront, "wavefront");
         loadObj(prism, "prism");
@@ -167,19 +177,39 @@ public class ZObjs {
         loadObj(crushingWheel, "crushing_wheel");
         loadObj(cogwheel, "cogwheel");
         loadObj(largeCogwheel, "large_cogwheel");
-        // ★ MMD 角色: PMX 加载 (4个模型)
-        loadPMX(mikuBlack, "blander/初音未来/Black.pmx");
-        centerMmd(mikuBlack);
-        loadPMX(mikuWhite, "blander/初音未来/White.pmx");
-        centerMmd(mikuWhite);
-        loadPMX(tetoNormal, "blander/重音teto/Teto normal ver.pmx");
+        // 加载OBJ模型 (暂时禁用初音的两个MMD模型)
+        // loadObj(mikuBlack, "blander/初音未来/Black");
+        // centerMmd(mikuBlack);
+        // loadObj(mikuWhite, "blander/初音未来/White");
+        // centerMmd(mikuWhite);
+        loadObj(tetoNormal, "blander/重音teto/重音Teto normal");
         centerMmd(tetoNormal);
-        loadPMX(tetoYandere, "blander/重音teto/Teto yandere ver.pmx");
+        loadObj(tetoYandere, "blander/重音teto/重音Teto yandere");
         centerMmd(tetoYandere);
+        // 加载初音OBJ模型
+        loadObj(mikuWhiteObj, "blander/初音未来/初音未来_白");
+        centerMmd(mikuWhiteObj);
+        loadObj(mikuBlackObj, "blander/初音未来/初音未来_黑");
+        centerMmd(mikuBlackObj);
     }
 
     /** 创建 MMD 模型配置 (topLight 着色, 双面渲染, 单 Z 层) */
     private static WavefrontObject createMmd(String name){
+        WavefrontObject obj = new WavefrontObject();
+        obj.textureName = name;
+        obj.size = 0.3f;
+        obj.shadingType = WavefrontObject.ShadingType.topLight;
+        obj.lightColor = Color.white;
+        obj.shadeColor = Color.valueOf("808080");
+        obj.maxShade = 0.3f;
+        obj.drawLayer = Layer.flyingUnit;
+        obj.singleZLayer = true;
+        obj.cullBackfaces = false;
+        return obj;
+    }
+
+    /** 创建 初音OBJ模型配置 (topLight 着色, 双面渲染, 单 Z 层) */
+    private static WavefrontObject createMikuObj(String name){
         WavefrontObject obj = new WavefrontObject();
         obj.textureName = name;
         obj.size = 0.3f;
@@ -201,19 +231,7 @@ public class ZObjs {
         for(Vec3 v : obj.vertices) v.y -= minY;
     }
 
-    /** 加载 PMX (MMD) 模型文件 */
-    private static void loadPMX(WavefrontObject obj, String path) {
-        Fi file = Vars.tree.get(path);
-        if (!file.exists()) {
-            Log.err("[Create] PMX file not found: " + path);
-            return;
-        }
-        try {
-            PMXLoader.load(obj, file);
-        } catch (Throwable t) {
-            Log.err("[Create] Failed to load PMX: " + path, t);
-        }
-    }
+    
 
     private static void loadObj(WavefrontObject obj, String name) {
         // ★ 路径解析: name 含 "/" 视为完整相对路径 (如 "blander/text_g/gale"), 否则拼 objects/ 前缀
