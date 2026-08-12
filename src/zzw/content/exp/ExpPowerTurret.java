@@ -12,7 +12,6 @@ import mindustry.world.meta.*;
 public class ExpPowerTurret extends ExpTurret {
     public BulletType shootType;
     public float powerUse = 1f;
-    private float baseLengthRatio = -1f;
 
     public ExpPowerTurret(String name){
         super(name);
@@ -30,17 +29,6 @@ public class ExpPowerTurret extends ExpTurret {
     public void init(){
         consumePowerCond(powerUse, TurretBuild::isActive);
         super.init();
-        if(shootType instanceof LaserBulletType laser){
-            baseLengthRatio = laser.length / Math.max(range, 1f);
-        }
-    }
-
-    @Override
-    public void setEFields(int l){
-        super.setEFields(l);
-        if(shootType instanceof LaserBulletType laser && baseLengthRatio > 0){
-            laser.length = range * baseLengthRatio;
-        }
     }
 
     public class ExpPowerTurretBuild extends ExpTurretBuild{

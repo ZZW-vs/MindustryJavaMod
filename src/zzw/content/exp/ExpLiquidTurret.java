@@ -28,7 +28,6 @@ public class ExpLiquidTurret extends ExpTurret {
     public TextureRegion liquidRegion;
     public TextureRegion topRegion;
     public boolean extinguish = true;
-    private ObjectMap<Liquid, Float> baseLengthRatios = new ObjectMap<>();
 
     public ExpLiquidTurret(String name){
         super(name);
@@ -73,25 +72,6 @@ public class ExpLiquidTurret extends ExpTurret {
         });
 
         super.init();
-
-        for(var entry : ammoTypes.entries()){
-            if(entry.value instanceof LaserBulletType laser){
-                baseLengthRatios.put(entry.key, laser.length / Math.max(range, 1f));
-            }
-        }
-    }
-
-    @Override
-    public void setEFields(int l){
-        super.setEFields(l);
-        for(var entry : ammoTypes.entries()){
-            if(entry.value instanceof LaserBulletType laser){
-                Float ratio = baseLengthRatios.get(entry.key);
-                if(ratio != null){
-                    laser.length = range * ratio;
-                }
-            }
-        }
     }
 
     @Override
