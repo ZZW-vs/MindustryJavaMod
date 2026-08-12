@@ -7,7 +7,6 @@ import arc.graphics.g2d.Lines;
 import arc.math.geom.Vec2;
 import arc.util.Tmp;
 import mindustry.entities.bullet.BulletType;
-import mindustry.entities.bullet.LaserBulletType;
 import mindustry.gen.Bullet;
 import mindustry.graphics.Drawf;
 import mindustry.type.Liquid;
@@ -22,21 +21,16 @@ import zzw.content.exp.OmniLiquidTurret;
  * - 激光子弹, 命中目标后生成 GeyserBulletType (喷泉子弹)
  * - 颜色和光效根据当前液体变化
  * - 从 b.owner (OmniLiquidTurretBuild) 读取当前液体类型
- *
- * 简化:
- * - 不继承 ExpLaserBulletType (项目未移植), 改用 v158 原生 LaserBulletType
- * - 移除 lengthInc/widthInc/damageInc 等经验等级增量 (炮台等级在 ExpTurret.EField 中处理 reload/range)
- * - hitMissed 行为简化: 始终在激光末端生成 geyser
+ * - 继承 ExpLaserBulletType 支持 lengthInc/damageInc 等级缩放
  */
-public class GeyserLaserBulletType extends LaserBulletType {
+public class GeyserLaserBulletType extends ExpLaserBulletType {
     public BulletType geyser;
     public float[] strokes = {2.9f, 1.8f, 1f};
     public float width = 3f;
+    public float widthInc = 0f;
 
     public GeyserLaserBulletType(float length, float damage) {
-        super(damage);
-        this.length = length;
-        this.drawSize = length * 2f;
+        super(length, damage);
         this.hitSize = 0f;
         this.lifetime = 18f;
         this.despawnEffect = mindustry.content.Fx.none;
@@ -61,11 +55,16 @@ public class GeyserLaserBulletType extends LaserBulletType {
 
     @Override
     public void init(Bullet b) {
-        super.init(b);
+        // 保存液体引用 (super.init 会设置 b.fdata 但不覆盖 b.data)
         Liquid l = getLiquid(b);
 
-        // ★ 激光末端位置 = b + trns(rotation, length)
-        Vec2 dest = new Vec2().trns(b.rotation(), length).add(b.x, b.y);
+        // 调用 ExpLaserBulletType.init 使用动态长度 + 伤害增量
+        super.init(b);
+
+        // ★ 激光末端位置 = b + trns(rotation, 实际长度)
+        // 使用 b.fdata (collideLaser 设置的实际碰撞长度)
+        float actualLength = b.fdata > 0 ? b.fdata : getLength(b);
+        Vec2 dest = new Vec2().trns(b.rotation(), actualLength).add(b.x, b.y);
 
         // 在目标点生成 geyser 子弹 (传入液体作为 Bullet.data)
         if (geyser != null) {
@@ -75,10 +74,11 @@ public class GeyserLaserBulletType extends LaserBulletType {
 
     @Override
     public void draw(Bullet b) {
-        // 激光从 b 指向末端
-        Tmp.v1.trns(b.rotation(), length).add(b);
+        // 激光从 b 指向末端 (使用实际碰撞长度 b.fdata)
+        float actualLength = b.fdata > 0 ? b.fdata : getLength(b);
+        Tmp.v1.trns(b.rotation(), actualLength).add(b);
 
-        float w = width;
+        float w = width + widthInc * getLevel(b);
         Liquid l = getLiquid(b);
         Draw.color(l.color, 1f);
 
@@ -105,4 +105,3 @@ public class GeyserLaserBulletType extends LaserBulletType {
         Drawf.light(b.x, b.y, Tmp.v1.x, Tmp.v1.y, w * 10 * b.fout(), l.lightColor, l.lightColor.a);
     }
 }
-

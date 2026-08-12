@@ -4,7 +4,6 @@ import arc.graphics.Color;
 import mindustry.content.Items;
 import mindustry.content.StatusEffects;
 import mindustry.entities.bullet.BasicBulletType;
-import mindustry.entities.bullet.LaserBulletType;
 import mindustry.gen.Sounds;
 import mindustry.graphics.Pal;
 import mindustry.type.Category;
@@ -12,6 +11,7 @@ import mindustry.type.ItemStack;
 import mindustry.world.Block;
 import mindustry.world.blocks.defense.turrets.Turret;
 import zzw.content.Z_Items;
+import zzw.content.units.bullets.ExpLaserBulletType;
 import zzw.content.units.bullets.GeyserBulletType;
 import zzw.content.units.bullets.GeyserLaserBulletType;
 
@@ -159,15 +159,16 @@ public class Z_Exp {
             shootSound = V7Sounds.laser;
 
             powerUse = 7f;
-            shootType = new LaserBulletType(20f){{
+            shootType = new ExpLaserBulletType(140f, 20f){{
                 colors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser.cpy().a(0.4f), mindustry.graphics.Pal.lancerLaser, arc.graphics.Color.white};
                 hitEffect = mindustry.content.Fx.hitLancer;
                 hitSize = 4;
                 lifetime = 16f;
                 drawSize = 400f;
                 collidesAir = false;
-                length = 140f;
                 ammoMultiplier = 1f;
+                lengthInc = 2f;
+                damageInc = 7f;
             }};
 
             maxLevel = 10;
@@ -199,14 +200,15 @@ public class Z_Exp {
             heatColor = mindustry.graphics.Pal.redderDust;
             shootSound = V7Sounds.laser;
 
-            shootType = new LaserBulletType(35f){{
+            shootType = new ExpLaserBulletType(140f, 35f){{
                 colors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser.cpy().a(0.4f), mindustry.graphics.Pal.lancerLaser, arc.graphics.Color.white};
                 hitEffect = mindustry.content.Fx.hitLancer;
                 hitSize = 4;
                 lifetime = 16f;
                 drawSize = 400f;
-                length = 140f;
                 ammoMultiplier = 1f;
+                lengthInc = 1.3f;
+                damageInc = 5f;
             }};
 
             maxLevel = 30;
@@ -219,14 +221,14 @@ public class Z_Exp {
         }};
 
         frostLaserTurret = new ExpLiquidTurret("frost-laser-turret"){{
-            ammo(mindustry.content.Liquids.cryofluid, new LaserBulletType(20f){{
+            ammo(mindustry.content.Liquids.cryofluid, new ExpLaserBulletType(160f, 20f){{
                 colors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser.cpy().a(0.4f), mindustry.graphics.Pal.lancerLaser, arc.graphics.Color.white};
                 hitEffect = mindustry.content.Fx.hitLancer;
                 hitSize = 4;
                 lifetime = 16f;
                 drawSize = 400f;
-                length = 160f;
                 ammoMultiplier = 1f;
+                damageInc = 2.5f;
             }});
             requirements(Category.turret, ItemStack.with(Z_Items.denseAlloy, 60, Items.metaglass, 15));
             size = 2;
@@ -269,15 +271,16 @@ public class Z_Exp {
             fromColor = mindustry.graphics.Pal.lancerLaser;
             toColor = mindustry.graphics.Pal.place;
 
-            shootType = new LaserBulletType(90f){{
+            shootType = new ExpLaserBulletType(160f, 90f){{
                 colors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser.cpy().a(0.4f), mindustry.graphics.Pal.lancerLaser, arc.graphics.Color.white};
                 hitEffect = mindustry.content.Fx.hitLaserBlast;
                 hitSize = 6;
                 lifetime = 20f;
                 drawSize = 400f;
-                length = 160f;
                 ammoMultiplier = 1f;
                 pierceCap = 4;
+                lengthInc = 2f;
+                damageInc = 6f;
             }};
 
             maxLevel = 30;
@@ -312,16 +315,17 @@ public class Z_Exp {
             heatColor = mindustry.graphics.Pal.redderDust;
             toColor = UnityPal.exp;
 
-            shootType = new LaserBulletType(150f){{
+            shootType = new ExpLaserBulletType(240f, 150f){{
                 colors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser.cpy().a(0.4f), mindustry.graphics.Pal.lancerLaser, UnityPal.exp};
                 hitEffect = mindustry.content.Fx.hitLaserBlast;
                 hitSize = 8;
                 lifetime = 22f;
                 drawSize = 500f;
-                length = 240f;
                 width = 28f;
                 ammoMultiplier = 1f;
                 pierceCap = 6;
+                lengthInc = 1f;
+                damageInc = 15f;
             }};
 
             expScale = 30;
@@ -438,8 +442,7 @@ public class Z_Exp {
 
             // branchLaser 子弹: 激光 + 3 发 frag (branchLaserFrag)
             // PU_V8: ExpLaserBulletType(140, 20) + fragBullet=branchLaserFrag + fragBullets=3
-            // 简化: v158 LaserBulletType + fragBullet + fragBullets (省略等级颜色/伤害增量)
-            shootType = new LaserBulletType(20f){{
+            shootType = new ExpLaserBulletType(150f, 20f){{
                 colors = new Color[]{
                         Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.5f).a(0.4f),
                         Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.5f),
@@ -450,9 +453,10 @@ public class Z_Exp {
                 lifetime = 16f;
                 drawSize = 400f;
                 collidesAir = false;
-                length = 150f;
                 ammoMultiplier = 1f;
                 pierceCap = 10;
+                lengthInc = 2f;
+                damageInc = 6f;
                 status = StatusEffects.shocked;
                 statusDuration = 3 * 60f;
 
@@ -518,6 +522,7 @@ public class Z_Exp {
                 geyser = new GeyserBulletType(400f, 10f){{
                     radius = 25f;
                 }};
+                damageInc = 5f;
             }};
 
             consumePowerCond(2.5f, Turret.TurretBuild::isActive);

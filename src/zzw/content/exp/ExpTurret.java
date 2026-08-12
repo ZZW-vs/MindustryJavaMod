@@ -335,6 +335,20 @@ public class ExpTurret extends Turret {
             super.update();
         }
 
+        /** ★ 修复: range 为 block 级共享字段, 多个不同等级炮台同时存在时会被覆写.
+         *  覆写 range() 返回当前 build 等级对应的射程, 避免"默认满级"问题. */
+        @Override
+        public float range(){
+            if(rangeField != null){
+                float r = rangeField.fromLevel(level());
+                if(peekAmmo() != null){
+                    return r + peekAmmo().rangeChange;
+                }
+                return r;
+            }
+            return super.range();
+        }
+
         @Override
         public void draw(){
             if(draw != null) draw.draw(this);
