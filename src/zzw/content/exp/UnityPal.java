@@ -14,7 +14,10 @@ public class UnityPal {
         expBack = Color.valueOf("4d8f07"),
         expLaser = Color.valueOf("F9DBB1"),
         passive = Color.valueOf("61caff"),
-        armor = Color.valueOf("e09e75");
+        armor = Color.valueOf("e09e75"),
+        // ===== TeleUnit 传送器所需颜色 (PU132 UnityPal) =====
+        dirium = Color.valueOf("96f7c3"),
+        diriumLight = Color.valueOf("ccffe4");
 
     public static final Color lancerLaser = Pal.lancerLaser;
 }

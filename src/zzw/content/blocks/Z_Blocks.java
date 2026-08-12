@@ -1,6 +1,7 @@
 package zzw.content.blocks;
 
 import mindustry.content.Items;
+import mindustry.gen.Sounds;
 import mindustry.game.EventType;
 import mindustry.type.Category;
 import mindustry.type.ItemStack;
@@ -78,6 +79,9 @@ public class Z_Blocks {
     // sharpslate-wall (锐板岩墙, StaticWall 环境墙)
     public static Block sharpslateWall, infusedSharpslateWall;
 
+    // ===== PU_V8 移植: 单位传送器 (TeleUnit) =====
+    public static Block teleunit;
+
     // ===== PU_V8 移植: 地板 =====
     public static Floor electroTile;
     public static Floor sharpslate, infusedSharpslate, archaicSharpslate;
@@ -92,6 +96,7 @@ public class Z_Blocks {
         createDecorativeBlocks();
         createPUFloors();
         createPUWalls();
+        createTeleUnit();
         registerEventListeners();
     }
 
@@ -307,6 +312,17 @@ public class Z_Blocks {
             variants = 2;
             infusedSharpslate.asFloor().wall = this;
             archaicSharpslate.asFloor().wall = this;
+        }};
+    }
+
+    // ===== PU_V8 移植: 单位传送器 (PU132 UnityBlocks L1787-1793 完整还原) =====
+    private static void createTeleUnit() {
+        teleunit = new TeleUnit("teleunit") {{
+            requirements(Category.units, ItemStack.with(Items.lead, 180, Items.titanium, 80, Items.silicon, 90, Items.phaseFabric, 64, Z_Items.dirium, 48));
+            size = 3;
+            ambientSound = Sounds.loopTech;  // v155.4: techloop -> loopTech
+            ambientSoundVolume = 0.02f;
+            consumePower(3f);
         }};
     }
 

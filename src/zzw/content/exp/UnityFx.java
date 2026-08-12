@@ -1,6 +1,7 @@
 package zzw.content.exp;
 
 import arc.Core;
+import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
@@ -11,7 +12,10 @@ import arc.math.Mathf;
 import arc.math.geom.Vec2;
 import arc.util.Tmp;
 import mindustry.entities.Effect;
+import mindustry.gen.Unit;
+import mindustry.type.UnitType;
 import mindustry.graphics.Drawf;
+import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
 
 /**
@@ -133,7 +137,39 @@ public class UnityFx {
                 Draw.color(Pal.lancerLaser);
                 Fill.circle(px, py, size * (0.5f + e.fslope() * 0.5f));
             }
-        });
+        }),
+
+        // ===== TeleUnit 传送特效 (PU132 UnityFx L847-879 完整移植) =====
+        // 传送到达特效: e.rotation 为 hitSize, 双层方框 + 随机方块扩散
+        tpOut = new Effect(30f, e -> {
+            Draw.color(UnityPal.dirium);
+            Lines.stroke(3f * e.fout());
+            Lines.square(e.x, e.y, e.finpow() * e.rotation, 45f);
+            Lines.stroke(5f * e.fout());
+            Lines.square(e.x, e.y, e.fin() * e.rotation, 45f);
+            Angles.randLenVectors(e.id, 10, e.fin() * (e.rotation + 10f), (x, y) -> Fill.square(e.x + x, e.y + y, e.fout() * 4f, 100f * Mathf.randomSeed(e.id + 1) * e.fin()));
+        }),
+
+        // 传送离开特效: 数据为 UnitType, 绘制单位图标渐显
+        tpIn = new Effect(50f, e -> {
+            if(!(e.data instanceof UnitType type)) return;
+            TextureRegion region = type.fullIcon;
+            Draw.color();
+            Draw.mixcol(UnityPal.dirium, 1f);
+            Draw.rect(region, e.x, e.y, region.width * Draw.scl * e.fout(), region.height * Draw.scl * e.fout(), e.rotation);
+            Draw.mixcol();
+        }),
+
+        // 传送闪光特效: 数据为 Unit, 在单位位置绘制图标渐隐 (渲染于飞行单位层之上)
+        tpFlash = new Effect(30f, e -> {
+            if(!(e.data instanceof Unit unit) || !unit.isValid()) return;
+            TextureRegion region = unit.type.fullIcon;
+            Draw.mixcol(UnityPal.diriumLight, 1f);
+            Draw.alpha(e.fout());
+            Draw.rect(region, unit.x, unit.y, unit.rotation - 90f);
+            Draw.mixcol();
+            Draw.color();
+        }).layer(Layer.flyingUnit + 1f);
 
     /** 绘制4向三角形尖刺 (PU_V8 UnityDrawf.spark) */
     public static void spark(float x, float y, float w, float h, float r){
