@@ -318,7 +318,8 @@ public class Z_Exp {
                 hitSize = 8;
                 lifetime = 22f;
                 drawSize = 500f;
-                length = 180f;
+                length = 240f;
+                width = 28f;
                 ammoMultiplier = 1f;
                 pierceCap = 6;
             }};

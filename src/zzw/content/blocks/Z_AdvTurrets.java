@@ -477,10 +477,11 @@ public class Z_AdvTurrets {
             consumeCoolant(0.01f);
             coolantMultiplier = 1.1f;
             shootSound = Sounds.shootLancer;  // ★ v155.4 替代 UnitySounds.cubeBlast (无 shootBig)
-            shootType = new PointBlastLaserBulletType(580f) {{
+            shootType = new PointBlastLaserBulletType(900f) {{
                 length = 320f;
                 lifetime = 17f;
                 pierce = true;
+                width = 32f;  // 激光加粗 (原12f → 32f)
                 auraDamage = 8000f;
                 damageRadius = 120f;
                 laserColors = new Color[]{Color.valueOf("a3e3ff")};  // UnityPal.advance

@@ -1,6 +1,7 @@
 package zzw.content.blocks.distribution;
 
 import mindustry.content.Items;
+import mindustry.content.Liquids;
 import mindustry.type.Category;
 import mindustry.type.ItemStack;
 import mindustry.world.Block;
@@ -17,12 +18,14 @@ import zzw.content.exp.DrawOver;
  * 2. steel-conveyor      - KoruhConveyor 钢制传送带 (absorbLasers=true 标志)
  * 3. mechanical-conveyor - ShadowedConveyor 机械传送带 (含 shadow 影子贴图)
  * 4. dirium-conveyor     - ExpKoruhConveyor 迪里姆合金传送带 (完整经验系统)
+ * 5. distribution-drill  - DistributionDrill 分配式钻机 (钻机间互传产物)
  */
 public class Z_Distribution {
     public static Block teleporter;
     public static KoruhConveyor steelConveyor;
     public static ShadowedConveyor mechanicalConveyor;
     public static ExpKoruhConveyor diriumConveyor;
+    public static DistributionDrill distributionDrill;
 
     public static void load() {
         // ===== Teleporter 物品传送器 (PU_V8 L1758-1760) =====
@@ -73,6 +76,20 @@ public class Z_Distribution {
             drawMultiplier = 1.3f;
 
             draw = new DrawOver();
+        }};
+
+        // ===== distribution-drill 分配式钻机 (PU132 L323-330) =====
+        // 钻机之间可互相传递产物，避免无限循环
+        distributionDrill = new DistributionDrill("distribution-drill") {{
+            requirements(Category.production, ItemStack.with(
+                Items.copper, 20, Items.silicon, 15, Items.titanium, 20
+            ));
+            tier = 3;
+            drillTime = 450;
+            size = 2;
+
+            // v155.4: consumes.liquid(...) -> consumeLiquid(...)
+            consumeLiquid(Liquids.water, 0.06f).boost();
         }};
     }
 }

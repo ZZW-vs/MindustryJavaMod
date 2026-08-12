@@ -153,13 +153,12 @@ public class Z_Blocks {
             health = 800;
             buildVisibility = BuildVisibility.shown;
         }};
-
-        // 2D图片展示台: 支持6张内置图片的展示，丰富的参数调节
-        imageDisplay = new ImageDisplayBlock("image-display") {{
-            requirements(Category.effect, ItemStack.with(Items.copper, 80, Items.lead, 50, Items.graphite, 30), true);
-            health = 600;
-            buildVisibility = BuildVisibility.shown;
-        }};
+        //2D图片展示台: 支持6张内置图片的展示，丰富的参数调节 (废弃但保留图片)
+        //imageDisplay = new ImageDisplayBlock("image-display") {{
+        //    requirements(Category.effect, ItemStack.with(Items.copper, 80, Items.lead, 50, Items.graphite, 30), true);
+        //    health = 600;
+        //    buildVisibility = BuildVisibility.shown;
+        //}};
     }
 
     // ===== PU_V8 移植: 墙体 (简化版, 用 vanilla Wall 或 LimitWall) =====
