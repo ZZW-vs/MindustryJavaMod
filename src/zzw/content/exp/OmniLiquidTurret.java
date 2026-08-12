@@ -36,6 +36,7 @@ public class OmniLiquidTurret extends ExpTurret {
     public boolean extinguish = true;
     public BulletType shootType;
     public float shootAmount = 0.5f;
+    private float baseLengthRatio = -1f;
 
     public OmniLiquidTurret(String name){
         super(name);
@@ -52,6 +53,22 @@ public class OmniLiquidTurret extends ExpTurret {
     public void setStats(){
         super.setStats();
         stats.add(Stat.ammo, ammo(0));
+    }
+
+    @Override
+    public void init(){
+        super.init();
+        if(shootType instanceof LaserBulletType laser){
+            baseLengthRatio = laser.length / Math.max(range, 1f);
+        }
+    }
+
+    @Override
+    public void setEFields(int l){
+        super.setEFields(l);
+        if(shootType instanceof LaserBulletType laser && baseLengthRatio > 0){
+            laser.length = range * baseLengthRatio;
+        }
     }
 
     @Override
