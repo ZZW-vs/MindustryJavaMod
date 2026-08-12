@@ -40,7 +40,6 @@ import zzw.content.units.bullets.ChangeTeamLaserBulletType;
 import zzw.content.blocks.turrets.AbsorberTurret;
 import zzw.content.blocks.turrets.BarrelsItemTurret;
 import zzw.content.blocks.turrets.BigLaserTurret;
-import zzw.content.blocks.turrets.BlockOverdriveTurret;
 import zzw.content.blocks.turrets.OrbTurret;
 import zzw.content.blocks.turrets.RampupPowerTurret;
 import zzw.content.blocks.turrets.ShieldTurret;
@@ -101,14 +100,13 @@ public class Z_Turrets {
     public static PowerTurret celsius, kelvin, current, muon, higgsBoson;
     // 中等 (21): caster, storm, eclipse, wBoson, singularity, orb, plasma, shockwire, shielder,
     //           zBoson, ephemeron, ghost, banshee, fallout, catastrophe, calamity, extinction,
-    //           buffTurret, upgradeTurret, absorber, orbTurret
+    //           absorber, orbTurret
     public static PowerTurret caster, storm, wBoson, singularity, orb, plasma, ephemeron;
     public static LaserTurret eclipse, shockwire, fallout;
     public static BigLaserTurret catastrophe, calamity, extinction;
     public static RampupPowerTurret zBoson;
     public static ShieldTurret shielder;
     public static BarrelsItemTurret ghost, banshee;
-    public static BlockOverdriveTurret buffTurret, upgradeTurret;
     public static AbsorberTurret absorber;
     public static OrbTurret orbTurret;
     // 西诺腐蚀者 (LaserTurret + ChangeTeamLaserBulletType)
@@ -1332,30 +1330,6 @@ public class Z_Turrets {
                 extinction = true;
             }};
             consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.27f && liquid.flammability < 0.1f, 2.5f)).boost().update(false);
-        }};
-
-        // ===== buffTurret (PU_V8 L2106-2112, BlockOverdriveTurret) =====
-        // 加速模式: 对附近非经验方块应用 applyBoost + heal
-        buffTurret = new BlockOverdriveTurret("buff-turret") {{
-            requirements(Category.effect, ItemStack.with(Items.thorium, 60, Items.plastanium, 90, Z_Items.stone, 100, Z_Items.denseAlloy, 70));
-            health = 200;
-            size = 1;
-            buffRange = 100f;
-            boostStrength = 2f;
-            upgrade = false;
-            consume(new mindustry.world.consumers.ConsumeItemFilter(i -> i == Z_Items.steel)).boost();
-        }};
-
-        // ===== upgradeTurret (PU_V8 L2114-2120, BlockOverdriveTurret) =====
-        // 经验模式: 对附近经验方块加经验
-        upgradeTurret = new BlockOverdriveTurret("upgrade-turret") {{
-            requirements(Category.effect, ItemStack.with(Items.surgeAlloy, 80, Z_Items.steel, 120, Z_Items.dirium, 70));
-            health = 300;
-            size = 1;
-            buffRange = 100f;
-            expPerSec = 5f;
-            upgrade = true;
-            consume(new mindustry.world.consumers.ConsumeItemFilter(i -> i == Z_Items.dirium)).boost();
         }};
 
         // ===== absorber (PU_V8 L1352-1366, AbsorberTurret) =====
