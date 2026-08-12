@@ -86,7 +86,23 @@ public class ShootArmorAbility extends Ability{
                     offset.set(0f, 0f);
                 }
 
-                Drawf.construct(unit.x + offset.x, unit.y + offset.y, region, unit.team.color, unit.rotation - 90f, shootHeat, shootHeat, Time.time * 2 + unit.id());
+                // v158 适配: 使用 Shaders.armor 替代 PU132 的 Drawf.construct (Shaders.build)
+                // PU132 原版用 Drawf.construct 因为 v132 没有专门的护甲 shader, 会产生建造扫描线效果
+                // v158 提供了 Shaders.armor (UnitArmorShader) 专门用于护甲闪光效果
+                Draw.alpha(shootHeat);
+                Draw.rect(region, unit.x + offset.x, unit.y + offset.y, unit.rotation - 90f);
+                Draw.alpha(1f);
+
+                Shaders.armor.region = region;
+                Shaders.armor.progress = shootHeat;
+                Shaders.armor.time = -Time.time / 20f * 2f;
+
+                Draw.color(unit.team.color);
+                Draw.shader(Shaders.armor);
+                Draw.rect(region, unit.x + offset.x, unit.y + offset.y, unit.rotation - 90f);
+                Draw.shader();
+
+                Draw.reset();
             });
         }
     }

@@ -127,7 +127,7 @@ public class Z_KoruhUnits{
         cache = new UnityUnitType("cache"){{
             mineTier = -1;
             speed = 7f;
-            drag = 0.001f;
+            drag = 0.05f;  // v158适配: PU132原版0.001f在v158物理引擎下惯性过大(一动停不下来),调整为0.05f
             health = 560;
             engineColor = Color.valueOf("d3ddff");
             flying = true;
