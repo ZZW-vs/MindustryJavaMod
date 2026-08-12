@@ -18,6 +18,7 @@ import zzw.content.exp.Z_Exp;
 import zzw.content.mechanics.Z_Mechanics;
 import zzw.content.mechanics.torque.Z_Torque;
 import zzw.content.units.Z_Units;
+import zzw.content.units.Z_KoruhUnits;
 import zzw.util.ZObjs;
 
 
@@ -67,6 +68,9 @@ public class TestMod extends Mod{
 
         // 加载 PU_V8 扭矩系统 (需要物品)
         Z_Torque.load();
+
+        // 加载 PU_V8 koruh 阵营单位 (需要在方块之前, MechPad 引用单位类型)
+        Z_KoruhUnits.load();
 
         // 加载自定义方块（可能需要物品和工厂）
         Z_Blocks.load();

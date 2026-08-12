@@ -1,10 +1,12 @@
 package zzw.content.blocks;
 
 import mindustry.content.Items;
+import mindustry.content.UnitTypes;
 import mindustry.gen.Sounds;
 import mindustry.game.EventType;
 import mindustry.type.Category;
 import mindustry.type.ItemStack;
+import mindustry.type.UnitType;
 import mindustry.world.Block;
 import mindustry.world.meta.BuildVisibility;
 import mindustry.world.blocks.defense.Wall;
@@ -13,7 +15,10 @@ import mindustry.world.blocks.environment.OverlayFloor;
 import mindustry.world.blocks.environment.StaticWall;
 import mindustry.world.meta.Stat;
 import zzw.content.Z_Items;
+import zzw.content.blocks.units.MechPad;
+import zzw.content.blocks.units.ConversionPad;
 import zzw.content.exp.EField;
+import zzw.content.units.Z_KoruhUnits;
 
 import arc.Events;
 
@@ -82,6 +87,10 @@ public class Z_Blocks {
     // ===== PU_V8 移植: 单位传送器 (TeleUnit) =====
     public static Block teleunit;
 
+    // ===== PU_V8 移植: 单位工厂 (MechPad/ConversionPad) =====
+    public static MechPad bufferPad, omegaPad, cachePad;
+    public static ConversionPad convertPad;
+
     // ===== PU_V8 移植: 地板 =====
     public static Floor electroTile;
     public static Floor sharpslate, infusedSharpslate, archaicSharpslate;
@@ -97,6 +106,7 @@ public class Z_Blocks {
         createPUFloors();
         createPUWalls();
         createTeleUnit();
+        createMechPads();
         registerEventListeners();
     }
 
@@ -323,6 +333,46 @@ public class Z_Blocks {
             ambientSound = Sounds.loopTech;  // v155.4: techloop -> loopTech
             ambientSoundVolume = 0.02f;
             consumePower(3f);
+        }};
+    }
+
+    // ===== PU_V8 移植: 单位工厂 (PU132 UnityBlocks L1729-1764 完整还原) =====
+    private static void createMechPads() {
+        bufferPad = new MechPad("buffer-pad") {{
+            requirements(Category.units, ItemStack.with(Z_Items.stone, 120, Items.copper, 170, Items.lead, 150, Items.titanium, 150, Items.silicon, 180));
+            size = 2;
+            craftTime = 100;
+            consumePower(0.7f);
+            unitType = Z_KoruhUnits.buffer;
+        }};
+
+        omegaPad = new MechPad("omega-pad") {{
+            requirements(Category.units, ItemStack.with(Z_Items.stone, 220, Items.lead, 200, Items.silicon, 230, Items.thorium, 260, Items.surgeAlloy, 100));
+            size = 3;
+            craftTime = 300f;
+            consumePower(1.2f);
+            unitType = Z_KoruhUnits.omega;
+        }};
+
+        cachePad = new MechPad("cache-pad") {{
+            requirements(Category.units, ItemStack.with(Z_Items.stone, 150, Items.lead, 160, Items.silicon, 100, Items.titanium, 60, Items.plastanium, 120, Items.phaseFabric, 60));
+            size = 2;
+            craftTime = 130f;
+            consumePower(0.8f);
+            unitType = Z_KoruhUnits.cache;
+        }};
+
+        convertPad = new ConversionPad("conversion-pad") {{
+            requirements(Category.units, BuildVisibility.sandboxOnly, ItemStack.empty);
+            size = 2;
+            craftTime = 60f;
+            consumePower(1f);
+            upgrades.add(
+                new UnitType[]{UnitTypes.dagger, UnitTypes.mace},
+                new UnitType[]{UnitTypes.flare, UnitTypes.horizon},
+                //new UnitType[]{Z_KoruhUnits.cache, Z_KoruhUnits.dijkstra},  // TODO: dijkstra 未移植
+                new UnitType[]{Z_KoruhUnits.omega, UnitTypes.reign}
+            );
         }};
     }
 

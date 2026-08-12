@@ -11,6 +11,7 @@ import arc.math.Interp;
 import arc.math.Mathf;
 import arc.math.geom.Vec2;
 import arc.util.Tmp;
+import arc.util.Time;
 import mindustry.entities.Effect;
 import mindustry.gen.Unit;
 import mindustry.type.UnitType;
@@ -169,7 +170,41 @@ public class UnityFx {
             Draw.rect(region, unit.x, unit.y, unit.rotation - 90f);
             Draw.mixcol();
             Draw.color();
-        }).layer(Layer.flyingUnit + 1f);
+        }).layer(Layer.flyingUnit + 1f),
+
+        // ===== LightningBurstAbility 所需特效 (PU132 UnityFx L742-780) =====
+        // 充能等待进度特效: 数据为 Object[]{whenReady, Unit}
+        waitFx = new Effect(30f, e -> {
+            Object[] data = (Object[])e.data;
+            float whenReady = (float)data[0];
+            Unit u = (Unit)data[1];
+            if(u == null || !u.isValid() || u.dead) return;
+            Draw.color(e.color);
+            Lines.stroke(e.fout() * 1.5f);
+            polySeg(60, 0, (int)(60 * (1 - (e.rotation - Time.time) / whenReady)), u.x, u.y, 8f, 0f);
+        }).layer(Layer.effect - 0.00001f),
+
+        // 充能完成环形特效: 数据为 Unit
+        ringFx = new Effect(25f, e -> {
+            if(!(e.data instanceof Unit u)) return;
+            if(!u.isValid() || u.dead) return;
+            Draw.color(Color.white, e.color, e.fin());
+            Lines.stroke(e.fout() * 1.5f);
+            Lines.circle(u.x, u.y, 8f);
+        });
+
+    /** 绘制多边形部分弧线 (PU132 polySeg, 原版未定义自行实现) */
+    private static void polySeg(int sides, int start, int end, float x, float y, float radius, float rotation){
+        float step = 360f / sides;
+        for(int i = start; i < end; i++){
+            float a1 = (i * step + rotation) * Mathf.degRad;
+            float a2 = ((i + 1) * step + rotation) * Mathf.degRad;
+            Lines.line(
+                x + Mathf.cos(a1) * radius, y + Mathf.sin(a1) * radius,
+                x + Mathf.cos(a2) * radius, y + Mathf.sin(a2) * radius
+            );
+        }
+    }
 
     /** 绘制4向三角形尖刺 (PU_V8 UnityDrawf.spark) */
     public static void spark(float x, float y, float w, float h, float r){
