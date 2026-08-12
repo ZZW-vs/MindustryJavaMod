@@ -7,36 +7,38 @@ import arc.graphics.g2d.TextureRegion;
 import arc.math.Angles;
 import arc.math.Mathf;
 import arc.struct.EnumSet;
-import arc.struct.Seq;
 import arc.util.Tmp;
 import mindustry.entities.Units;
 import mindustry.world.meta.BlockFlag;
 import mindustry.world.meta.BlockGroup;
-import mindustry.gen.Bullet;
 import mindustry.gen.Building;
-import mindustry.gen.Groups;
 import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
 import mindustry.world.blocks.defense.turrets.ReloadTurret;
 import mindustry.world.meta.Stat;
 import mindustry.world.meta.StatUnit;
+import zzw.content.exp.ExpHolder;
+import zzw.content.exp.UnityPal;
 
 import static mindustry.Vars.tilesize;
 
 /**
  * 区域过载炮台 (PU_V8 BlockOverdriveTurret 移植版)
- * buffTurret/upgradeTurret: 瞄准附近可加速的方块, 发射状态效果子弹为其加速
- * 简化: 移除 ExpHolder 依赖 (经验系统方块通过 b.block.canOverdrive 同样生效),
- *       移除 BlockStatusEffectBulletType (用普通 BulletType 占位, 仅保留视觉激光)
+ * buffTurret: 瞄准附近可加速的方块, 应用 applyBoost (加速) + heal (治疗)
+ * upgradeTurret: 瞄准附近经验方块, 为其增加经验
  * 参考: PU_V8 main/src/unity/world/blocks/defense/turrets/BlockOverdriveTurret.java
  */
 public class BlockOverdriveTurret extends ReloadTurret {
-    public final int timerBullet = timers++;
-
     public float buffRange = 50f;
     public float buffReload = 180f;
     public float phaseRangeBoost = 1.5f;
+    /** 加速强度 (buffTurret 模式) */
+    public float boostStrength = 2f;
+    /** 经验增量 (upgradeTurret 模式, 每秒) */
+    public float expPerSec = 5f;
+    /** true=经验模式 (upgradeTurret), false=加速模式 (buffTurret) */
+    public boolean upgrade = false;
 
     public TextureRegion baseRegion, laserRegion, laserEndRegion;
 
@@ -52,7 +54,6 @@ public class BlockOverdriveTurret extends ReloadTurret {
     @Override
     public void load() {
         super.load();
-        // ★ 贴图缺失时回退到 vanilla 方块底座 + overdrive-projector (PU_V8 原版也无 buff-turret 贴图)
         baseRegion = Core.atlas.find(name + "-base", Core.atlas.find("block-" + size));
         if(!region.found()){
             region = Core.atlas.find("overdrive-projector");
@@ -76,12 +77,12 @@ public class BlockOverdriveTurret extends ReloadTurret {
     public class BlockOverdriveTurretBuild extends ReloadTurretBuild {
         public Building target;
         public float buffingTime, phaseHeat, targetTime;
-        public boolean buffing;
+        public boolean buffing, isExp;
 
         @Override
         public void drawSelect() {
             Drawf.circles(x, y, buffRange, Pal.accent);
-            if (buffing) Drawf.selected(target, Tmp.c1.set(Pal.heal).lerp(Color.valueOf("feb380"), Mathf.absin(9f, 1f)).a(Mathf.absin(6f, 1f)));
+            if (buffing) Drawf.selected(target, isExp ? UnityPal.exp.a(Mathf.absin(6f, 1f)) : Tmp.c1.set(Pal.heal).lerp(Color.valueOf("feb380"), Mathf.absin(9f, 1f)).a(Mathf.absin(6f, 1f)));
         }
 
         @Override
@@ -94,7 +95,7 @@ public class BlockOverdriveTurret extends ReloadTurret {
             if (buffing) {
                 float angle = angleTo(target);
                 float len = 5;
-                Draw.color(Tmp.c2.set(Color.valueOf("feb380")).lerp(Pal.heal, Mathf.absin(10f, 1f)));
+                Draw.color(isExp ? UnityPal.exp : Tmp.c2.set(Color.valueOf("feb380")).lerp(Pal.heal, Mathf.absin(10f, 1f)));
                 Draw.alpha(1f);
                 Draw.z(Layer.block + 1);
                 Drawf.laser(laserRegion, laserEndRegion, x + Angles.trnsx(angle, len), y + Angles.trnsy(angle, len), target.x, target.y, 0.25f);
@@ -109,14 +110,12 @@ public class BlockOverdriveTurret extends ReloadTurret {
             buffing = false;
 
             if (target != null) {
+                isExp = target instanceof ExpHolder;
                 if (!targetValid(target)) {
                     target = null;
                 } else if (canConsume() && enabled) {
-                    if (timer(timerBullet, buffReload)) {
-                        // 发射视觉占位子弹 (v158 无 BlockStatusEffectBulletType, 仅作标记)
-                        // 实际加速由附近 block.canOverdrive 自然机制 + 此炮台作为 projector 实现
-                        timer.reset(timerBullet, 0);
-                    }
+                    // ★ 实际应用效果 (PU_V8 BlockStatusEffectBulletType.update 等效)
+                    applyEffect(target, edelta());
                     rotation = Mathf.slerpDelta(rotation, angleTo(target), 0.5f);
                     buffing = true;
                 }
@@ -140,18 +139,32 @@ public class BlockOverdriveTurret extends ReloadTurret {
             }
         }
 
+        /** 应用加速/经验效果到目标 */
+        protected void applyEffect(Building b, float delta) {
+            if (upgrade) {
+                // upgradeTurret: 给经验方块加经验
+                if (b instanceof ExpHolder exp) {
+                    exp.handleExp(Mathf.round(expPerSec * delta / 60f));
+                }
+            } else {
+                // buffTurret: 加速 + 治疗
+                float strength = boostStrength + phaseHeat * boostStrength;
+                b.applyBoost(strength, 180f);
+                if (b.health < b.maxHealth) {
+                    b.heal(strength * delta / 60f);
+                }
+            }
+        }
+
         @Override
         public boolean shouldConsume() {
             return target != null && enabled;
         }
 
         public boolean targetValid(Building b) {
-            return b.isValid() && b.block.canOverdrive && b != this && !proximity.contains(b) && !isBeingBuffed(b) && b.enabled;
-        }
-
-        public boolean isBeingBuffed(Building b) {
-            Seq<Bullet> bullets = Groups.bullet.intersect(b.x, b.y, b.block.size * 8, b.block.size * 8);
-            return bullets.size > 0 && bullets.get(0).owner != this;
+            return b.isValid() && b.block.canOverdrive && b != this && !proximity.contains(b) && b.enabled
+                    // upgrade 模式只瞄准经验方块; buff 模式瞄准非经验方块 (避免重复)
+                    && (upgrade ? (b instanceof ExpHolder) : !(b instanceof ExpHolder));
         }
     }
 }

@@ -1335,20 +1335,26 @@ public class Z_Turrets {
         }};
 
         // ===== buffTurret (PU_V8 L2106-2112, BlockOverdriveTurret) =====
+        // 加速模式: 对附近非经验方块应用 applyBoost + heal
         buffTurret = new BlockOverdriveTurret("buff-turret") {{
             requirements(Category.effect, ItemStack.with(Items.thorium, 60, Items.plastanium, 90, Z_Items.stone, 100, Z_Items.denseAlloy, 70));
             health = 200;
             size = 1;
             buffRange = 100f;
+            boostStrength = 2f;
+            upgrade = false;
             consume(new mindustry.world.consumers.ConsumeItemFilter(i -> i == Z_Items.steel)).boost();
         }};
 
         // ===== upgradeTurret (PU_V8 L2114-2120, BlockOverdriveTurret) =====
+        // 经验模式: 对附近经验方块加经验
         upgradeTurret = new BlockOverdriveTurret("upgrade-turret") {{
             requirements(Category.effect, ItemStack.with(Items.surgeAlloy, 80, Z_Items.steel, 120, Z_Items.dirium, 70));
             health = 300;
             size = 1;
             buffRange = 100f;
+            expPerSec = 5f;
+            upgrade = true;
             consume(new mindustry.world.consumers.ConsumeItemFilter(i -> i == Z_Items.dirium)).boost();
         }};
 
