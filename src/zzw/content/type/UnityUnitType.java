@@ -42,6 +42,8 @@ public class UnityUnitType extends UnitType{
     public UnityUnitType(String name){
         super(name);
         outlines = false;
+        // v155.4 适配: PU132 通过注解处理器自动设置, 简化版需手动指定默认构造器
+        constructor = mindustry.gen.UnitEntity::create;
     }
 
     @Override
