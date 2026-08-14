@@ -264,4 +264,41 @@ public class WorldUnitEntity extends UnitEntity {
     public boolean valid(int x, int y) {
         return x >= 0 && x < unitWorld.width() && y >= 0 && y < unitWorld.height();
     }
+
+    // ===== 鼠标悬停: 查找单位上的建筑 =====
+
+    /**
+     * 给定主世界坐标，返回该坐标在单位上对应的建筑（如果有的话）。
+     * <p>原理：把主世界坐标转换为子世界坐标，在子世界中查找该位置的 Tile.build。</p>
+     *
+     * @param worldX 主世界 X 像素坐标
+     * @param worldY 主世界 Y 像素坐标
+     * @return 该位置上的建筑，或 null
+     */
+    public Building buildingAt(float worldX, float worldY) {
+        if (unitWorld == null) return null;
+        // 主世界坐标 → 子世界像素坐标 (反向 cwX/cwY)
+        float subX = (worldX - x) + unitWorld.width() * Vars.tilesize / 2f;
+        float subY = (worldY - y) + unitWorld.height() * Vars.tilesize / 2f;
+        // 反向旋转
+        float r = -(rotation - 90f);
+        vec.set(subX - unitWorld.width() * Vars.tilesize / 2f, subY - unitWorld.height() * Vars.tilesize / 2f).rotate(r);
+        float sx = vec.x + unitWorld.width() * Vars.tilesize / 2f;
+        float sy = vec.y + unitWorld.height() * Vars.tilesize / 2f;
+        // 子世界像素 → tile 坐标
+        int tx = mindustry.core.World.toTile(sx);
+        int ty = mindustry.core.World.toTile(sy);
+        if (valid(tx, ty)) {
+            Tile tile = unitWorld.tile(tx, ty);
+            return tile != null ? tile.build : null;
+        }
+        return null;
+    }
+
+    /**
+     * 返回子世界中所有建筑的只读列表（用于UI显示状态）。
+     */
+    public Seq<Building> getBuildings() {
+        return buildings;
+    }
 }

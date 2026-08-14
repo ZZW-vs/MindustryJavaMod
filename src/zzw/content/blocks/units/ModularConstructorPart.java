@@ -57,18 +57,7 @@ public class ModularConstructorPart extends Block{
         backRegion = Core.atlas.find(name + "-back");
     }
 
-    /**
-     * 放置预览：用 effectColor（橙色）绘制
-     * 替代 Mindustry 默认的蓝色放置框
-     */
-    @Override
-    public void drawPlace(int x, int y, int rotation, boolean valid){
-        super.drawPlace(x, y, rotation, valid);
-        Draw.color(Tmp.c1.set(valid ? effectColor : Pal.remove).a(0.3f));
-        Fill.crect(x * Vars.tilesize, y * Vars.tilesize,
-            size * Vars.tilesize, size * Vars.tilesize);
-        Draw.reset();
-    }
+    // drawPlace 使用 Mindustry 默认行为，不额外覆盖
 
     public class ModularConstructorPartBuild extends Building implements ModularConstructorModuleInterface{
         public ModularConstructorPartBuild back, front;

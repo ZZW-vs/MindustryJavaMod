@@ -5,6 +5,7 @@ import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
 import arc.math.Mat;
 import arc.math.geom.Vec2;
+import arc.scene.ui.layout.Table;
 import arc.struct.Seq;
 import arc.util.Tmp;
 import arc.Core;
@@ -13,6 +14,7 @@ import mindustry.core.World;
 import mindustry.gen.Building;
 import mindustry.gen.Unit;
 import mindustry.graphics.Layer;
+import mindustry.ui.Styles;
 import zzw.content.units.entities.WorldUnitEntity;
 
 /**
@@ -92,10 +94,10 @@ public class WorldUnitType extends UnityUnitType {
                 Draw.sort(true);
 
                 // 遍历子世界建筑物, 逐个绘制
+                // ★ 不设固定 Draw.z(Layer.block), 让每个建筑自己决定渲染层级
+                // 这样传送带上的物品、炮台旋转等内部动画能正确渲染
                 for (int i = 0; i < build.size; i++) {
-                    Building b = build.get(i);
-                    Draw.z(Layer.block);
-                    b.draw();
+                    build.get(i).draw();
                 }
 
                 // Should fix the blending bug.
@@ -115,5 +117,50 @@ public class WorldUnitType extends UnityUnitType {
         }
 
         Draw.z(z);
+    }
+
+    /**
+     * 鼠标悬停显示：单位状态 + 鼠标所在位置的建筑状态
+     * <p>如果鼠标悬停在单位上的某个建筑位置，额外显示该建筑的信息。</p>
+     */
+    @Override
+    public void display(Unit unit, Table table){
+        super.display(unit, table);
+
+        if(unit instanceof WorldUnitEntity w && w.unitWorld != null && !w.buildings.isEmpty()){
+            table.row();
+            table.table(Styles.grayPanel, t -> {
+                t.add("[accent]单位上的建筑 (" + w.buildings.size + ")").left().row();
+                // 检测鼠标在哪个建筑上
+                float mx = Core.input.mouseWorldX(), my = Core.input.mouseWorldY();
+                mindustry.gen.Building hovered = w.buildingAt(mx, my);
+                if(hovered != null){
+                    t.table(bt -> {
+                        bt.left();
+                        bt.image(hovered.block.uiIcon).size(24f);
+                        bt.add(hovered.block.localizedName).left();
+                        bt.row();
+                        bt.add("[lightgray]血量: " + (int)hovered.health + "/" + (int)hovered.maxHealth).left().row();
+                        if(hovered.items != null && hovered.items.total() > 0){
+                            bt.add("[lightgray]物品: " + hovered.items.total()).left();
+                        }
+                        if(hovered.power != null){
+                            bt.add("[lightgray]电力: " + (int)(hovered.power.status * 100) + "%").left().row();
+                        }
+                    }).pad(4).left();
+                } else {
+                    // 没有悬停在特定建筑上时，显示建筑列表摘要
+                    t.table(bt -> {
+                        bt.left().top();
+                        int cols = 6;
+                        int i = 0;
+                        for(Building b : w.buildings){
+                            if(i++ % cols == 0) bt.row();
+                            bt.image(b.block.uiIcon).size(16f).pad(2);
+                        }
+                    }).pad(4).left();
+                }
+            }).growX().padTop(4);
+        }
     }
 }

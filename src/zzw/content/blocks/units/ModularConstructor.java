@@ -140,20 +140,26 @@ public class ModularConstructor extends Block{
     }
 
     /**
-     * 放置预览：用 buildColor（橙色）绘制模块挂载点位置框
-     * 替代 Mindustry 默认的蓝色放置框
+     * 放置预览：绘制模块挂载点位置框（橙色虚线框）
+     * 主方块的蓝色框由 InputHandler 绘制，这里只画模块位置提示
      */
     @Override
     public void drawPlace(int x, int y, int rotation, boolean valid){
         super.drawPlace(x, y, rotation, valid);
+        Color c = valid ? buildColor : Pal.remove;
+        // 镜像展开 moduleNodes 得到所有挂载点
+        float tw = moduleSize * Vars.tilesize;
         for(int i = 0; i < moduleNodes.length; i++){
             Vec2 node = moduleNodes[i];
-            float wx = (x + node.x) * Vars.tilesize;
-            float wy = (y + node.y) * Vars.tilesize;
-            Draw.color(Tmp.c1.set(valid ? buildColor : Pal.remove).a(0.3f));
-            Fill.crect(wx - moduleSize * Vars.tilesize / 2f, wy - moduleSize * Vars.tilesize / 2f,
-                moduleSize * Vars.tilesize, moduleSize * Vars.tilesize);
-            Draw.reset();
+            // 四个镜像位置
+            float[][] offsets = mirrorNodes ? new float[][]{
+                {node.x, node.y}, {-node.x, node.y}, {node.x, -node.y}, {-node.x, -node.y}
+            } : new float[][]{{node.x, node.y}};
+            for(float[] o : offsets){
+                float wx = (x + o[0]) * Vars.tilesize;
+                float wy = (y + o[1]) * Vars.tilesize;
+                Drawf.dashRect(c, wx - tw / 2f, wy - tw / 2f, tw, tw);
+            }
         }
     }
 
