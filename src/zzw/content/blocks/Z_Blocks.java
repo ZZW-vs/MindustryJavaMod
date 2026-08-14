@@ -1,6 +1,7 @@
 package zzw.content.blocks;
 
 import mindustry.content.Items;
+import mindustry.content.Liquids;
 import mindustry.content.UnitTypes;
 import mindustry.gen.Sounds;
 import mindustry.game.EventType;
@@ -16,9 +17,12 @@ import mindustry.world.blocks.environment.StaticWall;
 import mindustry.world.meta.Stat;
 import zzw.content.Z_Items;
 import zzw.content.blocks.units.MechPad;
-import zzw.content.blocks.units.ConversionPad;
+import zzw.content.blocks.units.ModularConstructor;
+import zzw.content.blocks.units.ModularConstructorPart;
+import zzw.content.blocks.units.TerraCore;
 import zzw.content.exp.EField;
 import zzw.content.units.Z_KoruhUnits;
+import zzw.content.units.Z_Units;
 
 import arc.Events;
 
@@ -87,9 +91,15 @@ public class Z_Blocks {
     // ===== PU_V8 移植: 单位传送器 (TeleUnit) =====
     public static Block teleunit;
 
-    // ===== PU_V8 移植: 单位工厂 (MechPad/ConversionPad) =====
+    // ===== PU_V8 移植: 单位工厂 (MechPad) =====
     public static MechPad bufferPad, omegaPad, cachePad;
-    public static ConversionPad convertPad;
+
+    // ===== PU132 移植: 模块化构造器 (ModularConstructor) =====
+    public static ModularConstructor advanceConstructor;
+    public static ModularConstructorPart advanceConstructorModule;
+
+    // ===== PU132 移植: 大地核心 (TerraCore, 世界单位召唤方块) =====
+    public static TerraCore terraCore;
 
     // ===== PU_V8 移植: 地板 =====
     public static Floor electroTile;
@@ -107,6 +117,8 @@ public class Z_Blocks {
         createPUWalls();
         createTeleUnit();
         createMechPads();
+        createModularConstructors();
+        createTerraCore();
         registerEventListeners();
     }
 
@@ -361,18 +373,62 @@ public class Z_Blocks {
             consumePower(0.8f);
             unitType = Z_KoruhUnits.cache;
         }};
+    }
 
-        convertPad = new ConversionPad("conversion-pad") {{
-            requirements(Category.units, BuildVisibility.sandboxOnly, ItemStack.empty);
-            size = 2;
-            craftTime = 60f;
-            consumePower(1f);
-            upgrades.add(
-                new UnitType[]{UnitTypes.dagger, UnitTypes.mace},
-                new UnitType[]{UnitTypes.flare, UnitTypes.horizon},
-                //new UnitType[]{Z_KoruhUnits.cache, Z_KoruhUnits.dijkstra},  // TODO: dijkstra 未移植
-                new UnitType[]{Z_KoruhUnits.omega, UnitTypes.reign}
+    // ===== PU132 移植: 模块化构造器 (PU132 UnityBlocks L3200-3234 完整还原+适配) =====
+    // advance-constructor-module: 6×6 部件, 链式连接到主构造器, 提升等级解锁更高 tier 单位
+    // advance-constructor: 13×13 主构造器, 通过模块连接提升 tier, 减少 tier 以上单位的建造时间
+    private static void createModularConstructors() {
+        // advance-constructor-module: 6×6, 中等材料, 功耗120f (Block 构造器已设), 需低温液体
+        // 适配: UnityItems.xenium → Z_Items.stone, UnityItems.advanceAlloy → Z_Items.advanceAlloy
+        // 适配: consumes.liquid(...) → consumeLiquid(...), consumes.power(...) 已在 Block 构造器中用 consumePower(120f)
+        advanceConstructorModule = new ModularConstructorPart("advance-constructor-module") {{
+            requirements(Category.units, ItemStack.with(Z_Items.stone, 300, Items.silicon, 200, Items.graphite, 300, Items.thorium, 400, Items.phaseFabric, 50, Items.surgeAlloy, 100, Z_Items.advanceAlloy, 300));
+            size = 6;
+            liquidCapacity = 20f;
+            consumeLiquid(Liquids.cryofluid, 0.7f);
+            hasLiquids = true;
+            hasPower = true;
+        }};
+
+        // advance-constructor: 13×13, 大量材料, 功耗13f
+        // 配方调整: T0=scepter(30min), T1=reign(40min), T2=devourer(50min)
+        // 适配: UnityItems.xenium → Z_Items.stone, UnityItems.advanceAlloy → Z_Items.advanceAlloy
+        // 适配: UnityUnitTypes.mantle → Z_Units.devourer (虫子单位作为终极单位)
+        // 适配: consumes.power(13f) → consumePower(13f)
+        advanceConstructor = new ModularConstructor("advance-constructor") {{
+            requirements(Category.units, ItemStack.with(Z_Items.stone, 3000, Items.silicon, 5000, Items.graphite, 2000, Items.thorium, 3000, Items.phaseFabric, 800, Items.surgeAlloy, 700, Z_Items.advanceAlloy, 1500));
+            size = 13;
+            efficiencyPerTier = 10f * 60f;
+            moduleBlock = advanceConstructorModule;
+
+            plans.addAll(
+                // T0: UnitTypes.scepter (30分钟建造时间)
+                new ModularConstructorPlan(UnitTypes.scepter, 30f * 60f, 0,
+                ItemStack.with(Items.silicon, 690, Items.lead, 60, Items.graphite, 30, Items.titanium, 550, Items.metaglass, 40, Items.plastanium, 420)),
+
+                // T1: UnitTypes.reign (40分钟建造时间)
+                new ModularConstructorPlan(UnitTypes.reign, 40f * 60f, 1,
+                ItemStack.with(Items.silicon, 1350, Items.lead, 160, Items.graphite, 90, Items.titanium, 550, Items.metaglass, 100, Items.plastanium, 830, Items.surgeAlloy, 330, Items.phaseFabric, 250)),
+
+                // T2: Z_Units.devourer (50分钟建造时间, 虫子单位作为终极单位)
+                new ModularConstructorPlan(Z_Units.devourer, 50f * 60f, 2,
+                ItemStack.with(Items.silicon, 2050, Items.graphite, 180, Items.titanium, 830, Items.metaglass, 150, Items.plastanium, 1250, Items.surgeAlloy, 500, Items.phaseFabric, 375))
             );
+
+            consumePower(13f);
+        }};
+    }
+
+    // ===== PU132 移植: 大地核心 (TerraCore, 召唤世界单位) =====
+    // 点击按钮召唤 terra 世界单位, 单位携带 8x18 子世界可放置建筑物
+    private static void createTerraCore() {
+        terraCore = new TerraCore("terra-core") {{
+            requirements(Category.units, ItemStack.with(Items.lead, 200, Items.silicon, 150, Items.thorium, 100, Items.phaseFabric, 50, Z_Items.advanceAlloy, 80));
+            size = 2;
+            health = 2000;
+            // 绑定召唤的单位类型 (Z_Units.terra 必须已加载)
+            type = (zzw.content.type.WorldUnitType) Z_Units.terra;
         }};
     }
 

@@ -23,7 +23,6 @@ import static mindustry.Vars.*;
  * - 玩家在 2.5*tilesize 范围内可点击激活
  * - 建造过程中显示单位图标和进度条
  * - 再次点击可还原为核心单位 (revert)
- * - 支持被 ConversionPad 继承
  *
  * v155.4 适配: consValid() 改为本地方法 (原版 @Override 已移除)
  */

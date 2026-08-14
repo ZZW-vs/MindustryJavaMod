@@ -72,6 +72,9 @@ public class TestMod extends Mod{
         // 加载 PU_V8 koruh 阵营单位 (需要在方块之前, MechPad 引用单位类型)
         Z_KoruhUnits.load();
 
+        // 加载自定义单位 (需要在方块之前, ModularConstructor/TerraCore 引用单位类型)
+        Z_Units.load();
+
         // 加载自定义方块（可能需要物品和工厂）
         Z_Blocks.load();
 
@@ -89,9 +92,6 @@ public class TestMod extends Mod{
 
         // 加载经验系统（需要物品）
         Z_Exp.load();
-
-        // 加载自定义单位 (需要物品, 方块, 用于工厂配方)
-        Z_Units.load();
     }
     
     /**

@@ -63,6 +63,9 @@ import zzw.content.units.entities.EndGroundUnit;
 import zzw.content.units.entities.SegmentUnitEntity;
 import zzw.content.units.entities.SegmentWormEntity;
 import zzw.content.units.entities.SlowLightningEntity;
+import zzw.content.units.entities.TimeReflect;
+import zzw.content.units.entities.WorldUnitEntity;
+import zzw.content.type.WorldUnitType;
 import zzw.content.units.rotor.Rotor;
 import zzw.content.units.types.CopterUnitType;
 import zzw.content.units.types.RainbowUnitType;
@@ -145,6 +148,9 @@ public class Z_Units {
         // —— PU132 kami 弹幕 Boss ——
         kami;                  // kami-mkii (弹幕装饰Boss, 双层弹环+屏障)
 
+    // —— PU132 世界单位 (WorldUnitEntity, 携带子世界的移动堡垒) ——
+    public static WorldUnitType terra;
+
     // —— PU_V8 共享子弹 (T6/T7 单位引用, 在 load() 中初始化) ——
     public static BulletType
         citadelFlame,           // citadel 火焰喷射
@@ -162,6 +168,11 @@ public class Z_Units {
         ZEntityRegister.register(EndGroundUnit.class, EndGroundUnit::new);
         // ★ 注册 CopterUnitEntity (直升机单位, extends UnitEntity, 带旋翼渲染)
         ZEntityRegister.register(CopterUnitEntity.class, CopterUnitEntity::create);
+        // ★ 注册 WorldUnitEntity (世界单位, extends UnitEntity, 携带子世界)
+        ZEntityRegister.register(WorldUnitEntity.class, WorldUnitEntity::create);
+        // ★ TimeReflect: 反射初始化 Time.runs / DelayRun.delay / DelayRun.finish 字段
+        //   让世界单位子世界中建筑物的 Time.run 进入单位自己的队列 (PU132 原版机制)
+        TimeReflect.init();
         // ★ 注册 SlowLightningEntity (慢闪电 Entity, 实现 Drawc 接口)
         SlowLightningEntity.register();
 
@@ -5198,5 +5209,26 @@ public class Z_Units {
         } catch (Throwable t) {
             try { arc.util.Log.err("set PU_V8 unit sounds failed", t); } catch (Throwable ignored) {}
         }
+
+        // ═══════════════════════════════════════════════════════════
+        //  Terra (PU132 世界单位, 携带子世界的移动堡垒)
+        //  - worldWidth=8, worldHeight=18 (8x18 tile 子世界)
+        //  - 由 TerraCore 方块召唤, setup() 时迁移附近建筑物到子世界
+        //  - drawBody() 渲染 hack: 子世界建筑物跟随单位移动和旋转
+        // ═══════════════════════════════════════════════════════════
+        terra = new WorldUnitType("terra") {{
+            health = 900000f;
+            speed = 0.2f;
+            hitSize = 60f;
+            armor = 16f;
+            flying = true;
+            rotateSpeed = 0.6f;
+            // 子世界尺寸 (8x18 tile)
+            worldWidth = 8;
+            worldHeight = 18;
+            // 基本外观
+            outlineColor = Color.valueOf("3a3a50");
+            // constructor 已在 WorldUnitType 构造器中设为 WorldUnitEntity::create
+        }};
     }
 }

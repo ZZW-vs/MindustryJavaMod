@@ -49,17 +49,20 @@ public class Z_Torque{
 
     public static void load(){
         // ===== 生产方块 (扭矩消耗) =====
-        // auger-drill (PU_V8 L2881): 3x3, GraphTorqueConsume(45f, 8f, 0.03f, 0.15f)
+        // auger-drill (PU_V8 L2881): 3x3, GraphTorqueConsume(45f, 8f, 1.5f, 0.03f, 0.15f)
+        // 效率调优: oversupplyFalloff 0.7→1.5 (衰减小一点), drillTime 400→300 (基础产矿提高)
+        // 1000转速(lastVelocity)时约20矿/秒, 10000转速时约36矿/秒
         augerDrill = new AugerDrill("auger-drill"){{
             requirements(Category.production, with(Items.lead, 100, Items.copper, 75));
             size = 3;
             health = 1000;
             tier = 3;
-            drillTime = 400f;
-            addGraph(new GraphTorqueConsume(45f, 8f, 0.03f, 0.15f).setAccept(0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
+            drillTime = 300f;
+            addGraph(new GraphTorqueConsume(45f, 8f, 1.5f, 0.03f, 0.15f).setAccept(0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
         }};
 
-        // mechanical-extractor (PU_V8 L2890): 3x3, GraphTorqueConsume(45f, 8f, 0.06f, 0.3f)
+        // mechanical-extractor (PU_V8 L2890): 3x3, GraphTorqueConsume(45f, 8f, 1.0f, 0.06f, 0.3f)
+        // 效率调优: oversupplyFalloff 0.7→1.0 (平方关系下不宜过高)
         mechanicalExtractor = new MechanicalExtractor("mechanical-extractor"){{
             requirements(Category.production, with(Items.lead, 100, Items.copper, 75));
             hasPower = false;
@@ -67,7 +70,7 @@ public class Z_Torque{
             health = 1000;
             pumpAmount = 0.4f;
 
-            addGraph(new GraphTorqueConsume(45f, 8f, 0.06f, 0.3f).setAccept(0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
+            addGraph(new GraphTorqueConsume(45f, 8f, 1.0f, 0.06f, 0.3f).setAccept(0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
         }};
 
         // ===== 分配方块 (扭矩传输) =====
