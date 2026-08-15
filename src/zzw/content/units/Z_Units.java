@@ -184,7 +184,7 @@ public class Z_Units {
             // 碰撞计算: 段间距22.7 > 半径9.875+9.875=19.75, 不重叠 (间隙2.95)
             hitSize = 19.75f;
             armor = 5f;
-            flying = true;
+            flying = false;  // 修复: 改为陆军单位
             rotateSpeed = 1f;
             faceTarget = false;
             // ★ 关闭 wobble (PU132 原版静止时不晃动)
@@ -243,7 +243,7 @@ public class Z_Units {
             // ★ hitSize=19.75f (19.25 + 0.5, 用户要求增大 0.5)
             hitSize = 19.75f;
             armor = 5f;
-            flying = true;
+            flying = false;  // 修复: 改为陆军单位
             // PU132: engineSize=-1f (不显示引擎喷射效果)
             engineSize = -1f;
             range = 210f;
@@ -5221,7 +5221,7 @@ public class Z_Units {
             speed = 0.35f;
             hitSize = 60f;
             armor = 28f;
-            flying = true;
+            flying = false;  // 修复: 改为陆军单位
             rotateSpeed = 1.0f;
             accel = 0.05f;
             drag = 0.04f;
