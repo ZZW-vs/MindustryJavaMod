@@ -11,6 +11,8 @@ import arc.struct.IntSeq;
 import arc.struct.IntSet;
 import arc.struct.Seq;
 import arc.util.Tmp;
+import arc.util.io.Writes;
+import arc.util.io.Reads;
 import mindustry.Vars;
 import mindustry.content.Blocks;
 import mindustry.core.World;
@@ -300,5 +302,170 @@ public class WorldUnitEntity extends UnitEntity {
      */
     public Seq<Building> getBuildings() {
         return buildings;
+    }
+
+    /**
+     * 保存子世界状态到数据流 (修复重进地图子世界物品消失的问题)
+     */
+    @Override
+    public void write(Writes write) {
+        super.write(write);
+        
+        // 保存子世界尺寸
+        write.s(unitWorld != null ? (short) unitWorld.width() : 0);
+        write.s(unitWorld != null ? (short) unitWorld.height() : 0);
+        
+        // 保存建筑物数量
+        write.i(buildings.size);
+        
+        if (unitWorld != null) {
+            // 保存每个建筑物的状态
+            for (Building building : buildings) {
+                // 写入建筑类型、位置、团队、旋转等基本信息
+                write.b((byte) Vars.content.indexOf(building.block));
+                write.f(building.x);
+                write.f(building.y);
+                write.b((byte) building.team.id);
+                write.b((byte) building.rotation);
+                
+                // 保存建筑物的特定状态
+                write.bool(building.health > 0);
+                if (building.health > 0) {
+                    write.f(building.health);
+                }
+                
+                // 保存炮台状态
+                write.bool(building instanceof TurretBuild);
+                if (building instanceof TurretBuild) {
+                    write.f(((TurretBuild) building).rotation);
+                    write.f(((TurretBuild) building).reload);
+                }
+                
+                // 保存电力节点链接状态
+                write.bool(building.power != null && building instanceof PowerNodeBuild);
+                if (building.power != null && building instanceof PowerNodeBuild) {
+                    write.i(building.power.links.size);
+                    for (int link : building.power.links) {
+                        write.i(link);
+                    }
+                }
+                
+                // 保存建筑物的物品/液体状态
+                if (building instanceof mindustry.world.blocks.storage.StorageBlock.StorageBuild) {
+                    mindustry.world.blocks.storage.StorageBlock.StorageBuild storage = (mindustry.world.blocks.storage.StorageBlock.StorageBuild) building;
+                    write.i(storage.items.total());
+                    for (int i = 0; i < storage.items.size; i++) {
+                        if (storage.items.get(i) > 0) {
+                            write.b((byte) i);
+                            write.i(storage.items.get(i));
+                        }
+                    }
+                    write.b((byte) -1); // 结束标记
+                } else if (building instanceof mindustry.world.blocks.storage.CoreBlock.CoreBuild) {
+                    mindustry.world.blocks.storage.CoreBlock.CoreBuild core = (mindustry.world.blocks.storage.CoreBlock.CoreBuild) building;
+                    write.i(core.items.total());
+                    for (int i = 0; i < core.items.size; i++) {
+                        if (core.items.get(i) > 0) {
+                            write.b((byte) i);
+                            write.i(core.items.get(i));
+                        }
+                    }
+                    write.b((byte) -1); // 结束标记
+                }
+            }
+        }
+    }
+    
+    /**
+     * 从数据流加载子世界状态 (修复重进地图子世界物品消失的问题)
+     */
+    @Override
+    public void read(Reads read, boolean legacy) {
+        super.read(read, legacy);
+        
+        // 读取子世界尺寸
+        short width = read.s();
+        short height = read.s();
+        
+        if (width > 0 && height > 0) {
+            // 重新创建子世界
+            unitWorld = new World();
+            unitWorld.tiles = new Tiles(width, height);
+            for (int i = 0; i < width * height; i++) {
+                unitWorld.tiles.set(i % width, i / height, new UnitTile(i % width, i / height));
+            }
+            unitWorld.tiles.eachTile(tile -> tile.setFloor(Blocks.metalFloor.asFloor()));
+            
+            // 读取建筑物数量
+            int buildingCount = read.i();
+            buildings.clear();
+            
+            // 重新创建建筑物
+            for (int i = 0; i < buildingCount; i++) {
+                int blockIndex = read.b() & 0xFF;
+                float x = read.f();
+                float y = read.f();
+                byte teamId = (byte) (read.b() & 0xFF);
+                byte rotation = (byte) (read.b() & 0xFF);
+                
+                Block block = Vars.content.block(blockIndex);
+                if (block != null) {
+                    // 在子世界中创建建筑
+                    int tx = (int) (x / Vars.tilesize);
+                    int ty = (int) (y / Vars.tilesize);
+                    if (tx >= 0 && tx < width && ty >= 0 && ty < height) {
+                        Building building = unitWorld.tile(tx, ty).setBlock(block, Vars.teams.get(teamId), rotation, () -> {
+                            Building b = unitWorld.tile(tx, ty).build;
+                            // 恢复建筑状态
+                            if (read.bool()) {
+                                b.health = read.f();
+                            }
+                            
+                            // 恢复炮台状态
+                            if (read.bool() && b instanceof TurretBuild) {
+                                TurretBuild turret = (TurretBuild) b;
+                                turret.rotation = read.f();
+                                turret.reload = read.f();
+                            }
+                            
+                            // 恢复电力节点链接
+                            if (read.bool() && b.power != null && b instanceof PowerNodeBuild) {
+                                PowerNodeBuild node = (PowerNodeBuild) b;
+                                int linkCount = read.i();
+                                for (int j = 0; j < linkCount; j++) {
+                                    node.configureAny(read.i());
+                                }
+                            }
+                            
+                            // 恢复存储状态
+                            if (b instanceof mindustry.world.blocks.storage.StorageBlock.StorageBuild) {
+                                mindustry.world.blocks.storage.StorageBlock.StorageBuild storage = (mindustry.world.blocks.storage.StorageBlock.StorageBuild) b;
+                                int itemCount = read.b() & 0xFF;
+                                while (itemCount != 0xFF) { // -1 转换为 255
+                                    storage.items.set(itemCount, read.i());
+                                    itemCount = read.b() & 0xFF;
+                                }
+                            } else if (b instanceof mindustry.world.blocks.storage.CoreBlock.CoreBuild) {
+                                mindustry.world.blocks.storage.CoreBlock.CoreBuild core = (mindustry.world.blocks.storage.CoreBlock.CoreBuild) b;
+                                int itemCount = read.b() & 0xFF;
+                                while (itemCount != 0xFF) { // -1 转换为 255
+                                    core.items.set(itemCount, read.i());
+                                    itemCount = read.b() & 0xFF;
+                                }
+                            }
+                            
+                            return b;
+                        });
+                        
+                        if (building != null) {
+                            buildings.add(building);
+                            if (building instanceof TurretBuild) {
+                                turrets.add((TurretBuild) building);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

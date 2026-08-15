@@ -160,6 +160,7 @@ public class Z_Factory {
             size = 2;
             health = 400;
             craftTime = 60f;
+            results = ItemStack.with(Items.copper, 10, Items.lead, 8);
             consume(new ConsumeItems(ItemStack.with(Items.coal, 1)));
         }};
     }
@@ -170,6 +171,7 @@ public class Z_Factory {
             size = 2;
             health = 500;
             craftTime = 80f;
+            results = ItemStack.with(Items.copper, 15, Items.lead, 12, Items.titanium, 8);
             consumeLiquid(Liquids.water, 0.2f);
             consume(new ConsumeItems(ItemStack.with(Items.copper, 2)));
         }};
@@ -181,6 +183,7 @@ public class Z_Factory {
             size = 2;
             health = 350;
             craftTime = 40f;
+            results = ItemStack.with(Items.copper, 12, Items.lead, 8, Items.silicon, 5);
             consumePower(1.5f);
             consume(new ConsumeItems(ItemStack.with(Items.copper, 1)));
         }};
@@ -192,6 +195,7 @@ public class Z_Factory {
             size = 3;
             health = 600;
             craftTime = 120f;
+            results = ItemStack.with(Items.copper, 18, Items.titanium, 12, Items.silicon, 8, Items.coal, 5);
             consumePower(2.0f);
             consumeLiquid(Liquids.water, 0.3f);
             consume(new ConsumeItems(ItemStack.with(Items.coal, 3)));
@@ -204,6 +208,7 @@ public class Z_Factory {
             size = 2;
             health = 450;
             craftTime = 100f;
+            results = ItemStack.with(Items.copper, 25, Items.titanium, 18, Items.silicon, 12);
             consumePower(1.8f);
         }};
     }
@@ -213,7 +218,9 @@ public class Z_Factory {
             requirements(Category.production, ItemStack.with(Items.copper, 20, Items.plastanium, 15, Items.silicon, 10));
             size = 2;
             health = 300;
-            consumeLiquid(Liquids.water, 0.1f);
+            craftTime = 60f;
+            results = ItemStack.with(Items.copper, 12, Items.plastanium, 8, Items.silicon, 5);
+            consumePower(1.2f);
         }};
     }
     
@@ -221,19 +228,20 @@ public class Z_Factory {
         sporePyrolyser = new SporePyrolyser("spore-pyrolyser") {{
             requirements(Category.production, ItemStack.with(Items.copper, 35, Items.titanium, 30, Items.silicon, 25));
             size = 3;
-            health = 700;
+            health = 500;
             craftTime = 90f;
+            results = ItemStack.with(Items.copper, 20, Items.titanium, 15, Items.silicon, 10);
             consumePower(2.5f);
-            consumeLiquid(Liquids.water, 0.4f);
         }};
     }
     
     private static void createHoldingCrucible() {
         holdingCrucible = new HoldingCrucible("holding-crucible") {{
             requirements(Category.crafting, ItemStack.with(Items.copper, 50, Items.lead, 40, Items.titanium, 30));
-            size = 4;
-            health = 2400;
-            consumeLiquid(Liquids.water, 0.2f);
+            size = 2;
+            health = 600;
+            craftTime = 120f;
+            results = ItemStack.with(Items.copper, 30, Items.lead, 20, Items.titanium, 12);
             consume(new ConsumeItems(ItemStack.with(Items.lead, 5)));
         }};
     }

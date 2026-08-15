@@ -5217,11 +5217,30 @@ public class Z_Units {
         //  - drawBody() 渲染 hack: 子世界建筑物跟随单位移动和旋转
         // ═══════════════════════════════════════════════════════════
         terra = new WorldUnitType("terra") {{
-            health = 16500f;
-            speed = 0.5f;  // 加快移动速度: 0.35f → 0.5f (+42.8%)
+            health = 26750f;  // 增加血量: 16500 + 10250 = 26750
+            speed = 0.7f;    // 进一步加快移动速度: 0.5f → 0.7f (+40%)
             hitSize = 60f;
-            armor = 32f;    // 提高护甲: 28f → 32f (+14.3%)
-            flying = false;  // 陆军单位
+            armor = 32f;     // 提高护甲: 28f → 32f (+14.3%)
+            // 低空飞行+陆地移动 (参考FO模组'消沉'单位)
+            flying = true;
+            hovering = true;
+            lockLegBase = true;
+            lowAltitude = true;
+            shadowElevation = 8f;     // 控制阴影高度
+            groundLayer = Layer.darkness + 1f;  // 地面渲染层级
+            // 添加腿部渲染配置 (Terra单位有腿)
+            legCount = 8;
+            legGroupSize = 2;
+            legPairOffset = 1f;
+            legMoveSpace = 0.33f;
+            legBaseOffset = 51.25f / 4f;
+            legLength = 672f;
+            legExtension = -48f;
+            legForwardScl = 0.75f;
+            legLengthScl = 0.9f;
+            baseLegStraightness = 1f;
+            legStraightness = 0.01f;
+            legStraightLength = 4f;
             rotateSpeed = 1.0f;
             accel = 0.08f;  // 加快加速度以配合新速度
             drag = 0.03f;   // 略微减少阻力以保持高速
