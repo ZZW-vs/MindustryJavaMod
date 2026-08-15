@@ -1,23 +1,34 @@
 package zzw.content.blocks.production;
 
 import arc.graphics.g2d.Draw;
-import zzw.content.blocks.GraphBlock;
 import zzw.content.graphics.UnityDrawf;
-import zzw.content.modules.GraphCrucibleModule;
-import zzw.content.modules.GraphHeatModule;
+import zzw.content.mechanics.torque.blocks.GraphBlock;
+import zzw.content.mechanics.torque.modules.GraphCrucibleModule;
+import zzw.content.mechanics.torque.modules.GraphHeatModule;
 
 /**
  * 坩埚容器 (PU132 unity.world.blocks.production.HoldingCrucible 移植)
- * <p>继承 GraphBlock。drawContents() 显示坩埚液体颜色,
+ * <p>继承完整版 GraphBlock (zzw.content.mechanics.torque)。drawContents() 显示坩埚液体颜色,
  * UnityDrawf.drawHeat 渲染热力叠加, 使用 GraphBuildBase.crucible() 获取 GraphCrucibleModule。</p>
  *
  * <p>适配说明:
  * <ul>
- *   <li>unity.world.blocks.GraphBlock → zzw.content.blocks.GraphBlock</li>
+ *   <li>unity.world.blocks.GraphBlock → zzw.content.mechanics.torque.blocks.GraphBlock (完整版)</li>
  *   <li>unity.graphics.UnityDrawf → zzw.content.graphics.UnityDrawf</li>
- *   <li>unity.world.modules.GraphCrucibleModule → zzw.content.modules.GraphCrucibleModule</li>
+ *   <li>unity.world.modules.GraphCrucibleModule → zzw.content.mechanics.torque.modules.GraphCrucibleModule</li>
  *   <li>增加 crucible()/heat() 的 null 检查, 防止未配置图时崩溃</li>
  * </ul></p>
+ *
+ * <p>注册配置 (PU132 UnityBlocks.java L2981-2987):
+ * <pre>{@code
+ * holdingCrucible = new HoldingCrucible("holding-crucible"){{
+ *     requirements(Category.crafting, with(...));
+ *     size = 4;
+ *     health = 2400;
+ *     addGraph(new GraphCrucible(50f, false).setAccept(0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0));
+ *     addGraph(new GraphHeat(275f, 0.05f, 0.01f).setAccept(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1));
+ * }};
+ * }</pre></p>
  */
 public class HoldingCrucible extends GraphBlock{
 
@@ -40,10 +51,10 @@ public class HoldingCrucible extends GraphBlock{
             drawTeamTop();
         }
 
-        /** 绘制坩埚内的液体 (颜色由 GraphCrucibleModule.getNetwork().color 决定) */
+        /** 绘制坩埚内的液体 (颜色由 CrucibleGraph.color 决定) */
         void drawContents(){
             GraphCrucibleModule crucGraph = crucible();
-            if(crucGraph != null && crucGraph.getVolumeContained() > 0f){
+            if(crucGraph != null && crucGraph.getVolumeContained() > 0f && crucGraph.getNetwork() != null){
                 Draw.color(crucGraph.getNetwork().color);
                 Draw.rect(liquidRegion, x, y);
             }

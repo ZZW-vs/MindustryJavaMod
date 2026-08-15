@@ -8,12 +8,12 @@ import arc.util.io.Reads;
 import arc.util.io.Writes;
 import mindustry.world.blocks.production.GenericCrafter;
 import zzw.content.graphics.UnityDrawf;
-import zzw.content.graphs.GraphBlockBase;
-import zzw.content.graphs.GraphBuildBase;
-import zzw.content.graphs.GraphHeat;
-import zzw.content.graphs.Graphs;
-import zzw.content.modules.GraphHeatModule;
-import zzw.content.modules.GraphModules;
+import zzw.content.mechanics.torque.blocks.GraphBlockBase;
+import zzw.content.mechanics.torque.blocks.GraphBlockBase.GraphBuildBase;
+import zzw.content.mechanics.torque.graphs.GraphHeat;
+import zzw.content.mechanics.torque.graphs.Graphs;
+import zzw.content.mechanics.torque.modules.GraphHeatModule;
+import zzw.content.mechanics.torque.modules.GraphModules;
 
 import static arc.Core.*;
 
@@ -25,7 +25,7 @@ import static arc.Core.*;
  *
  * <p>适配说明:
  * <ul>
- *   <li>PU132 实现 GraphBlockBase 接口 → 本项目同样实现 zzw.content.graphs.GraphBlockBase,
+ *   <li>PU132 实现 GraphBlockBase 接口 → 本项目同样实现 zzw.content.mechanics.torque.blocks.GraphBlockBase (完整版),
  *       在构造函数中注册 GraphHeat 连接器, 使 heat() 可用</li>
  *   <li>unity.graphics.UnityDrawf.drawHeat → zzw.content.graphics.UnityDrawf.drawHeat</li>
  *   <li>GraphBuildBase.heat() 返回 GraphHeatModule, 调用 getTemp() 获取温度 (K)</li>
