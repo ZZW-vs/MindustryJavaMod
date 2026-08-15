@@ -9,9 +9,13 @@ import arc.scene.ui.layout.Table;
 import arc.struct.Seq;
 import arc.util.Tmp;
 import arc.Core;
+import arc.Events;
 import mindustry.Vars;
 import mindustry.core.World;
+import mindustry.game.EventType.Trigger;
 import mindustry.gen.Building;
+import mindustry.gen.Bullet;
+import mindustry.gen.Groups;
 import mindustry.gen.Unit;
 import mindustry.graphics.Layer;
 import mindustry.ui.Styles;
@@ -20,21 +24,19 @@ import zzw.content.units.entities.WorldUnitEntity;
 /**
  * 世界单位类型 (PU132 unity.type.UnityUnitType 中 Worldc 渲染部分移植)
  *
- * 继承 UnityUnitType, 添加:
- * - worldWidth / worldHeight: 子世界尺寸 (tile 数)
- * - drawBody() 渲染 hack: 让子世界中的建筑物跟随单位移动和旋转
+ * <p>继承 UnityUnitType, 添加:
+ * <ul>
+ *   <li>worldWidth / worldHeight: 子世界尺寸 (tile 数)</li>
+ *   <li>drawBody() 渲染 hack: 让子世界中的建筑物跟随单位移动和旋转</li>
+ *   <li>updateInteraction(): 鼠标悬停/点击交互 (不受单位碰撞箱限制)</li>
+ * </ul>
  *
- * 适配 v155.4 改动:
- * - 去掉 altBatch (用普通 batch, 接受可能的半透明排序 bug)
- * - constructor 设为 WorldUnitEntity::create
- * - 简化渲染 hack, 核心功能保留 (保存/恢复 camera + proj, 旋转投影, 遍历 buildings.draw())
- *
- * 渲染 hack 原理 (PU132 UnityUnitType.drawBody L683-729):
- * 1. 保存当前 camera.position 和 Draw.proj()
- * 2. 计算偏移让子世界中心对齐单位位置
- * 3. Draw.proj(camera) + Draw.proj().rotate(r) 旋转投影
- * 4. 遍历 buildings 调用 b.draw()
- * 5. 恢复 camera 和 proj
+ * <p>适配 v155.4 改动:
+ * <ul>
+ *   <li>去掉 altBatch (用普通 batch, 接受可能的半透明排序 bug)</li>
+ *   <li>constructor 设为 WorldUnitEntity::create</li>
+ *   <li>Draw.sort(false) 确保建筑和子弹在单位之上</li>
+ * </ul>
  */
 public class WorldUnitType extends UnityUnitType {
 
@@ -44,13 +46,24 @@ public class WorldUnitType extends UnityUnitType {
 
     public WorldUnitType(String name) {
         super(name);
-        // ★ 适配: 设为 WorldUnitEntity 工厂方法 (PU132 通过注解处理器自动设置)
         constructor = WorldUnitEntity::create;
     }
 
     /**
      * 重写 drawBody: 在正常单位渲染后, 绘制子世界中的建筑物
-     * (原 PU132 UnityUnitType.drawBody 中 `if(unit instanceof Worldc)` 块)
+     * <p>渲染 hack 原理 (PU132 UnityUnitType.drawBody):
+     * <ol>
+     *   <li>保存当前 camera.position 和 Draw.proj()</li>
+     *   <li>计算偏移让子世界中心对齐单位位置</li>
+     *   <li>Draw.proj(camera) + Draw.proj().rotate(r) 旋转投影</li>
+     *   <li>Draw.sort(false) 关闭 z 排序, 按 call order 绘制</li>
+     *   <li>遍历 buildings 调用 b.draw() (建筑内部自定 z)</li>
+     *   <li>遍历 Groups.bullet 绘制子世界炮台发射的子弹</li>
+     *   <li>恢复 camera 和 proj</li>
+     * </ol>
+     *
+     * <p>★ 关键修复: 用 Draw.sort(false) 替代原来的 Draw.sort(true),
+     * 确保所有建筑和子弹都在单位 body 之上绘制, 不会被 z 排序到单位下方。</p>
      */
     @Override
     public void drawBody(Unit unit) {
@@ -64,7 +77,6 @@ public class WorldUnitType extends UnityUnitType {
             Draw.draw(z + 0.0001f, () -> {
                 Seq<Building> build = w.buildings;
                 World world = w.unitWorld;
-                // 子世界未初始化时跳过
                 if (world == null || build == null || build.isEmpty()) return;
 
                 float cx = world.width() * Vars.tilesize / 2f, cy = world.height() * Vars.tilesize / 2f;
@@ -75,39 +87,34 @@ public class WorldUnitType extends UnityUnitType {
                 Vec2 cam = Core.camera.position;
                 float camX = cam.x, camY = cam.y;
                 float cw = Core.camera.width / 2f, ch = Core.camera.height / 2f;
-                // 子世界中心偏移 (旋转后)
                 Tmp.v2.set(-cx, -cy).rotate(r);
-
-                // 计算单位在屏幕坐标中的位置, 加上子世界中心偏移
                 Tmp.v1.set(unit).sub(camX, camY).add(cw, ch).add(Tmp.v2);
-
-                // 移动 camera 让子世界中心对齐单位位置
                 cam.set(cw - Tmp.v1.x, ch - Tmp.v1.y);
                 Core.camera.update();
                 Draw.flush();
 
-                // ★ 适配: 省略 altBatch, 用普通 batch (接受可能的半透明排序 bug)
-
-                // 设置投影: 先用 camera 投影, 再旋转 r 度
                 Draw.proj(Core.camera);
                 Draw.proj().rotate(r);
-                Draw.sort(true);
 
-                // 遍历子世界建筑物, 逐个绘制
-                // ★ 不设固定 Draw.z(Layer.block), 让每个建筑自己决定渲染层级
-                // 这样传送带上的物品、炮台旋转等内部动画能正确渲染
+                // ★ 关闭 z 排序: 按 call order 绘制, 确保建筑和子弹都在单位之上
+                Draw.sort(false);
+
+                // 绘制建筑 (含传送带物品、炮台旋转等内部动画)
                 for (int i = 0; i < build.size; i++) {
                     build.get(i).draw();
                 }
 
-                // Should fix the blending bug.
-                Draw.z(9999f);
-                Draw.color(Color.clear);
-                Fill.rect(0, 0, 0, 0);
+                // 绘制子世界炮台发射的子弹 (在建筑之上)
+                // 遍历所有子弹, 检查 owner 是否为子世界建筑
+                for (Bullet bullet : Groups.bullet) {
+                    Object owner = bullet.owner;
+                    if (owner instanceof Building b && build.contains(b)) {
+                        bullet.draw();
+                    }
+                }
 
-                Draw.reset();
                 Draw.flush();
-                Draw.sort(false);
+                Draw.sort(true);
 
                 // 恢复 camera 和投影
                 cam.set(camX, camY);
@@ -119,48 +126,92 @@ public class WorldUnitType extends UnityUnitType {
         Draw.z(z);
     }
 
-    /**
-     * 鼠标悬停显示：单位状态 + 鼠标所在位置的建筑状态
-     * <p>如果鼠标悬停在单位上的某个建筑位置，额外显示该建筑的信息。</p>
-     */
-    @Override
-    public void display(Unit unit, Table table){
-        super.display(unit, table);
+    // ===== 鼠标交互 (不受单位碰撞箱限制) =====
 
-        if(unit instanceof WorldUnitEntity w && w.unitWorld != null && !w.buildings.isEmpty()){
-            table.row();
-            table.table(Styles.grayPanel, t -> {
-                t.add("[accent]单位上的建筑 (" + w.buildings.size + ")").left().row();
-                // 检测鼠标在哪个建筑上
-                float mx = Core.input.mouseWorldX(), my = Core.input.mouseWorldY();
-                mindustry.gen.Building hovered = w.buildingAt(mx, my);
-                if(hovered != null){
-                    t.table(bt -> {
-                        bt.left();
-                        bt.image(hovered.block.uiIcon).size(24f);
-                        bt.add(hovered.block.localizedName).left();
-                        bt.row();
-                        bt.add("[lightgray]血量: " + (int)hovered.health + "/" + (int)hovered.maxHealth).left().row();
-                        if(hovered.items != null && hovered.items.total() > 0){
-                            bt.add("[lightgray]物品: " + hovered.items.total()).left();
-                        }
-                        if(hovered.power != null){
-                            bt.add("[lightgray]电力: " + (int)(hovered.power.status * 100) + "%").left().row();
-                        }
-                    }).pad(4).left();
-                } else {
-                    // 没有悬停在特定建筑上时，显示建筑列表摘要
-                    t.table(bt -> {
-                        bt.left().top();
-                        int cols = 6;
-                        int i = 0;
-                        for(Building b : w.buildings){
-                            if(i++ % cols == 0) bt.row();
-                            bt.image(b.block.uiIcon).size(16f).pad(2);
-                        }
-                    }).pad(4).left();
+    /** 当前悬停的子世界建筑 */
+    private static Building hoveredBuild;
+    /** 悬停信息表 */
+    private static Table hoverTable;
+
+    /**
+     * 每帧更新: 检测鼠标是否在某个世界单位的子世界建筑上, 并处理交互。
+     * <p>需要在模组初始化时用 Events.run(Trigger.update, WorldUnitType::updateInteraction) 注册。</p>
+     * <ul>
+     *   <li>悬停: 显示建筑信息 (名称/血量/物品/电力)</li>
+     *   <li>点击: 打开建筑配置 UI (同原版点击方块)</li>
+     * </ul>
+     */
+    public static void updateInteraction() {
+        if (!Vars.state.isPlaying()) return;
+
+        float mx = Core.input.mouseWorldX(), my = Core.input.mouseWorldY();
+        Building found = null;
+
+        // 遍历所有世界单位, 查找鼠标下的子世界建筑
+        for (Unit unit : Groups.unit) {
+            if (unit instanceof WorldUnitEntity w && w.unitWorld != null && !w.buildings.isEmpty()) {
+                Building b = w.buildingAt(mx, my);
+                if (b != null) {
+                    found = b;
+                    break;
                 }
-            }).growX().padTop(4);
+            }
         }
+
+        if (found != null) {
+            // 建筑变了 → 重建悬停表
+            if (hoveredBuild != found) {
+                hoveredBuild = found;
+                if (hoverTable != null) hoverTable.remove();
+                hoverTable = new Table(Styles.grayPanel);
+                hoverTable.defaults().left().pad(2);
+                hoverTable.image(found.block.uiIcon).size(24f);
+                hoverTable.add(found.block.localizedName).left().row();
+                hoverTable.add("[lightgray]HP: " + (int)found.health + "/" + (int)found.maxHealth).left().row();
+                if (found.items != null && found.items.total() > 0) {
+                    hoverTable.add("[lightgray]物品: " + found.items.total()).left().row();
+                }
+                if (found.power != null) {
+                    hoverTable.add("[lightgray]电力: " + (int)(found.power.status * 100) + "%").left().row();
+                }
+                if (found.liquids != null && found.liquids.currentAmount() > 0) {
+                    hoverTable.add("[lightgray]液体: " + (int)found.liquids.currentAmount()).left().row();
+                }
+                hoverTable.pack();
+                Core.scene.add(hoverTable);
+                hoverTable.toFront();
+            }
+            // 跟随鼠标定位
+            if (hoverTable != null && hoverTable.parent != null) {
+                float sx = Core.input.mouseX() + 16;
+                float sy = Core.scene.getHeight() - Core.input.mouseY() - hoverTable.getHeight() - 8;
+                hoverTable.setPosition(sx, sy);
+            }
+
+            // 点击: 打开配置 UI (同原版点击方块)
+            if (Core.input.justTouched() && !Core.scene.hasMouse()) {
+                if (found.block.configurable && found.shouldShowConfigure(Vars.player)) {
+                    Vars.control.input.config.showConfig(found);
+                } else {
+                    // 非配置建筑: 显示物品栏
+                    Vars.control.input.inv.showFor(found);
+                }
+            }
+        } else {
+            // 鼠标不在任何子世界建筑上
+            hoveredBuild = null;
+            if (hoverTable != null) {
+                hoverTable.remove();
+                hoverTable = null;
+            }
+        }
+    }
+
+    /**
+     * 注册交互系统: 在 ClientLoadEvent 后注册 Trigger.update 回调。
+     * <p>应在模组 init() 中调用。</p>
+     */
+    public static void registerInteraction() {
+        Events.run(Trigger.update, WorldUnitType::updateInteraction);
     }
 }

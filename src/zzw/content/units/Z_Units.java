@@ -5217,23 +5217,22 @@ public class Z_Units {
         //  - drawBody() 渲染 hack: 子世界建筑物跟随单位移动和旋转
         // ═══════════════════════════════════════════════════════════
         terra = new WorldUnitType("terra") {{
-            health = 1200000f;
-            speed = 0.3f;
+            health = 1500000f;
+            speed = 0.35f;
             hitSize = 60f;
-            armor = 24f;
+            armor = 28f;
             flying = true;
-            rotateSpeed = 0.8f;
-            accel = 0.04f;
-            drag = 0.05f;
+            rotateSpeed = 1.0f;
+            accel = 0.05f;
+            drag = 0.04f;
             // 子世界尺寸 (8x18 tile)
             worldWidth = 8;
             worldHeight = 18;
             // 基本外观
             outlineColor = Color.valueOf("3a3a50");
             // 武器: 原版无武器, 但建筑物上的炮台会自动射击
-            // 轻量武器占位 (让单位有攻击能力, 即使没有建筑)
-            range = 400f;
-            maxRange = 400f;
+            range = 500f;
+            maxRange = 500f;
             // constructor 已在 WorldUnitType 构造器中设为 WorldUnitEntity::create
         }};
     }

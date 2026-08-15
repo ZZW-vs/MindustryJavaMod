@@ -42,6 +42,8 @@ public class TestMod extends Mod{
 
         Events.on(EventType.ClientLoadEvent.class, e -> {
             Time.run(WELCOME_DIALOG_DELAY, this::showWelcomeDialog);
+            // 注册世界单位鼠标交互 (悬停显示建筑状态, 点击打开配置)
+            zzw.content.type.WorldUnitType.registerInteraction();
         });
     }
 
