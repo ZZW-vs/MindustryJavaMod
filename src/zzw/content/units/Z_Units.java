@@ -5217,14 +5217,14 @@ public class Z_Units {
         //  - drawBody() 渲染 hack: 子世界建筑物跟随单位移动和旋转
         // ═══════════════════════════════════════════════════════════
         terra = new WorldUnitType("terra") {{
-            health = 1500000f;
-            speed = 0.35f;
+            health = 16500f;
+            speed = 0.5f;  // 加快移动速度: 0.35f → 0.5f (+42.8%)
             hitSize = 60f;
-            armor = 28f;
-            flying = false;  // 修复: 改为陆军单位
+            armor = 32f;    // 提高护甲: 28f → 32f (+14.3%)
+            flying = false;  // 陆军单位
             rotateSpeed = 1.0f;
-            accel = 0.05f;
-            drag = 0.04f;
+            accel = 0.08f;  // 加快加速度以配合新速度
+            drag = 0.03f;   // 略微减少阻力以保持高速
             // 子世界尺寸 (8x18 tile)
             worldWidth = 8;
             worldHeight = 18;

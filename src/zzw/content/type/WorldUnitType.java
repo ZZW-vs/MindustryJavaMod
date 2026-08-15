@@ -28,7 +28,6 @@ import zzw.content.units.entities.WorldUnitEntity;
  * <ul>
  *   <li>worldWidth / worldHeight: 子世界尺寸 (tile 数)</li>
  *   <li>drawBody() 渲染 hack: 让子世界中的建筑物跟随单位移动和旋转</li>
- *   <li>updateInteraction(): 鼠标悬停/点击交互 (不受单位碰撞箱限制)</li>
  * </ul>
  *
  * <p>适配 v155.4 改动:
@@ -124,94 +123,5 @@ public class WorldUnitType extends UnityUnitType {
         }
 
         Draw.z(z);
-    }
-
-    // ===== 鼠标交互 (不受单位碰撞箱限制) =====
-
-    /** 当前悬停的子世界建筑 */
-    private static Building hoveredBuild;
-    /** 悬停信息表 */
-    private static Table hoverTable;
-
-    /**
-     * 每帧更新: 检测鼠标是否在某个世界单位的子世界建筑上, 并处理交互。
-     * <p>需要在模组初始化时用 Events.run(Trigger.update, WorldUnitType::updateInteraction) 注册。</p>
-     * <ul>
-     *   <li>悬停: 显示建筑信息 (名称/血量/物品/电力)</li>
-     *   <li>点击: 打开建筑配置 UI (同原版点击方块)</li>
-     * </ul>
-     */
-    public static void updateInteraction() {
-        if (!Vars.state.isPlaying()) return;
-
-        float mx = Core.input.mouseWorldX(), my = Core.input.mouseWorldY();
-        Building found = null;
-
-        // 遍历所有世界单位, 查找鼠标下的子世界建筑
-        for (Unit unit : Groups.unit) {
-            if (unit instanceof WorldUnitEntity w && w.unitWorld != null && !w.buildings.isEmpty()) {
-                Building b = w.buildingAt(mx, my);
-                if (b != null) {
-                    found = b;
-                    break;
-                }
-            }
-        }
-
-        if (found != null) {
-            // 建筑变了 → 重建悬停表
-            if (hoveredBuild != found) {
-                hoveredBuild = found;
-                if (hoverTable != null) hoverTable.remove();
-                hoverTable = new Table(Styles.grayPanel);
-                hoverTable.defaults().left().pad(2);
-                hoverTable.image(found.block.uiIcon).size(24f);
-                hoverTable.add(found.block.localizedName).left().row();
-                hoverTable.add("[lightgray]HP: " + (int)found.health + "/" + (int)found.maxHealth).left().row();
-                if (found.items != null && found.items.total() > 0) {
-                    hoverTable.add("[lightgray]物品: " + found.items.total()).left().row();
-                }
-                if (found.power != null) {
-                    hoverTable.add("[lightgray]电力: " + (int)(found.power.status * 100) + "%").left().row();
-                }
-                if (found.liquids != null && found.liquids.currentAmount() > 0) {
-                    hoverTable.add("[lightgray]液体: " + (int)found.liquids.currentAmount()).left().row();
-                }
-                hoverTable.pack();
-                Core.scene.add(hoverTable);
-                hoverTable.toFront();
-            }
-            // 跟随鼠标定位
-            if (hoverTable != null && hoverTable.parent != null) {
-                float sx = Core.input.mouseX() + 16;
-                float sy = Core.scene.getHeight() - Core.input.mouseY() - hoverTable.getHeight() - 8;
-                hoverTable.setPosition(sx, sy);
-            }
-
-            // 点击: 打开配置 UI (同原版点击方块)
-            if (Core.input.justTouched() && !Core.scene.hasMouse()) {
-                if (found.block.configurable && found.shouldShowConfigure(Vars.player)) {
-                    Vars.control.input.config.showConfig(found);
-                } else {
-                    // 非配置建筑: 显示物品栏
-                    Vars.control.input.inv.showFor(found);
-                }
-            }
-        } else {
-            // 鼠标不在任何子世界建筑上
-            hoveredBuild = null;
-            if (hoverTable != null) {
-                hoverTable.remove();
-                hoverTable = null;
-            }
-        }
-    }
-
-    /**
-     * 注册交互系统: 在 ClientLoadEvent 后注册 Trigger.update 回调。
-     * <p>应在模组 init() 中调用。</p>
-     */
-    public static void registerInteraction() {
-        Events.run(Trigger.update, WorldUnitType::updateInteraction);
     }
 }
