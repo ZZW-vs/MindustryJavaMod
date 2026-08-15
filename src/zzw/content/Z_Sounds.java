@@ -45,7 +45,8 @@ public class Z_Sounds {
         tenmeikiriShoot,    // tenmeikiri 射击音效
         endgameActive,      // endgame 循环音效
         endgameShoot,       // endgame 主射击音效
-        endgameSmallShoot;  // endgame 副射击音效
+        endgameSmallShoot,  // endgame 副射击音效
+        clang;              // 金属碰撞音效 (PU132 UnitySounds.clang)
 
     public static void load() {
         spaceFracture = loadSound("end/space-fracture");
@@ -87,6 +88,7 @@ public class Z_Sounds {
         endgameActive = loadSound("end/endgame-active");
         endgameShoot = loadSound("end/endgame-shoot");
         endgameSmallShoot = loadSound("end/endgame-small-shoot");
+        clang = loadSound("clang");
     }
 
     /**

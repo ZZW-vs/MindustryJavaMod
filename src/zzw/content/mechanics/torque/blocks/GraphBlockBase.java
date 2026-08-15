@@ -42,6 +42,14 @@ public interface GraphBlockBase{
             return gms().torque();
         }
 
+        default GraphHeatModule heat(){
+            return gms().heat();
+        }
+
+        default GraphCrucibleModule crucible(){
+            return gms().crucible();
+        }
+
         default void onGraphUpdate(){}
 
         default void onNeighboursChanged(){}
