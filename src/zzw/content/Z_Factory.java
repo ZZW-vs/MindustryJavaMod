@@ -8,6 +8,7 @@ import mindustry.type.ItemStack;
 import mindustry.world.Block;
 import mindustry.world.blocks.production.Drill;
 import mindustry.world.consumers.ConsumeItems;
+import mindustry.world.consumers.ConsumeLiquid;
 import zzw.content.blocks.soul.SoulInfuser;
 import zzw.content.mechanics.FactoryBoost;
 import zzw.content.blocks.production.BurnerSmelter;
@@ -172,7 +173,7 @@ public class Z_Factory {
             health = 500;
             craftTime = 80f;
             outputItems = ItemStack.with(Items.copper, 15, Items.lead, 12, Items.titanium, 8);
-            consumeLiquid(Liquids.water, 0.2f);
+            consume(new ConsumeLiquid(Liquids.water, 0.2f));
             consume(new ConsumeItems(ItemStack.with(Items.copper, 2)));
         }};
     }
