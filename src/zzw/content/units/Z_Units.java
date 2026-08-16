@@ -19,6 +19,7 @@ import mindustry.entities.bullet.ShrapnelBulletType;
 import mindustry.gen.Sounds;
 import mindustry.gen.UnitEntity;
 import mindustry.graphics.Pal;
+import mindustry.graphics.Layer;
 import mindustry.type.UnitType;
 import mindustry.type.Weapon;
 
@@ -5241,6 +5242,13 @@ public class Z_Units {
             baseLegStraightness = 1f;
             legStraightness = 0.01f;
             legStraightLength = 4f;
+            // 确保腿部正确渲染
+            drawCell = true;
+            // 腿部渲染相关
+            legSplashRange = 50f;
+            legSplashDamage = 1000f;
+            mechStepParticles = true;
+            mechLegColor = Pal.darkMetal;
             rotateSpeed = 1.0f;
             accel = 0.08f;  // 加快加速度以配合新速度
             drag = 0.03f;   // 略微减少阻力以保持高速
