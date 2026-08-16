@@ -9,6 +9,7 @@ import mindustry.world.Block;
 import mindustry.world.blocks.production.Drill;
 import mindustry.world.consumers.ConsumeItems;
 import mindustry.world.consumers.ConsumeLiquid;
+import mindustry.world.consumers.ConsumeLiquidBase;
 import zzw.content.blocks.soul.SoulInfuser;
 import zzw.content.mechanics.FactoryBoost;
 import zzw.content.blocks.production.BurnerSmelter;

@@ -3,7 +3,8 @@ package zzw.content.blocks.production;
 import mindustry.type.Liquid;
 import mindustry.type.LiquidStack;
 import mindustry.ui.Bar;
-import mindustry.world.consumers.ConsumeLiquids;
+import mindustry.world.consumers.ConsumeLiquid;
+import mindustry.world.consumers.ConsumeLiquidBase;
 
 import static arc.Core.bundle;
 
@@ -28,14 +29,16 @@ public class LiquidsSmelter extends StemGenericCrafter{
 
     @Override
     public void init(){
-        ConsumeLiquids consume = findConsumer(c -> c instanceof ConsumeLiquids);
+        ConsumeLiquidBase consume = findConsumer(c -> c instanceof ConsumeLiquidBase);
         if(consume == null){
-            throw new RuntimeException("LiquidSmelter must have a ConsumeLiquids. Note that filters are not supported.");
+            throw new RuntimeException("LiquidSmelter must have a ConsumeLiquid. Note that filters are not supported.");
         }
 
-        LiquidStack[] stacks = consume.liquids;
-        liquids = new Liquid[stacks.length];
-        for(int i = 0; i < liquids.length; i++) liquids[i] = stacks[i].liquid;
+        // 由于ConsumeLiquid没有liquids数组，我们直接使用传入的液体
+        if(consume instanceof ConsumeLiquid){
+            ConsumeLiquid liquidConsume = (ConsumeLiquid)consume;
+            liquids = new Liquid[]{liquidConsume.liquid};
+        }
 
         super.init();
     }
