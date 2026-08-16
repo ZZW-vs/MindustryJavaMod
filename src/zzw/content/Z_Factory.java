@@ -198,8 +198,9 @@ public class Z_Factory {
             health = 600;
             craftTime = 120f;
             results = ItemStack.with(Items.copper, 18, Items.titanium, 12, Items.silicon, 8, Items.coal, 5);
+            fuelItem = Items.coal; // 设置燃料物品为煤炭
             consumePower(2.0f);
-            consumeLiquid(Liquids.water, 0.3f);
+            consume(new ConsumeLiquid(Liquids.water, 0.3f));
             consume(new ConsumeItems(ItemStack.with(Items.coal, 3)));
         }};
     }
@@ -229,13 +230,15 @@ public class Z_Factory {
             requirements(Category.production, ItemStack.with(Items.copper, 35, Items.titanium, 30, Items.silicon, 25));
             size = 3;
             health = 500;
+            outputItems = ItemStack.with(Items.copper, 20, Items.titanium, 15, Items.silicon, 10);
+            craftTime = 90f;
             consumePower(2.5f);
         }};
     }
     
     private static void createHoldingCrucible() {
         holdingCrucible = new HoldingCrucible("holding-crucible") {{
-            requirements(Category.crafting, ItemStack.with(Items.copper, 50, Items.lead, 40, Items.titanium, 30));
+            requirements(Category.production, ItemStack.with(Items.copper, 50, Items.lead, 40, Items.titanium, 30));
             size = 2;
             health = 600;
             consume(new ConsumeItems(ItemStack.with(Items.lead, 5)));

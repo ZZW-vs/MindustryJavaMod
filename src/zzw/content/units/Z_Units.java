@@ -5222,8 +5222,7 @@ public class Z_Units {
             speed = 0.7f;    // 进一步加快移动速度: 0.5f → 0.7f (+40%)
             hitSize = 60f;
             armor = 32f;     // 提高护甲: 28f → 32f (+14.3%)
-            // 低空飞行单位 (Terra没有腿)
-            flying = true;
+            // 低空飞行单位
             hovering = true;
             lowAltitude = true;
             shadowElevation = 8f;     // 控制阴影高度

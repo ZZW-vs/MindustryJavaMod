@@ -422,15 +422,15 @@ public class Z_Blocks {
 
     // ===== PU132 移植: 大地核心 (TerraCore, 召唤世界单位) =====
     // 点击按钮召唤 terra 世界单位, 单位携带 8x18 子世界可放置建筑物
-    private static void createTerraCore() {
-        terraCore = new TerraCore("terra-core") {{
-            requirements(Category.units, ItemStack.with(Items.lead, 200, Items.silicon, 150, Items.thorium, 100, Items.phaseFabric, 50, Z_Items.advanceAlloy, 80));
-            size = 2;
-            health = 2000;
-            // 绑定召唤的单位类型 (Z_Units.terra 必须已加载)
-            type = (zzw.content.type.WorldUnitType) Z_Units.terra;
-        }};
-    }
+        private static void createTerraCore () {
+            terraCore = new TerraCore("terra-core") {{
+                requirements(Category.units, ItemStack.with(Items.lead, 200, Items.silicon, 150, Items.thorium, 100, Items.phaseFabric, 50, Z_Items.advanceAlloy, 80));
+                size = 2;
+                health = 2000;
+                // 绑定召唤的单位类型 (Z_Units.terra 必须已加载)
+                type = Z_Units.terra;
+            }};
+        }
 
     // ===== PU_V8 移植: 地板 (vanilla Floor / OverlayFloor) =====
     private static void createPUFloors() {
