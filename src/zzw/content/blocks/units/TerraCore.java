@@ -3,7 +3,10 @@ package zzw.content.blocks.units;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.scene.ui.layout.Table;
+import arc.util.io.Reads;
+import arc.util.io.Writes;
 import mindustry.gen.Building;
+import mindustry.gen.Groups;
 import mindustry.gen.Icon;
 import mindustry.gen.Unit;
 import mindustry.graphics.Layer;
@@ -40,6 +43,29 @@ public class TerraCore extends Block {
     public class TerraCoreBuild extends Building {
         /** 当前绑定的世界单位 (null = 尚未召唤) */
         WorldUnitEntity unit;
+        /** 读档时待绑定的单位 id (建筑先于单位加载, 延迟到 updateTile 中解析) */
+        int pendingUnitId = -1;
+
+        /** 数据版本 1: 存档额外写入绑定的单位 id (旧存档 revision=0 不会多读字节) */
+        @Override
+        public byte version() {
+            return 1;
+        }
+
+        @Override
+        public void write(Writes write) {
+            super.write(write);
+            // ★ 保存绑定的单位 id, 重进地图后恢复核心与 Terra 的绑定
+            write.i(unit != null && unit.isAdded() ? unit.id : -1);
+        }
+
+        @Override
+        public void read(Reads read, byte revision) {
+            super.read(read, revision);
+            if (revision >= 1) {
+                pendingUnitId = read.i();
+            }
+        }
 
         @Override
         public void buildConfiguration(Table table) {
@@ -51,6 +77,7 @@ public class TerraCore extends Block {
                     u.y = y;
                     u.rotation = 90f;
                     unit = (WorldUnitEntity) u;
+                    pendingUnitId = -1;
                     u.add();
                     // ★ 初始化子世界 + 迁移附近建筑物
                     ((WorldUnitEntity) u).setup();
@@ -76,6 +103,17 @@ public class TerraCore extends Block {
 
         @Override
         public void updateTile() {
+            // ★ 读档后延迟绑定: 建筑先于单位加载 (map 区块在 entities 之前),
+            // 等 unitId 对应的世界单位出现在 Groups.unit 后再恢复绑定
+            if (unit == null && pendingUnitId != -1) {
+                for (Unit u : Groups.unit) {
+                    if (u.id == pendingUnitId && u instanceof WorldUnitEntity) {
+                        unit = (WorldUnitEntity) u;
+                        pendingUnitId = -1;
+                        break;
+                    }
+                }
+            }
             if (unit != null) {
                 // 接收单位身上的物品到方块中
                 Item item = unit.item();

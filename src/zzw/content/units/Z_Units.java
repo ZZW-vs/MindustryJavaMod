@@ -174,6 +174,9 @@ public class Z_Units {
         // ★ TimeReflect: 反射初始化 Time.runs / DelayRun.delay / DelayRun.finish 字段
         //   让世界单位子世界中建筑物的 Time.run 进入单位自己的队列 (PU132 原版机制)
         TimeReflect.init();
+        // ★ 注册世界单位子世界存档区块 (修复重进地图 Terra 子世界内容消失)
+        //   通过 SaveVersion CustomChunk 保存/恢复子世界建筑, 旧存档自动兼容
+        WorldUnitEntity.registerSaveChunk();
         // ★ 注册 SlowLightningEntity (慢闪电 Entity, 实现 Drawc 接口)
         SlowLightningEntity.register();
 

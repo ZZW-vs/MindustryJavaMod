@@ -10,15 +10,20 @@ import arc.struct.IntMap;
 import arc.struct.IntSeq;
 import arc.struct.IntSet;
 import arc.struct.Seq;
+import arc.util.Log;
 import arc.util.Tmp;
 import arc.util.io.Writes;
 import arc.util.io.Reads;
 import mindustry.Vars;
 import mindustry.content.Blocks;
 import mindustry.core.World;
+import mindustry.game.Team;
 import mindustry.game.Teams.TeamData;
 import mindustry.gen.Building;
+import mindustry.gen.Groups;
+import mindustry.gen.Unit;
 import mindustry.gen.UnitEntity;
+import mindustry.io.SaveVersion;
 import mindustry.world.Block;
 import mindustry.world.Tile;
 import mindustry.world.Tiles;
@@ -26,6 +31,14 @@ import mindustry.world.blocks.defense.turrets.BaseTurret.BaseTurretBuild;
 import mindustry.world.blocks.defense.turrets.ReloadTurret.ReloadTurretBuild;
 import mindustry.world.blocks.defense.turrets.Turret.TurretBuild;
 import mindustry.world.blocks.power.PowerNode.PowerNodeBuild;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 
 /**
  * 世界单位 Entity (PU132 unity.entities.comp.WorldComp 简化移植, 方案A)
@@ -143,20 +156,15 @@ public class WorldUnitEntity extends UnitEntity {
     // ===== setup() (原样搬 WorldComp.setup(), 创建子世界 + 迁移建筑物) =====
 
     public void setup() {
-        WorldUnitType uType = (WorldUnitType) type;
-        int w = uType.worldWidth, h = uType.worldHeight;
-        unitWorld = new World();
-        unitWorld.tiles = new Tiles(w, h);
-        for (int i = 0; i < w * h; i++) {
-            unitWorld.tiles.set(i % w, i / w, new UnitTile(i % w, i / w));
-        }
-        unitWorld.tiles.eachTile(tile -> tile.setFloor(Blocks.metalFloor.asFloor()));
+        // ★ 创建空白子世界 (与读档恢复共用)
+        createWorld();
 
         tmp.clear();
         tmpr.clear();
+        WorldUnitType uType = (WorldUnitType) type;
         TeamData data = team().data();
         if (data.buildingTree != null) {
-            Tmp.r1.setCentered(x, y, w * Vars.tilesize, h * Vars.tilesize);
+            Tmp.r1.setCentered(x, y, uType.worldWidth * Vars.tilesize, uType.worldHeight * Vars.tilesize);
             data.buildingTree.intersect(Tmp.r1, tmp);
         }
 
@@ -306,22 +314,222 @@ public class WorldUnitEntity extends UnitEntity {
     }
 
     /**
-     * 保存子世界状态到数据流 (修复重进地图子世界物品消失的问题)
-     * TODO: 完整的序列化功能需要进一步实现
+     * 创建空白子世界 (setup 迁移建筑 / 读档恢复建筑共用).
+     * <p>步骤:
+     * <ol>
+     *   <li>按 UnitType 的 worldWidth/worldHeight 创建 Tiles</li>
+     *   <li>每个 tile 用 UnitTile (无事件无渲染缓存的轻量 tile)</li>
+     *   <li>地板统一铺 metalFloor</li>
+     * </ol></p>
      */
-    @Override
-    public void write(Writes write) {
-        super.write(write);
-        // 暂时不保存子世界状态，避免编译错误
+    protected void createWorld() {
+        WorldUnitType uType = (WorldUnitType) type;
+        int w = uType.worldWidth, h = uType.worldHeight;
+        unitWorld = new World();
+        unitWorld.tiles = new Tiles(w, h);
+        for (int i = 0; i < w * h; i++) {
+            unitWorld.tiles.set(i % w, i / w, new UnitTile(i % w, i / w));
+        }
+        unitWorld.tiles.eachTile(tile -> tile.setFloor(Blocks.metalFloor.asFloor()));
     }
-    
+
+    // ===== 存档序列化 (修复重进地图子世界内容消失的问题) =====
+    //
+    // 方案: SaveVersion CustomChunk (官方为 mod 提供的自定义存档区块)
+    // <p>不修改 UnitEntity 的 write/read 字节流 —— 单位数据在存档中是定长区块,
+    // 直接追加字段会导致旧存档读档时字节错位、整个存档损坏。
+    // CustomChunk 独立于单位数据, 旧存档没有该区块时自动跳过, 完全向前兼容。</p>
+    // <p>时序: 存档时 custom 区块在 entities 之后写入;
+    // 读档时 custom 区块也在 entities 之后读取 —— 此时所有单位已加载进 Groups.unit,
+    // 可按 unitId 找回单位并重建其子世界。</p>
+
     /**
-     * 从数据流加载子世界状态 (修复重进地图子世界物品消失的问题)
-     * TODO: 完整的序列化功能需要进一步实现
+     * 把子世界建筑数据写入数据流 (由 {@link SaveChunk} 在存档时调用).
+     * <p>格式: [单位id][建筑数量] + 每个建筑 [数据长度][blockId tileX tileY rotation teamId revision writeBase+write数据]</p>
+     *
+     * @param write 存档输出流
      */
-    @Override
-    public void read(Reads read) {
-        super.read(read);
-        // 暂时不恢复子世界状态，避免编译错误
+    public void writeSubWorld(Writes write) throws IOException {
+        write.i(id);
+        if (unitWorld == null || buildings.isEmpty()) {
+            write.i(0);
+            return;
+        }
+        write.i(buildings.size);
+        for (int i = 0; i < buildings.size; i++) {
+            writeBuilding(write, buildings.get(i));
+        }
+    }
+
+    /**
+     * 写入单个建筑: 先缓冲到内存再写入, 附带 4 字节长度前缀.
+     * <p>长度前缀的作用: 读档时单个建筑解析失败 (如 mod 方块被移除) 可以整体跳过,
+     * 不会污染后续数据 —— 与原版 readMap 的容错机制一致。</p>
+     */
+    private void writeBuilding(Writes write, Building b) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream(128);
+        Writes bw = new Writes(new DataOutputStream(out));
+        b.writeBase(bw);
+        b.write(bw);
+        write.i(out.size());
+        write.b(out.toByteArray());
+    }
+
+    /**
+     * 从数据流恢复子世界 (由 {@link SaveChunk} 在读档时调用).
+     * <p>步骤:
+     * <ol>
+     *   <li>createWorld() 重建空白子世界</li>
+     *   <li>逐个建筑: newBuilding + setBlock 放置 → readAll 恢复状态</li>
+     *   <li>第二遍统一 updateProximity, 建立电力网络和物品传输邻近关系</li>
+     * </ol>
+     * 全程临时切换 Vars.world = unitWorld, 保证建筑的 world 查询都落在子世界内
+     * (与 setup() 的做法一致)。</p>
+     *
+     * @param read 存档输入流
+     * @param count 建筑数量 (由调用方从流中读出)
+     */
+    public void readSubWorld(Reads read, int count) throws IOException {
+        if (count <= 0) return;
+        createWorld();
+        buildings.clear();
+        turrets.clear();
+
+        World ow = Vars.world;
+        Vars.world = unitWorld;
+        try {
+            for (int i = 0; i < count; i++) {
+                readBuilding(read);
+            }
+            // ★ 第二遍: 所有建筑就位后统一刷新邻近关系 (电力图/物品传输在此建立)
+            for (int i = 0; i < buildings.size; i++) {
+                buildings.get(i).updateProximity();
+            }
+        } finally {
+            Vars.world = ow;
+        }
+    }
+
+    /**
+     * 读取单个建筑的数据块: [长度][字节数组], 字节数组内为
+     * [blockId tileX tileY rotation teamId revision writeBase+write数据].
+     * <p>先完整读出字节数组再解析 —— 即使解析抛异常, 外层流位置也不会错位。</p>
+     */
+    private void readBuilding(Reads read) throws IOException {
+        int len = read.i();
+        byte[] data = new byte[len];
+        read.input.readFully(data);
+        try (ByteArrayInputStream bin = new ByteArrayInputStream(data)) {
+            restoreBuilding(new Reads(new DataInputStream(bin)));
+        } catch (Exception e) {
+            Log.err("WorldUnit sub-world building restore failed", e);
+        }
+    }
+
+    /**
+     * 在子世界中重建一个建筑 (从已缓冲的 Reads 解析).
+     * <p>步骤:
+     * <ol>
+     *   <li>读取方块 id / tile 坐标 / 朝向 / 队伍 / 数据版本</li>
+     *   <li>block.newBuilding().create() 创建建筑并初始化物品/电力/液体模块</li>
+     *   <li>tile.setBlock 放置 (UnitTile.changeBuild 负责绑定 tile 和 rotation)</li>
+     *   <li>readAll 恢复血量/物品/电力/进度等全部状态</li>
+     * </ol>
+     * 方块缺失或越界时丢弃该建筑 (数据块已隔离, 不影响后续)。</p>
+     */
+    private void restoreBuilding(Reads br) {
+        Block block = Vars.content.block(br.s());
+        int tx = br.s(), ty = br.s();
+        byte rotation = br.b();
+        Team team = Team.get(br.b());
+        byte revision = br.b();
+
+        if (block == null || !block.hasBuilding() || !valid(tx, ty)) return;
+
+        Tile tile = unitWorld.tile(tx, ty);
+        Building nb = block.newBuilding().create(block, team);
+        try {
+            tile.setBlock(block, team, rotation, () -> nb);
+            nb.set(tile.drawx(), tile.drawy());
+            nb.readAll(br, revision);
+            nb.checkAllowUpdate();
+        } catch (Exception e) {
+            // 回滚半初始化的建筑, 避免残留在 tile 上
+            tile.setBlock(Blocks.air);
+            Log.err("WorldUnit sub-world building place failed: @", block.name);
+            return;
+        }
+
+        buildings.add(nb);
+        if (nb instanceof TurretBuild tb) turrets.add(tb);
+    }
+
+    /**
+     * 世界单位存档区块 (注册到 SaveVersion 的 CustomChunk).
+     * <p>区块名 "zzw-world-units", 存档格式:
+     * [单位数量] + 每个单位 {@link #writeSubWorld} 的输出。</p>
+     * <p>读档时按 unitId 在 Groups.unit 中找回单位 (此时单位已全部加载),
+     * 找不到则按长度前缀跳过该单位的全部建筑数据。</p>
+     */
+    public static class SaveChunk implements SaveVersion.CustomChunk {
+        @Override
+        public boolean shouldWrite() {
+            for (Unit u : Groups.unit) {
+                if (u instanceof WorldUnitEntity w && w.unitWorld != null && !w.buildings.isEmpty()) return true;
+            }
+            return false;
+        }
+
+        /** 单人存档专用: 不写入联机同步流 (联机不同步子世界, 与 PU132 原版一致) */
+        @Override
+        public boolean writeNet() {
+            return false;
+        }
+
+        @Override
+        public void write(DataOutput stream) throws IOException {
+            Writes write = new Writes(stream);
+            Seq<WorldUnitEntity> list = new Seq<>(4);
+            for (Unit u : Groups.unit) {
+                if (u instanceof WorldUnitEntity w && w.unitWorld != null) list.add(w);
+            }
+            write.i(list.size);
+            for (WorldUnitEntity w : list) {
+                w.writeSubWorld(write);
+            }
+        }
+
+        @Override
+        public void read(DataInput stream) throws IOException {
+            Reads read = new Reads(stream);
+            int units = read.i();
+            for (int u = 0; u < units; u++) {
+                int unitId = read.i();
+                int count = read.i();
+
+                WorldUnitEntity target = null;
+                for (Unit un : Groups.unit) {
+                    if (un.id == unitId && un instanceof WorldUnitEntity w) {
+                        target = w;
+                        break;
+                    }
+                }
+
+                if (target == null) {
+                    // 找不到对应单位 (已死亡或内容变动): 按长度前缀逐个跳过建筑数据块
+                    for (int i = 0; i < count; i++) {
+                        int len = read.i();
+                        read.input.skipBytes(len);
+                    }
+                    continue;
+                }
+                target.readSubWorld(read, count);
+            }
+        }
+    }
+
+    /** 注册存档区块 (在 Z_Units.load() 中调用一次) */
+    public static void registerSaveChunk() {
+        SaveVersion.addCustomChunk("zzw-world-units", new SaveChunk());
     }
 }

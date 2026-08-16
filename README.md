@@ -183,6 +183,16 @@
 - 免疫所有状态效果
 - ★ constructor 改用 `EndGroundUnit::create`（extends LegsUnit），同时具备防作弊系统和正常显示腿
 
+### 世界单位 (PU132 移植)
+
+#### 大地之核 (terra)
+- 由 **TerraCore 方块** 召唤的超级单位，携带一个可移动的子世界
+- 召唤时自动吸收附近建筑物到自身子世界中，建筑物跟随单位移动和旋转
+- 子世界支持建筑动画、电力网络、物品传输和玩家交互（悬停查看状态 / 点击配置）
+- **存档持久化**：通过 `SaveVersion` CustomChunk 区块保存子世界建筑数据，重进地图后子世界内容完整恢复
+  - 核心与单位的绑定关系一并保存（建筑数据版本保护，旧存档兼容）
+  - 单个建筑解析失败时按长度前缀跳过，不损坏存档
+
 ### 防作弊系统架构
 - **EndLegsUnit extends UnitEntity**：仅用于 End 阵营飞行单位（enigma/voidVessel/chronos/opticaecus），无腿
 - **EndGroundUnit extends LegsUnit**：用于 End 阵营腿单位（ravager/desolation），有腿且实现 Legsc 接口
