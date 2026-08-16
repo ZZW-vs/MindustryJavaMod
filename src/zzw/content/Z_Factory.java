@@ -32,36 +32,36 @@ public class Z_Factory {
     public static Block Pumpkin_Drill;
     // 灵魂注入器 (从 Z_SoulTurrets 移至工厂类, 使用 Category.crafting)
     public static SoulInfuser soulInfuser;
-    
-    // PU132 工厂移植
-    public static BurnerSmelter burnerSmelter;
-    public static LiquidsSmelter liquidsSmelter;
-    public static Press press;
-    public static ExplosiveSeparator explosiveSeparator;
-    public static FloorExtractor floorExtractor;
-    public static SporeFarm sporeFarm;
-    public static SporePyrolyser sporePyrolyser;
-    public static HoldingCrucible holdingCrucible;
+
+    // TODO PU132 工厂移植
+//    public static BurnerSmelter burnerSmelter;
+//    public static LiquidsSmelter liquidsSmelter;
+//    public static Press press;
+//    public static ExplosiveSeparator explosiveSeparator;
+//    public static FloorExtractor floorExtractor;
+//    public static SporeFarm sporeFarm;
+//    public static SporePyrolyser sporePyrolyser;
+//    public static HoldingCrucible holdingCrucible;
 
     public static void load() {
         createPlateMakers();
         createLargePlateMakers();
         createDrills();
         createSoulInfuser();
-        
-        // ===== PU132 工厂移植 =====
-        createBurnerSmelter();
-        createLiquidsSmelter();
-        createPress();
-        createExplosiveSeparator();
-        createFloorExtractor();
-        createSporeFarm();
-        createSporePyrolyser();
-        createHoldingCrucible();
+
+        //TODO ===== PU132 工厂移植 =====
+//        createBurnerSmelter();
+//        createLiquidsSmelter();
+//        createPress();
+//        createExplosiveSeparator();
+//        createFloorExtractor();
+//        createSporeFarm();
+//        createSporePyrolyser();
+//        createHoldingCrucible();
     }
 
     private static FactoryBoost.BoostedGenericCrafter plateMaker(String name,
-            ItemStack[] requirements, mindustry.type.Item input, mindustry.type.Item output, int size_, float craftTime_) {
+                                                                 ItemStack[] requirements, mindustry.type.Item input, mindustry.type.Item output, int size_, float craftTime_) {
         return new FactoryBoost.BoostedGenericCrafter(name) {{
             buildType = BoostedGenericCrafterBuild::new;
             requirements(Category.crafting, requirements);
@@ -76,7 +76,7 @@ public class Z_Factory {
     }
 
     private static FactoryBoost.BoostedGenericCrafter largePlateMaker(String name,
-            ItemStack[] requirements, mindustry.type.Item input, mindustry.type.Item output, float craftTime_) {
+                                                                      ItemStack[] requirements, mindustry.type.Item input, mindustry.type.Item output, float craftTime_) {
         return new FactoryBoost.BoostedGenericCrafter(name) {{
             buildType = BoostedGenericCrafterBuild::new;
             requirements(Category.crafting, requirements);
@@ -154,8 +154,9 @@ public class Z_Factory {
             injectEffect = Fx.smokeCloud;
         }};
     }
+}
     
-    // ===== PU132 工厂移植 =====
+    /* TODO ===== PU132 工厂移植 =====
     
     private static void createBurnerSmelter() {
         burnerSmelter = new BurnerSmelter("burner-smelter") {{
@@ -248,3 +249,4 @@ public class Z_Factory {
         }};
     }
 }
+*/
