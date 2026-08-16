@@ -18,6 +18,7 @@ import zzw.content.blocks.production.Press;
 import zzw.content.blocks.production.ExplosiveSeparator;
 import zzw.content.blocks.production.FloorExtractor;
 import zzw.content.blocks.production.SporeFarm;
+import zzw.content.mechanics.torque.graphs.GraphHeat;
 import zzw.content.blocks.production.SporePyrolyser;
 import zzw.content.blocks.production.HoldingCrucible;
 
@@ -233,6 +234,8 @@ public class Z_Factory {
             outputItems = ItemStack.with(Items.copper, 20, Items.titanium, 15, Items.silicon, 10);
             craftTime = 90f;
             consumePower(2.5f);
+            // 添加热量图，用于驱动生产效率
+            addGraph(new GraphHeat(275f, 0.05f, 0.01f).setAccept(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1));
         }};
     }
     
