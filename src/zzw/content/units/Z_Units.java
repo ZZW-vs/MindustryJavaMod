@@ -5228,7 +5228,10 @@ public class Z_Units {
             // 低空飞行单位
             hovering = true;
             lowAltitude = true;
-            shadowElevation = 8f;     // 控制阴影高度
+            // ★ 影子偏移修复: 影子偏移量 = shadowTX * clamp(elevation, shadowElevation, 1f),
+            //   8f 会导致 clamp 结果为 8 → 影子偏移 -96/-104 像素飞离本体;
+            //   低空单位用 0.1f 让影子贴近本体
+            shadowElevation = 0.1f;
             groundLayer = Layer.darkness + 1f;  // 地面渲染层级
             drawCell = true;
             rotateSpeed = 1.0f;

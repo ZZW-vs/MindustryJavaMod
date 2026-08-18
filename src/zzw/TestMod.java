@@ -42,7 +42,8 @@ public class TestMod extends Mod{
 
         Events.on(EventType.ClientLoadEvent.class, e -> {
             Time.run(WELCOME_DIALOG_DELAY, this::showWelcomeDialog);
-            // WorldUnitType 鼠标交互功能已移除
+            // ★ 注册世界单位子世界鼠标交互 (悬停显示建筑状态 / 点击打开配置和物品界面)
+            zzw.content.type.WorldUnitType.registerInteraction();
         });
     }
 

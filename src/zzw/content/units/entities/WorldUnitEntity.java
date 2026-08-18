@@ -148,6 +148,13 @@ public class WorldUnitEntity extends UnitEntity {
             }
         }
 
+        // ★ 去掉子世界炮台的红温动画 (heat 是 TurretBuild 的开火热度,
+        //   渲染为炮管上的红色 additive 发光; 每帧清零后不再显示,
+        //   射击/索敌/装填等其他行为不受影响)
+        for (int i = 0; i < turrets.size; i++) {
+            turrets.get(i).heat = 0f;
+        }
+
         // ★ TimeReflect: 恢复 Time.runs 为原始主世界队列
         TimeReflect.resetRuns();
         Vars.world = ow;
@@ -363,12 +370,22 @@ public class WorldUnitEntity extends UnitEntity {
 
     /**
      * 写入单个建筑: 先缓冲到内存再写入, 附带 4 字节长度前缀.
+     * <p>数据块内格式: [blockId tileX tileY rotation teamId revision] + writeBase + write 的输出。
+     * 元数据必须先于建筑数据写入 —— 恢复时才能先重建方块再 readAll 恢复状态。</p>
      * <p>长度前缀的作用: 读档时单个建筑解析失败 (如 mod 方块被移除) 可以整体跳过,
      * 不会污染后续数据 —— 与原版 readMap 的容错机制一致。</p>
      */
     private void writeBuilding(Writes write, Building b) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream(128);
         Writes bw = new Writes(new DataOutputStream(out));
+        // ★ 元数据 (与 restoreBuilding 的读取顺序严格一致)
+        bw.s(b.block.id);
+        bw.s(b.tile.x);
+        bw.s(b.tile.y);
+        bw.b(b.rotation);
+        bw.b(b.team.id);
+        bw.b(b.version());
+        // 建筑本体数据 (血量/物品/电力/液体/进度等)
         b.writeBase(bw);
         b.write(bw);
         write.i(out.size());
