@@ -7,6 +7,7 @@ import arc.math.Mat;
 import arc.math.geom.Vec2;
 import arc.scene.ui.layout.Table;
 import arc.struct.Seq;
+import arc.util.Align;
 import arc.util.Tmp;
 import arc.Core;
 import arc.Events;
@@ -19,7 +20,10 @@ import mindustry.gen.Groups;
 import mindustry.gen.Unit;
 import mindustry.graphics.Layer;
 import mindustry.ui.Styles;
+import mindustry.ui.dialogs.BaseDialog;
 import zzw.content.units.entities.WorldUnitEntity;
+
+import static mindustry.Vars.ui;
 
 /**
  * 世界单位类型 (PU132 unity.type.UnityUnitType 中 Worldc 渲染部分移植)
@@ -98,22 +102,29 @@ public class WorldUnitType extends UnityUnitType {
                 // ★ 关闭 z 排序: 按 call order 绘制, 确保建筑和子弹都在单位之上
                 Draw.sort(false);
 
+                // ★ 电力连接线修复: 建筑的 draw() 内部会用 world.build(links) 查链接目标
+                //   (如 PowerNode 的激光连线), 渲染期间切到子世界, 查询才落在子世界建筑上
+                mindustry.core.World ow = Vars.world;
+                Vars.world = world;
+
                 // 绘制建筑 (含传送带物品、炮台旋转等内部动画)
                 for (int i = 0; i < build.size; i++) {
                     build.get(i).draw();
                 }
 
                 // 绘制子世界炮台发射的子弹 (在建筑之上)
-                // 遍历所有子弹, 检查 owner 是否为子世界建筑
+                // 遍历所有子弹, 检查 owner 是否为子世界建筑 (O(1) 集合查询)
                 for (Bullet bullet : Groups.bullet) {
                     Object owner = bullet.owner;
-                    if (owner instanceof Building b && build.contains(b)) {
+                    if (owner instanceof Building b && w.ownsBuilding(b)) {
                         bullet.draw();
                     }
                 }
 
                 Draw.flush();
                 Draw.sort(true);
+
+                Vars.world = ow;
 
                 // 恢复 camera 和投影
                 cam.set(camX, camY);
@@ -200,19 +211,89 @@ public class WorldUnitType extends UnityUnitType {
                 }
             }
         } else {
-            // 鼠标不在任何子世界建筑上
-            hoveredBuild = null;
-            if (hoverTable != null) {
-                hoverTable.remove();
-                hoverTable = null;
+            // 鼠标不在子世界建筑上 → 检查是否悬停在 Terra 本体上
+            WorldUnitEntity hoveredUnit = null;
+            for (Unit unit : Groups.unit) {
+                if (unit instanceof WorldUnitEntity w && w.unitWorld != null && unit.within(mx, my, unit.hitSize / 2f + 8f)) {
+                    hoveredUnit = w;
+                    break;
+                }
+            }
+
+            if (hoveredUnit != null) {
+                // 悬停 Terra 本体: 显示状态信息 (建筑数/部署状态)
+                if (hoverTable == null || hoveredBuild == null) {
+                    hoveredBuild = null; // 清除建筑引用, 标记当前是单位悬停
+                    if (hoverTable != null) hoverTable.remove();
+                    WorldUnitEntity w = hoveredUnit;
+                    hoverTable = new Table(Styles.grayPanel);
+                    hoverTable.defaults().left().pad(4);
+                    hoverTable.add("[accent]" + w.type.localizedName + "[]").left().row();
+                    hoverTable.add("[lightgray]子世界建筑: " + w.buildings.size + " 座").left().row();
+                    hoverTable.add(w.deployed ? "[gold]已部署 - 点击单位打开控制面板[]" : "[lightgray]移动形态 - 点击单位打开控制面板[]").left();
+                    hoverTable.pack();
+                    Core.scene.add(hoverTable);
+                    hoverTable.toFront();
+                }
+                // 跟随鼠标
+                if (hoverTable != null && hoverTable.parent != null) {
+                    float sx = Core.input.mouseX() + 16;
+                    float sy = Core.scene.getHeight() - Core.input.mouseY() - hoverTable.getHeight() - 8;
+                    hoverTable.setPosition(sx, sy);
+                }
+
+                // 点击本体: 打开部署/收起面板 (玩家正在操控该单位时不拦截, 避免影响移动指令)
+                boolean busy = Vars.control.input != null && (Vars.control.input.isPlacing() || Vars.control.input.isBreaking());
+                if (Core.input.justTouched() && !Core.scene.hasMouse() && !busy && !hoveredUnit.isPlayer()) {
+                    showUnitPanel(hoveredUnit);
+                }
+            } else {
+                // 鼠标不在任何子世界建筑/世界单位上
+                hoveredBuild = null;
+                if (hoverTable != null) {
+                    hoverTable.remove();
+                    hoverTable = null;
+                }
             }
         }
+    }
+
+    /**
+     * 打开世界单位控制面板: 部署 / 收起.
+     * <p>部署: 子世界建筑落到主世界真实 tile, 原版输入 (建造菜单/配置/框选/修理) 全部可用;
+     * 收起: 范围内主世界建筑吸回子世界, 单位恢复移动。</p>
+     */
+    public static void showUnitPanel(WorldUnitEntity w) {
+        BaseDialog dialog = new BaseDialog("Terra 控制");
+
+        dialog.cont.add("[accent]" + w.type.localizedName).row();
+        dialog.cont.image().color(Color.gray).fillX().pad(6f).row();
+        dialog.cont.add(w.deployed
+            ? "[gold]当前状态: 已部署[]\n[lightgray]建筑已落在主世界, 可用原版建造菜单和交互。\n收起后单位才能移动。"
+            : "[lightgray]当前状态: 移动形态\n子世界建筑跟随单位移动, 点击建筑可查看和配置。\n部署后建筑落到地面, 原版交互全部可用。"
+        ).labelAlign(Align.center).pad(8f).row();
+
+        // 部署/收起按钮
+        dialog.cont.button(w.deployed ? "收起建筑" : "部署建筑", () -> {
+            if (w.deployed) {
+                int n = w.undeploy();
+                ui.showInfoFade("已收起 " + n + " 座建筑");
+            } else {
+                int n = w.deploy();
+                ui.showInfoFade(n > 0 ? "已部署 " + n + " 座建筑" : "没有可部署的建筑");
+            }
+            dialog.hide();
+        }).size(220f, 50f).pad(8f).row();
+
+        dialog.cont.button("@close", dialog::hide).size(220f, 44f).pad(4f);
+        dialog.show();
     }
 
     /**
      * 注册交互系统: 挂载 Trigger.update 回调。
      * <p>世界单位的子世界建筑不在主世界 tile 上, 原版输入系统找不到它们,
      * 因此通过每帧轮询实现悬停/点击交互 (与 PU132 原版思路一致)。</p>
+     * <p>部署态时建筑在主世界 tile 上, 由原版输入直接处理, 本层自动让位。</p>
      */
     public static void registerInteraction() {
         Events.run(Trigger.update, WorldUnitType::updateInteraction);

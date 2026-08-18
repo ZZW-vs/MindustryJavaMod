@@ -9,6 +9,7 @@ import arc.struct.FloatSeq;
 import arc.struct.IntMap;
 import arc.struct.IntSeq;
 import arc.struct.IntSet;
+import arc.struct.ObjectIntMap;
 import arc.struct.Seq;
 import arc.util.Log;
 import arc.util.Tmp;
@@ -20,6 +21,7 @@ import mindustry.core.World;
 import mindustry.game.Team;
 import mindustry.game.Teams.TeamData;
 import mindustry.gen.Building;
+import mindustry.gen.Bullet;
 import mindustry.gen.Groups;
 import mindustry.gen.Unit;
 import mindustry.gen.UnitEntity;
@@ -86,6 +88,14 @@ public class WorldUnitEntity extends UnitEntity {
         return new WorldUnitEntity();
     }
 
+    // ===== 部署系统字段 =====
+    /** 部署状态: true = 建筑落在主世界真实 tile 上 (原版输入全功能可用), 单位锁定不动 */
+    public boolean deployed = false;
+    /** 子世界建筑 id 集合 (子弹归属判断用, O(1) 查询) */
+    protected transient IntSet buildingIds = new IntSet(16);
+    /** 上一帧位置/朝向 (计算本帧位移, 驱动子弹跟随) */
+    protected transient float lastX, lastY, lastRotation;
+
     /** 返回注册的 classId (绕过 v155.4 的 checkEntityMapping 检查) */
     @Override
     public int classId() {
@@ -101,6 +111,13 @@ public class WorldUnitEntity extends UnitEntity {
 
         // 子世界未初始化时跳过 (setup() 尚未调用)
         if (unitWorld == null) return;
+
+        // ★ 部署状态: 建筑已挂主世界 (由原版系统更新), 单位锁定不动
+        if (deployed) {
+            vel.setZero();
+            followBullets();
+            return;
+        }
 
         float cx = unitWorld.width() * Vars.tilesize / 2f, cy = unitWorld.height() * Vars.tilesize / 2f;
         float r = rotation - 90f;
@@ -158,13 +175,65 @@ public class WorldUnitEntity extends UnitEntity {
         // ★ TimeReflect: 恢复 Time.runs 为原始主世界队列
         TimeReflect.resetRuns();
         Vars.world = ow;
+
+        // ★ 子弹跟随: 子世界炮台发射的子弹 (含蓄力激光) 每帧跟随单位移动旋转,
+        //   否则激光突刺类长寿命子弹会停在发射位置不随单位走
+        followBullets();
     }
 
-    // ===== setup() (原样搬 WorldComp.setup(), 创建子世界 + 迁移建筑物) =====
+    /**
+     * 让子世界建筑发射的子弹跟随单位本帧的位移和旋转.
+     * <p>子弹是独立实体, 生成后位置固定; 蓄力激光 (LaserBulletType 等长寿命子弹)
+     * 会一直停留在发射位置 —— 单位移动时看起来"激光留在原地"。
+     * 这里按上一帧位置差计算 delta, 对归属子弹做平移 + 绕单位中心旋转。</p>
+     * <p>归属判断: bullet.owner 是本单位的子世界建筑 (buildingIds 集合 O(1) 查询)。</p>
+     */
+    protected void followBullets() {
+        float dx = x - lastX, dy = y - lastY;
+        float dr = rotation - lastRotation;
 
+        if ((dx != 0f || dy != 0f || dr != 0f) && buildingIds.size > 0) {
+            for (Bullet blt : Groups.bullet) {
+                if (blt.owner instanceof Building ob && buildingIds.contains(ob.id)) {
+                    if (dr != 0f) {
+                        // 绕单位中心旋转 (与子世界渲染投影公式一致)
+                        Tmp.v1.set(blt.x, blt.y).sub(this).rotate(dr).add(this);
+                        blt.set(Tmp.v1.x, Tmp.v1.y);
+                        blt.rotation(blt.rotation() + dr);
+                    } else {
+                        blt.set(blt.x + dx, blt.y + dy);
+                    }
+                }
+            }
+        }
+        lastX = x;
+        lastY = y;
+        lastRotation = rotation;
+    }
+
+    // ===== setup / absorb / deploy (召唤初始化 + 收起/部署 双向迁移) =====
+
+    /**
+     * 召唤时初始化: 创建空白子世界并吸收脚下建筑 (PU132 WorldComp.setup 原逻辑).
+     */
     public void setup() {
         // ★ 创建空白子世界 (与读档恢复共用)
         createWorld();
+        absorb();
+    }
+
+    /**
+     * 收起: 吸收单位范围内的主世界建筑到子世界.
+     * <p>部署后玩家在单位区域内新建的建筑也在此一并吸收。
+     * 与 deploy() 互为逆操作; 朝向自动归整到 90 度倍数保证 tile 网格对齐。</p>
+     *
+     * @return 本次吸收的建筑数量
+     */
+    public int absorb() {
+        if (unitWorld == null) createWorld();
+        deployed = false;
+        // ★ 朝向归整到 90 度倍数: 任意角度时 tile 映射无法对齐主世界网格
+        rotation = Math.round(rotation / 90f) * 90f;
 
         tmp.clear();
         tmpr.clear();
@@ -177,16 +246,23 @@ public class WorldUnitEntity extends UnitEntity {
 
         tmpLinks.clear();
         tmpAdded.clear();
+        int absorbed = 0;
         for (Building building : tmp) {
             if (validPlace(building.tile) && tmpAdded.add(building.id)) {
-                int tx = conX(building.tile.x);
-                int ty = conY(building.tile.y);
+                // 向量法映射建筑中心像素 (含单位朝向旋转, 任意 90 度朝向正确)
+                vec.set(building.x, building.y).sub(x, y).rotate(-(rotation - 90f)).add(subCX(), subCY());
+                // ★ offset 校正 + round 得 tile 参考点 (奇数尺寸=中心tile, 偶数尺寸=原点tile, 与原版约定一致)
+                int tx = Math.round((vec.x - building.block.offset) / Vars.tilesize);
+                int ty = Math.round((vec.y - building.block.offset) / Vars.tilesize);
 
                 if (building.power != null && building instanceof PowerNodeBuild && !building.power.links.isEmpty()) {
                     IntSeq seq = building.power.links, nseq = new IntSeq();
                     for (int i = 0; i < seq.size; i++) {
                         int pos = seq.get(i);
-                        int cx = conX(Point2.x(pos)), cy = conY(Point2.y(pos));
+                        // 链接目标 tile 中心像素 (= 坐标*8) → 子世界 tile (同样向量旋转)
+                        vec.set(Point2.x(pos) * Vars.tilesize, Point2.y(pos) * Vars.tilesize)
+                            .sub(x, y).rotate(-(rotation - 90f)).add(subCX(), subCY());
+                        int cx = Math.round(vec.x / Vars.tilesize), cy = Math.round(vec.y / Vars.tilesize);
                         if (valid(cx, cy)) {
                             nseq.add(Point2.pack(cx, cy));
                         }
@@ -197,13 +273,19 @@ public class WorldUnitEntity extends UnitEntity {
                 }
 
                 tmpr.add(() -> {
-                    building.x = cwX(building.x);
-                    building.y = cwY(building.y);
-                    unitWorld.tile(tx, ty).setBlock(building.block, building.team, building.rotation, () -> building);
+                    // ★ 建筑像素坐标对齐到子世界 tile 中心 (offset + tile*8):
+                    //   与原版世界建筑完全一致的网格行为, 消除向量旋转的亚 tile 相位误差,
+                    //   存档(tile 坐标)与读档(drawx 重算)的位置天然一致, 不再错位
+                    Tile st = unitWorld.tile(tx, ty);
+                    st.setBlock(building.block, building.team, building.rotation, () -> building);
+                    building.x = st.drawx();
+                    building.y = st.drawy();
                 });
 
                 building.tile.remove();
                 buildings.add(building);
+                buildingIds.add(building.id);
+                absorbed++;
             }
         }
 
@@ -213,61 +295,168 @@ public class WorldUnitEntity extends UnitEntity {
         for (Runnable r : tmpr) {
             r.run();
         }
-        for (Building b : buildings) {
-            if (b instanceof PowerNodeBuild) {
-                IntSeq seq = tmpLinks.get(b.id);
-                if (seq != null && b.power != null) {
-                    b.power.links.clear();
-                    for (int i = 0; i < seq.size; i++) {
-                        int pos = seq.get(i);
-                        b.configureAny(pos);
-                    }
-                }
-            }
-            b.updateProximity();
-            if (b instanceof TurretBuild) {
-                TurretBuild tb = (TurretBuild) b;
-                turrets.add(tb);
-            }
-        }
+        rebuildFromBuildings();
 
         Vars.world = ow;
         tmpr.clear();
         tmp.clear();
         tmpLinks.clear();
+        return absorbed;
     }
 
-    // ===== 坐标转换 (原 WorldComp) =====
+    /**
+     * 部署: 子世界建筑落到主世界真实 tile 上 (deploy 的正向操作).
+     * <p>部署后建筑由原版系统全权管理 —— 建造菜单放方块、点击配置、
+     * 框选、修理、悬停面板等原版输入全部可用 (这就是"子世界=全局世界"形态)。
+     * 单位锁定不动, 移动前需先收起 (absorb)。</p>
+     * <p>落点被占 (地形/敌建筑) 的建筑留在子世界, 不影响其余建筑部署。</p>
+     *
+     * @return 成功部署到主世界的建筑数量
+     */
+    public int deploy() {
+        if (unitWorld == null || buildings.isEmpty()) return 0;
+        // ★ 朝向归整: 部署几何只在 90 度倍数时与主世界网格对齐
+        rotation = Math.round(rotation / 90f) * 90f;
+        float r = rotation - 90f;
+        int steps = Math.round(r / 90f) & 3;
 
-    /** 主世界坐标 → 子世界坐标 (float) */
-    public float cwX(float x) {
-        return (x - this.x) + (unitWorld.width() * Vars.tilesize / 2f);
+        tmp.clear();
+        tmpr.clear();
+        tmpLinks.clear();
+        tmpAdded.clear();
+
+        // 第一遍: 计算落点, 收集可部署建筑 (主世界上下文查询)
+        for (Building b : buildings) {
+            // ★ offset 校正 + round: 建筑中心像素 → tile 参考点
+            //   (奇数尺寸 offset=0 得中心 tile; 偶数尺寸 offset=4 得原点 tile, 与原版约定一致)
+            vec.set(b.x, b.y).sub(subCX(), subCY()).rotate(r).add(x, y);
+            int mx = Math.round((vec.x - b.block.offset) / Vars.tilesize);
+            int my = Math.round((vec.y - b.block.offset) / Vars.tilesize);
+            int newRot = (b.rotation + steps) & 3;
+            if (!canDeployAt(b.block, mx, my)) continue;
+
+            // 电力链接: 子世界 pos → 主世界 pos (向量旋转)
+            if (b.power != null && b instanceof PowerNodeBuild && !b.power.links.isEmpty()) {
+                IntSeq seq = b.power.links, nseq = new IntSeq();
+                for (int i = 0; i < seq.size; i++) {
+                    int pos = seq.get(i);
+                    vec.set(Point2.x(pos) * Vars.tilesize, Point2.y(pos) * Vars.tilesize)
+                        .sub(subCX(), subCY()).rotate(r).add(x, y);
+                    int cx = Math.round(vec.x / Vars.tilesize), cy = Math.round(vec.y / Vars.tilesize);
+                    nseq.add(Point2.pack(cx, cy));
+                }
+                if (!nseq.isEmpty()) tmpLinks.put(b.id, nseq);
+            }
+
+            final int fmx = mx, fmy = my, frot = newRot;
+            tmpr.add(() -> {
+                Tile mt = Vars.world.tile(fmx, fmy);
+                mt.setBlock(b.block, b.team, frot, () -> b);
+                // 主世界位置由 tile 语义决定 (与原版建筑完全一致)
+                b.x = mt.drawx();
+                b.y = mt.drawy();
+            });
+            tmp.add(b);
+        }
+
+        // 第二遍: 从子世界摘除 (切到子世界上下文, 多方块邻格查询才正确)
+        World ow = Vars.world;
+        Vars.world = unitWorld;
+        for (Building b : tmp) {
+            b.tile.remove();
+        }
+        Vars.world = ow;
+
+        // 第三遍: 主世界放置 + 电力重连 + 邻近关系
+        for (Runnable run : tmpr) {
+            run.run();
+        }
+        for (Building b : tmp) {
+            if (b instanceof PowerNodeBuild) {
+                IntSeq seq = tmpLinks.get(b.id);
+                if (seq != null && b.power != null) {
+                    b.power.links.clear();
+                    for (int i = 0; i < seq.size; i++) {
+                        b.configureAny(seq.get(i));
+                    }
+                }
+            }
+            b.updateProximity();
+        }
+
+        // 子世界列表只保留未部署的建筑
+        buildings.removeAll(tmp);
+        rebuildFromBuildings();
+        int deployedCount = tmp.size;
+        if (deployedCount > 0) deployed = true;
+
+        tmpr.clear();
+        tmp.clear();
+        tmpLinks.clear();
+        return deployedCount;
     }
 
-    /** 主世界坐标 → 子世界坐标 (float) */
-    public float cwY(float y) {
-        return (y - this.y) + (unitWorld.height() * Vars.tilesize / 2f);
+    /** 收起 (面板按钮入口, 语义化命名) */
+    public int undeploy() {
+        return absorb();
     }
 
-    /** 主世界 tile 坐标 → 子世界 tile 坐标 (int) */
-    public int conX(int x) {
-        return (x - (int) (this.x / Vars.tilesize)) + (unitWorld.width() / 2) - 1;
+    /**
+     * 检查主世界指定位置能否放置方块 (deploy 用).
+     * <p>遍历方块占据的全部 tile: 越界 / 已有建筑 / 地形不可建造则不可放置。
+     * 不使用 Build.validPlace —— 那会触发放置事件且规则更严, 此处只需基础检查。</p>
+     */
+    protected boolean canDeployAt(Block block, int x, int y) {
+        int offset = -(block.size - 1) / 2;
+        for (int dx = 0; dx < block.size; dx++) {
+            for (int dy = 0; dy < block.size; dy++) {
+                Tile t = Vars.world.tile(dx + offset + x, dy + offset + y);
+                if (t == null || t.build != null || t.solid() || !t.floor().placeableOn) return false;
+            }
+        }
+        return true;
     }
 
-    /** 主世界 tile 坐标 → 子世界 tile 坐标 (int) */
-    public int conY(int y) {
-        return (y - (int) (this.y / Vars.tilesize)) + (unitWorld.height() / 2) - 1;
+    /** 按当前 buildings 列表重建 turrets 和 buildingIds (吸收/部署/读档后调用) */
+    protected void rebuildFromBuildings() {
+        turrets.clear();
+        buildingIds.clear();
+        for (Building b : buildings) {
+            buildingIds.add(b.id);
+            if (b instanceof TurretBuild tb) turrets.add(tb);
+        }
     }
 
-    /** 检查 tile 上的方块是否能放入子世界 (考虑多方块) */
+    /** 判断建筑是否属于本单位的子世界 (子弹归属/渲染过滤用, O(1)) */
+    public boolean ownsBuilding(Building b) {
+        return buildingIds.contains(b.id);
+    }
+
+    // ===== 坐标转换 (统一向量旋转法, 任意 90 度朝向正确) =====
+
+    /** 子世界中心像素 X */
+    protected float subCX() {
+        return unitWorld.width() * Vars.tilesize / 2f;
+    }
+
+    /** 子世界中心像素 Y */
+    protected float subCY() {
+        return unitWorld.height() * Vars.tilesize / 2f;
+    }
+
+    /**
+     * 检查主世界 tile 上的方块是否能完整放入子世界 (考虑多方块旋转后的落位).
+     * <p>先按向量旋转算出中心子世界 tile, 再按方块尺寸铺开检查边界。</p>
+     */
     public boolean validPlace(Tile tile) {
         Block block = tile.block();
-        int offset = -(block.size - 1) / 2;
-        int tx = conX(tile.x);
-        int ty = conY(tile.y);
+        vec.set(tile.worldx(), tile.worldy()).sub(x, y).rotate(-(rotation - 90f)).add(subCX(), subCY());
+        int tx = mindustry.core.World.toTile(vec.x);
+        int ty = mindustry.core.World.toTile(vec.y);
 
+        int offset = -(block.size - 1) / 2;
         boolean valid = tx >= 0 && tx < unitWorld.width() && ty >= 0 && ty < unitWorld.height();
-        if (tile.block().isMultiblock()) {
+        if (block.isMultiblock()) {
             for (int dx = 0; dx < block.size; dx++) {
                 for (int dy = 0; dy < block.size; dy++) {
                     int wx = dx + offset + tx, wy = dy + offset + ty;
@@ -352,12 +541,14 @@ public class WorldUnitEntity extends UnitEntity {
 
     /**
      * 把子世界建筑数据写入数据流 (由 {@link SaveChunk} 在存档时调用).
-     * <p>格式: [单位id][建筑数量] + 每个建筑 [数据长度][blockId tileX tileY rotation teamId revision writeBase+write数据]</p>
+     * <p>格式: [单位id][部署状态][建筑数量] + 每个建筑 [数据长度][blockId tileX tileY rotation teamId revision writeBase+write数据]</p>
+     * <p>部署状态时建筑在主世界 (由原版存档管理), 此处只写标志不写建筑数据。</p>
      *
      * @param write 存档输出流
      */
     public void writeSubWorld(Writes write) throws IOException {
         write.i(id);
+        write.b(deployed ? (byte) 1 : (byte) 0);
         if (unitWorld == null || buildings.isEmpty()) {
             write.i(0);
             return;
@@ -370,8 +561,11 @@ public class WorldUnitEntity extends UnitEntity {
 
     /**
      * 写入单个建筑: 先缓冲到内存再写入, 附带 4 字节长度前缀.
-     * <p>数据块内格式: [blockId tileX tileY rotation teamId revision] + writeBase + write 的输出。
+     * <p>数据块内格式 (v3): [blockId tileX tileY rotation teamId revision x y] + writeBase + write 的输出。
      * 元数据必须先于建筑数据写入 —— 恢复时才能先重建方块再 readAll 恢复状态。</p>
+     * <p>★ 精确 x/y (v3 新增): writeBase 不含坐标, 若只存 tile 坐标,
+     * 读档后位置由 tile.drawx() 重算, 与存档前的连续坐标存在亚 tile 相位差 → 方块错位。
+     * 直接保存浮点坐标, 读档后精确还原。</p>
      * <p>长度前缀的作用: 读档时单个建筑解析失败 (如 mod 方块被移除) 可以整体跳过,
      * 不会污染后续数据 —— 与原版 readMap 的容错机制一致。</p>
      */
@@ -385,6 +579,9 @@ public class WorldUnitEntity extends UnitEntity {
         bw.b(b.rotation);
         bw.b(b.team.id);
         bw.b(b.version());
+        // ★ 精确像素坐标 (v3, 修复读档错位)
+        bw.f(b.x);
+        bw.f(b.y);
         // 建筑本体数据 (血量/物品/电力/液体/进度等)
         b.writeBase(bw);
         b.write(bw);
@@ -396,7 +593,7 @@ public class WorldUnitEntity extends UnitEntity {
      * 从数据流恢复子世界 (由 {@link SaveChunk} 在读档时调用).
      * <p>步骤:
      * <ol>
-     *   <li>createWorld() 重建空白子世界</li>
+     *   <li>createWorld() 重建空白子世界 (即使建筑为 0 也保证 unitWorld 有效)</li>
      *   <li>逐个建筑: newBuilding + setBlock 放置 → readAll 恢复状态</li>
      *   <li>第二遍统一 updateProximity, 建立电力网络和物品传输邻近关系</li>
      * </ol>
@@ -405,23 +602,25 @@ public class WorldUnitEntity extends UnitEntity {
      *
      * @param read 存档输入流
      * @param count 建筑数量 (由调用方从流中读出)
+     * @param deployed 读出的部署状态 (部署态: 建筑由原版存档恢复, 子世界保持空)
+     * @param ver 存档区块格式版本 (v3+ 建筑数据含精确 x/y)
      */
-    public void readSubWorld(Reads read, int count) throws IOException {
+    public void readSubWorld(Reads read, int count, boolean deployed, byte ver) throws IOException {
+        if (unitWorld == null) createWorld();
+        this.deployed = deployed;
         if (count <= 0) return;
-        createWorld();
-        buildings.clear();
-        turrets.clear();
 
         World ow = Vars.world;
         Vars.world = unitWorld;
         try {
             for (int i = 0; i < count; i++) {
-                readBuilding(read);
+                readBuilding(read, ver);
             }
             // ★ 第二遍: 所有建筑就位后统一刷新邻近关系 (电力图/物品传输在此建立)
             for (int i = 0; i < buildings.size; i++) {
                 buildings.get(i).updateProximity();
             }
+            rebuildFromBuildings();
         } finally {
             Vars.world = ow;
         }
@@ -429,15 +628,15 @@ public class WorldUnitEntity extends UnitEntity {
 
     /**
      * 读取单个建筑的数据块: [长度][字节数组], 字节数组内为
-     * [blockId tileX tileY rotation teamId revision writeBase+write数据].
+     * [blockId tileX tileY rotation teamId revision (x y)] + writeBase+write数据.
      * <p>先完整读出字节数组再解析 —— 即使解析抛异常, 外层流位置也不会错位。</p>
      */
-    private void readBuilding(Reads read) throws IOException {
+    private void readBuilding(Reads read, byte ver) throws IOException {
         int len = read.i();
         byte[] data = new byte[len];
         read.input.readFully(data);
         try (ByteArrayInputStream bin = new ByteArrayInputStream(data)) {
-            restoreBuilding(new Reads(new DataInputStream(bin)));
+            restoreBuilding(new Reads(new DataInputStream(bin)), ver);
         } catch (Exception e) {
             Log.err("WorldUnit sub-world building restore failed", e);
         }
@@ -447,19 +646,27 @@ public class WorldUnitEntity extends UnitEntity {
      * 在子世界中重建一个建筑 (从已缓冲的 Reads 解析).
      * <p>步骤:
      * <ol>
-     *   <li>读取方块 id / tile 坐标 / 朝向 / 队伍 / 数据版本</li>
+     *   <li>读取方块 id / tile 坐标 / 朝向 / 队伍 / 数据版本 / 精确坐标(v3+)</li>
      *   <li>block.newBuilding().create() 创建建筑并初始化物品/电力/液体模块</li>
      *   <li>tile.setBlock 放置 (UnitTile.changeBuild 负责绑定 tile 和 rotation)</li>
      *   <li>readAll 恢复血量/物品/电力/进度等全部状态</li>
      * </ol>
      * 方块缺失或越界时丢弃该建筑 (数据块已隔离, 不影响后续)。</p>
      */
-    private void restoreBuilding(Reads br) {
+    private void restoreBuilding(Reads br, byte ver) {
         Block block = Vars.content.block(br.s());
         int tx = br.s(), ty = br.s();
         byte rotation = br.b();
         Team team = Team.get(br.b());
         byte revision = br.b();
+        float px = 0f, py = 0f;
+        boolean hasPos = false;
+        if (ver >= 3) {
+            // v3+: 精确像素坐标 (修复读档错位 —— writeBase 不含坐标, tile 重算有亚 tile 相位差)
+            px = br.f();
+            py = br.f();
+            hasPos = true;
+        }
 
         if (block == null || !block.hasBuilding() || !valid(tx, ty)) return;
 
@@ -467,7 +674,12 @@ public class WorldUnitEntity extends UnitEntity {
         Building nb = block.newBuilding().create(block, team);
         try {
             tile.setBlock(block, team, rotation, () -> nb);
-            nb.set(tile.drawx(), tile.drawy());
+            // ★ 位置优先级: v3+ 用存档精确坐标; 旧版本用 tile 中心重算
+            if (hasPos) {
+                nb.set(px, py);
+            } else {
+                nb.set(tile.drawx(), tile.drawy());
+            }
             nb.readAll(br, revision);
             nb.checkAllowUpdate();
         } catch (Exception e) {
@@ -484,15 +696,20 @@ public class WorldUnitEntity extends UnitEntity {
     /**
      * 世界单位存档区块 (注册到 SaveVersion 的 CustomChunk).
      * <p>区块名 "zzw-world-units", 存档格式:
-     * [单位数量] + 每个单位 {@link #writeSubWorld} 的输出。</p>
+     * [版本=3][单位数量] + 每个单位 {@link #writeSubWorld} 的输出。</p>
      * <p>读档时按 unitId 在 Groups.unit 中找回单位 (此时单位已全部加载),
      * 找不到则按长度前缀跳过该单位的全部建筑数据。</p>
+     * <p>版本字节兼容: v1 (无版本前缀) 首字节是"单位数量 int"的高字节, 恒为 0;
+     * v2 = deployed 部署状态; v3 = 建筑数据追加精确 x/y 坐标 (修复读档错位)。</p>
      */
     public static class SaveChunk implements SaveVersion.CustomChunk {
+        /** 当前存档格式版本 (3: 建筑数据追加精确 x/y) */
+        static final byte VERSION = 3;
+
         @Override
         public boolean shouldWrite() {
             for (Unit u : Groups.unit) {
-                if (u instanceof WorldUnitEntity w && w.unitWorld != null && !w.buildings.isEmpty()) return true;
+                if (u instanceof WorldUnitEntity w && w.unitWorld != null) return true;
             }
             return false;
         }
@@ -510,6 +727,7 @@ public class WorldUnitEntity extends UnitEntity {
             for (Unit u : Groups.unit) {
                 if (u instanceof WorldUnitEntity w && w.unitWorld != null) list.add(w);
             }
+            write.b(VERSION);
             write.i(list.size);
             for (WorldUnitEntity w : list) {
                 w.writeSubWorld(write);
@@ -519,9 +737,23 @@ public class WorldUnitEntity extends UnitEntity {
         @Override
         public void read(DataInput stream) throws IOException {
             Reads read = new Reads(stream);
+
+            // 版本链识别: 3/2 为显式版本号; 0 为 v1 旧格式 (单位数量 int 的高字节)
+            byte ver = 0;
+            if (stream instanceof DataInputStream dis && dis.markSupported()) {
+                dis.mark(1);
+                int first = dis.read();
+                if (first == 3 || first == 2) {
+                    ver = (byte) first;
+                } else {
+                    dis.reset();
+                }
+            }
+
             int units = read.i();
             for (int u = 0; u < units; u++) {
                 int unitId = read.i();
+                boolean deployed = ver >= 2 && read.b() != 0;
                 int count = read.i();
 
                 WorldUnitEntity target = null;
@@ -540,7 +772,7 @@ public class WorldUnitEntity extends UnitEntity {
                     }
                     continue;
                 }
-                target.readSubWorld(read, count);
+                target.readSubWorld(read, count, deployed, ver);
             }
         }
     }
