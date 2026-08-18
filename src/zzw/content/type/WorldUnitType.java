@@ -211,6 +211,17 @@ public class WorldUnitType extends UnityUnitType {
                 }
             }
         } else {
+            // ★ 让位检查: 鼠标处有主世界建筑时轮询层完全退出 ——
+            //   部署后单位 hitbox 覆盖整个区域, 不让位会挡住原版的建筑 hover 提示和点击配置
+            if (Vars.world.buildWorld(mx, my) != null) {
+                hoveredBuild = null;
+                if (hoverTable != null) {
+                    hoverTable.remove();
+                    hoverTable = null;
+                }
+                return;
+            }
+
             // 鼠标不在子世界建筑上 → 检查是否悬停在 Terra 本体上
             WorldUnitEntity hoveredUnit = null;
             for (Unit unit : Groups.unit) {

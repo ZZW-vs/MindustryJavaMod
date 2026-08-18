@@ -95,6 +95,8 @@ public class WorldUnitEntity extends UnitEntity {
     protected transient IntSet buildingIds = new IntSet(16);
     /** 上一帧位置/朝向 (计算本帧位移, 驱动子弹跟随) */
     protected transient float lastX, lastY, lastRotation;
+    /** 部署前的 elevation (收起时恢复飞行高度; -1 = 未部署过) */
+    protected transient float savedElevation = -1f;
 
     /** 返回注册的 classId (绕过 v155.4 的 checkEntityMapping 检查) */
     @Override
@@ -115,6 +117,10 @@ public class WorldUnitEntity extends UnitEntity {
         // ★ 部署状态: 建筑已挂主世界 (由原版系统更新), 单位锁定不动
         if (deployed) {
             vel.setZero();
+            // ★ 单位下沉: elevation=0.5 时渲染层判定 (elevation > 0.5f) 不成立,
+            //   单位画在 groundLayer (darkness+1, 所有建筑之下), 建筑完整可见可交互;
+            //   同时 isFlying() (>= 0.09) 仍为 true, 命中判定等行为与飞行态一致
+            elevation = 0.5f;
             followBullets();
             return;
         }
@@ -232,6 +238,11 @@ public class WorldUnitEntity extends UnitEntity {
     public int absorb() {
         if (unitWorld == null) createWorld();
         deployed = false;
+        // ★ 恢复飞行高度 (deploy 时记录的 elevation, 哨兵 -1 表示从未部署)
+        if (savedElevation > 0) {
+            elevation = savedElevation;
+            savedElevation = -1f;
+        }
         // ★ 朝向归整到 90 度倍数: 任意角度时 tile 映射无法对齐主世界网格
         rotation = Math.round(rotation / 90f) * 90f;
 
@@ -388,7 +399,11 @@ public class WorldUnitEntity extends UnitEntity {
         buildings.removeAll(tmp);
         rebuildFromBuildings();
         int deployedCount = tmp.size;
-        if (deployedCount > 0) deployed = true;
+        if (deployedCount > 0) {
+            deployed = true;
+            // ★ 记录飞行高度并下沉: 单位画到建筑之下, 玩家可正常查看/点击/框选全部建筑
+            if (savedElevation < 0) savedElevation = elevation;
+        }
 
         tmpr.clear();
         tmp.clear();
