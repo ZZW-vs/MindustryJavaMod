@@ -10,6 +10,7 @@ import arc.math.Mat;
 import arc.math.Mathf;
 import arc.math.geom.Point2;
 import arc.math.geom.Vec2;
+import arc.scene.ui.layout.Table;
 import arc.struct.Seq;
 import arc.util.Tmp;
 import arc.util.Time;
@@ -21,12 +22,14 @@ import mindustry.entities.units.BuildPlan;
 import mindustry.game.EventType.Trigger;
 import mindustry.gen.Building;
 import mindustry.gen.Groups;
+import mindustry.gen.Tex;
 import mindustry.gen.Unit;
 import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
 import mindustry.input.Binding;
 import mindustry.input.InputHandler;
+import mindustry.ui.Styles;
 import mindustry.ui.fragments.PlacementFragment;
 import mindustry.world.Block;
 import zzw.content.units.entities.WorldUnitEntity;
@@ -143,12 +146,22 @@ public class WorldUnitType extends UnityUnitType {
                 World ow = Vars.world;
                 Vars.world = world;
 
-                // 建筑阴影 (黑色贴图左下偏移, 近似原版块阴影观感)
+                // ★ 建造模式: 子世界边缘呼吸虚线框 (提示当前可建造/拆除)
+                if (w.buildMode) {
+                    Draw.z(Layer.plans + 1f);
+                    Draw.color(Pal.accent, 0.6f + Mathf.absin(Time.time, 4f, 0.4f));
+                    Drawf.dashRect(Pal.accent, -2f, -2f, w.platW() + 4f, w.platH() + 4f);
+                    Draw.color();
+                }
+
+                // 建筑柔和阴影: 放大的黑色贴图 —— 贴图边缘的透明渐变形成模糊黑边
                 for (int i = 0; i < build.size; i++) {
                     Building b = build.get(i);
-                    Draw.z(Layer.block - 0.5f);
-                    Draw.color(0f, 0f, 0f, 0.4f);
-                    Draw.rect(b.block.region, b.x - 3f, b.y - 3f, b.drawrot());
+                    Draw.z(Layer.block - 0.1f);
+                    Draw.color(0f, 0f, 0f, 0.3f);
+                    float sw = b.block.region.width * Draw.scl + 3f;
+                    float sh = b.block.region.height * Draw.scl + 3f;
+                    Draw.rect(b.block.region, b.x - 1.5f, b.y - 1.5f, sw, sh, b.drawrot());
                 }
                 Draw.color();
 
@@ -158,6 +171,23 @@ public class WorldUnitType extends UnityUnitType {
                     Building b = build.get(i);
                     Draw.z(Layer.block);
                     b.draw();
+                }
+
+                // ★ 建造光束: 单位中心 → 正在建造/拆除的脚手架 (原版 BuilderComp.drawBuildingBeam 观感:
+                // 橙色三角光束 + 目标方块角标 + 单位端脉冲方点, 拆除时红色)
+                for (int i = 0; i < build.size; i++) {
+                    Building b = build.get(i);
+                    if (!(b instanceof mindustry.world.blocks.ConstructBlock.ConstructBuild cons)) continue;
+                    boolean decons = cons.current == cons.previous;
+                    float cx0 = w.subCX(), cy0 = w.subCY();
+                    float rad = cons.block.size * Vars.tilesize / 2f;
+
+                    Lines.stroke(1f, decons ? Pal.remove : Pal.accent);
+                    Draw.z(Layer.buildBeam);
+                    Draw.alpha(0.7f);
+                    Drawf.buildBeam(cx0, cy0, b.x, b.y, rad);
+                    Fill.square(cx0, cy0, 1.8f + Mathf.absin(Time.time, 2.2f, 1.1f), w.rotation + 45f);
+                    Draw.reset();
                 }
 
                 // ★ 悬停高亮: 光标下的子世界建筑画选择框/射程圈 (复刻原版悬停效果)
@@ -320,7 +350,9 @@ public class WorldUnitType extends UnityUnitType {
             }
         }
 
-        if (hit != null && !Core.scene.hasMouse()) {
+        // ★ 建造模式 gate: 只有点击主核心激活建造模式后才能建造/拆除
+        //   (未激活时只保留方块交互: 悬停/点击配置/物品界面)
+        if (hit != null && hit.buildMode && !Core.scene.hasMouse()) {
             int tx = World.toTile(tmpVec.x), ty = World.toTile(tmpVec.y);
 
             // 即时放置: 按住放置键 → 放进子世界 (平台区域整体接管, 与主世界地形无关;
@@ -353,33 +385,73 @@ public class WorldUnitType extends UnityUnitType {
             lastBreakPos = -1;
         }
 
-        // plans 清扫: 玩家建造队列中落在平台区域的计划 → 转译 (覆盖单点/拖线/蓝图粘贴),
-        // 同时防止原版把这些方块建到平台下方的主世界 tile 上;
-        // 让位规则同上: 该处主世界 tile 有建筑时保留原版计划
+        // plans 清扫 (覆盖单点/拖线/蓝图粘贴): 建造模式的单位转译进子世界;
+        // 未激活的单位也移除计划 —— 防止原版玩家单位把方块建到平台下方的主世界 tile 上
+        sweepPlans();
+    }
+
+    /**
+     * plans 清扫: 玩家建造队列中落在平台区域的计划, 按所属单位分别处理.
+     * <p>★ 锚点布局保持: 同一批计划 (拖线/蓝图) 在主世界网格上是直线/矩形布局,
+     * 逐点独立映射到旋转的子世界网格会变成"斜线" —— 这里以第一个落在平台的计划为锚点,
+     * 其余计划按【相对锚点的 tile 偏移旋转到子世界朝向】落位, 保持布局的相对形状
+     * (拖线仍是直线, 蓝图不扭曲)。</p>
+     * <p>让位规则: 该处主世界 tile 有建筑时保留原版计划 (玩家想操作的是地面建筑)。</p>
+     */
+    private static void sweepPlans() {
         Unit pu = Vars.player.unit();
-        if (pu != null && pu.plans.size > 0) {
-            for (int i = pu.plans.size - 1; i >= 0; i--) {
-                BuildPlan plan = pu.plans.get(i);
-                if (Vars.world.build(plan.x, plan.y) != null) continue;
-                WorldUnitEntity owner = null;
-                for (Unit u : Groups.unit) {
-                    if (u instanceof WorldUnitEntity w && w.unitWorld != null
-                        && w.team() == Vars.player.team()
-                        && w.worldToSubPixel(plan.x * Vars.tilesize + Vars.tilesize / 2f,
-                                             plan.y * Vars.tilesize + Vars.tilesize / 2f, tmpVec)) {
-                        owner = w;
-                        break;
-                    }
+        if (pu == null || pu.plans.size <= 0) return;
+
+        // 锚点: 第一个落在平台内 (且建造模式) 的计划; 同帧内同批计划围绕锚点布局
+        WorldUnitEntity anchorOwner = null;
+        int anchorPX = 0, anchorPY = 0, anchorSX = 0, anchorSY = 0;
+
+        for (int i = pu.plans.size - 1; i >= 0; i--) {
+            BuildPlan plan = pu.plans.get(i);
+            // 让位: 主世界该处有建筑 → 保留原版计划
+            if (Vars.world.build(plan.x, plan.y) != null) continue;
+
+            WorldUnitEntity owner = null;
+            for (Unit u : Groups.unit) {
+                if (u instanceof WorldUnitEntity w && w.unitWorld != null
+                    && w.team() == Vars.player.team()
+                    && w.worldToSubPixel(plan.x * Vars.tilesize + Vars.tilesize / 2f,
+                                         plan.y * Vars.tilesize + Vars.tilesize / 2f, tmpVec)) {
+                    owner = w;
+                    break;
                 }
-                if (owner == null) continue;
-                pu.plans.removeIndex(i);
-                int ptx = World.toTile(tmpVec.x), pty = World.toTile(tmpVec.y);
-                if (plan.breaking) {
-                    owner.breakSub(ptx, pty);
-                } else if (plan.block != null) {
-                    owner.placeSub(plan.block, ptx, pty,
-                        subRotation(owner, plan.rotation), plan.config);
-                }
+            }
+            if (owner == null) continue;
+
+            pu.plans.removeIndex(i);
+
+            // ★ 未激活建造模式 → 只移除 (防止主世界误建), 不转译
+            if (!owner.buildMode) continue;
+
+            int ptx, pty;
+            if (anchorOwner != owner) {
+                // 锚点重置: 新单位或第一批计划的第一个 → 光标映射落位
+                ptx = World.toTile(tmpVec.x);
+                pty = World.toTile(tmpVec.y);
+                anchorOwner = owner;
+                anchorPX = plan.x;
+                anchorPY = plan.y;
+                anchorSX = ptx;
+                anchorSY = pty;
+            } else {
+                // 同批后续计划: 相对锚点的主世界 tile 偏移 → 旋转到子世界朝向 → 平移到锚点
+                float dx = (plan.x - anchorPX) * Vars.tilesize;
+                float dy = (plan.y - anchorPY) * Vars.tilesize;
+                tmpVec.set(dx, dy).rotate(-(owner.rotation - 90f));
+                ptx = World.toTile(anchorSX * Vars.tilesize + tmpVec.x);
+                pty = World.toTile(anchorSY * Vars.tilesize + tmpVec.y);
+            }
+
+            if (plan.breaking) {
+                owner.breakSub(ptx, pty);
+            } else if (plan.block != null) {
+                owner.placeSub(plan.block, ptx, pty,
+                    subRotation(owner, plan.rotation), plan.config);
             }
         }
     }
@@ -439,14 +511,96 @@ public class WorldUnitType extends UnityUnitType {
                            (Vars.control.input.isPlacing() || Vars.control.input.isBreaking());
             if (Core.input.justTouched() && !Core.scene.hasMouse() && !busy) {
                 Building found = hoveredSubBuild;
-                if (found.block.configurable && found.shouldShowConfigure(Vars.player)) {
-                    Vars.control.input.config.showConfig(found);
-                } else {
-                    // 非配置建筑: 显示物品栏
-                    Vars.control.input.inv.showFor(found);
+
+                // ★ 点击主大地核心 → 弹出建造模式开关按钮 (不打开配置界面)
+                WorldUnitEntity coreOwner = null;
+                for (Unit unit : Groups.unit) {
+                    if (unit instanceof WorldUnitEntity w && w.mainCore == found) {
+                        coreOwner = w;
+                        break;
+                    }
                 }
+                if (coreOwner != null) {
+                    showBuildModePrompt(coreOwner);
+                    return;
+                }
+
+                // ★ 延迟打开配置界面 (Core.app.post): Trigger.update 早于原版输入处理,
+                //   同帧原版点击空地会触发 tileTapped(null) → hideConfig 把刚打开的
+                //   界面立即关掉 (表现为"配置界面打不开"); post 到帧末尾打开则不会被关
+                Core.app.post(() -> {
+                    if (found.dead) return;
+                    if (found.block.configurable && found.shouldShowConfigure(Vars.player)) {
+                        Vars.control.input.config.showConfig(found);
+                    } else {
+                        // 非配置建筑: 显示物品栏
+                        Vars.control.input.inv.showFor(found);
+                    }
+                });
             }
         }
+    }
+
+    // ===== 建造模式开关按钮 (点击主核心弹出) =====
+
+    /** 当前弹出的建造模式按钮面板 */
+    private static Table buildModeTable;
+    /** 面板对应的单位 */
+    private static WorldUnitEntity buildModeUnit;
+    /** 跳过弹出当次点击 (防止弹出帧的 justTouched 立即触发"点击外部收起") */
+    private static boolean suppressPromptClick = false;
+
+    /**
+     * 弹出建造模式开关按钮面板 (屏幕中下方, 点击主核心时调用).
+     * <p>按钮文本随当前状态切换: "进入建造模式" / "退出建造模式";
+     * 点击按钮 toggle buildMode 并收起; 点击面板外任意处也收起;
+     * 单位死亡自动收起。</p>
+     */
+    private static void showBuildModePrompt(WorldUnitEntity w) {
+        hideBuildModePrompt();
+        buildModeUnit = w;
+        suppressPromptClick = true;
+
+        buildModeTable = new Table(Tex.buttonEdge2);
+        buildModeTable.defaults().pad(4f);
+        buildModeTable.add("[accent]" + w.type.localizedName).padBottom(4f).row();
+        buildModeTable.button(w.buildMode ? "退出建造模式" : "进入建造模式", () -> {
+            w.buildMode = !w.buildMode;
+            hideBuildModePrompt();
+        }).size(180f, 44f);
+
+        buildModeTable.update(() -> {
+            // 单位死亡 / 核心丢失 → 收起面板
+            if (buildModeUnit == null || buildModeUnit.dead || !buildModeUnit.isAdded()
+                || buildModeUnit.mainCore == null || buildModeUnit.mainCore.dead) {
+                hideBuildModePrompt();
+                return;
+            }
+            // 跳过弹出当次点击
+            if (suppressPromptClick) {
+                suppressPromptClick = false;
+                return;
+            }
+            // 点击面板外 (游戏世界) → 收起; 点击面板本身由按钮 handler 处理
+            if (Core.input.justTouched() && !Core.scene.hasMouse()) {
+                hideBuildModePrompt();
+            }
+        });
+
+        buildModeTable.pack();
+        Core.scene.add(buildModeTable);
+        buildModeTable.setTranslation(Core.scene.getWidth() / 2f - buildModeTable.getWidth() / 2f,
+                                      Core.scene.getHeight() * 0.3f);
+        buildModeTable.toFront();
+    }
+
+    /** 收起建造模式按钮面板 */
+    private static void hideBuildModePrompt() {
+        if (buildModeTable != null) {
+            buildModeTable.remove();
+            buildModeTable = null;
+        }
+        buildModeUnit = null;
     }
 
     /**
