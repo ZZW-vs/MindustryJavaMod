@@ -742,7 +742,6 @@ public class WorldUnitEntity extends UnitEntity {
      *
      * @param read 存档输入流
      * @param count 建筑数量 (由调用方从流中读出)
-     * @param deployed 读出的部署状态 (部署态: 建筑由原版存档恢复, 子世界保持空)
      * @param ver 存档区块格式版本 (v3+ 建筑数据含精确 x/y)
      */
     public void readSubWorld(Reads read, int count, byte ver) throws IOException {
@@ -873,23 +872,64 @@ public class WorldUnitEntity extends UnitEntity {
             }
         }
 
+        /**
+         * 读档入口 (带区块长度版本, v158+ 调用路径).
+         * <p>★ 关键修复: {@code readChunk} 要求本方法消费的字节数严格等于区块长度,
+         * 否则主流错位 → 后续区块全部读废 → 整个存档无法加载 (EOFException)。
+         * 这里先把整个区块数据全量读入内存缓冲, 再在缓冲上解析 ——
+         * 无论解析结果如何, 主流消费恒等于 length: 单个区块数据损坏只损失
+         * 子世界内容, 不再炸掉整个存档。</p>
+         * <p>注: 编译目标 v155.4 的 CustomChunk 接口无此签名, 故不加 @Override;
+         * v158 运行时 readCustomChunks 的 chunk::read 方法引用动态分派到此方法。</p>
+         */
+        public void read(DataInput stream, int length) throws IOException {
+            byte[] data = new byte[length];
+            stream.readFully(data);
+            try (ByteArrayInputStream bin = new ByteArrayInputStream(data)) {
+                parseChunk(new Reads(new DataInputStream(bin)));
+            } catch (Exception e) {
+                Log.err("zzw-world-units chunk parse failed, sub-world data skipped", e);
+            }
+        }
+
+        /**
+         * 读档入口 (无长度版本, v155.4 抽象方法实现 / v158 default 转发兜底).
+         * <p>直接在主流上解析 (无法缓冲保护), 版本识别修复后各版本数据
+         * 均能正确对齐, 消费字节数正确。</p>
+         */
         @Override
         public void read(DataInput stream) throws IOException {
-            Reads read = new Reads(stream);
+            parseChunk(new Reads(stream));
+        }
 
-            // 版本链识别: 3/2 为显式版本号; 0 为 v1 旧格式 (单位数量 int 的高字节)
-            byte ver = 0;
-            if (stream instanceof DataInputStream dis && dis.markSupported()) {
-                dis.mark(1);
-                int first = dis.read();
-                if (first == 3 || first == 2) {
-                    ver = (byte) first;
-                } else {
-                    dis.reset();
-                }
+        /**
+         * 解析区块数据 (版本识别 + 按单位恢复子世界).
+         * <p>★ 版本识别修复: 存档流是 InflaterInputStream 包装的,
+         * {@code markSupported()} 恒为 false —— 旧版 mark/reset 检测从未生效,
+         * v3 存档读档时版本字节 [03] 被当成 units int 的高字节读入
+         * (= 0x03000000 个单位), 流彻底错位 → EOFException, 存档损坏。
+         * 现改为无条件读首字节判断:
+         * <ul>
+         *   <li>2 / 3 → v2 / v3 显式版本号</li>
+         *   <li>其他 (v1 旧格式首字节 = units int 最高字节, 小数量时恒 0) →
+         *       手动拼回剩余 3 字节还原 units</li>
+         * </ul></p>
+         */
+        private void parseChunk(Reads read) throws IOException {
+            int first = read.b() & 0xFF;
+            byte ver;
+            int units;
+            if (first == 3 || first == 2) {
+                // v2/v3: 首字节是显式版本号
+                ver = (byte) first;
+                units = read.i();
+            } else {
+                // v1: 无版本字节, first 是 units int 的最高字节 (单位数量小时恒 0)
+                ver = 0;
+                int b1 = read.b() & 0xFF, b2 = read.b() & 0xFF, b3 = read.b() & 0xFF;
+                units = (first << 24) | (b1 << 16) | (b2 << 8) | b3;
             }
 
-            int units = read.i();
             for (int u = 0; u < units; u++) {
                 int unitId = read.i();
                 int count = read.i();
