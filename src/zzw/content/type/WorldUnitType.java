@@ -1,9 +1,6 @@
 package zzw.content.type;
 
 import arc.graphics.Color;
-import arc.graphics.Pixmap;
-import arc.graphics.Texture;
-import arc.graphics.g2d.TextureRegion;
 import arc.graphics.g2d.Batch;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
@@ -27,11 +24,11 @@ import mindustry.gen.Building;
 import mindustry.gen.Groups;
 import mindustry.gen.Tex;
 import mindustry.gen.Unit;
-import mindustry.graphics.BlockRenderer;
 import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
 import mindustry.input.Binding;
+import mindustry.input.DesktopInput;
 import mindustry.input.InputHandler;
 import mindustry.ui.Styles;
 import mindustry.ui.fragments.PlacementFragment;
@@ -84,42 +81,6 @@ public class WorldUnitType extends UnityUnitType {
      */
     public static final Batch altBatch = new SpriteBatch();
 
-    /**
-     * 运行时生成的柔和阴影贴图: 中心实心白块 + 四边线性渐变.
-     * <p>复刻原版 BlockRenderer 影子观感 —— 原版用 1 texel/tile 的影子 FBO 记录建筑足迹
-     * (足迹内填 blendShadowColor 深灰), 经线性过滤放大 8 倍后足迹边缘形成柔和渐变,
-     * 再经 darkness 着色器转为黑色半透明, 采样时向左下偏移半格形成投影。
-     * 这里直接生成带边缘渐变的白色方块贴图, 绘制时染黑并按建筑足迹缩放 + 左下偏移,
-     * 得到与原版一致的"实心足迹 + 软边 + 左下投影"影子, 无需 per-unit FBO。</p>
-     */
-    private static TextureRegion softShadowRegion;
-
-    /**
-     * 懒加载生成柔和阴影贴图 (首次绘制时创建, 之后复用).
-     * <p>贴图 32x32, 边缘 8px 线性渐变 → 实心区占贴图一半。绘制尺寸取足迹的 2 倍时,
-     * 实心区正好覆盖建筑足迹, 四周软边向外扩散 (大方块软化范围也相应更大, 观感自然)。</p>
-     */
-    private static TextureRegion softShadow() {
-        if (softShadowRegion == null) {
-            int size = 32, edge = 8;
-            Pixmap pix = new Pixmap(size, size);
-            Color c = new Color(1f, 1f, 1f, 1f);
-            for (int x = 0; x < size; x++) {
-                for (int y = 0; y < size; y++) {
-                    // 像素到贴图四边的距离 → alpha 线性渐变 (0..edge 从 0 渐变到 1)
-                    float d = Math.min(Math.min(x + 0.5f, size - x - 0.5f), Math.min(y + 0.5f, size - y - 0.5f));
-                    c.a(Mathf.clamp(d / edge));
-                    pix.set(x, y, c);
-                }
-            }
-            Texture tex = new Texture(pix);
-            tex.setFilter(Texture.TextureFilter.linear);
-            softShadowRegion = new TextureRegion(tex);
-            pix.dispose();
-        }
-        return softShadowRegion;
-    }
-
     public WorldUnitType(String name) {
         super(name);
         constructor = WorldUnitEntity::create;
@@ -133,7 +94,6 @@ public class WorldUnitType extends UnityUnitType {
      *   <li>计算偏移让子世界中心对齐单位平台位置 (subCX/subCY 含网格偏移)</li>
      *   <li>切换 Core.batch 到 SortedSpriteBatch, Draw.proj(camera) + rotate(r)</li>
      *   <li>Draw.sort(true) 开启 z 排序, 每个建筑画前重置 Draw.z(Layer.block)</li>
-     *   <li>先画建筑阴影 (黑色贴图左下偏移, 近似原版块阴影观感), 再画建筑本体</li>
      *   <li>透明 quad 强制 batch 走完整混合管线 (PU132 blend 修复 trick)</li>
      *   <li>flush 后切回主 batch, 恢复 camera 和 proj</li>
      * </ol>
@@ -194,20 +154,6 @@ public class WorldUnitType extends UnityUnitType {
                     Draw.color();
                 }
 
-                // 原版风格建筑阴影: 方形足迹 + 软边 + 左下偏移半格
-                // (同 BlockRenderer: 足迹黑色 shadowColor.a 透明度, 线性过滤软边, 采样偏移形成左下投影)
-                for (int i = 0; i < build.size; i++) {
-                    Building b = build.get(i);
-                    if (!b.block.hasShadow) continue;
-                    Draw.z(Layer.block - 0.1f);
-                    Draw.color(0f, 0f, 0f, BlockRenderer.shadowColor.a);
-                    float bs = b.block.size * Vars.tilesize;
-                    // 贴图实心区占一半 → 画 2 倍足迹尺寸时实心区正好覆盖足迹, 四周软边向外扩散;
-                    // 偏移 -半格: 影子左下方向多露出 ~1 tile 渐变, 右上方向与足迹齐平 (原版投影观感)
-                    Draw.rect(softShadow(), b.x - Vars.tilesize / 2f, b.y - Vars.tilesize / 2f, bs * 2f, bs * 2f);
-                }
-                Draw.color();
-
                 // 绘制建筑 (含传送带物品、炮台旋转等内部动画; 每个建筑前重置 z,
                 // 建筑内部再自由切到 turretHeat/power 等层)
                 for (int i = 0; i < build.size; i++) {
@@ -255,9 +201,13 @@ public class WorldUnitType extends UnityUnitType {
                     Draw.rect(pb.fullIcon, px, py, pb.rotate ? buildPreviewRot * 90f : 0f);
                     Draw.alpha(1f);
 
-                    // 有效绿框 / 无效红框 (覆盖原版基于主世界地形的红框)
-                    float half = pb.size * Vars.tilesize / 2f;
-                    Drawf.dashRect(buildPreviewValid ? Pal.accent : Pal.remove, px - half, py - half, half * 2f, half * 2f);
+                    // 无效位置: ghost 上叠半透明红色方块 (原版 drawPlanTop 无效计划反馈风格,
+                    // 不再画虚线框; 建造模式下原版鼠标预览已被输入补丁抑制, 仅此一处预览)
+                    if (!buildPreviewValid) {
+                        Draw.color(Pal.remove, 0.3f);
+                        Fill.square(px, py, pb.size * Vars.tilesize / 2f);
+                        Draw.color();
+                    }
                 }
 
                 // blend 修复 trick (PU132): 透明 quad 强制 batch 走完整混合管线,
@@ -688,5 +638,53 @@ public class WorldUnitType extends UnityUnitType {
     public static void registerInteraction() {
         Events.run(Trigger.update, WorldUnitType::updateInteraction);
         Events.run(Trigger.draw, WorldUnitType::drawHighlight);
+        installInputPatch();
+    }
+
+    /** 输入补丁是否已安装 (ClientLoadEvent 只触发一次, 标记防重入) */
+    private static boolean inputPatched = false;
+
+    /**
+     * 替换桌面输入处理器, 抑制建造模式下的原版鼠标方块预览.
+     * <p>★ 双预览问题: 玩家附生大地单位开启建造模式后, 原版 DesktopInput 会按
+     * 主世界网格吸附在鼠标处画半透明 ghost, 而子世界网格 (随平台旋转) 上还有
+     * drawBody 画的另一个预览 —— 两个预览位置/角度不一致, 视觉非常混乱。
+     * 子世界预览吸附正确, 因此建造模式期间抑制原版预览, 只保留子世界预览。</p>
+     * <p>原理: drawBottom() 期间临时把 InputHandler.block 置空 —— 原版的拖线预览
+     * 和鼠标 ghost 预览分支全部以 {@code block != null} / {@code isPlacing()}
+     * (= block != null) 为前提, 置空即整体跳过; 绘制结束立即恢复,
+     * 不影响输入逻辑 (选中方块/放置判定均在 update 阶段读取 block)。</p>
+     */
+    private static void installInputPatch() {
+        if (inputPatched || Vars.control == null || Vars.control.input == null) return;
+        InputHandler old = Vars.control.input;
+        // 仅接管原版桌面输入 (移动端输入流程不同不处理; 已是补丁实例则跳过)
+        if (old.getClass() != DesktopInput.class) return;
+
+        // 与原版 Control.setInput 相同的换装流程: 摘下旧处理器 → 装上新处理器
+        boolean added = Core.input.getInputProcessors().contains(old);
+        old.remove();
+        DesktopInput patched = new DesktopInput() {
+            @Override
+            public void drawBottom() {
+                Unit u = Vars.player.unit();
+                if (u instanceof WorldUnitEntity w && w.buildMode) {
+                    // 建造模式: 临时清空选中方块 → 原版主世界网格的 ghost/拖线预览整体跳过
+                    Block b = block;
+                    block = null;
+                    try {
+                        super.drawBottom();
+                    } finally {
+                        block = b;
+                    }
+                } else {
+                    super.drawBottom();
+                }
+            }
+        };
+        patched.block = old.block;
+        Vars.control.input = patched;
+        if (added) patched.add();
+        inputPatched = true;
     }
 }
