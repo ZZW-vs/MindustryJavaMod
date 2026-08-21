@@ -44,6 +44,7 @@ import mindustry.world.blocks.defense.turrets.ReloadTurret.ReloadTurretBuild;
 import mindustry.world.blocks.defense.turrets.Turret.TurretBuild;
 import mindustry.world.blocks.power.PowerNode.PowerNodeBuild;
 import mindustry.world.blocks.storage.CoreBlock.CoreBuild;
+import zzw.content.blocks.units.TerraCore;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -109,6 +110,8 @@ public class WorldUnitEntity extends UnitEntity {
     protected transient float platW, platH;
     /** 子世界网格偏移 (奇数尺寸=12: 多出的一行一列放世界左方/最下方, 对齐偏左下的甲板贴图) */
     protected transient float gridOffX = 12f, gridOffY = 12f;
+    /** 主大地核心 (召唤本单位的 TerraCore, 被吸收进子世界; 不可拆除, 子世界唯一) */
+    public transient Building mainCore;
 
     /** 返回注册的 classId (绕过 v155.4 的 checkEntityMapping 检查) */
     @Override
@@ -262,6 +265,14 @@ public class WorldUnitEntity extends UnitEntity {
         int absorbed = 0;
         for (Building building : tmp) {
             if (validPlace(building.tile) && tmpAdded.add(building.id)) {
+                // ★ 大地核心: 第一个被吸收的 TerraCore 记录为主核心 (不可拆除);
+                //   其余 TerraCore 跳过 (子世界唯一 —— 召唤前的 TerraCore.buildConfiguration
+                //   检查已拦截多核心情况, 此处双保险)
+                if (building.block instanceof TerraCore) {
+                    if (mainCore != null) continue;
+                    mainCore = building;
+                }
+
                 // 向量法映射建筑中心像素 (含单位朝向旋转, 任意 90 度朝向正确)
                 vec.set(building.x, building.y).sub(x, y).rotate(-(rotation - 90f)).add(subCX(), subCY());
                 // ★ offset 校正 + round 得 tile 参考点 (奇数尺寸=中心tile, 偶数尺寸=原点tile, 与原版约定一致)
@@ -324,6 +335,24 @@ public class WorldUnitEntity extends UnitEntity {
         for (Building b : buildings) {
             buildingIds.add(b.id);
             if (b instanceof TurretBuild tb) turrets.add(tb);
+        }
+    }
+
+    /**
+     * 恢复主大地核心引用 (读档后调用).
+     * <p>mainCore 是 transient 字段, 读档后为 null —— 子世界里 TerraCore 唯一
+     * (放置被 placeSub 拦截、多余吸收被 absorb 拦截), 扫描 buildings 找到
+     * TerraCore 建筑即为唯一主核心, 无需存档字段 (v3 格式不变)。</p>
+     */
+    protected void restoreMainCore() {
+        if (mainCore == null || mainCore.dead || !buildingIds.contains(mainCore.id)) {
+            mainCore = null;
+            for (Building b : buildings) {
+                if (b.block instanceof TerraCore) {
+                    mainCore = b;
+                    break;
+                }
+            }
         }
     }
 
@@ -405,6 +434,9 @@ public class WorldUnitEntity extends UnitEntity {
      */
     public boolean placeSub(Block block, int tx, int ty, int rot, Object config) {
         if (unitWorld == null || block == null) return false;
+        // ★ 大地核心保护: 子世界只允许存在一个大地核心 (召唤时被吸收的主核心),
+        //   禁止玩家往子世界里放新的 TerraCore (防止无限套娃召唤)
+        if (block instanceof TerraCore) return false;
         Tile tile = unitWorld.tile(tx, ty);
         if (tile == null) return false;
 
@@ -464,6 +496,8 @@ public class WorldUnitEntity extends UnitEntity {
         if (unitWorld == null) return false;
         Tile tile = unitWorld.tile(tx, ty);
         if (tile == null || tile.build == null) return false;
+        // ★ 主大地核心不可拆除 (召唤本单位的 TerraCore, 拆掉会破坏单位与核心的绑定)
+        if (tile.build == mainCore) return false;
         // 只能拆己方/无主建筑 (原版 validBreak 的队伍检查)
         if (tile.team() != team && tile.team() != Team.derelict) return false;
         // 已在拆除中的脚手架不重复发起 (即时拆除 + 原版拆键 plan 转译会同时触发)
@@ -532,7 +566,12 @@ public class WorldUnitEntity extends UnitEntity {
         for (int i = buildings.size - 1; i >= 0; i--) {
             Building b = buildings.get(i);
 
-            if (b.dead) {
+            // ★ 完成/移除检测: constructFinish/deconstructFinish 内部不设置 dead 标记 ——
+            //   脚手架建造完成时 tile 上的建筑被替换 (tile.build != b), 拆除完成时 tile.build 为 null;
+            //   dead 标记仅在 breakSub 发起拆除时手动设置 (普通建筑换脚手架的中间态)。
+            //   只检测 dead 会导致: 建造完成后脚手架残留并反复 constructFinish 重建新建筑
+            //   (表现为黄色脚手架贴图+新建筑无功能), 拆除完成后红色脚手架贴图永久残留
+            if (b.dead || b.tile.build != b) {
                 buildings.remove(i);
                 buildingIds.remove(b.id);
                 if (b instanceof TurretBuild) turrets.remove((TurretBuild) b, true);
@@ -759,6 +798,7 @@ public class WorldUnitEntity extends UnitEntity {
                 buildings.get(i).updateProximity();
             }
             rebuildFromBuildings();
+            restoreMainCore();
         } finally {
             Vars.world = ow;
         }

@@ -1,6 +1,11 @@
 package zzw.content.type;
 
+import arc.graphics.Color;
+import arc.graphics.g2d.Batch;
 import arc.graphics.g2d.Draw;
+import arc.graphics.g2d.Fill;
+import arc.graphics.g2d.Lines;
+import arc.graphics.g2d.SpriteBatch;
 import arc.math.Mat;
 import arc.math.Mathf;
 import arc.math.geom.Point2;
@@ -18,6 +23,7 @@ import mindustry.gen.Building;
 import mindustry.gen.Groups;
 import mindustry.gen.Unit;
 import mindustry.graphics.Drawf;
+import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
 import mindustry.input.Binding;
 import mindustry.input.InputHandler;
@@ -61,6 +67,16 @@ public class WorldUnitType extends UnityUnitType {
     /** 子世界宽度 (tile 数) */
     public int worldWidth, worldHeight;
 
+    /**
+     * 子世界渲染专用 batch (PU132 UnityDrawf.altBatch 方案, v155.4 适配).
+     * <p>独立 SpriteBatch + Draw.sort(true) 顶点按 z 排序 —— 建筑内部自由切层
+     * (炮台热度/电力连线/传送带物品动画等) 与原版渲染管线一致; 切换 Core.batch
+     * 期间绘制的所有内容在主 batch 之后 flush, 天然显示在单位甲板之上。
+     * (PU132 原版用 arc 的 SortedSpriteBatch, v155.4 arc 无此类,
+     * 普通 SpriteBatch 开 sort 模式即等价的顶点 z 排序)</p>
+     */
+    public static final Batch altBatch = new SpriteBatch();
+
     public WorldUnitType(String name) {
         super(name);
         constructor = WorldUnitEntity::create;
@@ -71,11 +87,12 @@ public class WorldUnitType extends UnityUnitType {
      * <p>渲染 hack 原理 (PU132 UnityUnitType.drawBody):
      * <ol>
      *   <li>保存当前 camera.position 和 Draw.proj()</li>
-     *   <li>计算偏移让子世界中心对齐单位平台位置 (subCX/subCY 含网格半格偏移)</li>
-     *   <li>Draw.proj(camera) + Draw.proj().rotate(r) 旋转投影</li>
-     *   <li>Draw.sort(false) 关闭 z 排序, 按 call order 绘制</li>
-     *   <li>遍历 buildings 调用 b.draw() (建筑内部自定 z)</li>
-     *   <li>恢复 camera 和 proj</li>
+     *   <li>计算偏移让子世界中心对齐单位平台位置 (subCX/subCY 含网格偏移)</li>
+     *   <li>切换 Core.batch 到 SortedSpriteBatch, Draw.proj(camera) + rotate(r)</li>
+     *   <li>Draw.sort(true) 开启 z 排序, 每个建筑画前重置 Draw.z(Layer.block)</li>
+     *   <li>先画建筑阴影 (黑色贴图左下偏移, 近似原版块阴影观感), 再画建筑本体</li>
+     *   <li>透明 quad 强制 batch 走完整混合管线 (PU132 blend 修复 trick)</li>
+     *   <li>flush 后切回主 batch, 恢复 camera 和 proj</li>
      * </ol>
      *
      * <p>★ 子世界炮台发射的子弹不在投影里绘制 —— 子弹生成时就在主世界坐标,
@@ -95,7 +112,7 @@ public class WorldUnitType extends UnityUnitType {
                 World world = w.unitWorld;
                 if (world == null || build == null || build.isEmpty()) return;
 
-                // ★ 含网格偏移的中心: 9x19 奇数尺寸世界偏移半格对齐 8x18 甲板贴图
+                // ★ 含网格偏移的中心: 多出的一行一列放世界左方/最下方, 对齐偏左下的甲板贴图
                 float cx = w.subCX(), cy = w.subCY();
                 float r = w.rotation - 90f;
 
@@ -110,32 +127,50 @@ public class WorldUnitType extends UnityUnitType {
                 Core.camera.update();
                 Draw.flush();
 
+                // ★ PU132 渲染方案: 切换到 SortedSpriteBatch —— 建筑内部 Draw.z 切层
+                //   生效 (动画/发光/连线正确分层), flush 在单位之后 → 建筑整体在甲板之上
+                Batch old = Core.batch;
+                Core.batch = altBatch;
+
                 Draw.proj(Core.camera);
 
                 Draw.proj().rotate(r);
 
-                // ★ 关闭 z 排序: 按 call order 绘制, 确保建筑在单位甲板之上
-                Draw.sort(false);
+                Draw.sort(true);
 
                 // ★ 电力连接线修复: 建筑的 draw() 内部会用 world.build(links) 查链接目标
                 //   (如 PowerNode 的激光连线), 渲染期间切到子世界, 查询才落在子世界建筑上
                 World ow = Vars.world;
                 Vars.world = world;
 
-                // 绘制建筑 (含传送带物品、炮台旋转等内部动画)
+                // 建筑阴影 (黑色贴图左下偏移, 近似原版块阴影观感)
                 for (int i = 0; i < build.size; i++) {
-                    build.get(i).draw();
+                    Building b = build.get(i);
+                    Draw.z(Layer.block - 0.5f);
+                    Draw.color(0f, 0f, 0f, 0.4f);
+                    Draw.rect(b.block.region, b.x - 3f, b.y - 3f, b.drawrot());
+                }
+                Draw.color();
+
+                // 绘制建筑 (含传送带物品、炮台旋转等内部动画; 每个建筑前重置 z,
+                // 建筑内部再自由切到 turretHeat/power 等层)
+                for (int i = 0; i < build.size; i++) {
+                    Building b = build.get(i);
+                    Draw.z(Layer.block);
+                    b.draw();
                 }
 
                 // ★ 悬停高亮: 光标下的子世界建筑画选择框/射程圈 (复刻原版悬停效果)
                 if (hoveredSubBuild != null && !hoveredSubBuild.dead
                     && w.ownsBuilding(hoveredSubBuild)) {
+                    Draw.z(Layer.overlayUI);
                     hoveredSubBuild.drawSelect();
                 }
 
                 // ★ 放置预览: 鼠标在本子世界区域且处于放置模式 → 在子世界网格上画 ghost
                 //   (吸附到子世界自己的网格; 在投影上下文中绘制, 坐标即子世界坐标)
                 if (buildPreviewUnit == w && buildPreviewBlock != null) {
+                    Draw.z(Layer.plans);
                     Block pb = buildPreviewBlock;
                     // ★ 与原版 BuildPlan.drawx() 完全一致: tile 参考点 + 多方块偏移
                     //   (= tile*8 + offset, 建筑实际落位 drawx 同公式, ghost 与实位零偏差)
@@ -152,8 +187,15 @@ public class WorldUnitType extends UnityUnitType {
                     Drawf.dashRect(buildPreviewValid ? Pal.accent : Pal.remove, px - half, py - half, half * 2f, half * 2f);
                 }
 
+                // blend 修复 trick (PU132): 透明 quad 强制 batch 走完整混合管线,
+                // 防止上一个 draw 的混合状态污染
+                Draw.z(9999f);
+                Draw.color(Color.clear);
+                Fill.rect(0, 0, 0, 0);
+
+                Draw.reset();
                 Draw.flush();
-                Draw.sort(true);
+                Draw.sort(false);
 
                 Vars.world = ow;
 
@@ -161,6 +203,7 @@ public class WorldUnitType extends UnityUnitType {
                 cam.set(camX, camY);
                 Core.camera.update();
                 Draw.proj(proj);
+                Core.batch = old;
             });
         }
 
@@ -185,6 +228,45 @@ public class WorldUnitType extends UnityUnitType {
     private static Building lastPanelBuild;
     /** 原版 PlacementFragment.lastDisplayState 字段缓存 (反射强制刷新悬停面板) */
     private static Field lastDisplayStateField;
+
+    // ===== 高亮系统 (拒绝实体化时提示罪魁方块) =====
+
+    /** 当前高亮的建筑 (召唤被拒时高亮多余的 TerraCore) */
+    private static Building highlightBuild;
+    /** 高亮剩余时间 (秒) */
+    private static float highlightTimer = 0f;
+
+    /**
+     * 高亮指定建筑 3 秒 (闪烁选中框 + 脉冲填充, 原版 Drawf.selected 风格).
+     * <p>TerraCore 召唤检查失败时调用, 告诉玩家是哪个大地核心导致无法组装。</p>
+     */
+    public static void highlightBlock(Building b) {
+        highlightBuild = b;
+        highlightTimer = 3f;
+    }
+
+    /** 高亮渲染 (每帧由 Trigger.draw 调用) */
+    private static void drawHighlight() {
+        if (highlightBuild == null || highlightTimer <= 0f) return;
+        highlightTimer -= Time.delta;
+        Building b = highlightBuild;
+        if (b.dead || b.tile == null || b.tile.build != b) {
+            highlightBuild = null;
+            return;
+        }
+
+        Draw.z(Layer.overlayUI);
+        float half = b.block.size * Vars.tilesize / 2f;
+        float pulse = Mathf.absin(Time.time, 5f, 1f);
+
+        // 呼吸填充 + 闪烁线框 (原版选中/悬停高亮的观感)
+        Draw.color(Pal.accent, 0.25f + Mathf.absin(Time.time, 6f, 0.15f));
+        Fill.square(b.x, b.y, half);
+        Draw.color(Pal.accent);
+        Lines.stroke(2f);
+        Lines.square(b.x, b.y, half + 2f + pulse);
+        Draw.reset();
+    }
 
     // ===== 建造接管状态 =====
 
@@ -368,11 +450,12 @@ public class WorldUnitType extends UnityUnitType {
     }
 
     /**
-     * 注册交互系统: 挂载 Trigger.update 回调。
+     * 注册交互系统: 挂载 Trigger.update (交互轮询) 和 Trigger.draw (高亮渲染) 回调。
      * <p>世界单位的子世界建筑不在主世界 tile 上, 原版输入系统找不到它们,
      * 因此通过每帧轮询实现悬停/点击/建造交互 (与 PU132 原版思路一致)。</p>
      */
     public static void registerInteraction() {
         Events.run(Trigger.update, WorldUnitType::updateInteraction);
+        Events.run(Trigger.draw, WorldUnitType::drawHighlight);
     }
 }

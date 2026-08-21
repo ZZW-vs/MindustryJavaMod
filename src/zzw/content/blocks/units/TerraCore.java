@@ -2,9 +2,13 @@ package zzw.content.blocks.units;
 
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
+import arc.math.geom.Vec2;
 import arc.scene.ui.layout.Table;
+import arc.struct.Seq;
+import arc.util.Tmp;
 import arc.util.io.Reads;
 import arc.util.io.Writes;
+import mindustry.Vars;
 import mindustry.gen.Building;
 import mindustry.gen.Groups;
 import mindustry.gen.Icon;
@@ -15,6 +19,8 @@ import mindustry.ui.Styles;
 import mindustry.world.Block;
 import zzw.content.type.WorldUnitType;
 import zzw.content.units.entities.WorldUnitEntity;
+
+import static mindustry.Vars.ui;
 
 /**
  * 大地核心方块 (PU132 unity.world.blocks.units.TerraCore 简化移植)
@@ -71,6 +77,14 @@ public class TerraCore extends Block {
         public void buildConfiguration(Table table) {
             table.button(Icon.units, Styles.cleari, () -> {
                 if (type == null) return;
+
+                // ★ 已有绑定单位 (本核心已实体化进子世界后被点击) → 不重复召唤
+                if (unit != null && unit.isAdded()) return;
+
+                // ★ 子世界唯一性检查: 吸收范围内存在其他大地核心 → 拒绝实体化并高亮
+                //   (否则 absorb 会把第二个 TerraCore 吸进子世界, 破坏唯一性)
+                if (checkOtherTerraCores()) return;
+
                 Unit u = type.create(team);
                 if (u instanceof WorldUnitEntity) {
                     u.x = x;
@@ -83,6 +97,30 @@ public class TerraCore extends Block {
                     ((WorldUnitEntity) u).setup();
                 }
             }).size(50f);
+        }
+
+        /**
+         * 检查吸收范围内是否存在其他大地核心.
+         * <p>存在 → 提示"无法实体化"并高亮罪魁方块 (WorldUnitType.highlightBlock,
+         * 闪烁选中框 3 秒), 返回 true 拒绝本次召唤。</p>
+         */
+        private boolean checkOtherTerraCores() {
+            if (!(type instanceof WorldUnitType)) return false;
+            WorldUnitType wt = (WorldUnitType) type;
+
+            Seq<Building> nearby = new Seq<>();
+            if (team.data().buildingTree != null) {
+                Tmp.r1.setCentered(x, y, wt.worldWidth * Vars.tilesize, wt.worldHeight * Vars.tilesize);
+                team.data().buildingTree.intersect(Tmp.r1, nearby);
+            }
+            for (Building b : nearby) {
+                if (b != this && b.block instanceof TerraCore) {
+                    ui.showInfoFade("附近有其他大地核心，无法实体化");
+                    WorldUnitType.highlightBlock(b);
+                    return true;
+                }
+            }
+            return false;
         }
 
         @Override

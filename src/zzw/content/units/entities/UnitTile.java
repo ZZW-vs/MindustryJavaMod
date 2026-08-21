@@ -44,6 +44,13 @@ public class UnitTile extends Tile{
 
     @Override
     protected void changeBuild(Team team, Prov<Building> entityprov, int rotation){
+        // ★ 清理旧 build (原版 Tile.changeBuild 逻辑): 无论新 block 是否有 building,
+        //   旧 build 都要移除 —— 拆除完成 setBlock(air) 时若不清, tile.build 会残留
+        //   死建筑 (悬停查询返回幽灵建筑 / 误交互)
+        if(build != null){
+            build.remove();
+            build = null;
+        }
         if(block.hasBuilding()){
             build = entityprov.get();
             if(build.block == null){
@@ -60,6 +67,14 @@ public class UnitTile extends Tile{
 
     @Override
     protected void fireChanged(){
+
+    }
+
+    /** 屏蔽 tile 变更前事件: BlockIndexer/Pathfinder/FogControl/BlockRenderer/Minimap
+     *  监听该事件并操作主世界缓存 —— 子世界 tile 坐标 (0~19) 会错误更新主世界
+     *  对应区域, 全部屏蔽 (子世界不参与主世界的任何缓存系统) */
+    @Override
+    protected void firePreChanged(){
 
     }
 
