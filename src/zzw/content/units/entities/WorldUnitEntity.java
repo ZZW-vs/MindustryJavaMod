@@ -3,8 +3,11 @@ package zzw.content.units.entities;
 import zzw.content.units.ZEntityRegister;
 import zzw.content.type.WorldUnitType;
 
+import arc.Core;
 import arc.math.geom.Point2;
+import arc.math.geom.Rect;
 import arc.math.geom.Vec2;
+import arc.scene.ui.layout.Table;
 import arc.struct.FloatSeq;
 import arc.struct.IntMap;
 import arc.struct.IntSeq;
@@ -13,11 +16,16 @@ import arc.struct.ObjectIntMap;
 import arc.struct.Seq;
 import arc.util.Log;
 import arc.util.Tmp;
+import arc.util.Time;
 import arc.util.io.Writes;
 import arc.util.io.Reads;
+import arc.math.Mathf;
 import mindustry.Vars;
 import mindustry.content.Blocks;
 import mindustry.core.World;
+import mindustry.game.EventType.BlockBuildBeginEvent;
+import mindustry.game.EventType.BlockBuildEndEvent;
+import mindustry.game.EventType.BuildRotateEvent;
 import mindustry.game.Team;
 import mindustry.game.Teams.TeamData;
 import mindustry.gen.Building;
@@ -29,10 +37,13 @@ import mindustry.io.SaveVersion;
 import mindustry.world.Block;
 import mindustry.world.Tile;
 import mindustry.world.Tiles;
+import mindustry.world.blocks.ConstructBlock;
+import mindustry.world.blocks.ConstructBlock.ConstructBuild;
 import mindustry.world.blocks.defense.turrets.BaseTurret.BaseTurretBuild;
 import mindustry.world.blocks.defense.turrets.ReloadTurret.ReloadTurretBuild;
 import mindustry.world.blocks.defense.turrets.Turret.TurretBuild;
 import mindustry.world.blocks.power.PowerNode.PowerNodeBuild;
+import mindustry.world.blocks.storage.CoreBlock.CoreBuild;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -43,14 +54,15 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 /**
- * 世界单位 Entity (PU132 unity.entities.comp.WorldComp 简化移植, 方案A)
+ * 世界单位 Entity (PU132 unity.entities.comp.WorldComp 简化移植)
  *
  * 设计: extends UnitEntity, 直接继承 UnitEntity 的所有 Unit 接口默认行为
- * - 携带一个子世界 (unitWorld), 子世界中的建筑物跟随单位移动和旋转
+ * - 携带一个子世界 (unitWorld), 子世界中的建筑物跟随单位自由移动和旋转 (PU132 原版行为)
  * - setup(): 创建子世界 + 扫描迁移附近建筑物 (原样搬 WorldComp.setup())
  * - update(): 临时切换 Vars.world + 旋转坐标更新建筑物 (原样搬 WorldComp.update())
- * - cwX/cwY/conX/conY: 主世界坐标 ↔ 子世界坐标转换
- * - validPlace/valid: 边界检查
+ * - 子世界网格偏移: 9x19 奇数尺寸世界偏移半格对齐 8x18 甲板贴图 (修复方块错位)
+ * - 长方形碰撞箱 (hitbox 重写): 与平台同样大小, 悬停检测覆盖全平台 + 平台整体挡弹
+ * - display 重写: 悬停信息委托给光标下的子世界建筑 (原版右下角信息面板显示建筑信息)
  *
  * 适配 v155.4 改动:
  * - 去掉 @EntityComponent / @Import / @MethodPriority 注解 (PU132 注解处理器依赖)
@@ -88,15 +100,15 @@ public class WorldUnitEntity extends UnitEntity {
         return new WorldUnitEntity();
     }
 
-    // ===== 部署系统字段 =====
-    /** 部署状态: true = 建筑落在主世界真实 tile 上 (原版输入全功能可用), 单位锁定不动 */
-    public boolean deployed = false;
+    
     /** 子世界建筑 id 集合 (子弹归属判断用, O(1) 查询) */
     protected transient IntSet buildingIds = new IntSet(16);
     /** 上一帧位置/朝向 (计算本帧位移, 驱动子弹跟随) */
     protected transient float lastX, lastY, lastRotation;
-    /** 部署前的 elevation (收起时恢复飞行高度; -1 = 未部署过) */
-    protected transient float savedElevation = -1f;
+    /** 子世界平台尺寸 (世界像素, createWorld 时计算; 长方形碰撞箱用) */
+    protected transient float platW, platH;
+    /** 子世界网格半格偏移 (奇数尺寸世界偏移半格, 使 9x19 网格对齐 8x18 甲板贴图) */
+    protected transient float gridOffX = 4f, gridOffY = 4f;
 
     /** 返回注册的 classId (绕过 v155.4 的 checkEntityMapping 检查) */
     @Override
@@ -114,18 +126,9 @@ public class WorldUnitEntity extends UnitEntity {
         // 子世界未初始化时跳过 (setup() 尚未调用)
         if (unitWorld == null) return;
 
-        // ★ 部署状态: 建筑已挂主世界 (由原版系统更新), 单位锁定不动
-        if (deployed) {
-            vel.setZero();
-            // ★ 单位下沉: elevation=0.5 时渲染层判定 (elevation > 0.5f) 不成立,
-            //   单位画在 groundLayer (darkness+1, 所有建筑之下), 建筑完整可见可交互;
-            //   同时 isFlying() (>= 0.09) 仍为 true, 命中判定等行为与飞行态一致
-            elevation = 0.5f;
-            followBullets();
-            return;
-        }
-
-        float cx = unitWorld.width() * Vars.tilesize / 2f, cy = unitWorld.height() * Vars.tilesize / 2f;
+        // 正常更新: 子世界中的建筑物跟随单位移动和旋转 (平台可自由移动和旋转,
+        // 放置预览通过连续坐标映射吸附到子世界自己的网格)
+        float cx = subCX(), cy = subCY();
         float r = rotation - 90f;
         positions.clear();
 
@@ -170,6 +173,11 @@ public class WorldUnitEntity extends UnitEntity {
                 t.rotation -= r;
             }
         }
+
+        // ★ 子世界建造推进: Terra 自当 builder, 推进 ConstructBlock 脚手架进度并扣主世界核心资源;
+        //   完成的脚手架被 constructFinish 替换为新建筑 → 在此注册进 buildings 列表
+        // (放在 positions 恢复循环之后: 本方法会增删 buildings 列表, 先恢复旧建筑坐标再处理)
+        tickConstructions();
 
         // ★ 去掉子世界炮台的红温动画 (heat 是 TurretBuild 的开火热度,
         //   渲染为炮管上的红色 additive 发光; 每帧清零后不再显示,
@@ -217,7 +225,7 @@ public class WorldUnitEntity extends UnitEntity {
         lastRotation = rotation;
     }
 
-    // ===== setup / absorb / deploy (召唤初始化 + 收起/部署 双向迁移) =====
+    // ===== setup / absorb (召唤初始化 + 吸收建筑到子世界) =====
 
     /**
      * 召唤时初始化: 创建空白子世界并吸收脚下建筑 (PU132 WorldComp.setup 原逻辑).
@@ -229,21 +237,15 @@ public class WorldUnitEntity extends UnitEntity {
     }
 
     /**
-     * 收起: 吸收单位范围内的主世界建筑到子世界.
-     * <p>部署后玩家在单位区域内新建的建筑也在此一并吸收。
-     * 与 deploy() 互为逆操作; 朝向自动归整到 90 度倍数保证 tile 网格对齐。</p>
+     * 吸收单位范围内的主世界建筑到子世界 (召唤时由 setup() 调用).
+     * <p>朝向归整到 90 度倍数保证 tile 映射对齐。</p>
      *
      * @return 本次吸收的建筑数量
      */
     public int absorb() {
         if (unitWorld == null) createWorld();
-        deployed = false;
-        // ★ 恢复飞行高度 (deploy 时记录的 elevation, 哨兵 -1 表示从未部署)
-        if (savedElevation > 0) {
-            elevation = savedElevation;
-            savedElevation = -1f;
-        }
-        // ★ 朝向归整到 90 度倍数: 任意角度时 tile 映射无法对齐主世界网格
+
+        // ★ 朝向归整到 90 度倍数: 任意角度时 tile 映射无法对齐网格
         rotation = Math.round(rotation / 90f) * 90f;
 
         tmp.clear();
@@ -315,124 +317,7 @@ public class WorldUnitEntity extends UnitEntity {
         return absorbed;
     }
 
-    /**
-     * 部署: 子世界建筑落到主世界真实 tile 上 (deploy 的正向操作).
-     * <p>部署后建筑由原版系统全权管理 —— 建造菜单放方块、点击配置、
-     * 框选、修理、悬停面板等原版输入全部可用 (这就是"子世界=全局世界"形态)。
-     * 单位锁定不动, 移动前需先收起 (absorb)。</p>
-     * <p>落点被占 (地形/敌建筑) 的建筑留在子世界, 不影响其余建筑部署。</p>
-     *
-     * @return 成功部署到主世界的建筑数量
-     */
-    public int deploy() {
-        if (unitWorld == null || buildings.isEmpty()) return 0;
-        // ★ 朝向归整: 部署几何只在 90 度倍数时与主世界网格对齐
-        rotation = Math.round(rotation / 90f) * 90f;
-        float r = rotation - 90f;
-        int steps = Math.round(r / 90f) & 3;
-
-        tmp.clear();
-        tmpr.clear();
-        tmpLinks.clear();
-        tmpAdded.clear();
-
-        // 第一遍: 计算落点, 收集可部署建筑 (主世界上下文查询)
-        for (Building b : buildings) {
-            // ★ offset 校正 + round: 建筑中心像素 → tile 参考点
-            //   (奇数尺寸 offset=0 得中心 tile; 偶数尺寸 offset=4 得原点 tile, 与原版约定一致)
-            vec.set(b.x, b.y).sub(subCX(), subCY()).rotate(r).add(x, y);
-            int mx = Math.round((vec.x - b.block.offset) / Vars.tilesize);
-            int my = Math.round((vec.y - b.block.offset) / Vars.tilesize);
-            int newRot = (b.rotation + steps) & 3;
-            if (!canDeployAt(b.block, mx, my)) continue;
-
-            // 电力链接: 子世界 pos → 主世界 pos (向量旋转)
-            if (b.power != null && b instanceof PowerNodeBuild && !b.power.links.isEmpty()) {
-                IntSeq seq = b.power.links, nseq = new IntSeq();
-                for (int i = 0; i < seq.size; i++) {
-                    int pos = seq.get(i);
-                    vec.set(Point2.x(pos) * Vars.tilesize, Point2.y(pos) * Vars.tilesize)
-                        .sub(subCX(), subCY()).rotate(r).add(x, y);
-                    int cx = Math.round(vec.x / Vars.tilesize), cy = Math.round(vec.y / Vars.tilesize);
-                    nseq.add(Point2.pack(cx, cy));
-                }
-                if (!nseq.isEmpty()) tmpLinks.put(b.id, nseq);
-            }
-
-            final int fmx = mx, fmy = my, frot = newRot;
-            tmpr.add(() -> {
-                Tile mt = Vars.world.tile(fmx, fmy);
-                mt.setBlock(b.block, b.team, frot, () -> b);
-                // 主世界位置由 tile 语义决定 (与原版建筑完全一致)
-                b.x = mt.drawx();
-                b.y = mt.drawy();
-            });
-            tmp.add(b);
-        }
-
-        // 第二遍: 从子世界摘除 (切到子世界上下文, 多方块邻格查询才正确)
-        World ow = Vars.world;
-        Vars.world = unitWorld;
-        for (Building b : tmp) {
-            b.tile.remove();
-        }
-        Vars.world = ow;
-
-        // 第三遍: 主世界放置 + 电力重连 + 邻近关系
-        for (Runnable run : tmpr) {
-            run.run();
-        }
-        for (Building b : tmp) {
-            if (b instanceof PowerNodeBuild) {
-                IntSeq seq = tmpLinks.get(b.id);
-                if (seq != null && b.power != null) {
-                    b.power.links.clear();
-                    for (int i = 0; i < seq.size; i++) {
-                        b.configureAny(seq.get(i));
-                    }
-                }
-            }
-            b.updateProximity();
-        }
-
-        // 子世界列表只保留未部署的建筑
-        buildings.removeAll(tmp);
-        rebuildFromBuildings();
-        int deployedCount = tmp.size;
-        if (deployedCount > 0) {
-            deployed = true;
-            // ★ 记录飞行高度并下沉: 单位画到建筑之下, 玩家可正常查看/点击/框选全部建筑
-            if (savedElevation < 0) savedElevation = elevation;
-        }
-
-        tmpr.clear();
-        tmp.clear();
-        tmpLinks.clear();
-        return deployedCount;
-    }
-
-    /** 收起 (面板按钮入口, 语义化命名) */
-    public int undeploy() {
-        return absorb();
-    }
-
-    /**
-     * 检查主世界指定位置能否放置方块 (deploy 用).
-     * <p>遍历方块占据的全部 tile: 越界 / 已有建筑 / 地形不可建造则不可放置。
-     * 不使用 Build.validPlace —— 那会触发放置事件且规则更严, 此处只需基础检查。</p>
-     */
-    protected boolean canDeployAt(Block block, int x, int y) {
-        int offset = -(block.size - 1) / 2;
-        for (int dx = 0; dx < block.size; dx++) {
-            for (int dy = 0; dy < block.size; dy++) {
-                Tile t = Vars.world.tile(dx + offset + x, dy + offset + y);
-                if (t == null || t.build != null || t.solid() || !t.floor().placeableOn) return false;
-            }
-        }
-        return true;
-    }
-
-    /** 按当前 buildings 列表重建 turrets 和 buildingIds (吸收/部署/读档后调用) */
+    /** 按当前 buildings 列表重建 turrets 和 buildingIds (吸收/读档后调用) */
     protected void rebuildFromBuildings() {
         turrets.clear();
         buildingIds.clear();
@@ -449,14 +334,14 @@ public class WorldUnitEntity extends UnitEntity {
 
     // ===== 坐标转换 (统一向量旋转法, 任意 90 度朝向正确) =====
 
-    /** 子世界中心像素 X */
-    protected float subCX() {
-        return unitWorld.width() * Vars.tilesize / 2f;
+    /** 子世界中心像素 X (含网格偏移: 奇数尺寸世界偏移半格对齐甲板贴图) */
+    public float subCX() {
+        return unitWorld.width() * Vars.tilesize / 2f + gridOffX;
     }
 
-    /** 子世界中心像素 Y */
-    protected float subCY() {
-        return unitWorld.height() * Vars.tilesize / 2f;
+    /** 子世界中心像素 Y (含网格偏移) */
+    public float subCY() {
+        return unitWorld.height() * Vars.tilesize / 2f + gridOffY;
     }
 
     /**
@@ -487,11 +372,197 @@ public class WorldUnitEntity extends UnitEntity {
         return x >= 0 && x < unitWorld.width() && y >= 0 && y < unitWorld.height();
     }
 
+    /**
+     * 子世界能否放置方块 (多方块按尺寸铺开检查边界和占用).
+     * <p>子世界地板全是 metalFloor 可建, 无需地形检查; 子世界里也没有单位, 无需重叠检查。</p>
+     */
+    public boolean canBuildSub(Block block, int tx, int ty) {
+        if (unitWorld == null || block == null) return false;
+        int offset = -(block.size - 1) / 2;
+        for (int dx = 0; dx < block.size; dx++) {
+            for (int dy = 0; dy < block.size; dy++) {
+                int x2 = tx + offset + dx, y2 = ty + offset + dy;
+                if (!valid(x2, y2)) return false;
+                if (unitWorld.tile(x2, y2).build != null) return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 在子世界放置方块 (复用原版 Build.beginPlace 的核心流程, 但 tile 查询落在子世界).
+     * <p>流程:
+     * <ol>
+     *   <li>quickRotate: 同方块同队 → 只旋转已有建筑</li>
+     *   <li>instantBuild 方块 → 直接完成 (setBlock + 配置 + 特效 + 事件)</li>
+     *   <li>普通方块 → 放 ConstructBlock 脚手架, 由 {@link #tickConstructions()} 推进建造</li>
+     * </ol>
+     * 不走 Build.validPlace —— 那会查主世界的迷雾可见性/单位重叠等, 对子世界坐标无意义;
+     * 边界与占用检查由 {@link #canBuildSub} 完成。</p>
+     *
+     * @param rot 子世界内部朝向 (调用方需把主世界朝向换算成子世界朝向)
+     * @param config 放置配置 (蓝图粘贴等场景携带)
+     */
+    public boolean placeSub(Block block, int tx, int ty, int rot, Object config) {
+        if (unitWorld == null || block == null) return false;
+        Tile tile = unitWorld.tile(tx, ty);
+        if (tile == null) return false;
+
+        // quickRotate: 同方块同队 → 旋转已有建筑 (原版 beginPlace 行为)
+        if (tile.team() == team && tile.block() == block && tile.build != null && block.quickRotate) {
+            int previous = tile.build.rotation;
+            tile.build.rotation = Mathf.mod(rot, 4);
+            tile.build.updateProximity();
+            tile.build.noSleep();
+            arc.Events.fire(new BuildRotateEvent(tile.build, this, previous));
+            return true;
+        }
+
+        if (!canBuildSub(block, tx, ty)) return false;
+
+        World ow = Vars.world;
+        Vars.world = unitWorld;
+        try {
+            // instantBuild: 直接完成 (原版 ConstructBlock.constructFinish 的核心步骤)
+            if (block.instantBuild) {
+                arc.Events.fire(new BlockBuildBeginEvent(tile, team, this, false));
+                block.placeBegan(tile, tile.block(), this);
+                tile.setBlock(block, team, rot);
+                if (tile.build != null) {
+                    if (config != null) tile.build.configured(this, config);
+                    registerBuilding(tile.build);
+                    tile.build.updateProximity();
+                    tile.build.noSleep();
+                }
+                block.placeEffect.at(tile.drawx(), tile.drawy(), block.size);
+                arc.Events.fire(new BlockBuildEndEvent(tile, this, team, false, config));
+                block.placeEnded(tile, this, rot, config);
+                return true;
+            }
+
+            // 普通方块: 放 ConstructBlock 脚手架 (原版 beginPlace 的核心步骤)
+            Block sub = ConstructBlock.get(block.size);
+            tile.setBlock(sub, team, rot);
+            ConstructBuild cons = (ConstructBuild) tile.build;
+            cons.setConstruct(Blocks.air, block);
+            cons.lastConfig = config;
+            registerBuilding(cons);
+            arc.Events.fire(new BlockBuildBeginEvent(tile, team, this, false));
+            block.placeBegan(tile, Blocks.air, this);
+            return true;
+        } finally {
+            Vars.world = ow;
+        }
+    }
+
+    /**
+     * 拆除子世界建筑 (复用原版 Build.beginBreak 的核心流程).
+     * <p>instantDeconstruct 方块直接移除; 普通建筑放拆除脚手架,
+     * 由 {@link #tickConstructions()} 推进拆除并按阶段返还资源到主世界核心。</p>
+     */
+    public boolean breakSub(int tx, int ty) {
+        if (unitWorld == null) return false;
+        Tile tile = unitWorld.tile(tx, ty);
+        if (tile == null || tile.build == null) return false;
+        // 只能拆己方/无主建筑 (原版 validBreak 的队伍检查)
+        if (tile.team() != team && tile.team() != Team.derelict) return false;
+        // 已在拆除中的脚手架不重复发起 (即时拆除 + 原版拆键 plan 转译会同时触发)
+        if (tile.build instanceof ConstructBuild cb && cb.current == cb.previous) return false;
+
+        float prevPercent = tile.build.healthf();
+        int rotation = tile.build.rotation;
+        Block previous = tile.block();
+
+        // 即拆方块: 直接移除 (原版 ConstructBlock.deconstructFinish 的核心步骤)
+        if (previous.instantDeconstruct) {
+            World ow = Vars.world;
+            Vars.world = unitWorld;
+            try {
+                previous.breakEffect.at(tile.drawx(), tile.drawy(), previous.size, previous.mapColor);
+                arc.Events.fire(new BlockBuildEndEvent(tile, this, team, true, null));
+                tile.remove();
+            } finally {
+                Vars.world = ow;
+            }
+            return true;
+        }
+
+        World ow = Vars.world;
+        Vars.world = unitWorld;
+        try {
+            Block sub = ConstructBlock.get(previous.size);
+            tile.build.onDeconstructed(this);
+            tile.build.dead = true;
+            tile.setBlock(sub, team, rotation);
+            ConstructBuild cons = (ConstructBuild) tile.build;
+            cons.setDeconstruct(previous);
+            cons.health = cons.maxHealth * prevPercent;
+            registerBuilding(cons);
+            arc.Events.fire(new BlockBuildBeginEvent(tile, team, this, true));
+            return true;
+        } finally {
+            Vars.world = ow;
+        }
+    }
+
+    /** 注册建筑到子世界列表 (放置/建造完成/恢复后调用), 并刷新邻近关系 (电力/传送带连接) */
+    protected void registerBuilding(Building b) {
+        buildings.add(b);
+        buildingIds.add(b.id);
+        if (b instanceof TurretBuild tb) turrets.add(tb);
+        b.updateProximity();
+    }
+
+    /**
+     * 子世界建造推进: Terra 自当 builder (原版 BuilderComp.updateBuild 的子世界版).
+     * <p>职责:
+     * <ol>
+     *   <li>推进每个 ConstructBlock 脚手架的建造/拆除进度 (资源自动扣主世界核心/返还)</li>
+     *   <li>清理 dead 脚手架; 建造完成时 constructFinish 在同 tile 生成新建筑 → 注册进列表</li>
+     * </ol>
+     * 方向判定: current == previous 为拆除 (setDeconstruct 两者相同), 否则为建造 ——
+     * 对读档恢复的脚手架同样准确 (两者都参与序列化)。</p>
+     * <p>必须在 Vars.world = unitWorld 上下文中调用 (constructFinish → setBlock 的多方块邻格查询)。</p>
+     */
+    protected void tickConstructions() {
+        if (buildings.isEmpty()) return;
+        Building coreBuild = team.core();
+        CoreBuild core = coreBuild instanceof CoreBuild ? (CoreBuild) coreBuild : null;
+
+        for (int i = buildings.size - 1; i >= 0; i--) {
+            Building b = buildings.get(i);
+
+            if (b.dead) {
+                buildings.remove(i);
+                buildingIds.remove(b.id);
+                if (b instanceof TurretBuild) turrets.remove((TurretBuild) b, true);
+
+                // 建造完成的产物: 同 tile 上出现新建筑 → 注册 (可在主世界投影位置补特效反馈)
+                Building nb = b.tile.build;
+                if (nb != null && nb != b && !buildingIds.contains(nb.id)) {
+                    registerBuilding(nb);
+                    vec.set(nb.x, nb.y).sub(subCX(), subCY()).rotate(rotation - 90f).add(x, y);
+                    nb.block.placeEffect.at(vec.x, vec.y, nb.block.size);
+                }
+                continue;
+            }
+
+            if (b instanceof ConstructBuild cons) {
+                float amount = Time.delta / Math.max(cons.buildCost, 1f);
+                if (cons.current == cons.previous) {
+                    cons.deconstruct(this, core, amount);
+                } else {
+                    cons.construct(this, core, amount, cons.lastConfig);
+                }
+            }
+        }
+    }
+
     // ===== 鼠标悬停: 查找单位上的建筑 =====
 
     /**
-     * 给定主世界坐标，返回该坐标在单位上对应的建筑（如果有的话）。
-     * <p>原理：把主世界坐标转换为子世界坐标，在子世界中查找该位置的 Tile.build。</p>
+     * 给定主世界坐标，返回该坐标在单位平台上对应的建筑（如果有的话）。
+     * <p>原理：把主世界坐标逆旋转平移到子世界像素坐标，在子世界中查找该位置的 Tile.build。</p>
      *
      * @param worldX 主世界 X 像素坐标
      * @param worldY 主世界 Y 像素坐标
@@ -499,17 +570,10 @@ public class WorldUnitEntity extends UnitEntity {
      */
     public Building buildingAt(float worldX, float worldY) {
         if (unitWorld == null) return null;
-        // 主世界坐标 → 子世界像素坐标 (反向 cwX/cwY)
-        float subX = (worldX - x) + unitWorld.width() * Vars.tilesize / 2f;
-        float subY = (worldY - y) + unitWorld.height() * Vars.tilesize / 2f;
-        // 反向旋转
+        // 主世界坐标 → 子世界像素 (逆旋转 + 平移到子世界原点), 再换算 tile
         float r = -(rotation - 90f);
-        vec.set(subX - unitWorld.width() * Vars.tilesize / 2f, subY - unitWorld.height() * Vars.tilesize / 2f).rotate(r);
-        float sx = vec.x + unitWorld.width() * Vars.tilesize / 2f;
-        float sy = vec.y + unitWorld.height() * Vars.tilesize / 2f;
-        // 子世界像素 → tile 坐标
-        int tx = mindustry.core.World.toTile(sx);
-        int ty = mindustry.core.World.toTile(sy);
+        vec.set(worldX - x, worldY - y).rotate(r).add(subCX(), subCY());
+        int tx = World.toTile(vec.x), ty = World.toTile(vec.y);
         if (valid(tx, ty)) {
             Tile tile = unitWorld.tile(tx, ty);
             return tile != null ? tile.build : null;
@@ -518,10 +582,56 @@ public class WorldUnitEntity extends UnitEntity {
     }
 
     /**
-     * 返回子世界中所有建筑的只读列表（用于UI显示状态）。
+     * 主世界坐标 → 子世界像素坐标 (连续映射, 供建造接管使用).
+     * <p>平台可自由移动和旋转 —— 光标落在平台范围内时, 通过本映射换算到子世界网格,
+     * 放置预览自动吸附到子世界的网格 (与主世界网格无关)。</p>
+     *
+     * @param out 输出子世界像素坐标 (复用调用方的缓冲避免分配)
+     * @return false = 坐标不在子世界范围内
      */
-    public Seq<Building> getBuildings() {
-        return buildings;
+    public boolean worldToSubPixel(float worldX, float worldY, Vec2 out) {
+        if (unitWorld == null) return false;
+        float r = -(rotation - 90f);
+        out.set(worldX - x, worldY - y).rotate(r).add(subCX(), subCY());
+        return out.x >= 0f && out.x < platW && out.y >= 0f && out.y < platH;
+    }
+
+    /**
+     * 长方形碰撞箱: 与子世界平台同样大小的矩形, 随单位旋转取轴对齐包围盒.
+     * <p>作用:
+     * <ul>
+     *   <li>敌方子弹打在整个平台范围被要塞吸收 (而非穿过平台)</li>
+     *   <li>原版悬停检测覆盖全平台 —— PlacementFragment.hovered() 通过单位碰撞箱命中本单位
+     *       后调用 display(), 由 {@link #display(Table)} 委托给光标下的子世界建筑</li>
+     * </ul></p>
+     */
+    @Override
+    public void hitbox(Rect rect) {
+        if (platW <= 0f || platH <= 0f) {
+            super.hitbox(rect);
+            return;
+        }
+        float rad = (rotation - 90f) * Mathf.degRad;
+        float cos = Math.abs(Mathf.cos(rad)), sin = Math.abs(Mathf.sin(rad));
+        rect.setCentered(x, y, platW * cos + platH * sin, platW * sin + platH * cos);
+    }
+
+    /**
+     * 悬停信息显示委托: 光标在子世界建筑上时, 右下角原版信息面板显示该建筑的信息.
+     * <p>原版 PlacementFragment.hovered() 命中本单位后调用 display() ——
+     * 这里转交给光标下的子世界建筑, 悬停体验与原世界完全一致 (血量/电力/物品条全是原版 UI)。
+     * 光标在平台空白处时回落为显示单位自身信息 (原版悬停单位的行为)。</p>
+     */
+    @Override
+    public void display(Table table) {
+        if (!Vars.headless) {
+            Building b = buildingAt(Core.input.mouseWorldX(), Core.input.mouseWorldY());
+            if (b != null && b.displayable()) {
+                b.display(table);
+                return;
+            }
+        }
+        super.display(table);
     }
 
     /**
@@ -542,6 +652,14 @@ public class WorldUnitEntity extends UnitEntity {
             unitWorld.tiles.set(i % w, i / w, new UnitTile(i % w, i / w));
         }
         unitWorld.tiles.eachTile(tile -> tile.setFloor(Blocks.metalFloor.asFloor()));
+
+        // ★ 平台尺寸 (长方形碰撞箱用) + 网格偏移:
+        //   甲板贴图是 8x18 (偶数) 网格, 子世界是 9x19 (奇数) —— 奇数尺寸时子世界
+        //   整体偏移半格 (4px), 多出的一行一列落在贴图左边和最下方, 网格完美对齐
+        platW = w * Vars.tilesize;
+        platH = h * Vars.tilesize;
+        gridOffX = (w % 2 == 1) ? Vars.tilesize / 2f : 0f;
+        gridOffY = (h % 2 == 1) ? Vars.tilesize / 2f : 0f;
     }
 
     // ===== 存档序列化 (修复重进地图子世界内容消失的问题) =====
@@ -563,7 +681,6 @@ public class WorldUnitEntity extends UnitEntity {
      */
     public void writeSubWorld(Writes write) throws IOException {
         write.i(id);
-        write.b(deployed ? (byte) 1 : (byte) 0);
         if (unitWorld == null || buildings.isEmpty()) {
             write.i(0);
             return;
@@ -620,9 +737,8 @@ public class WorldUnitEntity extends UnitEntity {
      * @param deployed 读出的部署状态 (部署态: 建筑由原版存档恢复, 子世界保持空)
      * @param ver 存档区块格式版本 (v3+ 建筑数据含精确 x/y)
      */
-    public void readSubWorld(Reads read, int count, boolean deployed, byte ver) throws IOException {
+    public void readSubWorld(Reads read, int count, byte ver) throws IOException {
         if (unitWorld == null) createWorld();
-        this.deployed = deployed;
         if (count <= 0) return;
 
         World ow = Vars.world;
@@ -768,7 +884,6 @@ public class WorldUnitEntity extends UnitEntity {
             int units = read.i();
             for (int u = 0; u < units; u++) {
                 int unitId = read.i();
-                boolean deployed = ver >= 2 && read.b() != 0;
                 int count = read.i();
 
                 WorldUnitEntity target = null;
@@ -787,7 +902,7 @@ public class WorldUnitEntity extends UnitEntity {
                     }
                     continue;
                 }
-                target.readSubWorld(read, count, deployed, ver);
+                target.readSubWorld(read, count, ver);
             }
         }
     }
