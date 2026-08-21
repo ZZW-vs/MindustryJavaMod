@@ -346,6 +346,23 @@ public class WorldUnitEntity extends UnitEntity {
         for (Runnable r : tmpr) {
             r.run();
         }
+
+        // ★ 电力链接坐标写回: PowerNode 的 links 存 tile 坐标, 吸收进子世界后主世界坐标失效
+        //   (渲染时 world.build(link) 在子世界查不到目标 → 电力连接线全部不显示);
+        //   上方循环算好的子世界坐标 (tmpLinks) 写回各节点, 链接目标未被吸收的死链剔除
+        for (int i = 0; i < buildings.size; i++) {
+            Building b = buildings.get(i);
+            IntSeq links = tmpLinks.get(b.id);
+            if (links == null || b.power == null) continue;
+            for (int j = links.size - 1; j >= 0; j--) {
+                int pos = links.get(j);
+                Tile lt = unitWorld.tile(Point2.x(pos), Point2.y(pos));
+                if (lt == null || lt.build == null) links.removeIndex(j);
+            }
+            b.power.links.clear();
+            b.power.links.addAll(links);
+        }
+
         rebuildFromBuildings();
 
         Vars.world = ow;
@@ -523,8 +540,10 @@ public class WorldUnitEntity extends UnitEntity {
         if (unitWorld == null) return false;
         Tile tile = unitWorld.tile(tx, ty);
         if (tile == null || tile.build == null) return false;
-        // ★ 主大地核心不可拆除 (召唤本单位的 TerraCore, 拆掉会破坏单位与核心的绑定)
-        if (tile.build == mainCore) return false;
+        // ★ 主大地核心不可拆除 (召唤本单位的 TerraCore, 拆掉会破坏单位与核心的绑定);
+        //   除 mainCore 引用判断外再按 block 类型兜底 —— 子世界 TerraCore 唯一且禁止新放,
+        //   mainCore 引用丢失 (transient 字段恢复异常等) 时也不会漏判
+        if (tile.build == mainCore || tile.block() instanceof TerraCore) return false;
         // 只能拆己方/无主建筑 (原版 validBreak 的队伍检查)
         if (tile.team() != team && tile.team() != Team.derelict) return false;
         // 已在拆除中的脚手架不重复发起 (即时拆除 + 原版拆键 plan 转译会同时触发)
@@ -748,6 +767,9 @@ public class WorldUnitEntity extends UnitEntity {
      * @param write 存档输出流
      */
     public void writeSubWorld(Writes write) throws IOException {
+        // ★ 存档保护: postDraw→UI 阶段建筑 x/y 会被临时换成主世界投影坐标 (见
+        //   WorldUnitType 坐标换班机制), 写档前统一换回子世界坐标, 防止投影坐标进存档
+        WorldUnitType.ensureSubCoords();
         write.i(id);
         if (unitWorld == null || buildings.isEmpty()) {
             write.i(0);

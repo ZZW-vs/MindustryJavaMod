@@ -21,6 +21,7 @@ import mindustry.core.World;
 import mindustry.entities.units.BuildPlan;
 import mindustry.game.EventType.Trigger;
 import mindustry.gen.Building;
+import mindustry.gen.Call;
 import mindustry.gen.Groups;
 import mindustry.gen.Tex;
 import mindustry.gen.Unit;
@@ -186,6 +187,19 @@ public class WorldUnitType extends UnityUnitType {
                     hoveredSubBuild.drawSelect();
                 }
 
+                // ★ 配置界面打开时: 在投影上下文中绘制配置覆盖层 (范围圈/电力连线/连接点) ——
+                //   原版 OverlayRenderer 在主世界上下文调用 drawConfigure, 子世界坐标会画到
+                //   地图原点附近; 这里在投影上下文中重画 (Vars.world=子世界, 连接查询也正确)
+                if (Vars.control != null && Vars.control.input != null
+                    && Vars.control.input.config.isShown()) {
+                    Building cfg = Vars.control.input.config.getSelected();
+                    if (cfg != null && w.ownsBuilding(cfg)) {
+                        Draw.z(Layer.overlayUI);
+                        cfg.drawConfigure();
+                        Draw.reset();
+                    }
+                }
+
                 // ★ 放置预览: 鼠标在本子世界区域且处于放置模式 → 在子世界网格上画 ghost
                 //   (吸附到子世界自己的网格; 在投影上下文中绘制, 坐标即子世界坐标)
                 if (buildPreviewUnit == w && buildPreviewBlock != null) {
@@ -304,6 +318,65 @@ public class WorldUnitType extends UnityUnitType {
     private static int lastBreakPos = -1;
     /** 临时坐标缓冲 (避免每帧分配) */
     private static final Vec2 tmpVec = new Vec2();
+
+    // ===== 坐标换班机制 (子世界建筑 x/y 双坐标系) =====
+    //
+    // 子世界建筑的 x/y 平时是【子世界坐标】(渲染投影和建筑逻辑都依赖它),
+    // 但原版 UI 阶段 (scene.act / 输入点击) 用主世界语义读取这些坐标:
+    //   - 配置面板/物品栏定位: mouseScreen(build.x, build.y) → 面板摆到屏幕外/地图原点
+    //   - 物品取放距离检查: player.within(build, itemTransferRange) → 永远超距被拒
+    // 解决: postDraw (世界渲染全部结束) 后把所有子世界建筑 x/y 换成【主世界投影坐标】,
+    // 下一帧 Trigger.update 开头 (单位更新/渲染之前) 再换回来 —— 逻辑和渲染阶段
+    // 看到的始终是子世界坐标, UI 和输入阶段看到的是主世界坐标。
+
+    /** 子世界建筑 x/y 当前是否处于主世界投影态 */
+    private static boolean coordsSwapped = false;
+
+    /**
+     * postDraw 阶段: 全部子世界建筑 x/y → 主世界投影坐标.
+     * <p>与 update() 里的临时投影公式完全一致: (sub - 子世界中心) 绕单位朝向旋转后
+     * 平移到单位位置。帧内渲染已全部完成, 无人读取子世界坐标, 换班无副作用。</p>
+     */
+    private static void swapToMainCoords() {
+        if (coordsSwapped) return;
+        for (Unit u : Groups.unit) {
+            if (!(u instanceof WorldUnitEntity w) || w.unitWorld == null) continue;
+            float r = w.rotation - 90f;
+            for (int i = 0; i < w.buildings.size; i++) {
+                Building b = w.buildings.get(i);
+                tmpVec.set(b.x - w.subCX(), b.y - w.subCY()).rotate(r).add(w.x, w.y);
+                b.x = tmpVec.x;
+                b.y = tmpVec.y;
+            }
+        }
+        coordsSwapped = true;
+    }
+
+    /**
+     * 换回子世界坐标 (每帧 Trigger.update 开头 / 存档写 x/y 前调用).
+     * <p>逆投影: (main - 单位位置) 反向旋转后平移回子世界中心。postDraw 到下一帧
+     * Trigger.update 之间单位不会移动 (移动发生在 Trigger.update 之后的单位更新阶段),
+     * 逆变换精确还原, 不产生漂移。</p>
+     */
+    private static void swapBackToSubCoords() {
+        if (!coordsSwapped) return;
+        for (Unit u : Groups.unit) {
+            if (!(u instanceof WorldUnitEntity w) || w.unitWorld == null) continue;
+            float r = w.rotation - 90f;
+            for (int i = 0; i < w.buildings.size; i++) {
+                Building b = w.buildings.get(i);
+                tmpVec.set(b.x - w.x, b.y - w.y).rotate(-r).add(w.subCX(), w.subCY());
+                b.x = tmpVec.x;
+                b.y = tmpVec.y;
+            }
+        }
+        coordsSwapped = false;
+    }
+
+    /** 确保子世界建筑坐标为子世界坐标 (存档写 x/y 前调用, 防止投影坐标进存档) */
+    public static void ensureSubCoords() {
+        swapBackToSubCoords();
+    }
 
     /**
      * 主世界朝向 → 子世界内部朝向换算.
@@ -481,6 +554,10 @@ public class WorldUnitType extends UnityUnitType {
      * <p>需要在模组初始化时用 Events.run(Trigger.update, WorldUnitType::updateInteraction) 注册。</p>
      */
     public static void updateInteraction() {
+        // ★ 坐标换班换回: 上一帧 postDraw 后建筑 x/y 是主世界投影坐标 (供 UI/输入用),
+        //   本帧逻辑/渲染需要子世界坐标 —— 必须在单位更新缓存坐标之前换回
+        swapBackToSubCoords();
+
         if (!Vars.state.isPlaying()) return;
 
         // ★ 建造权限与附生绑定: 未被玩家附生的大地单位自动关闭建造模式 ——
@@ -554,6 +631,22 @@ public class WorldUnitType extends UnityUnitType {
                         // 非配置建筑: 显示物品栏
                         Vars.control.input.inv.showFor(found);
                     }
+                });
+            }
+
+            // ★ 拖拽物品投放到子世界建筑: 原版 tryDropItems 只认主世界 tile 上的建筑
+            //   (selected.build), 光标下是子世界建筑时在此转交 (复刻原版拖放体验)。
+            //   Core.app.post 到帧末执行: transferInventory 的距离检查读建筑 x/y,
+            //   此时坐标换班机制已把 x/y 换成主世界投影坐标, 距离检查才能通过
+            if (Vars.control.input != null && Vars.control.input.isDroppingItem()
+                && Core.input.keyRelease(Binding.select) && !Core.scene.hasMouse()
+                && !hoveredSubBuild.dead && hoveredSubBuild.allowDeposit()
+                && Vars.control.input.canDepositItem(hoveredSubBuild)
+                && hoveredSubBuild.acceptStack(Vars.player.unit().item(),
+                    Vars.player.unit().stack().amount, Vars.player.unit()) > 0) {
+                Building target = hoveredSubBuild;
+                Core.app.post(() -> {
+                    if (!target.dead) Call.transferInventory(Vars.player, target);
                 });
             }
         }
@@ -638,6 +731,9 @@ public class WorldUnitType extends UnityUnitType {
     public static void registerInteraction() {
         Events.run(Trigger.update, WorldUnitType::updateInteraction);
         Events.run(Trigger.draw, WorldUnitType::drawHighlight);
+        // ★ 坐标换班: 世界渲染全部结束后把子世界建筑 x/y 换成主世界投影坐标,
+        //   供 UI 阶段 (配置面板/物品栏定位, 物品取放距离检查) 使用
+        Events.run(Trigger.postDraw, WorldUnitType::swapToMainCoords);
         installInputPatch();
     }
 
