@@ -1,6 +1,9 @@
 package zzw.content.type;
 
 import arc.graphics.Color;
+import arc.graphics.Pixmap;
+import arc.graphics.Texture;
+import arc.graphics.g2d.TextureRegion;
 import arc.graphics.g2d.Batch;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
@@ -24,6 +27,7 @@ import mindustry.gen.Building;
 import mindustry.gen.Groups;
 import mindustry.gen.Tex;
 import mindustry.gen.Unit;
+import mindustry.graphics.BlockRenderer;
 import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
@@ -79,6 +83,42 @@ public class WorldUnitType extends UnityUnitType {
      * 普通 SpriteBatch 开 sort 模式即等价的顶点 z 排序)</p>
      */
     public static final Batch altBatch = new SpriteBatch();
+
+    /**
+     * 运行时生成的柔和阴影贴图: 中心实心白块 + 四边线性渐变.
+     * <p>复刻原版 BlockRenderer 影子观感 —— 原版用 1 texel/tile 的影子 FBO 记录建筑足迹
+     * (足迹内填 blendShadowColor 深灰), 经线性过滤放大 8 倍后足迹边缘形成柔和渐变,
+     * 再经 darkness 着色器转为黑色半透明, 采样时向左下偏移半格形成投影。
+     * 这里直接生成带边缘渐变的白色方块贴图, 绘制时染黑并按建筑足迹缩放 + 左下偏移,
+     * 得到与原版一致的"实心足迹 + 软边 + 左下投影"影子, 无需 per-unit FBO。</p>
+     */
+    private static TextureRegion softShadowRegion;
+
+    /**
+     * 懒加载生成柔和阴影贴图 (首次绘制时创建, 之后复用).
+     * <p>贴图 32x32, 边缘 8px 线性渐变 → 实心区占贴图一半。绘制尺寸取足迹的 2 倍时,
+     * 实心区正好覆盖建筑足迹, 四周软边向外扩散 (大方块软化范围也相应更大, 观感自然)。</p>
+     */
+    private static TextureRegion softShadow() {
+        if (softShadowRegion == null) {
+            int size = 32, edge = 8;
+            Pixmap pix = new Pixmap(size, size);
+            Color c = new Color(1f, 1f, 1f, 1f);
+            for (int x = 0; x < size; x++) {
+                for (int y = 0; y < size; y++) {
+                    // 像素到贴图四边的距离 → alpha 线性渐变 (0..edge 从 0 渐变到 1)
+                    float d = Math.min(Math.min(x + 0.5f, size - x - 0.5f), Math.min(y + 0.5f, size - y - 0.5f));
+                    c.a(Mathf.clamp(d / edge));
+                    pix.set(x, y, c);
+                }
+            }
+            Texture tex = new Texture(pix);
+            tex.setFilter(Texture.TextureFilter.linear);
+            softShadowRegion = new TextureRegion(tex);
+            pix.dispose();
+        }
+        return softShadowRegion;
+    }
 
     public WorldUnitType(String name) {
         super(name);
@@ -154,14 +194,17 @@ public class WorldUnitType extends UnityUnitType {
                     Draw.color();
                 }
 
-                // 建筑柔和阴影: 放大的黑色贴图 —— 贴图边缘的透明渐变形成模糊黑边
+                // 原版风格建筑阴影: 方形足迹 + 软边 + 左下偏移半格
+                // (同 BlockRenderer: 足迹黑色 shadowColor.a 透明度, 线性过滤软边, 采样偏移形成左下投影)
                 for (int i = 0; i < build.size; i++) {
                     Building b = build.get(i);
+                    if (!b.block.hasShadow) continue;
                     Draw.z(Layer.block - 0.1f);
-                    Draw.color(0f, 0f, 0f, 0.3f);
-                    float sw = b.block.region.width * Draw.scl + 3f;
-                    float sh = b.block.region.height * Draw.scl + 3f;
-                    Draw.rect(b.block.region, b.x - 1.5f, b.y - 1.5f, sw, sh, b.drawrot());
+                    Draw.color(0f, 0f, 0f, BlockRenderer.shadowColor.a);
+                    float bs = b.block.size * Vars.tilesize;
+                    // 贴图实心区占一半 → 画 2 倍足迹尺寸时实心区正好覆盖足迹, 四周软边向外扩散;
+                    // 偏移 -半格: 影子左下方向多露出 ~1 tile 渐变, 右上方向与足迹齐平 (原版投影观感)
+                    Draw.rect(softShadow(), b.x - Vars.tilesize / 2f, b.y - Vars.tilesize / 2f, bs * 2f, bs * 2f);
                 }
                 Draw.color();
 
@@ -350,9 +393,9 @@ public class WorldUnitType extends UnityUnitType {
             }
         }
 
-        // ★ 建造模式 gate: 只有点击主核心激活建造模式后才能建造/拆除
-        //   (未激活时只保留方块交互: 悬停/点击配置/物品界面)
-        if (hit != null && hit.buildMode && !Core.scene.hasMouse()) {
+        // ★ 建造模式 gate: 玩家附生该单位且建造模式已激活才能建造/拆除
+        //   (未附生/未激活时只保留方块交互: 悬停/点击配置/物品界面)
+        if (hit != null && hit.buildMode && hit == Vars.player.unit() && !Core.scene.hasMouse()) {
             int tx = World.toTile(tmpVec.x), ty = World.toTile(tmpVec.y);
 
             // 即时放置: 按住放置键 → 放进子世界 (平台区域整体接管, 与主世界地形无关;
@@ -402,14 +445,21 @@ public class WorldUnitType extends UnityUnitType {
         Unit pu = Vars.player.unit();
         if (pu == null || pu.plans.size <= 0) return;
 
+        // ★ 附生建造模式的大地单位: 主世界建造完全屏蔽 (保留"只能往子世界放方块"特性) ——
+        //   canBuild 覆写放行后原版输入会往 plans 里塞主世界计划, 这里把平台外的计划
+        //   全部清掉, 平台上的计划照常转译进子世界; terra buildSpeed=0 无法自行推进,
+        //   残留的主世界计划会让 BuilderComp 生成永远卡在 0% 的脚手架
+        boolean controllingBuild = pu instanceof WorldUnitEntity cw && cw.buildMode;
+
         // 锚点: 第一个落在平台内 (且建造模式) 的计划; 同帧内同批计划围绕锚点布局
         WorldUnitEntity anchorOwner = null;
         int anchorPX = 0, anchorPY = 0, anchorSX = 0, anchorSY = 0;
 
         for (int i = pu.plans.size - 1; i >= 0; i--) {
             BuildPlan plan = pu.plans.get(i);
-            // 让位: 主世界该处有建筑 → 保留原版计划
-            if (Vars.world.build(plan.x, plan.y) != null) continue;
+            // 让位: 主世界该处有建筑 → 保留原版计划 (玩家想操作的是地面建筑);
+            //   附生建造模式时例外 —— 主世界计划一律清除, 建造全部收归子世界
+            if (!controllingBuild && Vars.world.build(plan.x, plan.y) != null) continue;
 
             WorldUnitEntity owner = null;
             for (Unit u : Groups.unit) {
@@ -421,7 +471,11 @@ public class WorldUnitType extends UnityUnitType {
                     break;
                 }
             }
-            if (owner == null) continue;
+            if (owner == null) {
+                // 平台之外的纯主世界计划: 附生建造模式 → 移除 (屏蔽主世界建造)
+                if (controllingBuild) pu.plans.removeIndex(i);
+                continue;
+            }
 
             pu.plans.removeIndex(i);
 
@@ -479,6 +533,16 @@ public class WorldUnitType extends UnityUnitType {
     public static void updateInteraction() {
         if (!Vars.state.isPlaying()) return;
 
+        // ★ 建造权限与附生绑定: 未被玩家附生的大地单位自动关闭建造模式 ——
+        //   玩家一次只能附生一个单位, 天然保证"最多一个大地核心处于建造状态";
+        //   玩家脱离附生 (换控其他单位/死亡) 时立即收回建造权限
+        Unit pu = Vars.player.unit();
+        for (Unit u : Groups.unit) {
+            if (u instanceof WorldUnitEntity w && w.buildMode && u != pu) {
+                w.buildMode = false;
+            }
+        }
+
         float mx = Core.input.mouseWorldX(), my = Core.input.mouseWorldY();
 
         // ★ 建造接管: 光标在平台范围时, 放置/拆除/预览直接作用于子世界
@@ -521,7 +585,11 @@ public class WorldUnitType extends UnityUnitType {
                     }
                 }
                 if (coreOwner != null) {
-                    showBuildModePrompt(coreOwner);
+                    // ★ 建造模式按钮仅对附生该单位的玩家开放 (未附生时点主核心无反应 ——
+                    //   建造/拆除权限全部与附生状态绑定, 防止远处遥控开启建造模式)
+                    if (coreOwner == Vars.player.unit()) {
+                        showBuildModePrompt(coreOwner);
+                    }
                     return;
                 }
 
@@ -566,13 +634,22 @@ public class WorldUnitType extends UnityUnitType {
         buildModeTable.add("[accent]" + w.type.localizedName).padBottom(4f).row();
         buildModeTable.button(w.buildMode ? "退出建造模式" : "进入建造模式", () -> {
             w.buildMode = !w.buildMode;
+            // ★ 唯一性: 开启时自动关闭其他大地核心的建造模式 (一次最多一个处于建造状态)
+            if (w.buildMode) {
+                for (Unit u : Groups.unit) {
+                    if (u instanceof WorldUnitEntity o && o != w && o.buildMode) {
+                        o.buildMode = false;
+                    }
+                }
+            }
             hideBuildModePrompt();
         }).size(180f, 44f);
 
         buildModeTable.update(() -> {
-            // 单位死亡 / 核心丢失 → 收起面板
+            // 单位死亡 / 核心丢失 / 玩家脱离附生 → 收起面板
             if (buildModeUnit == null || buildModeUnit.dead || !buildModeUnit.isAdded()
-                || buildModeUnit.mainCore == null || buildModeUnit.mainCore.dead) {
+                || buildModeUnit.mainCore == null || buildModeUnit.mainCore.dead
+                || Vars.player.unit() != buildModeUnit) {
                 hideBuildModePrompt();
                 return;
             }

@@ -131,6 +131,21 @@ public class WorldUnitEntity extends UnitEntity {
         return ZEntityRegister.classId(WorldUnitEntity.class);
     }
 
+    /**
+     * 建造能力判定 (物品栏明暗 + 建造输入开关的总闸).
+     *
+     * <p>原版链路: {@code PlacementFragment} 按钮颜色 = 核心资源够 && {@code player.isBuilder()};
+     * 而 {@code Player.isBuilder()} 直接返回 {@code unit.canBuild()}, 基类实现要求
+     * {@code type.buildSpeed > 0} —— terra 的 buildSpeed=0 (不能在主世界自行施工),
+     * 因此默认全灰. 这里覆写为"附生本单位 && 建造模式激活"才放行:
+     * 开启建造模式后物品栏方块按主世界核心资源正常变亮/变暗,
+     * 主世界的实际放置屏蔽由 {@code sweepPlans()} 清扫计划兜底.</p>
+     */
+    @Override
+    public boolean canBuild() {
+        return buildMode && Vars.player.unit() == this;
+    }
+
     // ===== update() (原 WorldComp.update, 去掉 @MethodPriority, 保留 TimeReflect) =====
 
     @Override
