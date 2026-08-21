@@ -60,7 +60,7 @@ import java.io.IOException;
  * - 携带一个子世界 (unitWorld), 子世界中的建筑物跟随单位自由移动和旋转 (PU132 原版行为)
  * - setup(): 创建子世界 + 扫描迁移附近建筑物 (原样搬 WorldComp.setup())
  * - update(): 临时切换 Vars.world + 旋转坐标更新建筑物 (原样搬 WorldComp.update())
- * - 子世界网格偏移: 9x19 奇数尺寸世界偏移半格对齐 8x18 甲板贴图 (修复方块错位)
+ * - 子世界网格偏移: 9x19 多出的一行一列放世界左方/最下方, 对齐偏左下的甲板贴图区域 (修复方块错位)
  * - 长方形碰撞箱 (hitbox 重写): 与平台同样大小, 悬停检测覆盖全平台 + 平台整体挡弹
  * - display 重写: 悬停信息委托给光标下的子世界建筑 (原版右下角信息面板显示建筑信息)
  *
@@ -107,8 +107,8 @@ public class WorldUnitEntity extends UnitEntity {
     protected transient float lastX, lastY, lastRotation;
     /** 子世界平台尺寸 (世界像素, createWorld 时计算; 长方形碰撞箱用) */
     protected transient float platW, platH;
-    /** 子世界网格半格偏移 (奇数尺寸世界偏移半格, 使 9x19 网格对齐 8x18 甲板贴图) */
-    protected transient float gridOffX = 4f, gridOffY = 4f;
+    /** 子世界网格偏移 (奇数尺寸=12: 多出的一行一列放世界左方/最下方, 对齐偏左下的甲板贴图) */
+    protected transient float gridOffX = 12f, gridOffY = 12f;
 
     /** 返回注册的 classId (绕过 v155.4 的 checkEntityMapping 检查) */
     @Override
@@ -654,12 +654,20 @@ public class WorldUnitEntity extends UnitEntity {
         unitWorld.tiles.eachTile(tile -> tile.setFloor(Blocks.metalFloor.asFloor()));
 
         // ★ 平台尺寸 (长方形碰撞箱用) + 网格偏移:
-        //   甲板贴图是 8x18 (偶数) 网格, 子世界是 9x19 (奇数) —— 奇数尺寸时子世界
-        //   整体偏移半格 (4px), 多出的一行一列落在贴图左边和最下方, 网格完美对齐
+        //   甲板可建造区是 8x18 (偶数) 网格, 但它相对单位中心 (大地核心/贴图中心)
+        //   不是居中的 —— 实测甲板区域偏左下一格。子世界 9x19 (奇数) 比甲板多出
+        //   一行一列, 多出的空间按设计放在【世界左方和最下方】:
+        //   <ul>
+        //     <li>奇数尺寸: gridOff = 半格(4) + 一格(8) = 12 —— 网格右边界/顶边界
+        //         与甲板对齐, 多出的一列在左、一行在最下方 (甲板外, 不影响建造)</li>
+        //     <li>偶数尺寸: 与甲板同尺寸, 无多出空间, 居中 (gridOff=0)</li>
+        //   </ul>
+        //   格线相位: subCX = w*8/2 + 12, 48 mod 8 = 0 —— 网格格线仍落在甲板纹理
+        //   大格线上 (实测甲板大格线相位 0 mod 8, 过贴图中心), 方块与甲板贴图对齐
         platW = w * Vars.tilesize;
         platH = h * Vars.tilesize;
-        gridOffX = (w % 2 == 1) ? Vars.tilesize / 2f : 0f;
-        gridOffY = (h % 2 == 1) ? Vars.tilesize / 2f : 0f;
+        gridOffX = (w % 2 == 1) ? Vars.tilesize / 2f + Vars.tilesize : 0f;
+        gridOffY = (h % 2 == 1) ? Vars.tilesize / 2f + Vars.tilesize : 0f;
     }
 
     // ===== 存档序列化 (修复重进地图子世界内容消失的问题) =====
