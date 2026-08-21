@@ -137,9 +137,10 @@ public class WorldUnitType extends UnityUnitType {
                 //   (吸附到子世界自己的网格; 在投影上下文中绘制, 坐标即子世界坐标)
                 if (buildPreviewUnit == w && buildPreviewBlock != null) {
                     Block pb = buildPreviewBlock;
-                    // 锚点 tile 中心 + 多方块偏移 (与原版建筑 drawx 一致)
-                    float px = buildPreviewX * Vars.tilesize + Vars.tilesize / 2f + pb.offset;
-                    float py = buildPreviewY * Vars.tilesize + Vars.tilesize / 2f + pb.offset;
+                    // ★ 与原版 BuildPlan.drawx() 完全一致: tile 参考点 + 多方块偏移
+                    //   (= tile*8 + offset, 建筑实际落位 drawx 同公式, ghost 与实位零偏差)
+                    float px = buildPreviewX * Vars.tilesize + pb.offset;
+                    float py = buildPreviewY * Vars.tilesize + pb.offset;
 
                     // ghost 贴图 (呼吸透明度, 同原版预览观感)
                     Draw.alpha(0.45f + Mathf.absin(Time.time, 3f, 0.1f));
