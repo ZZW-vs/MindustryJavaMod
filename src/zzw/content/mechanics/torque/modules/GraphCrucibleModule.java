@@ -124,7 +124,14 @@ public class GraphCrucibleModule extends GraphModule<GraphCrucible, GraphCrucibl
 
             int len = 0;
 
-            if(cc != null) len = cc.size;
+            // ★ 只统计有图标的条目: 煤/石墨等添加剂熔成碳 (MeltInfo.item == null),
+            //   无物品图标; 按 cc.size 分配数组会留下尾部 null → Draw.rect(null) 崩溃
+            if(cc != null){
+                MeltInfo[] melts = MeltInfo.all;
+                for(var i : cc){
+                    if(melts[i.id].item != null) len++;
+                }
+            }
             IconBarStat data = new IconBarStat(temp - 273f, 500f, 0f, tempCol, len);
 
             if(temp < 270f){

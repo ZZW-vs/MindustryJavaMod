@@ -70,7 +70,8 @@ public class IconBar extends Element{
         for(int i = 0, len = data.values.length; i < len; i++){
             dPos = Mathf.map(data.values[i], minVal, maxVal, realX, x + width);
             Lines.line(dPos, realY, dPos, realY + 12f);
-            Draw.rect(data.icons[i], dPos, y + height * 0.75f);
+            // 防御: 空图标跳过 (v158 Draw.rect 对 null 直接抛 NPE, v132 旧版容忍)
+            if(data.icons[i] != null) Draw.rect(data.icons[i], dPos, y + height * 0.75f);
         }
 
         Draw.color(Color.lightGray);
