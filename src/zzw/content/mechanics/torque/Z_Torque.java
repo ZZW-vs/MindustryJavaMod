@@ -4,6 +4,14 @@ import mindustry.content.Items;
 import mindustry.type.Category;
 import mindustry.world.meta.BuildVisibility;
 import zzw.content.Z_Items;
+import zzw.content.blocks.power.CombustionHeater;
+import zzw.content.blocks.power.HeatPipe;
+import zzw.content.blocks.power.SolarCollector;
+import zzw.content.blocks.power.SolarReflector;
+import zzw.content.blocks.power.ThermalHeater;
+import zzw.content.blocks.production.CastingMold;
+import zzw.content.blocks.production.Crucible;
+import zzw.content.blocks.production.CruciblePump;
 import zzw.content.mechanics.torque.blocks.GraphBlock;
 import zzw.content.mechanics.torque.blocks.distribution.DriveShaft;
 import zzw.content.mechanics.torque.blocks.distribution.InlineGearbox;
@@ -15,6 +23,8 @@ import zzw.content.mechanics.torque.blocks.power.WaterTurbine;
 import zzw.content.mechanics.torque.blocks.power.WindTurbine;
 import zzw.content.mechanics.torque.blocks.production.AugerDrill;
 import zzw.content.mechanics.torque.blocks.production.MechanicalExtractor;
+import zzw.content.mechanics.torque.graphs.GraphCrucible;
+import zzw.content.mechanics.torque.graphs.GraphHeat;
 import zzw.content.mechanics.torque.graphs.GraphTorque;
 import zzw.content.mechanics.torque.graphs.GraphTorqueConsume;
 import zzw.content.mechanics.torque.graphs.GraphTorqueGenerate;
@@ -46,6 +56,29 @@ public class Z_Torque{
     public static WaterTurbine waterTurbine;
     public static ElectricMotor electricMotor;
     public static TorqueGenerator infiTorque;
+
+    // ===== PU132 热力系统 =====
+    /** 热管: 热量网络传输管道 */
+    public static HeatPipe heatPipe;
+    /** 小型散热器: 热量网络耗散端 */
+    public static GraphBlock smallRadiator;
+    /** 地热加热器: 热液地板产热 */
+    public static ThermalHeater thermalHeater;
+    /** 燃烧加热器: 焚烧可燃物产热 */
+    public static CombustionHeater combustionHeater;
+    /** 太阳能集热器: 配合反射镜聚焦产热 */
+    public static SolarCollector solarCollector;
+    /** 太阳反射镜: 为集热器聚焦光线 */
+    public static SolarReflector solarReflector;
+
+    // ===== PU132 坩埚系统 =====
+    /** 坩埚熔炉: 熔化物品/合成合金 */
+    public static Crucible crucible;
+    /** 坩埚容器: 熔融物网络缓存 (Z_Factory 注册 holdingCrucible) */
+    /** 坩埚泵: 熔融物网络间传输 */
+    public static CruciblePump cruciblePump;
+    /** 铸模: 熔融物冷却铸回物品 */
+    public static CastingMold castingMold;
 
     public static void load(){
         // ===== 生产方块 (扭矩消耗) =====
@@ -149,6 +182,90 @@ public class Z_Torque{
             preserveDraw = true;
             rotate = false;
             addGraph(new GraphTorqueGenerate(0.001f, 1f, 999999f, 9999f).setAccept(1, 1, 1, 1));
+        }};
+
+        // ===== PU132 热力系统 (UnityBlocks L2941/L3018-3057 原版配置) =====
+
+        // heat-pipe: 热量网络管道, GraphHeat(5f, 0.7f, 0.008f) accept(1,1,1,1)
+        heatPipe = new HeatPipe("heat-pipe"){{
+            requirements(Category.distribution, with(Items.copper, 15, Z_Items.cupronickel, 10, Z_Items.nickel, 5));
+            health = 140;
+            addGraph(new GraphHeat(5f, 0.7f, 0.008f).setAccept(1, 1, 1, 1));
+        }};
+
+        // small-radiator: 小型散热器, GraphHeat(10f, 0.7f, 0.05f) accept(1,1,1,1)
+        smallRadiator = new GraphBlock("small-radiator"){{
+            requirements(Category.power, with(Items.copper, 30, Z_Items.cupronickel, 20, Z_Items.nickel, 15));
+            health = 200;
+            solid = true;
+            addGraph(new GraphHeat(10f, 0.7f, 0.05f).setAccept(1, 1, 1, 1));
+        }};
+
+        // thermal-heater: 地热加热器, GraphHeat(40f, 0.6f, 0.004f) accept(1,1,0,0,0,0,0,0)
+        thermalHeater = new ThermalHeater("thermal-heater"){{
+            requirements(Category.power, with(Items.copper, 150, Z_Items.nickel, 100, Items.titanium, 150));
+            size = 2;
+            health = 500;
+            maxTemp = 1100f;
+            mulCoeff = 0.11f;
+            addGraph(new GraphHeat(40f, 0.6f, 0.004f).setAccept(1, 1, 0, 0, 0, 0, 0, 0));
+        }};
+
+        // combustion-heater: 燃烧加热器, GraphHeat(40f, 0.6f, 0.004f) accept(1,1,0,0,0,0,0,0)
+        combustionHeater = new CombustionHeater("combustion-heater"){{
+            requirements(Category.power, with(Items.copper, 100, Z_Items.nickel, 70, Items.graphite, 40, Items.titanium, 80));
+            size = 2;
+            health = 550;
+            itemCapacity = 5;
+            maxTemp = 1200f;
+            mulCoeff = 0.45f;
+            addGraph(new GraphHeat(40f, 0.6f, 0.004f).setAccept(1, 1, 0, 0, 0, 0, 0, 0));
+        }};
+
+        // solar-collector: 太阳能集热器, GraphHeat(60f, 1f, 0.02f) accept(8向仅上)
+        solarCollector = new SolarCollector("solar-collector"){{
+            requirements(Category.power, with(Z_Items.nickel, 80, Items.titanium, 50, Items.lead, 30));
+            size = 3;
+            health = 1500;
+            maxTemp = 800f;
+            mulCoeff = 0.03f;
+            addGraph(new GraphHeat(60f, 1f, 0.02f).setAccept(0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
+        }};
+
+        // solar-reflector: 太阳反射镜 (链接集热器聚焦产热)
+        solarReflector = new SolarReflector("solar-reflector"){{
+            requirements(Category.power, with(Z_Items.nickel, 25, Items.copper, 50));
+            size = 2;
+            health = 800;
+        }};
+
+        // ===== PU132 坩埚系统 (UnityBlocks L2974-3004 原版配置) =====
+
+        // crucible: 坩埚熔炉, GraphCrucible + GraphHeat(75f, 0.2f, 0.006f) accept(1,1,1,1)
+        crucible = new Crucible("crucible"){{
+            requirements(Category.crafting, with(Z_Items.nickel, 10, Items.titanium, 15));
+            health = 400;
+            addGraph(new GraphCrucible().setAccept(1, 1, 1, 1));
+            addGraph(new GraphHeat(75f, 0.2f, 0.006f).setAccept(1, 1, 1, 1));
+        }};
+
+        // crucible-pump: 坩埚泵, GraphCrucible(10f, false) multi + GraphHeat(50f, 0.1f, 0.003f)
+        cruciblePump = new CruciblePump("crucible-pump"){{
+            requirements(Category.crafting, with(Z_Items.cupronickel, 50, Z_Items.nickel, 50, Items.metaglass, 15));
+            size = 2;
+            health = 500;
+            consumePower(1f);
+            addGraph(new GraphCrucible(10f, false).setAccept(1, 1, 0, 0, 2, 2, 0, 0).multi());
+            addGraph(new GraphHeat(50f, 0.1f, 0.003f).setAccept(1, 1, 1, 1, 1, 1, 1, 1));
+        }};
+
+        // casting-mold: 铸模, GraphCrucible(2f, false) + GraphHeat(55f, 0.2f, 0f)
+        castingMold = new CastingMold("casting-mold"){{
+            requirements(Category.crafting, with(Items.titanium, 70, Z_Items.nickel, 30));
+            size = 2;
+            health = 700;
+            addGraph(new GraphCrucible(2f, false).setAccept(0, 0, 0, 0, 1, 1, 0, 0));
+            addGraph(new GraphHeat(55f, 0.2f, 0f).setAccept(1, 1, 1, 1, 1, 1, 1, 1));
         }};
     }
 }

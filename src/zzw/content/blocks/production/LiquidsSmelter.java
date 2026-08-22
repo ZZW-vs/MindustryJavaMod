@@ -3,24 +3,26 @@ package zzw.content.blocks.production;
 import mindustry.type.Liquid;
 import mindustry.type.LiquidStack;
 import mindustry.ui.Bar;
-import mindustry.world.consumers.ConsumeLiquid;
 import mindustry.world.consumers.ConsumeLiquidBase;
+import mindustry.world.consumers.ConsumeLiquids;
 
 import static arc.Core.bundle;
 
 /**
  * 多液体冶炼炉 (PU132 unity.world.blocks.production.LiquidsSmelter 移植)
- * <p>继承 StemGenericCrafter。init() 中检查是否有 ConsumeLiquids,
- * setBars() 中移除默认 liquid bar, 为每种液体添加单独的 bar。</p>
+ *
+ * <p>要求消耗器为 {@link ConsumeLiquids} (多液体), init() 中提取所有消耗液体,
+ * setBars() 中移除默认液体条并为每种液体单独添加进度条 (固化器同时显示岩浆和水)。</p>
  *
  * <p>适配说明:
  * <ul>
  *   <li>@Merge(Stemc) → extends StemGenericCrafter</li>
- *   <li>consumes API: v132 ConsumeType.liquid → v155.4 findConsumer</li>
- *   <li>bars.add/remove → addBar/removeBar (v155.4 barMap API)</li>
+ *   <li>v132 ConsumeType.liquid → v155.4 findConsumer (消耗器 API 变更)</li>
+ *   <li>v132 bars.add/remove → v155.4 addBar/removeBar</li>
  * </ul></p>
  */
 public class LiquidsSmelter extends StemGenericCrafter{
+    /** 所有消耗的液体 (init 时从 ConsumeLiquids 提取) */
     protected Liquid[] liquids;
 
     public LiquidsSmelter(String name){
@@ -29,16 +31,14 @@ public class LiquidsSmelter extends StemGenericCrafter{
 
     @Override
     public void init(){
-        ConsumeLiquidBase consume = findConsumer(c -> c instanceof ConsumeLiquidBase);
+        ConsumeLiquids consume = findConsumer(c -> c instanceof ConsumeLiquids);
         if(consume == null){
-            throw new RuntimeException("LiquidSmelter must have a ConsumeLiquid. Note that filters are not supported.");
+            throw new RuntimeException("LiquidSmelter must have a ConsumeLiquids. Note that filters are not supported.");
         }
 
-        // 由于ConsumeLiquid没有liquids数组，我们直接使用传入的液体
-        if(consume instanceof ConsumeLiquid){
-            ConsumeLiquid liquidConsume = (ConsumeLiquid)consume;
-            liquids = new Liquid[]{liquidConsume.liquid};
-        }
+        LiquidStack[] stacks = consume.liquids;
+        liquids = new Liquid[stacks.length];
+        for(int i = 0; i < liquids.length; i++) liquids[i] = stacks[i].liquid;
 
         super.init();
     }

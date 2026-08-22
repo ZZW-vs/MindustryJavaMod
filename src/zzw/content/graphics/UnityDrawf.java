@@ -34,14 +34,49 @@ public class UnityDrawf{
          2,  1,  2,  1,  9, 45,  9, 19,  2,  1,  2,  1, 14, 18, 14, 13
     };
 
-    /** 绘制热贴图, 颜色随温度 (K) 变化 */
-    public static void drawHeat(TextureRegion region, float x, float y, float rotation, float temp){
-        if(region == null || !Core.settings.getBool("effects")) return;
-        // 温度归一化到 0~1 (室温 293.15K ~ 1273.15K)
-        float t = Mathf.clamp((temp - 293.15f) / 980f);
-        // 冷 (蓝) -> 热 (红橙)
-        Draw.color(1f, 0.3f * (1f - t), 0.2f * (1f - t), 0.75f * t + 0.05f);
-        Draw.rect(region, x, y, rotation);
+    /** 贴图 UV 裁剪缓冲 (drawSlideRect 复用, 避免每帧分配) */
+    private static final TextureRegion nRegion = new TextureRegion();
+
+    /**
+     * 绘制热贴图 (PU132 原版逻辑): 温度 > 498K 显示热色 (additive 叠加),
+     * 温度 < 273K 显示冷色; 过热 (a>1) 时颜色饱和泛白。
+     */
+    public static void drawHeat(TextureRegion reg, float x, float y, float rot, float temp){
+        float a;
+        if(temp > 273.15f){
+            a = Math.max(0f, (temp - 498f) * 0.001f);
+            if(a < 0.01f) return;
+            if(a > 1f){
+                arc.graphics.Color fCol = mindustry.graphics.Pal.turretHeat.cpy().add(0, 0, 0.01f * a);
+                fCol.mul(a);
+                Draw.color(fCol, a);
+            }else{
+                Draw.color(mindustry.graphics.Pal.turretHeat, a);
+            }
+        }else{
+            a = 1f - Mathf.clamp(temp / 273.15f);
+            if(a < 0.01f) return;
+            Draw.color(UnityPal.coldColor, a);
+        }
+        Draw.blend(arc.graphics.Blending.additive);
+        Draw.rect(reg, x, y, rot);
+        Draw.blend();
         Draw.color();
+    }
+
+    /**
+     * 绘制滚动条纹矩形 (PU132 原版): 通过 UV 偏移实现贴图平移流动效果,
+     * 坩埚泵的液体流动动画用。
+     */
+    public static void drawSlideRect(TextureRegion region, float x, float y, float w, float h, float tw, float th, float rot, int step, float offset){
+        if(region == null) return;
+        nRegion.set(region);
+
+        float scaleX = w / tw;
+        float texW = nRegion.u2 - nRegion.u;
+
+        nRegion.u += Mathf.map(offset % 1, 0f, 1f, 0f, texW * step / tw);
+        nRegion.u2 = nRegion.u + scaleX * texW;
+        Draw.rect(nRegion, x, y, w, h, w * 0.5f, h * 0.5f, rot);
     }
 }

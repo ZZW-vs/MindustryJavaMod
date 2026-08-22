@@ -1,7 +1,11 @@
 package zzw.content;
 
 import arc.graphics.Color;
+import mindustry.content.Items;
 import mindustry.type.Item;
+import zzw.content.mechanics.torque.meta.CrucibleRecipe;
+import zzw.content.mechanics.torque.meta.CrucibleRecipe.InputRecipe;
+import zzw.content.mechanics.torque.meta.MeltInfo;
 
 /**
  * 自定义物品注册 - 包含 ProjectUnity 物品、基础金属、农作物等
@@ -209,6 +213,35 @@ public class Z_Items {
             cost = 0.5f;
             alwaysUnlocked = false;
         }};
+
+        //region 坩埚熔化信息 (PU132 UnityItems 原版配置)
+        // 熔点(K) / 熔速 / 蒸发速度 / 蒸发温度(K) / 铸造优先级
+        MeltInfo meltCopper = new MeltInfo(Items.copper, 750f, 0.1f, 0.02f, 2100f, 1);
+        MeltInfo meltLead = new MeltInfo(Items.lead, 570f, 0.2f, 0.02f, 1900f, 1);
+        MeltInfo meltTitanium = new MeltInfo(Items.titanium, 1600f, 0.07f, 1);
+        MeltInfo meltSand = new MeltInfo(Items.sand, 1000f, 0.25f, 1);
+        MeltInfo carbon = new MeltInfo("carbon", 4000f, 0.01f, 0.01f, 600f, 0);
+        // 煤/石墨作为碳源添加剂 (additive=true, 不单独存在)
+        new MeltInfo(Items.coal, carbon, 0.5f, 0, true);
+        new MeltInfo(Items.graphite, carbon, 1f, 0, true);
+        MeltInfo meltNickel = new MeltInfo(nickel, 1100f, 0.15f, 1);
+        MeltInfo meltCuproNickel = new MeltInfo(cupronickel, 850f, 0.05f, 2);
+        MeltInfo meltMetaglass = new MeltInfo(Items.metaglass, 950f, 0.05f, 2);
+        MeltInfo meltSilicon = new MeltInfo(Items.silicon, 900f, 0.2f, 2);
+        MeltInfo meltSurgeAlloy = new MeltInfo(Items.surgeAlloy, 1500f, 0.05f, 3);
+        MeltInfo meltThorium = new MeltInfo(Items.thorium, 1650f, 0.03f, 1);
+        MeltInfo meltSuperAlloy = new MeltInfo(superAlloy, 1800f, 0.02f, 4);
+        //endregion
+
+        //region 坩埚合金配方 (PU132 UnityItems 原版配置)
+        // 白铜 = 镍(固态) + 铜(液态); 硅 = 沙 + 碳(固态); 玻璃 = 沙 + 铅;
+        // 电涌合金 = 硅 + 铅 + 铜 + 钛; 超级合金 = 白铜 + 硅 + 钍 + 钛
+        new CrucibleRecipe(meltCuproNickel, 0.6f, new InputRecipe(meltNickel, 0.8f, false), new InputRecipe(meltCopper, 2f));
+        new CrucibleRecipe(meltSilicon, 0.25f, new InputRecipe(meltSand, 1.25f), new InputRecipe(carbon, 0.25f, false));
+        new CrucibleRecipe(meltMetaglass, 0.5f, new InputRecipe(meltSand, 1f / 3f), new InputRecipe(meltLead, 1f / 3f));
+        new CrucibleRecipe(meltSurgeAlloy, 0.25f, new InputRecipe(meltSilicon, 1f), new InputRecipe(meltLead, 2f), new InputRecipe(meltCopper, 1f), new InputRecipe(meltTitanium, 1.5f));
+        new CrucibleRecipe(meltSuperAlloy, 0.2f, new InputRecipe(meltCuproNickel, 1f), new InputRecipe(meltSilicon, 1f), new InputRecipe(meltThorium, 1f), new InputRecipe(meltTitanium, 1f));
+        //endregion
     }
 
     private static Item basic(String name, String color) {
