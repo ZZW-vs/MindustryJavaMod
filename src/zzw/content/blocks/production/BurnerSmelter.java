@@ -20,13 +20,16 @@ import static arc.Core.bundle;
  * <p>适配说明:
  * <ul>
  *   <li>继承 StemGenericCrafter 替代 PU132 @Merge(Stemc) 生成类</li>
- *   <li>UnityItems.stone → Z_Items.Andesite (ZZW 项目物品)</li>
- *   <li>consumes API: v132 ConsumeType.item → v155.4 findConsumer + consume</li>
- *   <li>block.consumes.itemFilters.get(id) → block.itemFilter[id]</li>
+ *   <li>★ input 允许为 null (无材料输入, 纯烧燃料产液体, 熔化器用);
+ *       PU132 默认 input = UnityItems.stone, 用户要求熔化器不消耗任何材料</li>
+ *   <li>PU132 的 ItemModule.nextIndex/takeIndex 在 v155.4+ 不存在,
+ *       改为遍历 content.items() 查找第一个非 input 且通过过滤器的物品作为燃料</li>
+ *   <li>★ setStats 移除手动 stats.add(Stat.input, input) —— v155.4 的 super.setStats()
+ *       会自动生成消耗品统计, 手动添加导致"输入"重复显示</li>
  * </ul></p>
  */
 public class BurnerSmelter extends StemGenericCrafter{
-    /** 输入物品 (会被冶炼消耗) */
+    /** 输入物品 (会被冶炼消耗); null = 不消耗材料 (纯燃料驱动) */
     public Item input;
     /** 最小效率阈值 (低于此值的物品不会被接受为燃料) */
     public float minEfficiency = 0.6f;
@@ -45,8 +48,6 @@ public class BurnerSmelter extends StemGenericCrafter{
         if(findConsumer(c -> c instanceof ConsumeItemFilter) == null){
             consume(new ConsumeItemFilter(item -> getItemEfficiency(item) > minEfficiency)).update(false).optional(true, false);
         }
-        // 默认输入物品: 用 Z_Items.Andesite 替代 PU132 的 UnityItems.stone
-        if(input == null) input = zzw.content.Z_Items.Andesite;
 
         super.init();
     }
@@ -59,12 +60,6 @@ public class BurnerSmelter extends StemGenericCrafter{
             () -> Pal.lighterOrange,
             () -> build.productionEfficiency
         ));
-    }
-
-    @Override
-    public void setStats(){
-        stats.add(Stat.input, input);
-        super.setStats();
     }
 
     /** 物品作为燃料的效率 (默认使用 flammability) */
@@ -80,7 +75,8 @@ public class BurnerSmelter extends StemGenericCrafter{
 
         @Override
         public void updateTile(){
-            if(items.has(input) && itemDuration > 0f){
+            // input == null 时纯燃料驱动 (不检查材料)
+            if((input == null || items.has(input)) && itemDuration > 0f){
                 // 有输入且有燃料: 按效率推进进度
                 progress += getProgressIncrease(craftTime) * productionEfficiency;
                 itemDuration -= delta();
@@ -96,7 +92,7 @@ public class BurnerSmelter extends StemGenericCrafter{
 
                     // PU132 的 ItemModule.nextIndex/takeIndex 在 v155.4+ 不存在,
                     // 改为遍历 content.items() 查找第一个非 input 且通过过滤器的物品作为燃料
-                    if(items.has(input) && shouldConsume()){
+                    if((input == null || items.has(input)) && shouldConsume()){
                         Item fuelItem = null;
                         for(int i = 0, n = Vars.content.items().size; i < n; i++){
                             Item it = Vars.content.item(i);
@@ -120,9 +116,9 @@ public class BurnerSmelter extends StemGenericCrafter{
                 warmup = Mathf.lerp(warmup, 0f, 0.02f);
             }
 
-            // 进度满: 消耗输入, 输出液体
+            // 进度满: 消耗输入 (无 input 时跳过), 输出液体
             if(progress >= 1f){
-                items.remove(input, 1);
+                if(input != null) items.remove(input, 1);
 
                 if(outputLiquid != null) handleLiquid(this, outputLiquid.liquid, outputLiquid.amount);
 

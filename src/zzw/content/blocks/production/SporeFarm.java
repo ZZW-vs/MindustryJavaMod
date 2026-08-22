@@ -7,6 +7,7 @@ import arc.util.io.*;
 import mindustry.*;
 import mindustry.content.*;
 import mindustry.gen.*;
+import mindustry.type.Item;
 import mindustry.world.*;
 import mindustry.world.blocks.environment.*;
 import zzw.content.graphics.UnityDrawf;
@@ -105,6 +106,13 @@ public class SporeFarm extends Block{
         }
 
         @Override
+        public boolean acceptItem(Building source, Item item){
+            // 允许接收孢子荚 (相邻孢子农场整体共享输出时互相传递;
+            // 本方块不消耗物品, 原版默认 acceptItem 会因 consumesItem=false 拒绝)
+            return item == Items.sporePod && items.get(item) < getMaximumAccepted(item);
+        }
+
+        @Override
         public void updateTile(){
             // 首次放置时计算栅栏索引
             if(tileIndex == -1){
@@ -132,7 +140,20 @@ public class SporeFarm extends Block{
                     if(growth < 0f) growth = 0f;
                 }
             }
-            if(timer(timerDump, 15f)) dump(Items.sporePod);
+            if(timer(timerDump, 15f)){
+                // ★ 整体共享输出: 先尝试直接输出到相邻建筑;
+                // 失败则把孢子荚转移给相邻孢子农场 (物品在整体内流动, 任意出口即可全部输出)
+                if(!dump(Items.sporePod)){
+                    for(int i = 0; i < proximity.size; i++){
+                        Building other = proximity.get((i + cdump) % proximity.size);
+                        if(other instanceof SporeFarmBuild b && other.team == team && b.acceptItem(this, Items.sporePod)){
+                            b.handleItem(this, Items.sporePod);
+                            items.remove(Items.sporePod, 1);
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
         @Override

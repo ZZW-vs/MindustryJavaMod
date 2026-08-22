@@ -55,6 +55,13 @@ public class Press extends GenericCrafter{
     }
 
     @Override
+    public void setStats(){
+        super.setStats();
+        // 输出物品速率四舍五入到最多 2 位小数 (原版 3 位)
+        zzw.content.util.StatUtils.roundOutputStats(this);
+    }
+
+    @Override
     public TextureRegion[] icons(){
         return new TextureRegion[]{region, leftRegion, rightRegion};
     }

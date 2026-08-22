@@ -38,4 +38,12 @@ public class DrawGlow extends DrawBlock{
     public void load(Block block){
         top = Core.atlas.find(block.name + "-top");
     }
+
+    @Override
+    public TextureRegion[] icons(Block block){
+        // v155.4: DrawBlock.icons 默认返回空数组 → finalIcons 填充 error 贴图 →
+        // 图标生成阶段把 error 写进 atlas 的 "block-<名>-full" → 物品栏图标变错误贴图。
+        // 按 v132 原版默认行为返回 {region}。
+        return new TextureRegion[]{block.region};
+    }
 }

@@ -4,6 +4,7 @@ import arc.Core;
 import arc.graphics.Blending;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
+import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
 import arc.util.Time;
 import mindustry.content.Fx;
@@ -305,7 +306,15 @@ public class Z_Factory {
 
     /** 钢冶炼厂: 煤+石墨还原致密合金 (UnityBlocks L1447-1468) */
     private static void createSteelSmelter() {
-        steelSmelter = new GenericCrafter("steel-smelter"){{
+        steelSmelter = new GenericCrafter("steel-smelter"){
+            @Override
+            public void setStats(){
+                super.setStats();
+                // 输出物品速率四舍五入到最多 2 位小数 (原版 3 位)
+                zzw.content.util.StatUtils.roundOutputStats(this);
+            }
+
+            {{
             requirements(Category.crafting, ItemStack.with(Items.lead, 45, Items.silicon, 20, Z_Items.denseAlloy, 30));
             health = 140;
             itemCapacity = 10;
@@ -327,7 +336,8 @@ public class Z_Factory {
                     Draw.reset();
                 }
             };
-        }};
+            }}
+        };
     }
 
     /** 熔化器: 焚烧可燃物产出岩浆, 需要火源点燃 (UnityBlocks L1491-1521) */
@@ -502,7 +512,15 @@ public class Z_Factory {
 
     /** 终端坩埚: 七系合金合成终极物质 (UnityBlocks L3474-3504) */
     private static void createTerminalCrucible() {
-        terminalCrucible = new GenericCrafter("terminal-crucible"){{
+        terminalCrucible = new GenericCrafter("terminal-crucible"){
+            @Override
+            public void setStats(){
+                super.setStats();
+                // 输出物品速率四舍五入到最多 2 位小数 (原版 3 位)
+                zzw.content.util.StatUtils.roundOutputStats(this);
+            }
+
+            {{
             requirements(Category.crafting, ItemStack.with(Items.lead, 810, Items.graphite, 720, Items.silicon, 520, Items.phaseFabric, 430, Items.surgeAlloy, 320, Z_Items.plagueAlloy, 120, Z_Items.darkAlloy, 120, Z_Items.lightAlloy, 120, Z_Items.advanceAlloy, 120, Z_Items.monolithAlloy, 120, Z_Items.sparkAlloy, 120, Z_Items.superAlloy, 120));
             size = 6;
             craftTime = 310f;
@@ -514,6 +532,15 @@ public class Z_Factory {
             consume(new ConsumeItems(ItemStack.with(Z_Items.plagueAlloy, 3, Z_Items.darkAlloy, 3, Z_Items.lightAlloy, 3, Z_Items.advanceAlloy, 3, Z_Items.monolithAlloy, 3, Z_Items.sparkAlloy, 3, Z_Items.superAlloy, 3)));
 
             drawer = new DrawGlow(){
+                /** 灯光贴图 (load 时预加载, 避免每帧 atlas 查询) */
+                TextureRegion lights;
+
+                @Override
+                public void load(Block block){
+                    super.load(block);
+                    lights = Core.atlas.find(block.name + "-lights");
+                }
+
                 @Override
                 public void draw(Building build){
                     GenericCrafterBuild gb = (GenericCrafterBuild)build;
@@ -522,7 +549,7 @@ public class Z_Factory {
                     Draw.blend(Blending.additive);
 
                     Draw.color(1f, Mathf.absin(5f, 0.5f) + 0.5f, Mathf.absin(Time.time + 90f * Mathf.radDeg, 5f, 0.5f) + 0.5f, gb.warmup);
-                    Draw.rect(Core.atlas.find("terminal-crucible-lights"), build.x, build.y);
+                    Draw.rect(lights, build.x, build.y);
 
                     float b = (Mathf.absin(8f, 0.25f) + 0.75f) * gb.warmup;
                     Draw.color(1f, b, b, b);
@@ -533,7 +560,8 @@ public class Z_Factory {
                     Draw.blend();
                 }
             };
-        }};
+            }}
+        };
     }
 
     /** 终焉锻造厂: 终极合成设施 (UnityBlocks L3506-3530+) */
@@ -564,6 +592,15 @@ public class Z_Factory {
                 });
 
                 drawer = new DrawGlow(){
+                    /** 灯光贴图 (load 时预加载, 避免每帧 atlas 查询) */
+                    TextureRegion lights;
+
+                    @Override
+                    public void load(Block block){
+                        super.load(block);
+                        lights = Core.atlas.find(block.name + "-lights");
+                    }
+
                     @Override
                     public void draw(Building build){
                         GenericCrafterBuild gb = (GenericCrafterBuild)build;
@@ -572,7 +609,7 @@ public class Z_Factory {
                         Draw.blend(Blending.additive);
                         Draw.color(1f, Mathf.absin(5f, 0.5f) + 0.5f, Mathf.absin(Time.time + 90f * Mathf.radDeg, 5f, 0.5f) + 0.5f, gb.warmup);
 
-                        Draw.rect(Core.atlas.find("end-forge-lights"), build.x, build.y);
+                        Draw.rect(lights, build.x, build.y);
                         float b = (Mathf.absin(8f, 0.25f) + 0.75f) * gb.warmup;
 
                         Draw.color(1f, b, b, b);

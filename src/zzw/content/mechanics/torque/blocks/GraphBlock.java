@@ -6,6 +6,7 @@ import arc.scene.ui.layout.*;
 import arc.util.io.*;
 import mindustry.gen.*;
 import mindustry.world.*;
+import zzw.content.graphics.UnityDrawf;
 import zzw.content.mechanics.torque.graphs.*;
 import zzw.content.mechanics.torque.meta.*;
 import zzw.content.mechanics.torque.modules.*;
@@ -141,10 +142,17 @@ public class GraphBlock extends Block implements GraphBlockBase{
 
         @Override
         public void draw(){
+            // PU132 原版 GraphBlock.draw(): preserveDraw 走原版绘制;
+            // 否则带热量图的方块画本体 + 热色叠加 (small-radiator / 热源等)
             if(preserveDraw){
                 super.draw();
+            }else if(graphs.hasGraph(GraphType.heat)){
+                Draw.rect(region, x, y);
+                if(heat() != null){
+                    UnityDrawf.drawHeat(heatRegion, x, y, 0, heat().getTemp());
+                }
+                drawTeamTop();
             }
-            // 注: heat/crucible 分支已移除 (本系统仅移植 torque)
         }
     }
 }

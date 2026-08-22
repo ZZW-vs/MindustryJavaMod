@@ -3,12 +3,14 @@ package zzw.content.blocks.power;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
+import arc.math.Angles;
 import arc.math.Mathf;
 import arc.util.Time;
 import arc.util.Eachable;
 import mindustry.content.StatusEffects;
 import mindustry.entities.units.BuildPlan;
 import mindustry.gen.Unit;
+import mindustry.graphics.Drawf;
 import zzw.content.graphics.UnityDrawf;
 import zzw.content.mechanics.torque.Utils;
 import zzw.content.mechanics.torque.blocks.GraphBlock;
@@ -48,6 +50,10 @@ public class HeatPipe extends GraphBlock{
     public void drawPlanRegion(BuildPlan req, Eachable<BuildPlan> list){
         float scl = tilesize * req.animScale;
         Draw.rect(region, req.drawx(), req.drawy(), scl, scl, req.rotation * 90f);
+        // 放置预览方向箭头 (传动带风格): 指向当前旋转方向
+        float ang = req.rotation * 90f;
+        float x2 = req.drawx() + Angles.trnsx(ang, 3f), y2 = req.drawy() + Angles.trnsy(ang, 3f);
+        Drawf.arrow(req.drawx(), req.drawy(), x2, y2, 3f, 3f);
     }
 
     public class HeatPipeBuild extends GraphBuild{
@@ -56,7 +62,7 @@ public class HeatPipe extends GraphBlock{
 
         @Override
         public void created(){
-            rotation = 0;
+            // 保留放置朝向 (放置预览箭头指示方向; 贴图本身无方向性)
             super.created();
         }
 

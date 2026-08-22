@@ -187,9 +187,11 @@ public class Z_Torque{
         // ===== PU132 热力系统 (UnityBlocks L2941/L3018-3057 原版配置) =====
 
         // heat-pipe: 热量网络管道, GraphHeat(5f, 0.7f, 0.008f) accept(1,1,1,1)
+        // ★ rotate=true: 放置时可旋转, 预览显示方向箭头 (传动带风格, 用户需求)
         heatPipe = new HeatPipe("heat-pipe"){{
             requirements(Category.distribution, with(Items.copper, 15, Z_Items.cupronickel, 10, Z_Items.nickel, 5));
             health = 140;
+            rotate = true;
             addGraph(new GraphHeat(5f, 0.7f, 0.008f).setAccept(1, 1, 1, 1));
         }};
 

@@ -8,8 +8,6 @@ import mindustry.content.Fx;
 import mindustry.entities.Effect;
 import mindustry.ui.Bar;
 import mindustry.world.blocks.production.GenericCrafter;
-import mindustry.world.meta.Stat;
-import mindustry.world.meta.StatUnit;
 import zzw.content.entities.ExpHolder;
 import zzw.content.entities.ExpOrbs;
 import zzw.content.graphics.UnityPal;
@@ -49,15 +47,11 @@ public class KoruhCrafter extends GenericCrafter{
     @Override
     public void setStats(){
         super.setStats();
-        stats.add(Stat.itemCapacity, "@", Core.bundle.format("exp.expAmount", expCapacity));
-        if(expUse > 0){
-            // bundle key "explib.expAmount" 在主 bundle 不存在, 用硬编码字符串兜底
-            float expPerSec = (expUse / craftTime) * 60;
-            String expLabel = Core.bundle.has("explib.expAmount")
-                ? Core.bundle.format("explib.expAmount", expPerSec)
-                : (int)expPerSec + " exp/s";
-            stats.add(Stat.input, "@ [lightgray]@[]", expLabel, StatUnit.perSecond.localized());
-        }
+        // ★ v155.4 的 super.setStats() 会自动生成物品容量/输入消耗统计,
+        //   之前手动添加的 Stat.itemCapacity / Stat.input(经验) 与自动统计重复,
+        //   导致介绍里出现两行输入/容量 —— 移除; 经验信息由经验条显示。
+        // 输出物品速率四舍五入到最多 2 位小数 (原版 3 位)
+        zzw.content.util.StatUtils.roundOutputStats(this);
     }
 
     @Override
