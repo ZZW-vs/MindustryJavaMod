@@ -3,6 +3,8 @@ package zzw.content.blocks.draw;
 import arc.Core;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
+import arc.util.Eachable;
+import mindustry.entities.units.BuildPlan;
 import mindustry.graphics.Drawf;
 import mindustry.gen.Building;
 import mindustry.type.Liquid;
@@ -71,5 +73,12 @@ public class DrawLiquid extends DrawBlock{
     @Override
     public TextureRegion[] icons(Block block){
         return top.found() ? new TextureRegion[]{block.region, top} : new TextureRegion[]{block.region};
+    }
+
+    @Override
+    public void drawPlan(Block block, BuildPlan plan, Eachable<BuildPlan> list){
+        // v158: GenericCrafter.drawPlanRegion 委托给 drawer.drawPlan, DrawBlock 默认为空
+        // → 放置时无跟随鼠标的方块预览; 委托回默认预览 (与 DrawDefault 一致)
+        block.drawDefaultPlanRegion(plan, list);
     }
 }

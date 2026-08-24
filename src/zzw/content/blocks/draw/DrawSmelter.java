@@ -6,7 +6,9 @@ import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
+import arc.util.Eachable;
 import arc.util.Time;
+import mindustry.entities.units.BuildPlan;
 import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
 import mindustry.gen.Building;
@@ -51,6 +53,13 @@ public class DrawSmelter extends DrawBlock{
         // 图标生成阶段把 error 写进 atlas 的 "block-<名>-full" → 物品栏图标变错误贴图。
         // 按 v132 原版默认行为返回 {region}。
         return new TextureRegion[]{block.region};
+    }
+
+    @Override
+    public void drawPlan(Block block, BuildPlan plan, Eachable<BuildPlan> list){
+        // v158: GenericCrafter.drawPlanRegion 委托给 drawer.drawPlan, DrawBlock 默认为空
+        // → 放置时无跟随鼠标的方块预览; 委托回默认预览 (与 DrawDefault 一致)
+        block.drawDefaultPlanRegion(plan, list);
     }
 
     @Override

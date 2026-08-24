@@ -6,6 +6,7 @@ import mindustry.world.meta.BuildVisibility;
 import zzw.content.Z_Items;
 import zzw.content.blocks.power.CombustionHeater;
 import zzw.content.blocks.power.HeatPipe;
+import zzw.content.blocks.power.HeatSource;
 import zzw.content.blocks.power.SolarCollector;
 import zzw.content.blocks.power.SolarReflector;
 import zzw.content.blocks.power.ThermalHeater;
@@ -70,6 +71,10 @@ public class Z_Torque{
     public static SolarCollector solarCollector;
     /** 太阳反射镜: 为集热器聚焦光线 */
     public static SolarReflector solarReflector;
+    /** 无限热源: 沙盒热量源 (持续注入热量) */
+    public static HeatSource infiHeater;
+    /** 无限冷源: 沙盒冷源 (热量归零) */
+    public static HeatSource infiCooler;
 
     // ===== PU132 坩埚系统 =====
     /** 坩埚熔炉: 熔化物品/合成合金 */
@@ -173,6 +178,21 @@ public class Z_Torque{
             // v155.4: consumes.power(...) -> consumePower(...)
             consumePower(4.5f);
             addGraph(new GraphTorqueGenerate(0.1f, 25f, 10f, 16f).setAccept(0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
+        }};
+
+        // infi-heater (PU132 L3160): 沙盒无限热源, GraphHeat(1000f, 1f, 0f) accept(1,1,1,1)
+        infiHeater = new HeatSource("infi-heater"){{
+            requirements(Category.power, BuildVisibility.sandboxOnly, with());
+            health = 200;
+            addGraph(new GraphHeat(1000f, 1f, 0f).setAccept(1, 1, 1, 1));
+        }};
+
+        // infi-cooler (PU132 L3166): 沙盒无限冷源 (isVoid=true 热量归零)
+        infiCooler = new HeatSource("infi-cooler"){{
+            requirements(Category.power, BuildVisibility.sandboxOnly, with());
+            health = 200;
+            isVoid = true;
+            addGraph(new GraphHeat(1000f, 1f, 0f).setAccept(1, 1, 1, 1));
         }};
 
         // infi-torque (PU_V8 L3148): sandbox, GraphTorqueGenerate(0.001f, 1f, 999999f, 9999f) accept(1,1,1,1)

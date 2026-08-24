@@ -4,6 +4,8 @@ import arc.Core;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
+import arc.util.Eachable;
+import mindustry.entities.units.BuildPlan;
 import mindustry.gen.Building;
 import mindustry.world.Block;
 import mindustry.world.draw.DrawBlock;
@@ -32,6 +34,13 @@ public class DrawGlow extends DrawBlock{
         Draw.alpha(Mathf.absin(b.totalProgress, glowScale, glowAmount) * b.warmup);
         Draw.rect(top, build.x, build.y);
         Draw.reset();
+    }
+
+    @Override
+    public void drawPlan(Block block, BuildPlan plan, Eachable<BuildPlan> list){
+        // v158: GenericCrafter.drawPlanRegion 委托给 drawer.drawPlan, DrawBlock 默认为空
+        // → 放置时无跟随鼠标的方块预览; 委托回默认预览 (与 DrawDefault 一致)
+        block.drawDefaultPlanRegion(plan, list);
     }
 
     @Override

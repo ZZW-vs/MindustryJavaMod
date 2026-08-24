@@ -602,19 +602,24 @@ public class Z_Factory {
                     }
 
                     @Override
-                    public void draw(Building build){
-                        GenericCrafterBuild gb = (GenericCrafterBuild)build;
-                        Draw.rect(build.block.region, build.x, build.y);
+                public void draw(Building build){
+                    GenericCrafterBuild gb = (GenericCrafterBuild)build;
+                    Draw.rect(build.block.region, build.x, build.y);
 
-                        Draw.blend(Blending.additive);
-                        Draw.color(1f, Mathf.absin(5f, 0.5f) + 0.5f, Mathf.absin(Time.time + 90f * Mathf.radDeg, 5f, 0.5f) + 0.5f, gb.warmup);
+                    Draw.blend(Blending.additive);
+                    Draw.color(1f, Mathf.absin(5f, 0.5f) + 0.5f, Mathf.absin(Time.time + 90f * Mathf.radDeg, 5f, 0.5f) + 0.5f, gb.warmup);
 
-                        Draw.rect(lights, build.x, build.y);
-                        float b = (Mathf.absin(8f, 0.25f) + 0.75f) * gb.warmup;
+                    Draw.rect(lights, build.x, build.y);
+                    float b = (Mathf.absin(8f, 0.25f) + 0.75f) * gb.warmup;
 
-                        Draw.color(1f, b, b, b);
-                        Draw.rect(top, build.x, build.y);
-                    }
+                    Draw.color(1f, b, b, b);
+                    Draw.rect(top, build.x, build.y);
+
+                    // 渲染状态复位: 不重置 blend 会导致后续所有方块渲染残留 additive 叠加模式
+                    // → 画面变白变糊、贴图变亮 (终端坩埚同款写法)
+                    Draw.reset();
+                    Draw.blend();
+                }
                 };
             }
         };

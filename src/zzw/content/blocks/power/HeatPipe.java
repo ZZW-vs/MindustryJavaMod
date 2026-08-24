@@ -3,15 +3,12 @@ package zzw.content.blocks.power;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
-import arc.math.Angles;
 import arc.math.Mathf;
 import arc.util.Time;
 import arc.util.Eachable;
 import mindustry.content.StatusEffects;
 import mindustry.entities.units.BuildPlan;
 import mindustry.gen.Unit;
-import mindustry.graphics.Drawf;
-import zzw.content.graphics.UnityDrawf;
 import zzw.content.mechanics.torque.Utils;
 import zzw.content.mechanics.torque.blocks.GraphBlock;
 import zzw.content.util.GraphicUtils;
@@ -25,12 +22,16 @@ import static mindustry.Vars.tilesize;
  * <p>连接热量网络的导热管道: 贴图按 4 邻居连接位掩码自动拼接 (8x2 切片 16 变体)。
  * 高温时发光, 单位踩上会受到灼烧伤害。管道温度低于 0°C 或高于 225°C 时显示热色。</p>
  *
+ * <p>★ 与 PU132 差异: rotate=true (用户需求, 保留放置时的游戏自带大箭头)。
+ * 因此端口索引 n 与物理方向存在偏移: 物理方向 = (n + rotation) % 4,
+ * 计算贴图位掩码时必须把端口索引换算回物理方向, 否则贴图拼接错乱。</p>
+ *
  * <p>适配说明: unity.util.GraphicUtils → zzw.content.util.GraphicUtils;
  * onNeighboursChanged 为项目 GraphBlockBase 接口方法。</p>
  */
 public class HeatPipe extends GraphBlock{
     final static Color baseColor = Color.valueOf("6e7080");
-    /** 邻居方向到位掩码位的映射 (右→0, 上→3, 左→2, 下→1) */
+    /** 物理方向到位掩码位的映射 (右→0, 上→3, 左→2, 下→1) */
     final static int[] shift = new int[]{0, 3, 2, 1};
     /** 热色贴图 16 变体 (8x2 切片) */
     TextureRegion[] heatRegions, regions;
@@ -48,12 +49,10 @@ public class HeatPipe extends GraphBlock{
 
     @Override
     public void drawPlanRegion(BuildPlan req, Eachable<BuildPlan> list){
+        // 只绘制方块本体 (与 PU132 原版一致);
+        // 放置方向大箭头由游戏 InputHandler 在 rotate=true 时自动绘制 (线拖拽时仅线尾一个)
         float scl = tilesize * req.animScale;
         Draw.rect(region, req.drawx(), req.drawy(), scl, scl, req.rotation * 90f);
-        // 放置预览方向箭头 (传动带风格): 指向当前旋转方向
-        float ang = req.rotation * 90f;
-        float x2 = req.drawx() + Angles.trnsx(ang, 3f), y2 = req.drawy() + Angles.trnsy(ang, 3f);
-        Drawf.arrow(req.drawx(), req.drawy(), x2, y2, 3f, 3f);
     }
 
     public class HeatPipeBuild extends GraphBuild{
@@ -61,15 +60,11 @@ public class HeatPipe extends GraphBlock{
         int spriteIndex;
 
         @Override
-        public void created(){
-            // 保留放置朝向 (放置预览箭头指示方向; 贴图本身无方向性)
-            super.created();
-        }
-
-        @Override
         public void onNeighboursChanged(){
             spriteIndex = 0;
-            heat().eachNeighbourValue(n -> spriteIndex += 1 << shift[n]);
+            // rotate=true 时端口索引 n 的物理方向 = (n + rotation) % 4,
+            // 需换算回物理方向再查 shift 表, 否则贴图切片错乱
+            heat().eachNeighbourValue(n -> spriteIndex += 1 << shift[(n + rotation) % 4]);
         }
 
         @Override
