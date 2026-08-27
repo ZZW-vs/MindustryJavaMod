@@ -115,7 +115,7 @@ public class WorldUnitType extends UnityUnitType {
                 World world = w.unitWorld;
                 if (world == null || build == null || build.isEmpty()) return;
 
-                // ★ 含网格偏移的中心: 多出的一行一列放世界左方/最下方, 对齐偏左下的甲板贴图
+                // ★ 子世界中心 (8x18 网格居中, 无偏移)
                 float cx = w.subCX(), cy = w.subCY();
                 float r = w.rotation - 90f;
 

@@ -1,7 +1,9 @@
 package zzw.content.exp;
 
 import arc.graphics.Color;
+import arc.math.Angles;
 import arc.math.Mathf;
+import mindustry.Vars;
 import mindustry.content.Fx;
 import mindustry.entities.Effect;
 import mindustry.gen.Building;
@@ -70,7 +72,11 @@ public class ExpIncinerator extends Incinerator{
             if(orbProgress >= 1f && spawnCooldown <= 0f){
                 orbProgress -= 1f;
                 spawnCooldown = 1f / maxOrbsPerSecond;
-                ExpOrbs.dropExp(x, y, rotdeg());
+                // 从方块朝向一侧边缘生成 (距中心 15 像素, 避免生成在方块中间无法拾取)
+                float offset = Vars.tilesize / 2f - 1f;
+                float ex = x + Angles.trnsx(rotdeg(), offset);
+                float ey = y + Angles.trnsy(rotdeg(), offset);
+                ExpOrbs.dropExp(ex, ey, rotdeg());
             }
         }
 

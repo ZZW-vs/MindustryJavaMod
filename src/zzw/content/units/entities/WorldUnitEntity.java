@@ -390,7 +390,7 @@ public class WorldUnitEntity extends UnitEntity {
 
     // ===== 坐标转换 (统一向量旋转法, 任意 90 度朝向正确) =====
 
-    /** 子世界中心像素 X (含网格偏移: 奇数尺寸世界偏移半格对齐甲板贴图) */
+    /** 子世界中心像素 X (8x18 偶数尺寸网格居中, gridOff=0) */
     public float subCX() {
         return unitWorld.width() * Vars.tilesize / 2f + gridOffX;
     }
@@ -720,10 +720,10 @@ public class WorldUnitEntity extends UnitEntity {
         unitWorld.tiles.eachTile(tile -> tile.setFloor(Blocks.metalFloor.asFloor()));
 
         // ★ 平台尺寸 (长方形碰撞箱用) + 网格偏移:
-        //   按用户实测校准: 子世界网格整体居中 (gridOff=0), TerraCore (2x2 偶数方块,
-        //   offset=4) 吸收时落在子世界正中心 tile (4,9) —— 大地核心居中。
-        //   格线相位: subCX = w*8/2 = 36, 36 mod 8 = 4 —— 格线与甲板纹理对齐
-        //   (甲板贴图大格线相位 0 mod 8, 偏移半格后的格线正好落在纹理小格中心)
+        //   子世界网格整体居中 (gridOff=0), TerraCore (2x2 偶数方块, offset=4)
+        //   吸收时落在子世界正中心 tile (4,9) —— 大地核心居中。
+        //   8x18 偶数尺寸: subCX = w*8/2 = 32, 32 mod 8 = 0 —— 格线与甲板纹理直接对齐,
+        //   无多余行/列 (此前 9x19 在右侧和下方各多一行空间, 已按需求删去)
         platW = w * Vars.tilesize;
         platH = h * Vars.tilesize;
         gridOffX = 0f;

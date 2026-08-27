@@ -5223,9 +5223,9 @@ public class Z_Units {
         terra = new WorldUnitType("terra") {{
             health = 26750f;  // 增加血量: 16500 + 10250 = 26750
             speed = 0.7f;    // 进一步加快移动速度: 0.5f → 0.7f (+40%)
-            // ★ 平台碰撞箱: 覆盖 9x19 子世界平台 (hitbox() 重写为随单位旋转的长方形,
-            //   9x19 tile = 72x152 像素, hitSize 取长边)
-            hitSize = 152f;
+            // ★ 平台碰撞箱: 覆盖 8x18 子世界平台 (hitbox() 重写为随单位旋转的长方形,
+            //   8x18 tile = 64x144 像素, hitSize 取长边)
+            hitSize = 144f;
             armor = 32f;     // 提高护甲: 28f → 32f (+14.3%)
             // 低空飞行单位
             hovering = true;
@@ -5239,9 +5239,9 @@ public class Z_Units {
             rotateSpeed = 1.0f;
             accel = 0.08f;  // 加快加速度以配合新速度
             drag = 0.03f;   // 略微减少阻力以保持高速
-            // 子世界尺寸 (9x19 tile - 增加左边和最下方的一行空间)
-            worldWidth = 9;
-            worldHeight = 19;
+            // 子世界尺寸 (8x18 tile - 删去右侧和下方多余的一行空间)
+            worldWidth = 8;
+            worldHeight = 18;
             // 基本外观
             outlineColor = Color.valueOf("3a3a50");
             // 武器: 原版无武器, 但建筑物上的炮台会自动射击
