@@ -95,6 +95,9 @@ public abstract class BaseGraph<M extends GraphModule<? extends Graph, M, G>, G 
         module.eachNeighbour(n -> {
             if(module.getNetworkOfPort(n.value) == this) neighs.add(n.key);
         });
+        // ★ 修复崩溃: 模块在此网络中无同网络邻居 (端口网络已被 copyGraph/rebuild 重指),
+        // PU132 原版此处直接 neighs.get(0) 越界; 无邻居则移除它不影响网络连通性 → 非割点
+        if(neighs.isEmpty()) return false;
         int neighbourIndex = 1;
         if(neighbourIndex >= neighs.size) target = null;
         else target = neighs.get(neighbourIndex);
