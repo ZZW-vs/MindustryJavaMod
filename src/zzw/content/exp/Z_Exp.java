@@ -57,6 +57,8 @@ public class Z_Exp {
     // 经验存储运输
     public static Block expTank, expChest, expRouter, expTower, expTowerDiagonal, bufferTower,
             expHub, expUnloader, expNode, expNodeLarge, expFountain, expVoid;
+    // 经验焚化炉: 焚化物品/液体产经验球
+    public static ExpIncinerator expIncinerator;
 
     // 经验炮台 (电力)
     public static ExpPowerTurret laserTurret, chargeLaserTurret, fractalLaserTurret, btLaserTurret;
@@ -143,6 +145,16 @@ public class Z_Exp {
         expVoid = new ExpVoid("exp-void"){{
             requirements(Category.effect, ItemStack.with());
             buildVisibility = mindustry.world.meta.BuildVisibility.sandboxOnly;
+        }};
+
+        // 经验焚化炉: 焚化任意物品/液体产经验球 (1x1, 耗电比原版焚化炉多 0.2/tick)
+        expIncinerator = new ExpIncinerator("exp-incinerator"){{
+            requirements(Category.effect, ItemStack.with(Items.copper, 20, Items.lead, 20, Z_Items.denseAlloy, 10));
+            health = 90;
+            liquidCapacity = 20f;
+            // 原版焚化炉 0.5 + 0.2 = 0.7/tick
+            consumePower(0.7f);
+            envEnabled |= mindustry.world.meta.Env.space;
         }};
         //endregion
 

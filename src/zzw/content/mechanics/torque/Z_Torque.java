@@ -250,7 +250,9 @@ public class Z_Torque{
             size = 3;
             health = 1500;
             maxTemp = 800f;
-            mulCoeff = 0.03f;
+            // ★ 0.03 → 0.1: PU132 原版升温过慢 (几面反射镜对准仍需数秒升几度),
+            //   同等反射镜数量下升温速度提升约 3 倍
+            mulCoeff = 0.1f;
             addGraph(new GraphHeat(60f, 1f, 0.02f).setAccept(0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
         }};
 

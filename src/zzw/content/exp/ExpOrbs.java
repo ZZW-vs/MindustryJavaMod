@@ -133,7 +133,10 @@ public class ExpOrbs {
                     conveyor(b, conv, (ConveyorBuild)tile.build);
                 }
             }
-            else if(tile.block() instanceof Incinerator && ((IncineratorBuild)tile.build).heat > 0.5f){
+            else if(tile.block() instanceof Incinerator && !(tile.build instanceof ExpIncinerator.ExpIncineratorBuild)
+                && ((IncineratorBuild)tile.build).heat > 0.5f){
+                // ★ 经验焚化炉排除: 它是经验球的生产端, 若不排除刚弹出的球会在
+                //   下一帧 update 立即落回自身 tile 被吞掉
                 b.remove();
             }
             else if(tile.solid()){
