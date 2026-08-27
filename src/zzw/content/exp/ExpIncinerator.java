@@ -1,6 +1,7 @@
 package zzw.content.exp;
 
 import arc.graphics.Color;
+import arc.math.Mathf;
 import mindustry.content.Fx;
 import mindustry.entities.Effect;
 import mindustry.gen.Building;
@@ -20,7 +21,8 @@ import mindustry.world.blocks.production.Incinerator;
  * <ul>
  *   <li>耗电: 0.5 → 0.7 (每 tick, 比原版多 0.2)</li>
  *   <li>液体: 接受所有液体 (原版仅 incinerable), 容量 20</li>
- *   <li>产出: 焚化积累到阈值时弹出经验球</li>
+ *   <li>产出: 焚化积累到阈值时弹出经验球, 弹出速率有上限
+ *       (每秒最多 {@link #maxOrbsPerSecond} 个)</li>
  * </ul></p>
  *
  * <p>注: 经验球飞行时不会被本方块回收 (见 ExpOrbs.ExpOrb.update 的排除判断),
@@ -31,6 +33,8 @@ public class ExpIncinerator extends Incinerator{
     public int itemsPerOrb = 5;
     /** 每焚化多少液体单位产出一个经验球 */
     public float liquidPerOrb = 10f;
+    /** 产出速率上限: 每秒最多弹出多少个经验球 */
+    public float maxOrbsPerSecond = 1.2f;
 
     public ExpIncinerator(String name){
         super(name);
@@ -41,19 +45,39 @@ public class ExpIncinerator extends Incinerator{
     }
 
     public class ExpIncineratorBuild extends IncineratorBuild{
-        /** 已焚化物品计数 (累计到 itemsPerOrb 弹球后清零) */
+        /** 已焚化物品计数 (累计到 itemsPerOrb 折算为 1 颗粒进度) */
         private int itemCount;
         /** 已焚化液体量累计 (单位: 液体单位) */
         private float liquidAmount;
+        /** 待弹出颗粒数 (焚化折算完成, 因速率上限暂未弹出的部分) */
+        private float orbProgress;
+        /** 弹球冷却计时 (秒, <=0 时才允许弹球) */
+        private float spawnCooldown;
+
+        @Override
+        public void updateTile(){
+            super.updateTile();
+
+            // 冷却计时递减
+            if(spawnCooldown > 0f) spawnCooldown -= delta();
+
+            // 有待弹出颗粒且冷却结束 → 弹出 1 个, 重置冷却为 1/速率
+            // (每次只弹 1 个, 下一帧继续, 保证不超过 maxOrbsPerSecond)
+            if(orbProgress >= 1f && spawnCooldown <= 0f){
+                orbProgress -= 1f;
+                spawnCooldown = 1f / maxOrbsPerSecond;
+                ExpOrbs.spreadExp(x, y, ExpOrbs.expAmount);
+            }
+        }
 
         @Override
         public void handleItem(Building source, Item item){
             super.handleItem(source, item);
 
-            // 计数累计, 达到阈值弹出经验球 (10 Exp./球)
+            // 计数累计, 达到阈值折算为 1 颗粒进度 (实际弹出由 updateTile 限速)
             if(++itemCount >= itemsPerOrb){
                 itemCount = 0;
-                ExpOrbs.spreadExp(x, y, ExpOrbs.expAmount);
+                orbProgress = Mathf.clamp(orbProgress + 1f, 0f, 100f);
             }
         }
 
@@ -61,11 +85,11 @@ public class ExpIncinerator extends Incinerator{
         public void handleLiquid(Building source, Liquid liquid, float amount){
             super.handleLiquid(source, liquid, amount);
 
-            // 液体按单位量累计, 每 liquidPerOrb 单位弹一球 (循环处理单次大量注入)
+            // 液体按单位量累计, 每 liquidPerOrb 单位折算为 1 颗粒进度 (循环处理单次大量注入)
             liquidAmount += amount;
             while(liquidAmount >= liquidPerOrb){
                 liquidAmount -= liquidPerOrb;
-                ExpOrbs.spreadExp(x, y, ExpOrbs.expAmount);
+                orbProgress = Mathf.clamp(orbProgress + 1f, 0f, 100f);
             }
         }
 
