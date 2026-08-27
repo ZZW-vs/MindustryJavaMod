@@ -39,6 +39,9 @@ public class ExpIncinerator extends Incinerator{
     public ExpIncinerator(String name){
         super(name);
 
+        // 可旋转: 经验球朝方块朝向弹出 (放置时 R 键调整方向)
+        rotate = true;
+
         // 经验绿火焰
         flameColor = Color.valueOf("84ff00");
         effect = Fx.fuelburn;
@@ -61,12 +64,13 @@ public class ExpIncinerator extends Incinerator{
             // 冷却计时递减
             if(spawnCooldown > 0f) spawnCooldown -= delta();
 
-            // 有待弹出颗粒且冷却结束 → 弹出 1 个, 重置冷却为 1/速率
-            // (每次只弹 1 个, 下一帧继续, 保证不超过 maxOrbsPerSecond)
+            // 有待弹出颗粒且冷却结束 → 朝方块朝向弹出 1 个, 重置冷却为 1/速率
+            // (每次只弹 1 个, 下一帧继续, 保证不超过 maxOrbsPerSecond;
+            //  dropExp 按指定角度发射, 颗粒飞向朝向一侧的拾取者而非随机散开)
             if(orbProgress >= 1f && spawnCooldown <= 0f){
                 orbProgress -= 1f;
                 spawnCooldown = 1f / maxOrbsPerSecond;
-                ExpOrbs.spreadExp(x, y, ExpOrbs.expAmount);
+                ExpOrbs.dropExp(x, y, rotdeg());
             }
         }
 
