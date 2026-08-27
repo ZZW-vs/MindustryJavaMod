@@ -89,6 +89,16 @@ public class WavefrontObject{
         public int vertexCount;
     }
 
+    // ===== 排序缓存 (手机端崩溃修复: 避免每帧分配大数组) =====
+    /** drawBatched 排序缓存: 7万面模型每帧 new float[7万] + new Integer[7万](装箱)
+     *  = 60fps 下 84MB/s 垃圾分配, Android GC 被打爆 → 卡死/OOM 崩溃 */
+    protected float[] batchZVals;
+    protected Integer[] batchOrder;
+    /** draw() singleZLayer 路径排序缓存 (同上, 小模型也复用) */
+    protected float[] sortZVals;
+    protected Integer[] sortIndices;
+    protected Face[] sortedFaces;
+
     public void load(Fi file, @Nullable Fi material){
         if(material != null){
             BufferedReader matR = material.reader(64);
@@ -338,8 +348,11 @@ public class WavefrontObject{
 
         Log.info("[Create] WavefrontObject loaded: " + drawnVertices.size + " verts, " + faces.size + " faces, boundRadius=" + boundRadius);
 
-        // ★ 构建 GPU Mesh (高面数模型用 GPU 渲染, 兼容手机端)
-        buildGpuMesh();
+        // ★ 手机端崩溃修复: 不再构建 GPU Mesh
+        //   drawGpuMesh 渲染路径已弃用 (全项目无调用者, GPU Shader 手机端兼容性问题已回退 CPU 路径),
+        //   但 buildGpuMesh 仍会为每个模型分配 顶点数组(~8MB/模型 堆) + Mesh GPU 原生缓冲(~8MB/模型),
+        //   4 个角色模型合计浪费 ~58MB, 在 512MB 内存的手机上直接 OOM 崩溃
+        // buildGpuMesh();
     }
 
     /** ★ 从 mod 文件树加载独立 Texture (非 atlas 贴图, 用于 MMD 等多贴图模型) */
@@ -408,7 +421,14 @@ public class WavefrontObject{
         Face[] drawOrder;
         if(singleZLayer){
             int n = faces.size;
-            float[] zVals = new float[n];
+            // ★ 手机端崩溃修复: 排序数组缓存复用 (避免每帧分配)
+            if(sortIndices == null || sortIndices.length != n){
+                sortZVals = new float[n];
+                sortIndices = new Integer[n];
+                for(int i = 0; i < n; i++) sortIndices[i] = i;
+                sortedFaces = new Face[n];
+            }
+            float[] zVals = sortZVals;
             for(int i = 0; i < n; i++){
                 float z = 0;
                 Face f = faces.get(i);
@@ -417,11 +437,9 @@ public class WavefrontObject{
                 //   (不能用混合比较规则, 否则违反传递性 → TimSort 抛 IllegalArgumentException)
                 zVals[i] = z / f.verts.length + i * 1e-6f;
             }
-            Integer[] indices = new Integer[n];
-            for(int i = 0; i < n; i++) indices[i] = i;
-            Arrays.sort(indices, (a, b) -> Float.compare(zVals[a], zVals[b]));
-            drawOrder = new Face[n];
-            for(int i = 0; i < n; i++) drawOrder[i] = faces.get(indices[i]);
+            Arrays.sort(sortIndices, (a, b) -> Float.compare(zVals[a], zVals[b]));
+            for(int i = 0; i < n; i++) sortedFaces[i] = faces.get(sortIndices[i]);
+            drawOrder = sortedFaces;
         }else{
             drawOrder = faces.toArray(Face.class);
         }
@@ -472,8 +490,17 @@ public class WavefrontObject{
     protected void drawBatched(){
         int n = faces.size;
 
+        // ★ 手机端崩溃修复: 排序数组缓存复用, 只在面数变化时重新分配
+        //   Integer 装箱对象(0..n-1)首次填充后一直复用, 后续帧零分配
+        if(batchOrder == null || batchOrder.length != n){
+            batchZVals = new float[n];
+            batchOrder = new Integer[n];
+            for(int i = 0; i < n; i++) batchOrder[i] = i;
+        }
+        float[] zVals = batchZVals;
+        Integer[] order = batchOrder;
+
         // 1. 计算每个面的 z 值 (加索引微偏移保证唯一性)
-        float[] zVals = new float[n];
         for(int i = 0; i < n; i++){
             float z = 0;
             Face f = faces.get(i);
@@ -482,8 +509,6 @@ public class WavefrontObject{
         }
 
         // 2. 全局排序 (所有面按 z 排序, 远的先画)
-        Integer[] order = new Integer[n];
-        for(int i = 0; i < n; i++) order[i] = i;
         Arrays.sort(order, (a, b) -> Float.compare(zVals[a], zVals[b]));
 
         // 3. 用 Draw.draw 包裹整个模型渲染

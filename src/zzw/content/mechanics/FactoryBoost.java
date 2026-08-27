@@ -81,6 +81,10 @@ public class FactoryBoost {
             private float cachedMultiplier = 1f;
             private float nextRefresh = 0f;
 
+            public BoostedGenericCrafterBuild() {
+
+            }
+
 
             // 立即重算: 事件驱动时调用
             public void recalcBoost() {
