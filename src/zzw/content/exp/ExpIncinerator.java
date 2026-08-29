@@ -72,11 +72,15 @@ public class ExpIncinerator extends Incinerator{
             if(orbProgress >= 1f && spawnCooldown <= 0f){
                 orbProgress -= 1f;
                 spawnCooldown = 1f / maxOrbsPerSecond;
-                // 从方块朝向一侧边缘生成 (距中心 15 像素, 避免生成在方块中间无法拾取)
-                float offset = Vars.tilesize / 2f - 1f;
+                // ★ 从方块朝向一侧 2 格外生成 (tilesize=8, 2格=16px):
+                //   之前 offset = tilesize/2-1 = 3px 仍在 1x1 方块内部 (半宽 4px),
+                //   颗粒生成在工厂自身 tile 上被 solid 判定弹回卡住;
+                //   2 格外生成确保完全离开工厂方块, 弹出距离明显
+                float offset = Vars.tilesize * 2f;
                 float ex = x + Angles.trnsx(rotdeg(), offset);
                 float ey = y + Angles.trnsy(rotdeg(), offset);
-                ExpOrbs.dropExp(ex, ey, rotdeg());
+                // 弹出速度 6 (默认 4), 颗粒飞得更远更容易被拾取者接住
+                ExpOrbs.dropExp(ex, ey, rotdeg(), 6f, ExpOrbs.expAmount);
             }
         }
 

@@ -1,10 +1,14 @@
 package zzw.content.blocks.production;
 
 import arc.graphics.g2d.Draw;
+import arc.scene.ui.layout.Table;
+import mindustry.gen.Icon;
+import mindustry.ui.Styles;
 import zzw.content.graphics.UnityDrawf;
 import zzw.content.mechanics.torque.blocks.GraphBlock;
 import zzw.content.mechanics.torque.modules.GraphCrucibleModule;
 import zzw.content.mechanics.torque.modules.GraphHeatModule;
+import zzw.content.mechanics.torque.ui.dialogs.CrucibleDialog;
 
 /**
  * 坩埚容器 (PU132 unity.world.blocks.production.HoldingCrucible 移植)
@@ -35,9 +39,17 @@ public class HoldingCrucible extends GraphBlock{
     public HoldingCrucible(String name){
         super(name);
         solid = true;
+        // ★ 信息面板: 点击打开坩埚内容物图表 (与坩埚熔炉一致:
+        //   温度条 + 内容物堆叠条 + 所有物品熔点参考列表)
+        configurable = true;
     }
 
     public class HoldingCrucibleBuild extends GraphBuild{
+        @Override
+        public void buildConfiguration(Table table){
+            table.button(Icon.chartBar, Styles.clearNonei, new CrucibleDialog(this)::show).size(50f);
+        }
+
         @Override
         public void draw(){
             Draw.rect(region, x, y);

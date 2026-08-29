@@ -306,6 +306,11 @@ public class WorldUnitEntity extends UnitEntity {
                 int tx = Math.round((vec.x - building.block.offset) / Vars.tilesize);
                 int ty = Math.round((vec.y - building.block.offset) / Vars.tilesize);
 
+                // ★ 大地核心向左移 1 格: 半格网格偏移 (gridOff) 叠加后让核心
+                //   落在子世界平台正中间 (2x2 核心占正中 2 列, 8 宽网格的中间)
+                //   (新变量保证 lambda 捕获的 tx 仍是 effectively final)
+                final int ftx = building.block instanceof TerraCore ? tx - 1 : tx;
+
                 if (building.power != null && building instanceof PowerNodeBuild && !building.power.links.isEmpty()) {
                     IntSeq seq = building.power.links, nseq = new IntSeq();
                     for (int i = 0; i < seq.size; i++) {
@@ -327,7 +332,7 @@ public class WorldUnitEntity extends UnitEntity {
                     // ★ 建筑像素坐标对齐到子世界 tile 中心 (offset + tile*8):
                     //   与原版世界建筑完全一致的网格行为, 消除向量旋转的亚 tile 相位误差,
                     //   存档(tile 坐标)与读档(drawx 重算)的位置天然一致, 不再错位
-                    Tile st = unitWorld.tile(tx, ty);
+                    Tile st = unitWorld.tile(ftx, ty);
                     st.setBlock(building.block, building.team, building.rotation, () -> building);
                     building.x = st.drawx();
                     building.y = st.drawy();
@@ -720,14 +725,14 @@ public class WorldUnitEntity extends UnitEntity {
         unitWorld.tiles.eachTile(tile -> tile.setFloor(Blocks.metalFloor.asFloor()));
 
         // ★ 平台尺寸 (长方形碰撞箱用) + 网格偏移:
-        //   子世界网格整体居中 (gridOff=0), TerraCore (2x2 偶数方块, offset=4)
-        //   吸收时落在子世界正中心 tile (4,9) —— 大地核心居中。
-        //   8x18 偶数尺寸: subCX = w*8/2 = 32, 32 mod 8 = 0 —— 格线与甲板纹理直接对齐,
-        //   无多余行/列 (此前 9x19 在右侧和下方各多一行空间, 已按需求删去)
+        //   子世界整体往右上偏移 0.5 格 (gridOff = tilesize/2 = 4px),
+        //   修复甲板贴图与网格的显示偏位 —— 渲染投影 / 交互映射 / 建筑跟随
+        //   全部走 subCX()/subCY(), 偏移在所有环节一致生效;
+        //   实体化的大地核心在 absorb() 中额外向左移 1 格, 落在平台正中间
         platW = w * Vars.tilesize;
         platH = h * Vars.tilesize;
-        gridOffX = 0f;
-        gridOffY = 0f;
+        gridOffX = Vars.tilesize / 2f;
+        gridOffY = Vars.tilesize / 2f;
     }
 
     // ===== 存档序列化 (修复重进地图子世界内容消失的问题) =====

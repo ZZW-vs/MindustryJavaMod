@@ -52,7 +52,6 @@ public class CastingMold extends GraphBlock{
     }
 
     public class CastingMoldBuild extends GraphBuild{
-        final static String tooHot = "Too hot to cast!";
         /** 输出目标建筑缓存 (非坩埚的 8 邻居) */
         final OrderedSet<Building> outputBuildings = new OrderedSet<>(8);
         /** 当前铸造的熔融物 */
@@ -81,12 +80,13 @@ public class CastingMold extends GraphBlock{
                 if(castingMelt != null){
                     sub.image(castingMelt.item.uiIcon).size(iconMed);
                     sub.label(() -> {
-                        if(pourProgress == 1f && castSpeed == 0f) return tooHot;
+                        // ★ 汉化: 过热提示走 bundle (stat.unity.casting.toohot)
+                        if(pourProgress == 1f && castSpeed == 0f) return Core.bundle.get("stat.unity.casting.toohot", "温度过高，无法铸造！");
 
                         return Strings.fixed((pourProgress + castProgress) * 50f, 2) + "%";
                     }).color(Color.lightGray);
                 }else{
-                    sub.labelWrap("Nothing being casted").color(Color.lightGray);
+                    sub.labelWrap(Core.bundle.get("stat.unity.casting.nothing", "暂无铸造物")).color(Color.lightGray);
                 }
             }).left();
         }
