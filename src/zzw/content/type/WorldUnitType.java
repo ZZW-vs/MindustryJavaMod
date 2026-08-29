@@ -147,10 +147,12 @@ public class WorldUnitType extends UnityUnitType {
                 Vars.world = world;
 
                 // ★ 建造模式: 子世界边缘呼吸虚线框 (提示当前可建造/拆除)
+                //   虚线框相对平台往左下各偏移半格, 与实际网格覆盖区域一致
+                //   (gridOffX/Y = -0.5 格, 平台原点在中心偏右上)
                 if (w.buildMode) {
                     Draw.z(Layer.plans + 1f);
                     Draw.color(Pal.accent, 0.6f + Mathf.absin(Time.time, 4f, 0.4f));
-                    Drawf.dashRect(Pal.accent, -2f, -2f, w.platW() + 4f, w.platH() + 4f);
+                    Drawf.dashRect(Pal.accent, -Vars.tilesize / 2f - 2f, -Vars.tilesize / 2f - 2f, w.platW() + 4f, w.platH() + 4f);
                     Draw.color();
                 }
 

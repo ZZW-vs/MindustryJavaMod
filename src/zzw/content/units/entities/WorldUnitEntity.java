@@ -306,10 +306,10 @@ public class WorldUnitEntity extends UnitEntity {
                 int tx = Math.round((vec.x - building.block.offset) / Vars.tilesize);
                 int ty = Math.round((vec.y - building.block.offset) / Vars.tilesize);
 
-                // ★ 大地核心向左移 1 格: 半格网格偏移 (gridOff) 叠加后让核心
-                //   落在子世界平台正中间 (2x2 核心占正中 2 列, 8 宽网格的中间)
+                // ★ 大地核心网格位置校正: 实体化映射天然向左偏 1 格,
+                //   +1 校正后 2x2 核心落在 8 宽网格正中间 (正跨中轴线)
                 //   (新变量保证 lambda 捕获的 tx 仍是 effectively final)
-                final int ftx = building.block instanceof TerraCore ? tx - 1 : tx;
+                final int ftx = building.block instanceof TerraCore ? tx + 1 : tx;
 
                 if (building.power != null && building instanceof PowerNodeBuild && !building.power.links.isEmpty()) {
                     IntSeq seq = building.power.links, nseq = new IntSeq();
