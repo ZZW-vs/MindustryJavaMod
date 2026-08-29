@@ -725,15 +725,15 @@ public class WorldUnitEntity extends UnitEntity {
         unitWorld.tiles.eachTile(tile -> tile.setFloor(Blocks.metalFloor.asFloor()));
 
         // ★ 平台尺寸 (长方形碰撞箱用) + 网格偏移:
-        //   子世界相对上一版 (-0.5,+1.5) 再整体上移 2 格 = (-0.5,+3.5) 格,
-        //   修正甲板贴图与网格的显示偏位 —— 渲染投影 / 交互映射 / 建筑跟随
-        //   全部走 subCX()/subCY(), 偏移在所有环节一致生效;
+        //   Y 方向: gridOffY 增大 → 视觉向下 (与直觉相反, 已实测),
+        //   故上移 2 格 = 1.5 - 2 = -0.5 格; X 方向: -0.5 格 (已对准)
+        //   渲染投影 / 交互映射 / 建筑跟随全部走 subCX()/subCY(), 偏移全环节一致;
         //   实体化的大地核心在 absorb() 中额外向左移 1 格, 落在平台正中间
         //   (8x18 网格中心 tile 附近, 2x2 核心正跨中轴线)
         platW = w * Vars.tilesize;
         platH = h * Vars.tilesize;
         gridOffX = -Vars.tilesize / 2f;
-        gridOffY = Vars.tilesize * 3.5f;
+        gridOffY = -Vars.tilesize / 2f;
     }
 
     // ===== 存档序列化 (修复重进地图子世界内容消失的问题) =====
