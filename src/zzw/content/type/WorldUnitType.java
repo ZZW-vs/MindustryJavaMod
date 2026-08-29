@@ -1,6 +1,7 @@
 package zzw.content.type;
 
 import arc.graphics.Color;
+import arc.graphics.SystemCursor;
 import arc.graphics.g2d.Batch;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
@@ -647,15 +648,18 @@ public class WorldUnitType extends UnityUnitType {
     private static boolean inputPatched = false;
 
     /**
-     * 替换桌面输入处理器, 抑制建造模式下的原版鼠标方块预览.
+     * 替换桌面输入处理器, 抑制建造模式下的原版主世界网格建造渲染.
      * <p>★ 双预览问题: 玩家附生大地单位开启建造模式后, 原版 DesktopInput 会按
      * 主世界网格吸附在鼠标处画半透明 ghost, 而子世界网格 (随平台旋转) 上还有
      * drawBody 画的另一个预览 —— 两个预览位置/角度不一致, 视觉非常混乱。
      * 子世界预览吸附正确, 因此建造模式期间抑制原版预览, 只保留子世界预览。</p>
-     * <p>原理: drawBottom() 期间临时把 InputHandler.block 置空 —— 原版的拖线预览
-     * 和鼠标 ghost 预览分支全部以 {@code block != null} / {@code isPlacing()}
-     * (= block != null) 为前提, 置空即整体跳过; 绘制结束立即恢复,
-     * 不影响输入逻辑 (选中方块/放置判定均在 update 阶段读取 block)。</p>
+     * <p>★ 批量删除红框: 原版拆除时 drawTop() 里 drawBreakSelection 会按主世界
+     * 网格画红色选择框 —— 子世界拆除由子世界网格接管, 该红框位置不对且视觉冗余,
+     * 建造模式下整体跳过 drawTop 的选择框绘制。</p>
+     * <p>原理: 建造模式下直接跳过原版 drawBottom()/drawTop() 的绘制分支 ——
+     * 原版 ghost (isPlacing)、拖线预览 (linePlans)、蓝图预览 (selectPlans)、
+     * 拆除红框 (drawBreakSelection) 全部不画; 输入逻辑 (update 阶段) 不受影响,
+     * plans 由 sweepPlans 转译进子世界。</p>
      */
     private static void installInputPatch() {
         if (inputPatched || Vars.control == null || Vars.control.input == null) return;
@@ -667,21 +671,34 @@ public class WorldUnitType extends UnityUnitType {
         boolean added = Core.input.getInputProcessors().contains(old);
         old.remove();
         DesktopInput patched = new DesktopInput() {
+            /** 建造模式激活 (玩家附生大地单位且已开启) */
+            private boolean subBuildMode() {
+                Unit u = Vars.player.unit();
+                return u instanceof WorldUnitEntity w && w.buildMode;
+            }
+
             @Override
             public void drawBottom() {
-                Unit u = Vars.player.unit();
-                if (u instanceof WorldUnitEntity w && w.buildMode) {
-                    // 建造模式: 临时清空选中方块 → 原版主世界网格的 ghost/拖线预览整体跳过
-                    Block b = block;
-                    block = null;
-                    try {
-                        super.drawBottom();
-                    } finally {
-                        block = b;
+                // 建造模式: 原版主世界网格的全部建造预览整体跳过
+                // (ghost / 拖线 linePlans / 蓝图 selectPlans / splan —— 只保留子世界网格预览;
+                //  已放置计划的选中框也不受影响, 建造模式下 plans 已被 sweepPlans 清空)
+                if (subBuildMode()) return;
+                super.drawBottom();
+            }
+
+            @Override
+            public void drawTop() {
+                // 建造模式: 跳过批量拆除红框 (drawBreakSelection) 和蓝图选框 ——
+                // 拆除由子世界网格接管, 原版红框按主世界网格画, 位置不对且视觉混乱;
+                // 保留光标类型重置 (跳过会残留上帧的非箭头光标)
+                if (subBuildMode()) {
+                    if (cursorType != SystemCursor.arrow && Core.scene.hasMouse()) {
+                        Core.graphics.cursor(cursorType = SystemCursor.arrow);
                     }
-                } else {
-                    super.drawBottom();
+                    Draw.reset();
+                    return;
                 }
+                super.drawTop();
             }
         };
         patched.block = old.block;
