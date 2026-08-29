@@ -1,7 +1,7 @@
 package zzw.content.type;
 
 import arc.graphics.Color;
-import arc.graphics.SystemCursor;
+import arc.Graphics.Cursor.SystemCursor;
 import arc.graphics.g2d.Batch;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
