@@ -306,10 +306,10 @@ public class WorldUnitEntity extends UnitEntity {
                 int tx = Math.round((vec.x - building.block.offset) / Vars.tilesize);
                 int ty = Math.round((vec.y - building.block.offset) / Vars.tilesize);
 
-                // ★ 大地核心网格位置校正: 实体化映射天然向左偏 1 格,
-                //   +1 校正后 2x2 核心落在 8 宽网格正中间 (正跨中轴线)
-                //   (新变量保证 lambda 捕获的 tx 仍是 effectively final)
-                final int ftx = building.block instanceof TerraCore ? tx + 1 : tx;
+                // ★ 大地核心网格位置: 不做额外校正 —— gridOffX=-0.5 格已把网格左移半格,
+                //   核心天然落点即平台正中 (此前的 ±1 校正是旧 gridOff 时代的历史遗留,
+                //   叠加后反而偏右 1 格, 已移除)
+                final int ftx = tx;
 
                 if (building.power != null && building instanceof PowerNodeBuild && !building.power.links.isEmpty()) {
                     IntSeq seq = building.power.links, nseq = new IntSeq();
