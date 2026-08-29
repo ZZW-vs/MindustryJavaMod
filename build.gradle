@@ -28,6 +28,9 @@ ext{
 allprojects{
     tasks.withType(JavaCompile){
         options.compilerArgs.addAll(['--release', '8'])
+        // ★ UTF-8 源码编码: Windows 默认 GBK, 中文注释按 GBK 解码会报
+        //   "不可映射字符" 警告且编译产物字符串乱码 (游戏内中文变问号)
+        options.encoding = "UTF-8"
     }
 }
 

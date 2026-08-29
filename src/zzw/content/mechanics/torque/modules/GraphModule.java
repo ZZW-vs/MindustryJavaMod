@@ -353,7 +353,13 @@ public abstract class GraphModule<T extends Graph, M extends GraphModule<T, M, G
         saveCache.clear();
         if(multi) readMulti(read, revision);
         else{
-            saveCache.add(readLocal(read, revision));
+            // ★ 修复存档损坏 (v155 适配): saveCache 是 raw Seq, readLocal 返回 Object[] 时
+            //   v155 arc 的 Seq.add(T[]) 批量重载会被命中 ——
+            //   返回 null (热量/扭矩模块无本地数据) 时在 Seq.add 内部 NPE, 整个读档中止;
+            //   返回非空数组 (坩埚模块) 时元素被逐个拆开加入, applySaveState 取出时 ClassCastException。
+            //   PU132 时代的 arc 没有该重载, 原代码走 add(T) 把数组作为单个元素存入;
+            //   这里显式转 Object 强制走单元素重载, 恢复原版语义
+            saveCache.add((Object)readLocal(read, revision));
             networkSaveState = true;
         }
     }
@@ -361,7 +367,8 @@ public abstract class GraphModule<T extends Graph, M extends GraphModule<T, M, G
     //multi
     void readMulti(Reads read, byte revision){
         int netAm = read.b();
-        for(int i = 0; i < netAm; i++) saveCache.add(readLocal(read, revision));
+        // ★ 同上: 显式转 Object 强制走 add(T) 单元素重载 (数组/null 作为一个整体存入)
+        for(int i = 0; i < netAm; i++) saveCache.add((Object)readLocal(read, revision));
         networkSaveState = true;
     }
 
