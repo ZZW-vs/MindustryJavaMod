@@ -147,6 +147,15 @@ public class WorldUnitType extends UnityUnitType {
                 World ow = Vars.world;
                 Vars.world = world;
 
+                // ★ 护盾半透明修复: animateShields 开启时原版护盾走 Renderer 的
+                //   drawRange(Layer.shields) → effectBuffer 离屏缓冲 + Shaders.shield
+                //   后处理管线 (半透明流光外观); 子世界手动直渲染没走该管线,
+                //   Fill.poly 以 alpha=1 纯色画出 → 护盾/力墙变成不透明"图形"。
+                //   渲染期间临时关闭 → 护盾走半透明分支 (0.09 alpha 填充 + 描边),
+                //   画完立即恢复, 不影响主世界护盾动画
+                boolean oldAnimateShields = Vars.renderer.animateShields;
+                Vars.renderer.animateShields = false;
+
                 // ★ 建造模式: 子世界边缘呼吸虚线框 (提示当前可建造/拆除)
                 //   虚线框相对平台往左下各偏移半格, 与实际网格覆盖区域一致
                 //   (gridOffX/Y = -0.5 格, 平台原点在中心偏右上)
@@ -164,6 +173,8 @@ public class WorldUnitType extends UnityUnitType {
                     Draw.z(Layer.block);
                     b.draw();
                 }
+
+                Vars.renderer.animateShields = oldAnimateShields;
 
                 // ★ 建造光束: 单位中心 → 正在建造/拆除的脚手架 (原版 BuilderComp.drawBuildingBeam 观感:
                 // 橙色三角光束 + 目标方块角标 + 单位端脉冲方点, 拆除时红色)
