@@ -71,6 +71,8 @@ public class Z_Exp {
     public static ExpLiquidTurret frostLaserTurret;
     // 经验炮台 (BurstCharge 电力, PU_V8 BurstChargePowerTurret 简化为 ExpPowerTurret)
     public static ExpPowerTurret swarmLaserTurret;
+    // 经验系力场投影仪 (ClassicProjector)
+    public static ClassicProjector shieldGenerator, deflectGenerator;
     // 经验炮台 (OmniLiquid 液体)
     public static OmniLiquidTurret kelvinLaserTurret;
 
@@ -569,6 +571,54 @@ public class Z_Exp {
             maxLevel = 30;
             pregrade = frostLaserTurret;
             pregradeLevel = 15;
+        }};
+
+        // ===== 经验系力场投影仪 (PU132 UnityBlocks L1660-1702, ClassicProjector) =====
+
+        // shield-generator: 经验力墙 (被打获得经验, 等级提升半径与护盾血量)
+        shieldGenerator = new ClassicProjector("shield-generator"){{
+            requirements(Category.effect, ItemStack.with(Items.silicon, 50, Items.titanium, 35, Z_Items.steel, 15));
+            health = 200;
+            cooldownNormal = 1f;
+            cooldownBrokenBase = 0.3f;
+            phaseRadiusBoost = 10f;
+            phaseShieldBoost = 200;
+            hasItems = hasLiquids = false;
+
+            consumePower(1.5f);
+
+            maxLevel = 15;
+            expFields = new EField[]{
+                    new ELinear(v -> radius = v, 40f, 0.5f, mindustry.world.meta.Stat.range, v -> arc.util.Strings.autoFixed(v / tilesize, 2) + " blocks"),
+                    new ELinear(v -> shieldHealth = v, 500f, 25f, mindustry.world.meta.Stat.shieldHealth)
+            };
+            fromColor = toColor = Pal.lancerLaser;
+        }};
+
+        // deflect-generator: 偏折发生器 (经验力墙 + 子弹反弹, shield-generator 5级升级而来)
+        deflectGenerator = new ClassicProjector("deflect-generator"){{
+            requirements(Category.effect, ItemStack.with(Items.silicon, 50, Items.titanium, 30, Z_Items.steel, 30, Z_Items.dirium, 8));
+            health = 800;
+            size = 2;
+            cooldownNormal = 1.5f;
+            cooldownLiquid = 1.2f;
+            cooldownBrokenBase = 0.35f;
+            phaseRadiusBoost = 40f;
+
+            consumeItem(Items.phaseFabric).boost();
+            consumePower(5f);
+
+            fromColor = Pal.lancerLaser;
+            toColor = zzw.content.graphics.UnityPal.diriumLight;
+            maxLevel = 30;
+            expFields = new EField[]{
+                    new ELinear(v -> radius = v, 60f, 0.75f, mindustry.world.meta.Stat.range, v -> arc.util.Strings.autoFixed(v / tilesize, 2) + " blocks"),
+                    new ELinear(v -> shieldHealth = v, 820f, 35f, mindustry.world.meta.Stat.shieldHealth),
+                    new ELinear(v -> deflectChance = v, 0f, 0.1f, mindustry.world.meta.Stat.baseDeflectChance, v -> arc.util.Strings.autoFixed(v * 100, 1) + "%")
+            };
+            pregrade = shieldGenerator;
+            pregradeLevel = 5;
+            effectColors = new Color[]{Pal.lancerLaser, zzw.content.graphics.UnityPal.lancerDir1, zzw.content.graphics.UnityPal.lancerDir2, zzw.content.graphics.UnityPal.lancerDir3, zzw.content.graphics.UnityPal.diriumLight};
         }};
         //endregion
     }
