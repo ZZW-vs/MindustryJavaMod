@@ -69,15 +69,25 @@ public class Reinforcer extends Block {
 
         // 装甲化状态效果 (仅创建一次, PU132 UnityStatusEffects.plated)
         if (plated == null) {
-            plated = new StatusEffect("plated") {{
-                speedMultiplier = 0.75f;
-                damageMultiplier = 1.5f;
-                healthMultiplier = 2f;
-                reloadMultiplier = 1.2f;
-                permanent = true;
-                effect = zzw.content.graphics.UnityFx.platedFx;
-                effectChance = 0.4f;
-            }};
+            plated = new StatusEffect("plated") {
+                {
+                    speedMultiplier = 0.75f;
+                    damageMultiplier = 1.5f;
+                    healthMultiplier = 2f;
+                    reloadMultiplier = 1.2f;
+                    permanent = true;
+                    effect = zzw.content.graphics.UnityFx.platedFx;
+                    effectChance = 0.4f;
+                }
+
+                // ★ mod 贴图打包时 region 名会加 mod 前缀 (create-status-plated),
+                //   而原版 loadIcon() 只查裸名 status-plated → 永远匹配不到
+                //   → 覆写 loadIcon 手动指向带前缀的 region
+                @Override
+                public void loadIcon() {
+                    fullIcon = uiIcon = Core.atlas.find("create-status-plated");
+                }
+            };
         }
     }
 

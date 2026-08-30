@@ -47,10 +47,20 @@ public class TeleUnit extends Block{
         super(name);
         update = configurable = outputsPayload = true;
         if(tpCoolDown == null){
-            tpCoolDown = new StatusEffect("tpcooldown"){{
-                color = UnityPal.diriumLight;
-                effect = Fx.none;
-            }};
+            tpCoolDown = new StatusEffect("tpcooldown"){
+                {
+                    color = UnityPal.diriumLight;
+                    effect = Fx.none;
+                }
+
+                // ★ mod 贴图打包时 region 名会加 mod 前缀 (create-status-tpcooldown),
+                //   而原版 loadIcon() 只查裸名 status-tpcooldown → 永远匹配不到
+                //   → 覆写 loadIcon 手动指向带前缀的 region
+                @Override
+                public void loadIcon(){
+                    fullIcon = uiIcon = Core.atlas.find("create-status-tpcooldown");
+                }
+            };
         }
         Events.on(WorldLoadEvent.class, e -> {
             for(int i = 0; i < heads.length; i++){
