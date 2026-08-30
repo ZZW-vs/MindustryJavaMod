@@ -22,7 +22,6 @@ import mindustry.world.blocks.production.GenericCrafter;
 import mindustry.world.blocks.production.GenericCrafter.GenericCrafterBuild;
 import mindustry.world.consumers.ConsumeItems;
 import mindustry.world.consumers.ConsumeLiquids;
-import zzw.content.blocks.soul.SoulInfuser;
 import zzw.content.mechanics.FactoryBoost;
 import zzw.content.blocks.production.BurnerSmelter;
 import zzw.content.blocks.production.LiquidsSmelter;
@@ -56,8 +55,6 @@ public class Z_Factory {
     public static Block Plate_Maker_Iron, Plate_Maker_Gold, Plate_Maker_Copper;
     public static Block Large_Plate_Maker_Iron, Large_Plate_Maker_Gold, Large_Plate_Maker_Copper;
     public static Block Pumpkin_Drill;
-    // 灵魂注入器 (从 Z_SoulTurrets 移至工厂类, 使用 Category.crafting)
-    public static SoulInfuser soulInfuser;
 
     // ===== PU132 工厂 =====
     /** 辐照器 (Press, 3x3): 钍+钛+电涌合金 → 辐照电涌 */
@@ -95,8 +92,6 @@ public class Z_Factory {
         createPlateMakers();
         createLargePlateMakers();
         createDrills();
-        createSoulInfuser();
-
         // ===== PU132 工厂移植 (原版 UnityBlocks 配置) =====
         createIrradiator();
         createDarkAlloyForge();
@@ -192,21 +187,10 @@ public class Z_Factory {
         }};
     }
 
-    // ===== SoulInfuser 灵魂注入器 (从 Z_SoulTurrets 移至工厂类) =====
-    // 简化版: 消耗 monolite + 电力产生灵魂, 注入附近炮台/容器
-    // PU_V8: size=3, Category.crafting (工厂类)
-    private static void createSoulInfuser() {
-        soulInfuser = new SoulInfuser("soul-infuser") {{
-            requirements(Category.crafting, ItemStack.with(Z_Items.monolite, 200, Items.titanium, 250, Items.silicon, 420));
-            size = 3;
-            health = 600;
-            craftTime = 60f;
-            consumePower(3.2f);
-            consume(new ConsumeItems(ItemStack.with(Z_Items.monolite, 2)));
-            range = 15f;
-            injectEffect = Fx.smokeCloud;
-        }};
-    }
+    // ===== SoulInfuser 灵魂注入器 =====
+    // ★ 已迁移至 Z_Blocks.createSoulFactories(): 原版为灵魂地板萃取器(FloorExtractor),
+    //   依赖 Z_Blocks 中注册的灵魂地板 (infusedSharpslate 等), 加载顺序需在地板之后;
+    //   旧简化版(消耗monolite物品)还原度不足, 已替换为完整移植版
 
     // ===== PU132 工厂 (原版 UnityBlocks.java 配置) =====
 

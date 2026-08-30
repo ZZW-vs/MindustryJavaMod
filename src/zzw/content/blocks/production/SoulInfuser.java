@@ -14,19 +14,18 @@ import static mindustry.Vars.*;
 
 /**
  * 灵魂灌注器 (PU132 unity.world.blocks.production.SoulInfuser 移植)
- * <p>继承 FloorExtractor, 手动实现 Soulc 功能。可配置, 链接范围内的灵魂炮台
- * (实现了 ISoulTurret 接口的建筑), 制作完成时向它们输送灵魂。</p>
+ * <p>继承 SoulFloorExtractor (= FloorExtractor + 灵魂持有), 从灵魂地板萃取灵魂:
+ * 制作完成时优先向链接的灵魂持有建筑 (ISoulTurret: 炮台/碎屑提取器/巨石合金锻造厂)
+ * 输送灵魂, 剩余的灌注自身 (PU132 原版行为: consume 先发容器再 join 自身)。</p>
  *
  * <p>适配说明:
  * <ul>
- *   <li>@Merge(FloorExtractor + Soulc) → extends FloorExtractor + 手动实现灵魂逻辑</li>
- *   <li>SoulContainer 引用 → 简化为 ISoulTurret (zzw.content.blocks.soul),
- *       因为 SoulContainer 不存在于本项目</li>
+ *   <li>PU132 SoulInfuser extends SoulFloorExtractor (@Merge生成) → 同构继承链</li>
+ *   <li>SoulContainer 引用 → 简化为 ISoulTurret (zzw.content.blocks.soul 通用灵魂持有接口)</li>
  *   <li>acceptSoul()/join() (Soulc 接口) → ISoulTurret.souls()/maxSouls()/joinSoul()</li>
- *   <li>自身不再实现 Soulc (生产者不需要接受灵魂), shouldConsume 仅检查链接炮台</li>
  * </ul></p>
  */
-public class SoulInfuser extends FloorExtractor{
+public class SoulInfuser extends SoulFloorExtractor{
     /** 每次制作产生的灵魂数量 */
     public int amount = 1;
     /** 最大链接炮台数 */
@@ -62,7 +61,7 @@ public class SoulInfuser extends FloorExtractor{
         Drawf.dashCircle(x * tilesize + offset, y * tilesize + offset, range * tilesize, Pal.accent);
     }
 
-    public class SoulInfuserBuild extends FloorExtractorBuild{
+    public class SoulInfuserBuild extends SoulFloorExtractorBuild{
         /** 链接的炮台位置列表 */
         public IntSeq containers = new IntSeq();
 
@@ -110,27 +109,54 @@ public class SoulInfuser extends FloorExtractor{
 
         @Override
         public boolean shouldConsume(){
-            // 有任何链接炮台需要灵魂时才消耗
+            // PU132 原版: 链接容器需要灵魂 或 自身还能容纳灵魂时才消耗
             for(int i = 0; i < containers.size; i++){
                 Building build = world.build(containers.items[i]);
                 if(build instanceof ISoulTurret t && t.souls() < t.maxSouls()){
                     return true;
                 }
             }
-            return false;
+            // 自身可容纳 >= amount 个灵魂
+            return maxSouls - souls() >= amount;
         }
 
         @Override
         public void consume(){
             super.consume();
 
-            // 向链接的炮台输送灵魂
+            // PU132 原版: 优先向链接容器输送, 剩余的灌注自身
             int sent = 0;
             for(int i = 0; i < containers.size && sent < amount; i++){
                 Building build = world.build(containers.items[i]);
                 if(build instanceof ISoulTurret t && t.souls() < t.maxSouls()){
                     if(t.joinSoul()) sent++;
                 }
+            }
+
+            // 剩余灵魂灌入自身 (PU132: acceptSoul(sent) 次 join())
+            if(sent < amount){
+                for(int i = 0; i < amount - sent; i++){
+                    joinSoul();
+                }
+            }
+        }
+
+        @Override
+        public void write(arc.util.io.Writes write){
+            super.write(write);
+            write.i(containers.size);
+            for(int i = 0; i < containers.size; i++){
+                write.i(containers.get(i));
+            }
+        }
+
+        @Override
+        public void read(arc.util.io.Reads read, byte revision){
+            super.read(read, revision);
+            int n = read.i();
+            containers.clear();
+            for(int i = 0; i < n; i++){
+                containers.add(read.i());
             }
         }
     }

@@ -199,5 +199,14 @@ public class UnityFx{
     platedFx = new Effect(30f, e -> {
         Draw.color(e.color);
         Fill.circle(e.x, e.y, e.fout() * (float)e.data);
+    }),
+
+    /** 灵魂环特效 (PU132 UnityFx.monolithRingEffect): e.data(Float) 为强度缩放 */
+    monolithRingEffect = new Effect(60f, e -> {
+        if(e.data instanceof Float data){
+            Draw.color(Pal.lancerLaser);
+            Lines.stroke(e.fout() * 3f * data);
+            Lines.circle(e.x, e.y, e.finpow() * 24f * data);
+        }
     });
 }

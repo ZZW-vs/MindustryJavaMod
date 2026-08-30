@@ -25,6 +25,7 @@ import zzw.content.units.Z_KoruhUnits;
 import zzw.content.units.Z_Units;
 
 import arc.Events;
+import arc.graphics.g2d.Draw;
 
 /**
  * 自定义方块注册 - 铜/铁方块、南瓜、3D展示台、各类墙体与地板
@@ -104,6 +105,14 @@ public class Z_Blocks {
     // ===== PU132 移植: 强化器 (Reinforcer/supercharger, 为单位施加永久装甲化) =====
     public static zzw.content.blocks.effect.Reinforcer superCharger;
 
+    // ===== PU132 移植: 灵魂系工厂 (Monolith 阵营) =====
+    /** 灵魂灌注器: 从灵魂地板萃取灵魂, 输送给链接的灵魂持有建筑 */
+    public static zzw.content.blocks.production.SoulInfuser soulInfuser;
+    /** 碎屑提取器: 从灵魂地板提取远古碎屑 (需灵魂驱动) */
+    public static zzw.content.blocks.production.SoulFloorExtractor debrisExtractor;
+    /** 巨石合金锻造厂: 远古碎屑+巨石 → 巨石合金 (需灵魂驱动) */
+    public static zzw.content.blocks.production.SoulGenericCrafter monolithAlloyForge;
+
     // ===== PU_V8 移植: 地板 =====
     public static Floor electroTile;
     public static Floor sharpslate, infusedSharpslate, archaicSharpslate;
@@ -123,6 +132,7 @@ public class Z_Blocks {
         createModularConstructors();
         createTerraCore();
         createReinforcer();
+        createSoulFactories();
         registerEventListeners();
     }
 
@@ -421,6 +431,184 @@ public class Z_Blocks {
             );
 
             consumePower(13f);
+        }};
+    }
+
+    /**
+     * 灵魂系工厂 (PU132 UnityBlocks L2243-2409, Monolith 阵营灵魂机制)
+     * <p>灵魂地板 (灌注锐板岩/远古锐板岩/远古能量) 提供萃取效率; 灵魂灌注器
+     * 萃取灵魂并输送给链接建筑; 碎屑提取器/巨石合金锻造厂持有灵魂后提速。</p>
+     */
+    private static void createSoulFactories() {
+        // ===== 灵魂灌注器 soul-infuser (PU132 L2292-2362) =====
+        final float[] scales = {1f, 0.9f, 0.7f};
+        final arc.graphics.Color[] colors = {
+            zzw.content.graphics.UnityPal.monolithDark,
+            zzw.content.graphics.UnityPal.monolith,
+            zzw.content.graphics.UnityPal.monolithLight
+        };
+
+        soulInfuser = new zzw.content.blocks.production.SoulInfuser("soul-infuser") {{
+            requirements(Category.crafting, ItemStack.with(Z_Items.monolite, 200, Items.titanium, 250, Items.silicon, 420));
+            // 灵魂地板萃取效率 (PU132 原版 setup)
+            setup(
+                infusedSharpslate, 0.6f,
+                archaicSharpslate, 1f,
+                archaicEnergy, 1.4f
+            );
+
+            size = 3;
+            craftTime = 60f;
+            updateEffect = mindustry.content.Fx.smeltsmoke;
+            craftEffect = mindustry.content.Fx.producesmoke;
+            // 灵魂生产者: 无需灵魂即可工作 (PU132 requireSoul=false)
+            requireSoul = false;
+
+            consumePower(3.2f);
+            consumeLiquid(mindustry.content.Liquids.cryofluid, 0.2f);
+
+            drawer = new zzw.content.blocks.draw.DrawGlow();
+            // 三层闪光圆环 (PU132 shiningCircle 特效)
+            draw((zzw.content.blocks.production.SoulFloorExtractor.SoulFloorExtractorBuild e) -> {
+                float z = Draw.z();
+                Draw.z(mindustry.graphics.Layer.effect);
+
+                for(int i = 0; i < colors.length; i++){
+                    float scl = e.warmup * 4f * scales[i];
+
+                    Draw.color(colors[i]);
+                    zzw.content.units.effects.UnityDrawf.shiningCircle(e.id, arc.util.Time.time + i,
+                        e.x, e.y, scl,
+                        3, 20f,
+                        scl * 2f, scl * 2f,
+                        60f
+                    );
+                }
+
+                Draw.z(z);
+            });
+
+            // 灵魂热度动画 + 灵魂环特效 + 随机闪电 (PU132 update 回调)
+            update((zzw.content.blocks.production.SoulFloorExtractor.SoulFloorExtractorBuild e) -> {
+                if(e.efficiency > 0){
+                    e.soulWarmup = arc.math.Mathf.lerpDelta(e.soulWarmup, e.efficiency, 0.02f);
+                }else{
+                    e.soulWarmup = arc.math.Mathf.lerpDelta(e.soulWarmup, 0f, 0.02f);
+                }
+
+                if(!arc.math.Mathf.zero(e.soulWarmup)){
+                    float f = e.soulf();
+                    if(e.timer.get(effectTimer, 45f - f * 15f)){
+                        zzw.content.graphics.UnityFx.monolithRingEffect.at(e.x, e.y, e.rotation, e.soulWarmup * 3f / 4f);
+                    }
+
+                    if(arc.math.Mathf.chanceDelta(e.soulWarmup * 0.5f)){
+                        mindustry.entities.Lightning.create(
+                            e.team,
+                            mindustry.graphics.Pal.lancerLaser,
+                            1f,
+                            e.x, e.y,
+                            arc.math.Mathf.randomSeed((int)arc.util.Time.time + e.id, 360f),
+                            (int)(e.soulWarmup * 3f) + arc.math.Mathf.random(3)
+                        );
+                    }
+                }
+            });
+        }};
+
+        // ===== 碎屑提取器 debris-extractor (PU132 L2243-2290) =====
+        debrisExtractor = new zzw.content.blocks.production.SoulFloorExtractor("debris-extractor") {{
+            requirements(Category.crafting, ItemStack.with(Z_Items.monolite, 140, Items.surgeAlloy, 80, Items.thorium, 60));
+            // 灵魂地板萃取效率 (PU132 原版 setup: 比灵魂灌注器低很多)
+            setup(
+                infusedSharpslate, 0.04f,
+                archaicSharpslate, 0.08f,
+                archaicEnergy, 1f
+            );
+
+            size = 2;
+            outputItem = new ItemStack(Z_Items.archDebris, 1);
+            craftTime = 84f;
+
+            consumePower(2.4f);
+            consumeLiquid(mindustry.content.Liquids.cryofluid, 0.08f);
+
+            // 双层热度贴图呼吸动画 (PU132 draw 回调)
+            draw((zzw.content.blocks.production.SoulFloorExtractor.SoulFloorExtractorBuild e) -> {
+                Draw.color(heatColor, heatColorLight, arc.math.Mathf.absin(arc.util.Time.time, 6f, 1f) * e.warmup);
+                Draw.alpha(e.warmup);
+                Draw.rect(heatRegion1, e.x, e.y);
+
+                Draw.color(heatColor, heatColorLight, arc.math.Mathf.absin(arc.util.Time.time + 4f, 6f, 1f) * e.warmup);
+                Draw.alpha(e.warmup);
+                Draw.rect(heatRegion2, e.x, e.y);
+
+                Draw.color();
+                Draw.alpha(1f);
+            });
+
+            // 灵魂热度动画 + 灵魂环特效 (PU132 update 回调)
+            update((zzw.content.blocks.production.SoulFloorExtractor.SoulFloorExtractorBuild e) -> {
+                if(e.efficiency > 0){
+                    e.soulWarmup = arc.math.Mathf.lerpDelta(e.soulWarmup, e.efficiency, 0.02f);
+                }else{
+                    e.soulWarmup = arc.math.Mathf.lerpDelta(e.soulWarmup, 0f, 0.02f);
+                }
+
+                if(!arc.math.Mathf.zero(e.soulWarmup)){
+                    float f = e.soulf();
+                    if(e.timer.get(effectTimer, 45f - f * 15f)){
+                        zzw.content.graphics.UnityFx.monolithRingEffect.at(e.x, e.y, e.rotation, e.soulWarmup / 2f);
+                    }
+                }
+            });
+        }};
+
+        // ===== 巨石合金锻造厂 monolith-alloy-forge (PU132 L2364-2409) =====
+        monolithAlloyForge = new zzw.content.blocks.production.SoulGenericCrafter("monolith-alloy-forge") {{
+            requirements(Category.crafting, ItemStack.with(Items.lead, 380, Z_Items.monolite, 240, Items.silicon, 400, Items.titanium, 240, Items.thorium, 90, Items.surgeAlloy, 160));
+
+            outputItem = new ItemStack(Z_Items.monolithAlloy, 3);
+            size = 4;
+            ambientSound = mindustry.gen.Sounds.loopMachine;
+            ambientSoundVolume = 0.6f;
+            drawer = new zzw.content.blocks.draw.DrawSmelter(zzw.content.graphics.UnityPal.monolithLight){{
+                flameRadius = 5f;
+                flameRadiusIn = 2.6f;
+            }};
+
+            consumePower(3.6f);
+            consumeItem(Z_Items.archDebris, 1);
+            consumeItem(Items.silicon, 3);
+            consumeItem(Z_Items.monolite, 2);
+            consumeLiquid(mindustry.content.Liquids.cryofluid, 0.1f);
+
+            // 灵魂热度动画 + 灵魂环特效 + 随机闪电 (PU132 update 回调, 闪电比灌注器强)
+            update((zzw.content.blocks.production.SoulGenericCrafter.SoulGenericCrafterBuild e) -> {
+                if(e.efficiency > 0){
+                    e.soulWarmup = arc.math.Mathf.lerpDelta(e.soulWarmup, e.efficiency, 0.02f);
+                }else{
+                    e.soulWarmup = arc.math.Mathf.lerpDelta(e.soulWarmup, 0f, 0.02f);
+                }
+
+                if(!arc.math.Mathf.zero(e.soulWarmup)){
+                    float f = e.soulf();
+                    if(e.timer.get(effectTimer, 45f - f * 15f)){
+                        zzw.content.graphics.UnityFx.monolithRingEffect.at(e.x, e.y, e.rotation, e.soulWarmup);
+                    }
+
+                    if(arc.math.Mathf.chanceDelta(e.soulWarmup * 0.5f)){
+                        mindustry.entities.Lightning.create(
+                            e.team,
+                            mindustry.graphics.Pal.lancerLaser,
+                            1f,
+                            e.x, e.y,
+                            arc.math.Mathf.randomSeed((int)arc.util.Time.time + e.id, 360f),
+                            (int)(e.soulWarmup * 4f) + arc.math.Mathf.random(3)
+                        );
+                    }
+                }
+            });
         }};
     }
 
