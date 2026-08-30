@@ -44,7 +44,12 @@ public class LightHoldBlock extends GenericCrafter {
     public void setBars() {
         super.setBars();
         // Block 层无法预知 slots (created 时才建), 用 acceptors 判断是否有需光槽
-        boolean requires = arc.util.Structs.contains(acceptors.toArray(), a -> a.required > 0f);
+        // ★ Seq.toArray() 返回 Object[] 不能直接强转元素数组 (v155 arc 泛型擦除),
+        //   直接遍历 Seq 判定
+        boolean requires = false;
+        for (LightAcceptorType a : acceptors) {
+            if (a.required > 0f) { requires = true; break; }
+        }
         if (requires) {
             addBar("light", (LightHoldBuild build) -> new mindustry.ui.Bar(
                 () -> arc.Core.bundle.get("bar.light", "Light") + " " + (int)(build.lightStatus() * 100) + "%",
