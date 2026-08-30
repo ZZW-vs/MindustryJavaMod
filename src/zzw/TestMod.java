@@ -94,14 +94,39 @@ public class TestMod extends Mod{
         // PU_V8 物品运输方块 (传送器 + 3 种传送带)
         Z_Distribution.load();
 
-        // PU 炮台 (turret 类别末尾, 紧凑成组)
-        Z_Turrets.load();
+        // ===== PU 移植炮台 (turret 类别, 完全按 PU132 UnityBlocks 派系顺序成组排列) =====
+        // ★ 物品栏顺序 = 方块注册顺序, 各派系内部顺序与 PU132 原版一致
 
-        // fmonolith 灵魂炮台
-        zzw.content.blocks.Z_SoulTurrets.load();
+        // dark 派系 (7): apparition, ghost, banshee, fallout, catastrophe, calamity, extinction
+        Z_Turrets.loadDark();
 
-        // 高级炮台 (TractorBeam/oracle/recluse/prism/supernova)
-        zzw.content.blocks.Z_AdvTurrets.load();
+        // light 派系 (12): photon, graviton, electron, proton, neutron, gluon,
+        //                  w-boson, z-boson, higgs-boson, singularity, muon, ephemeron
+        Z_Turrets.loadLight();
+
+        // imber 派系 (7): orb, shockwire, current, plasma, electrobomb, shielder, orb-turret
+        Z_Turrets.loadImber();
+
+        // koruh 派系经验炮台 (8): laser-turret ~ inferno (PU132 顺序)
+        Z_Exp.loadTurrets();
+
+        // monolith 派系 (14, PU132 交错顺序):
+        // ricochet, diviner → life-stealer, recluse, absorber-aura → mage, blackout, shellshock
+        // → heat-ray, oracle → purge → incandescence, prism, supernova
+        zzw.content.blocks.Z_SoulTurrets.loadPart1();
+        zzw.content.blocks.Z_AdvTurrets.loadPart1();
+        zzw.content.blocks.Z_SoulTurrets.loadPart2();
+        zzw.content.blocks.Z_AdvTurrets.loadPart2();
+        zzw.content.blocks.Z_SoulTurrets.loadPart3();
+        zzw.content.blocks.Z_AdvTurrets.loadPart3();
+
+        // advance 派系 (8): celsius, kelvin, arc-caster, arc-storm, blue-eclipse, xeno-corruptor,
+        //                    the-cube, wavefront
+        Z_Turrets.loadAdvance();
+        zzw.content.blocks.Z_AdvTurrets.load3D();
+
+        // end 派系 (2): tenmeikiri, endgame
+        zzw.content.blocks.Z_AdvTurrets.loadEnd();
 
         // 经验系统 (effect 类别末尾)
         Z_Exp.load();

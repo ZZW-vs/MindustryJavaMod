@@ -74,7 +74,23 @@ public class Z_AdvTurrets {
     public static ObjPowerTurret cube;
     public static WavefrontTurret wavefront;
 
+
+    /**
+     * 全量加载 (兼容入口): monolith 高级炮台 + advance 3D 炮台 + end 终极炮台。
+     * <p>
+     * ★ TestMod 按 PU132 派系顺序交错调用: monolith 组 (Part1/2/3 与 Z_SoulTurtles 交错) →
+     * advance 组 (Z_Turrets.loadAdvance + load3D) → end 组 (loadEnd)。
+     */
     public static void load() {
+        loadPart1();
+        loadPart2();
+        loadPart3();
+        load3D();
+        loadEnd();
+    }
+
+    /** monolith 组第 1 段 (PU132 顺序): life-stealer, recluse, absorber-aura (交错于 Z_SoulTurrets.loadPart1 之后) */
+    public static void loadPart1() {
         // ===== lifeStealer (PU_V8 L2462-2475) =====
         // SoulLifeStealerTurret: 持续激光+吸血蓄能+范围治疗
         // ★ 完整移植 PU_V8: laserAlpha 回调基于 power.status 和 soulf
@@ -110,6 +126,53 @@ public class Z_AdvTurrets {
             healEffect = Fx.healBlockFull;
         }};
 
+        // ===== recluse (PU_V8 L2477-2503) =====
+        // SoulTurretItemTurret: 物品炮台, 子弹施加 unmoving 状态
+        recluse = new SoulItemTurret("recluse") {{
+            requirements(Category.turret, ItemStack.with(Items.lead, 15, Z_Items.monolite, 20));
+            size = 1;
+            health = 200;
+            inaccuracy = 4f;
+            reload = 20f;
+            range = 110f;
+            shootCone = 3f;
+            ammoUseEffect = Fx.none;
+            rotateSpeed = 12f;
+            // ammo: stopLead/stopMonolite/stopSilicon (施加 unmoving 状态)
+            ammo(Items.lead, new BasicBulletType(3.6f, 72f, "shell") {{
+                width = 9f;
+                height = 12f;
+                ammoMultiplier = 4;
+                lifetime = 60f;
+                frontColor = Color.white;
+                backColor = Pal.lancerLaser;
+                status = mindustry.content.StatusEffects.unmoving;
+                statusDuration = 5f;
+            }}, Z_Items.monolite, new BasicBulletType(4f, 100f, "shell") {{
+                width = 9f;
+                height = 12f;
+                ammoMultiplier = 4;
+                lifetime = 60f;
+                frontColor = Color.white;
+                backColor = Pal.lancerLaser;
+                status = mindustry.content.StatusEffects.unmoving;
+                statusDuration = 8f;
+            }}, Items.silicon, new BasicBulletType(4f, 72f, "shell") {{
+                width = 9f;
+                height = 12f;
+                ammoMultiplier = 4;
+                lifetime = 60f;
+                frontColor = Color.white;
+                backColor = Pal.lancerLaser;
+                status = mindustry.content.StatusEffects.unmoving;
+                statusDuration = 16f;
+                homingPower = 0.08f;
+            }});
+            requireSoul = false;
+            efficiencyFrom = 0.8f;
+            efficiencyTo = 1.5f;
+        }};
+
         // ===== absorberAura (PU_V8 L2505-2521) =====
         // SoulAbsorberTurret: 持续激光+吸收敌方单位能量产电
         // ★ 完整移植 PU_V8: targetBullets=true + laserAlpha 回调
@@ -141,7 +204,10 @@ public class Z_AdvTurrets {
             // PU_V8 原版: targetBullets=true (吸收子弹产电)
             targetBullets = true;
         }};
+    }
 
+    /** monolith 组第 2 段 (PU132 顺序): heat-ray, oracle (交错于 Z_SoulTurrets.loadPart2 之后) */
+    public static void loadPart2() {
         // ===== heatRay (PU_V8 L2624-2641) =====
         // SoulHeatRayTurret: 持续热射线, damage=240, 仅对地, 施加 melting 状态
         // ★ 完整移植 PU_V8: laserAlpha 回调基于 power.status 和 soulf
@@ -166,36 +232,6 @@ public class Z_AdvTurrets {
             maxSouls = 5;
             efficiencyFrom = 0.8f;
             efficiencyTo = 1.6f;
-            // PU_V8 原版: laserAlpha = power.status * (0.7 + soulf * 0.3)
-            laserAlpha(b -> b.power.status * (0.7f + b.soulf() * 0.3f));
-        }};
-
-        // ===== incandescence (PU_V8 L2712-2732) =====
-        // SoulHeatRayTurret: 强化热射线, damage=480, 对空对地, 施加 melting 状态
-        incandescence = new SoulHeatRayTurret("incandescence") {{
-            requirements(Category.turret, ItemStack.with(Z_Items.monolite, 250, Items.phaseFabric, 45, Z_Items.monolithAlloy, 100));
-            size = 3;
-            health = 1680;
-            range = 180f;
-            consumePower(4f);
-            damage = 480f;
-            shootCone = 6f;
-            rotateSpeed = 10f;
-            force = 0f;
-            scaledForce = 0f;
-            targetGround = true;
-            targetAir = true;
-            laserColor = Color.valueOf("ffd9a0");
-            laserWidth = 0.54f;
-            shootLength = 6f;
-            shootSound = Z_Sounds.heatRay;
-            // ★ PU_V8: 施加 melting 状态
-            status = mindustry.content.StatusEffects.melting;
-            statusDuration = 60f;
-            requireSoul = false;
-            maxSouls = 7;
-            efficiencyFrom = 0.7f;
-            efficiencyTo = 1.67f;
             // PU_V8 原版: laserAlpha = power.status * (0.7 + soulf * 0.3)
             laserAlpha(b -> b.power.status * (0.7f + b.soulf() * 0.3f));
         }};
@@ -252,52 +288,38 @@ public class Z_AdvTurrets {
             subShootSound = Sounds.shootLancer;  // PU_V8 原版 Sounds.laser 简化替代
             subShootSoundVolume = 1f;
         }};
+    }
 
-        // ===== recluse (PU_V8 L2477-2503) =====
-        // SoulTurretItemTurret: 物品炮台, 子弹施加 unmoving 状态
-        recluse = new SoulItemTurret("recluse") {{
-            requirements(Category.turret, ItemStack.with(Items.lead, 15, Z_Items.monolite, 20));
-            size = 1;
-            health = 200;
-            inaccuracy = 4f;
-            reload = 20f;
-            range = 110f;
-            shootCone = 3f;
-            ammoUseEffect = Fx.none;
-            rotateSpeed = 12f;
-            // ammo: stopLead/stopMonolite/stopSilicon (施加 unmoving 状态)
-            ammo(Items.lead, new BasicBulletType(3.6f, 72f, "shell") {{
-                width = 9f;
-                height = 12f;
-                ammoMultiplier = 4;
-                lifetime = 60f;
-                frontColor = Color.white;
-                backColor = Pal.lancerLaser;
-                status = mindustry.content.StatusEffects.unmoving;
-                statusDuration = 5f;
-            }}, Z_Items.monolite, new BasicBulletType(4f, 100f, "shell") {{
-                width = 9f;
-                height = 12f;
-                ammoMultiplier = 4;
-                lifetime = 60f;
-                frontColor = Color.white;
-                backColor = Pal.lancerLaser;
-                status = mindustry.content.StatusEffects.unmoving;
-                statusDuration = 8f;
-            }}, Items.silicon, new BasicBulletType(4f, 72f, "shell") {{
-                width = 9f;
-                height = 12f;
-                ammoMultiplier = 4;
-                lifetime = 60f;
-                frontColor = Color.white;
-                backColor = Pal.lancerLaser;
-                status = mindustry.content.StatusEffects.unmoving;
-                statusDuration = 16f;
-                homingPower = 0.08f;
-            }});
+    /** monolith 组第 3 段 (PU132 顺序): incandescence, prism, supernova (交错于 Z_SoulTurrets.loadPart3 之后) */
+    public static void loadPart3() {
+        // ===== incandescence (PU_V8 L2712-2732) =====
+        // SoulHeatRayTurret: 强化热射线, damage=480, 对空对地, 施加 melting 状态
+        incandescence = new SoulHeatRayTurret("incandescence") {{
+            requirements(Category.turret, ItemStack.with(Z_Items.monolite, 250, Items.phaseFabric, 45, Z_Items.monolithAlloy, 100));
+            size = 3;
+            health = 1680;
+            range = 180f;
+            consumePower(4f);
+            damage = 480f;
+            shootCone = 6f;
+            rotateSpeed = 10f;
+            force = 0f;
+            scaledForce = 0f;
+            targetGround = true;
+            targetAir = true;
+            laserColor = Color.valueOf("ffd9a0");
+            laserWidth = 0.54f;
+            shootLength = 6f;
+            shootSound = Z_Sounds.heatRay;
+            // ★ PU_V8: 施加 melting 状态
+            status = mindustry.content.StatusEffects.melting;
+            statusDuration = 60f;
             requireSoul = false;
-            efficiencyFrom = 0.8f;
-            efficiencyTo = 1.5f;
+            maxSouls = 7;
+            efficiencyFrom = 0.7f;
+            efficiencyTo = 1.67f;
+            // PU_V8 原版: laserAlpha = power.status * (0.7 + soulf * 0.3)
+            laserAlpha(b -> b.power.status * (0.7f + b.soulf() * 0.3f));
         }};
 
         // ===== prism (PU_V8 L2734-2763, PrismTurret + ModelInstance) =====
@@ -384,7 +406,61 @@ public class Z_AdvTurrets {
                 incendChance = 0f;
             }};
         }};
+    }
 
+    /** advance 派系 3D 模型炮台 (PU132 顺序): the-cube, wavefront (在 Z_Turrets.loadAdvance 之后) */
+    public static void load3D() {
+        // ===== cube (PU_V8 L3411-3429, ObjPowerTurret + PointBlastLaserBulletType) =====
+        // 3D 立方体炮台: 伪 3D 渲染 + 受击形变 + 旋转动画
+        // ★ v155.4 适配: reloadTime → reload; powerUse → consumePower(); UnityObjs.cube → ZObjs.cube
+        cube = new ObjPowerTurret("the-cube") {{
+            requirements(Category.turret, ItemStack.with(
+                Items.copper, 3300, Items.lead, 2900, Items.graphite, 4400,
+                Items.silicon, 3800, Items.titanium, 4600,
+                Z_Items.xenium, 2300, Items.phaseFabric, 670, Z_Items.advanceAlloy, 1070));
+            health = 22500;
+            object = ZObjs.cube;
+            size = 10;
+            range = 320f;
+            reload = 240f;
+            consumePower(260f);
+            consumeCoolant(0.01f);
+            coolantMultiplier = 1.1f;
+            shootSound = Sounds.shootLancer;  // ★ v155.4 替代 UnitySounds.cubeBlast (无 shootBig)
+            shootType = new PointBlastLaserBulletType(900f) {{
+                length = 320f;
+                lifetime = 17f;
+                pierce = true;
+                width = 32f;  // 激光加粗 (原12f → 32f)
+                auraDamage = 8000f;
+                damageRadius = 120f;
+                laserColors = new Color[]{Color.valueOf("a3e3ff")};  // UnityPal.advance
+            }};
+        }};
+
+        // ===== wavefront (PU_V8 L3431-3444, WavefrontTurret + WavefrontLaser) =====
+        // 3D wavefront 炮台: 伪 3D 渲染 (因 arc 无 g3d 包, 用 WavefrontObject 替代 ModelInstance)
+        // ★ v155.4 简化: 移除 AnimControl (展开/折叠动画), 保留旋转和间隙动画
+        wavefront = new WavefrontTurret("wavefront") {{
+            requirements(Category.turret, ItemStack.with(
+                Items.copper, 4900, Items.graphite, 6000, Items.silicon, 5000,
+                Items.titanium, 6500, Z_Items.xenium, 1500, Z_Items.advanceAlloy, 1500,
+                Z_Items.terminum, 700, Z_Items.terminaAlloy, 500));
+            health = 50625;
+            object = ZObjs.wavefront;
+            size = 15;
+            range = 420f;
+            rotateSpeed = 3f;
+            reload = 240f;
+            consumePower(260f);
+            coolantMultiplier = 0.9f;
+            shootSound = Sounds.shootLancer;  // ★ v155.4 替代 UnitySounds.cubeBlast (无 shootBig)
+            shootType = new WavefrontLaserBulletType(2400f);
+        }};
+    }
+
+    /** end 派系终极炮台 (PU132 顺序): tenmeikiri, endgame */
+    public static void loadEnd() {
         // ===== tenmeikiri (PU_V8 L3542-3584, EndLaserTurret + EndCutterLaserBulletType) =====
         // 持续激光炮台, 充能后发射超长激光 (防作弊伤害, 4 色叠加 + 闪电)
         // ★ 完整移植: 防作弊系统 + 持续激光跟踪 + 7 层灯光渲染 + 底座叠加层
@@ -458,54 +534,6 @@ public class Z_AdvTurrets {
             // 冷却液作为可选 booster (非必需, BaseTurret.init 会自动设 optional/booster/update=false)
             coolant = consumeCoolant(0.6f);
             coolant.boost();
-        }};
-
-        // ===== cube (PU_V8 L3411-3429, ObjPowerTurret + PointBlastLaserBulletType) =====
-        // 3D 立方体炮台: 伪 3D 渲染 + 受击形变 + 旋转动画
-        // ★ v155.4 适配: reloadTime → reload; powerUse → consumePower(); UnityObjs.cube → ZObjs.cube
-        cube = new ObjPowerTurret("the-cube") {{
-            requirements(Category.turret, ItemStack.with(
-                Items.copper, 3300, Items.lead, 2900, Items.graphite, 4400,
-                Items.silicon, 3800, Items.titanium, 4600,
-                Z_Items.xenium, 2300, Items.phaseFabric, 670, Z_Items.advanceAlloy, 1070));
-            health = 22500;
-            object = ZObjs.cube;
-            size = 10;
-            range = 320f;
-            reload = 240f;
-            consumePower(260f);
-            consumeCoolant(0.01f);
-            coolantMultiplier = 1.1f;
-            shootSound = Sounds.shootLancer;  // ★ v155.4 替代 UnitySounds.cubeBlast (无 shootBig)
-            shootType = new PointBlastLaserBulletType(900f) {{
-                length = 320f;
-                lifetime = 17f;
-                pierce = true;
-                width = 32f;  // 激光加粗 (原12f → 32f)
-                auraDamage = 8000f;
-                damageRadius = 120f;
-                laserColors = new Color[]{Color.valueOf("a3e3ff")};  // UnityPal.advance
-            }};
-        }};
-
-        // ===== wavefront (PU_V8 L3431-3444, WavefrontTurret + WavefrontLaser) =====
-        // 3D wavefront 炮台: 伪 3D 渲染 (因 arc 无 g3d 包, 用 WavefrontObject 替代 ModelInstance)
-        // ★ v155.4 简化: 移除 AnimControl (展开/折叠动画), 保留旋转和间隙动画
-        wavefront = new WavefrontTurret("wavefront") {{
-            requirements(Category.turret, ItemStack.with(
-                Items.copper, 4900, Items.graphite, 6000, Items.silicon, 5000,
-                Items.titanium, 6500, Z_Items.xenium, 1500, Z_Items.advanceAlloy, 1500,
-                Z_Items.terminum, 700, Z_Items.terminaAlloy, 500));
-            health = 50625;
-            object = ZObjs.wavefront;
-            size = 15;
-            range = 420f;
-            rotateSpeed = 3f;
-            reload = 240f;
-            consumePower(260f);
-            coolantMultiplier = 0.9f;
-            shootSound = Sounds.shootLancer;  // ★ v155.4 替代 UnitySounds.cubeBlast (无 shootBig)
-            shootType = new WavefrontLaserBulletType(2400f);
         }};
     }
 }

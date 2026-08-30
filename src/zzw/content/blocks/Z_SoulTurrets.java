@@ -41,7 +41,21 @@ public class Z_SoulTurrets {
     // ===== 6 个简单 SoulTurretPowerTurret 炮台 =====
     public static SoulTurretPowerTurret ricochet, diviner, mage, blackout, shellshock, purge;
 
+
+    /**
+     * 全量加载 (兼容入口): monolith 派系简单灵魂炮台 6 个。
+     * <p>
+     * ★ TestMod 按 PU132 monolith 交错顺序调用 loadPart1/2/3,
+     * 中间穿插 Z_AdvTurrets 的 monolith 炮台 (life-stealer/recluse/absorber-aura 等)。
+     */
     public static void load() {
+        loadPart1();
+        loadPart2();
+        loadPart3();
+    }
+
+    /** monolith 组第 1 段: ricochet, diviner (PU132 交错序列前 2 个) */
+    public static void loadPart1() {
         // ===== ricochet (PU_V8 L2412-2435) =====
         // size=1, 弹跳子弹, 不需要灵魂, 0.8~1.5倍效率
         ricochet = new SoulTurretPowerTurret("ricochet") {{
@@ -89,7 +103,10 @@ public class Z_SoulTurrets {
             efficiencyFrom = 0.8f;
             efficiencyTo = 1.5f;
         }};
+    }
 
+    /** monolith 组第 2 段: mage, blackout, shellshock (PU132 交错序列中段, 前面是 Adv 的 life-stealer/recluse/absorber-aura) */
+    public static void loadPart2() {
         // ===== mage (PU_V8 L2523-2550) =====
         // size=2, 3连发闪电, 不需要灵魂, maxSouls=5, 0.8~1.6倍效率
         mage = new SoulTurretPowerTurret("mage") {{
@@ -188,7 +205,10 @@ public class Z_SoulTurrets {
             efficiencyFrom = 0.8f;
             efficiencyTo = 1.6f;
         }};
+    }
 
+    /** monolith 组第 3 段: purge (PU132 交错序列中 heat-ray/oracle 之后, incandescence 之前) */
+    public static void loadPart3() {
         // ===== purge (PU_V8 L2688-2710) =====
         // size=3, 弹跳子弹, 不需要灵魂, maxSouls=7, 0.7~1.67倍效率
         purge = new SoulTurretPowerTurret("purge") {{

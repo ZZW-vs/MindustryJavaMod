@@ -76,6 +76,12 @@ public class Z_Exp {
     // 经验炮台 (OmniLiquid 液体)
     public static OmniLiquidTurret kelvinLaserTurret;
 
+    /**
+     * 全量加载: 经验存储运输 + 力场投影仪 (非炮台部分)。
+     * <p>
+     * ★ 经验炮台已拆分到 loadTurrets(), 由 TestMod 在 turret 类别的 koruh 派系位置调用,
+     * 确保 PU 移植炮台在物品栏按 PU132 原版派系顺序成组排列。
+     */
     public static void load() {
         //region 经验存储运输
         expTank = new ExpTank("exp-tank"){{
@@ -187,7 +193,66 @@ public class Z_Exp {
         }};
         //endregion
 
-        //region 经验炮台
+        //region 经验系力场投影仪 (炮台部分已拆至 loadTurrets, 由 TestMod 在 koruh 派系位置调用)
+
+        // ===== 经验系力场投影仪 (PU132 UnityBlocks L1660-1702, ClassicProjector) =====
+
+        // shield-generator: 经验力墙 (被打获得经验, 等级提升半径与护盾血量)
+        shieldGenerator = new ClassicProjector("shield-generator"){{
+            requirements(Category.effect, ItemStack.with(Items.silicon, 50, Items.titanium, 35, Z_Items.steel, 15));
+            health = 200;
+            cooldownNormal = 1f;
+            cooldownBrokenBase = 0.3f;
+            phaseRadiusBoost = 10f;
+            phaseShieldBoost = 200;
+            hasItems = hasLiquids = false;
+
+            consumePower(1.5f);
+
+            maxLevel = 15;
+            expFields = new EField[]{
+                    new ELinear(v -> radius = v, 40f, 0.5f, mindustry.world.meta.Stat.range, v -> arc.util.Strings.autoFixed(v / tilesize, 2) + " blocks"),
+                    new ELinear(v -> shieldHealth = v, 500f, 25f, mindustry.world.meta.Stat.shieldHealth)
+            };
+            fromColor = toColor = Pal.lancerLaser;
+        }};
+
+        // deflect-generator: 偏折发生器 (经验力墙 + 子弹反弹, shield-generator 5级升级而来)
+        deflectGenerator = new ClassicProjector("deflect-generator"){{
+            requirements(Category.effect, ItemStack.with(Items.silicon, 50, Items.titanium, 30, Z_Items.steel, 30, Z_Items.dirium, 8));
+            health = 800;
+            size = 2;
+            cooldownNormal = 1.5f;
+            cooldownLiquid = 1.2f;
+            cooldownBrokenBase = 0.35f;
+            phaseRadiusBoost = 40f;
+
+            consumeItem(Items.phaseFabric).boost();
+            consumePower(5f);
+
+            fromColor = Pal.lancerLaser;
+            toColor = zzw.content.graphics.UnityPal.diriumLight;
+            maxLevel = 30;
+            expFields = new EField[]{
+                    new ELinear(v -> radius = v, 60f, 0.75f, mindustry.world.meta.Stat.range, v -> arc.util.Strings.autoFixed(v / tilesize, 2) + " blocks"),
+                    new ELinear(v -> shieldHealth = v, 820f, 35f, mindustry.world.meta.Stat.shieldHealth),
+                    new ELinear(v -> deflectChance = v, 0f, 0.1f, mindustry.world.meta.Stat.baseDeflectChance, v -> arc.util.Strings.autoFixed(v * 100, 1) + "%")
+            };
+            pregrade = shieldGenerator;
+            pregradeLevel = 5;
+            effectColors = new Color[]{Pal.lancerLaser, zzw.content.graphics.UnityPal.lancerDir1, zzw.content.graphics.UnityPal.lancerDir2, zzw.content.graphics.UnityPal.lancerDir3, zzw.content.graphics.UnityPal.diriumLight};
+        }};
+        //endregion
+    }
+
+    /**
+     * 经验炮台 8 个 (koruh 派系, PU132 UnityBlocks 注册顺序):
+     * laser-turret, charge-laser-turret, frost-laser-turret, fractal-laser-turret,
+     * swarm-laser-turret, kelvin-laser-turret, bt-laser-turret, inferno
+     * <p>
+     * ★ 物品栏顺序 = 注册顺序, 由 TestMod 在 imber 之后 monolith 之前调用。
+     */
+    public static void loadTurrets() {
         laserTurret = new ExpPowerTurret("laser-turret"){{
             requirements(Category.turret, ItemStack.with(Items.copper, 90, Items.silicon, 40, Items.titanium, 15));
             size = 2;
@@ -334,123 +399,6 @@ public class Z_Exp {
             pregradeLevel = 15;
         }};
 
-        btLaserTurret = new ExpPowerTurret("bt-laser-turret"){{
-            requirements(Category.turret, ItemStack.with(Items.surgeAlloy, 80, Z_Items.steel, 120, Z_Items.dirium, 70));
-            size = 4;
-            health = 2400;
-
-            reload = 90f;
-            coolantMultiplier = 2f;
-            range = 160f;
-
-            shoot.firstShotDelay = 100f;
-            recoil = 4f;
-            targetAir = true;
-            shake = 6f;
-            powerUse = 15f;
-
-            shootEffect = mindustry.content.Fx.lancerLaserShoot;
-            smokeEffect = mindustry.content.Fx.none;
-            shootSound = V7Sounds.laser;
-
-            heatColor = mindustry.graphics.Pal.redderDust;
-            toColor = UnityPal.exp;
-
-            shootType = new ExpLaserBulletType(240f, 150f){{
-                colors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser.cpy().a(0.4f), mindustry.graphics.Pal.lancerLaser, UnityPal.exp};
-                hitEffect = mindustry.content.Fx.hitLaserBlast;
-                hitSize = 8;
-                lifetime = 22f;
-                drawSize = 500f;
-                width = 28f;
-                ammoMultiplier = 1f;
-                pierceCap = 6;
-                lengthInc = 1f;
-                damageInc = 15f;
-            }};
-
-            expScale = 30;
-            pregrade = chargeLaserTurret;
-            maxLevel = 20;
-            expFields = new EField[]{
-                new LinearReloadTime(v -> reload = v, 90f, -3f),
-                new ELinear(v -> range = v, 160f, 1f, mindustry.world.meta.Stat.shootRange, v -> arc.util.Strings.autoFixed(v / tilesize, 2) + " blocks")
-            };
-            effectColors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser, UnityPal.exp};
-        }};
-
-        infernoTurret = new ExpItemTurret("inferno"){{
-            // ★完整移植 PU_V8: 3 种弹药 (scrap/slagShot, coal/coalBlaze, pyratite/pyraBlaze)
-            // shootSmallBlaze/shootPyraBlaze: 火焰色粒子向射击方向喷射 (PU_V8 自定义)
-            // ★ v158 简化: 用 BulletType 替代 ExpBulletType, 用自定义 Effect 替代 ShootFx
-            ammo(
-                mindustry.content.Items.scrap, new mindustry.entities.bullet.LiquidBulletType(mindustry.content.Liquids.slag) {{
-                    // ★ PU_V8 Bullets.slagShot 等效 (来自 PU特供v132版): damage=4.0f, drag=0.01f
-                    damage = 4.0f;
-                    drag = 0.01f;
-                }},
-                mindustry.content.Items.coal, new mindustry.entities.bullet.BulletType(3.35f, 32f) {{
-                    ammoMultiplier = 3;
-                    hitSize = 7f;
-                    lifetime = 24f;
-                    pierce = true;
-                    collidesAir = false;
-                    statusDuration = 60f * 4;
-                    // ★ PU_V8 shootSmallBlaze: 火焰色 (lightFlame/darkFlame/gray) 16粒子向射击方向喷射
-                    shootEffect = new mindustry.entities.Effect(22f, e -> {
-                        arc.graphics.g2d.Draw.color(Pal.lightFlame, Pal.darkFlame, Pal.gray, e.fin());
-                        arc.math.Angles.randLenVectors(e.id, 16, e.finpow() * 60f, e.rotation, 18f, (x, y) ->
-                            arc.graphics.g2d.Fill.circle(e.x + x, e.y + y, 0.85f + e.fout() * 3.5f));
-                    });
-                    hitEffect = mindustry.content.Fx.hitFlameSmall;
-                    despawnEffect = mindustry.content.Fx.none;
-                    status = mindustry.content.StatusEffects.burning;
-                    keepVelocity = true;
-                    hittable = false;
-                }},
-                mindustry.content.Items.pyratite, new mindustry.entities.bullet.BulletType(3.35f, 46f) {{
-                    ammoMultiplier = 3;
-                    hitSize = 7f;
-                    lifetime = 24f;
-                    pierce = true;
-                    collidesAir = false;
-                    statusDuration = 60f * 4;
-                    // ★ PU_V8 shootPyraBlaze: pyra 火焰色粒子
-                    shootEffect = new mindustry.entities.Effect(32f, e -> {
-                        arc.graphics.g2d.Draw.color(Pal.lightPyraFlame, Pal.darkPyraFlame, Pal.gray, e.fin());
-                        arc.math.Angles.randLenVectors(e.id, 16, e.finpow() * 60f, e.rotation, 18f, (x, y) ->
-                            arc.graphics.g2d.Fill.circle(e.x + x, e.y + y, 0.85f + e.fout() * 3.5f));
-                    });
-                    hitEffect = mindustry.content.Fx.hitFlameSmall;
-                    despawnEffect = mindustry.content.Fx.none;
-                    status = mindustry.content.StatusEffects.burning;
-                    keepVelocity = false;
-                    hittable = false;
-                }}
-            );
-            requirements(Category.turret, ItemStack.with(Z_Items.stone, 150, Z_Items.denseAlloy, 65, Items.graphite, 60));
-            size = 3;
-            health = 1200;
-
-            reload = 6f;  // ★ PU_V8 reloadTime=6f (快速发射)
-            range = 80f;  // ★ PU_V8 range=80f
-            targetAir = false;
-            targetGround = true;
-            shootCone = 5f;
-            recoil = 0f;
-            coolantMultiplier = 2f;
-            shootSound = Sounds.shootFlame;  // ★ PU_V8 Sounds.flame → v158 Sounds.shootFlame (火焰喷射)
-            heatColor = mindustry.graphics.Pal.redderDust;
-
-            // ★ v158: shoot 默认为 ShootPattern (无 spread 字段), 需初始化为 ShootSpread
-            shoot = new mindustry.entities.pattern.ShootSpread(1, 0f);
-            maxLevel = 10;  // ★ PU_V8 maxLevel=10
-            expFields = new EField[]{
-                new EList<>(v -> shoot.shots = v, new Integer[]{1, 1, 2, 2, 2, 3, 3, 4, 4, 5, 5}, mindustry.world.meta.Stat.shots),
-                new EList<>(v -> ((mindustry.entities.pattern.ShootSpread)shoot).spread = v, new Float[]{0f, 0f, 5f, 10f, 15f, 7f, 14f, 8f, 10f, 6f, 9f}, null)
-            };
-        }};
-
         // ===== swarmLaserTurret (PU_V8 L1890-1935, BurstChargePowerTurret → 简化为 ExpPowerTurret)
         // PU_V8: chargeTime=50, chargeMaxDelay=30, chargeEffects=4, shots=4, burstSpacing=20
         // ★ v158 完整移植: firstShotDelay=50 (chargeTime), shotDelay=20 (burstSpacing), shots=4
@@ -573,53 +521,121 @@ public class Z_Exp {
             pregradeLevel = 15;
         }};
 
-        // ===== 经验系力场投影仪 (PU132 UnityBlocks L1660-1702, ClassicProjector) =====
+        btLaserTurret = new ExpPowerTurret("bt-laser-turret"){{
+            requirements(Category.turret, ItemStack.with(Items.surgeAlloy, 80, Z_Items.steel, 120, Z_Items.dirium, 70));
+            size = 4;
+            health = 2400;
 
-        // shield-generator: 经验力墙 (被打获得经验, 等级提升半径与护盾血量)
-        shieldGenerator = new ClassicProjector("shield-generator"){{
-            requirements(Category.effect, ItemStack.with(Items.silicon, 50, Items.titanium, 35, Z_Items.steel, 15));
-            health = 200;
-            cooldownNormal = 1f;
-            cooldownBrokenBase = 0.3f;
-            phaseRadiusBoost = 10f;
-            phaseShieldBoost = 200;
-            hasItems = hasLiquids = false;
+            reload = 90f;
+            coolantMultiplier = 2f;
+            range = 160f;
 
-            consumePower(1.5f);
+            shoot.firstShotDelay = 100f;
+            recoil = 4f;
+            targetAir = true;
+            shake = 6f;
+            powerUse = 15f;
 
-            maxLevel = 15;
+            shootEffect = mindustry.content.Fx.lancerLaserShoot;
+            smokeEffect = mindustry.content.Fx.none;
+            shootSound = V7Sounds.laser;
+
+            heatColor = mindustry.graphics.Pal.redderDust;
+            toColor = UnityPal.exp;
+
+            shootType = new ExpLaserBulletType(240f, 150f){{
+                colors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser.cpy().a(0.4f), mindustry.graphics.Pal.lancerLaser, UnityPal.exp};
+                hitEffect = mindustry.content.Fx.hitLaserBlast;
+                hitSize = 8;
+                lifetime = 22f;
+                drawSize = 500f;
+                width = 28f;
+                ammoMultiplier = 1f;
+                pierceCap = 6;
+                lengthInc = 1f;
+                damageInc = 15f;
+            }};
+
+            expScale = 30;
+            pregrade = chargeLaserTurret;
+            maxLevel = 20;
             expFields = new EField[]{
-                    new ELinear(v -> radius = v, 40f, 0.5f, mindustry.world.meta.Stat.range, v -> arc.util.Strings.autoFixed(v / tilesize, 2) + " blocks"),
-                    new ELinear(v -> shieldHealth = v, 500f, 25f, mindustry.world.meta.Stat.shieldHealth)
+                new LinearReloadTime(v -> reload = v, 90f, -3f),
+                new ELinear(v -> range = v, 160f, 1f, mindustry.world.meta.Stat.shootRange, v -> arc.util.Strings.autoFixed(v / tilesize, 2) + " blocks")
             };
-            fromColor = toColor = Pal.lancerLaser;
+            effectColors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser, UnityPal.exp};
         }};
 
-        // deflect-generator: 偏折发生器 (经验力墙 + 子弹反弹, shield-generator 5级升级而来)
-        deflectGenerator = new ClassicProjector("deflect-generator"){{
-            requirements(Category.effect, ItemStack.with(Items.silicon, 50, Items.titanium, 30, Z_Items.steel, 30, Z_Items.dirium, 8));
-            health = 800;
-            size = 2;
-            cooldownNormal = 1.5f;
-            cooldownLiquid = 1.2f;
-            cooldownBrokenBase = 0.35f;
-            phaseRadiusBoost = 40f;
+        infernoTurret = new ExpItemTurret("inferno"){{
+            // ★完整移植 PU_V8: 3 种弹药 (scrap/slagShot, coal/coalBlaze, pyratite/pyraBlaze)
+            // shootSmallBlaze/shootPyraBlaze: 火焰色粒子向射击方向喷射 (PU_V8 自定义)
+            // ★ v158 简化: 用 BulletType 替代 ExpBulletType, 用自定义 Effect 替代 ShootFx
+            ammo(
+                mindustry.content.Items.scrap, new mindustry.entities.bullet.LiquidBulletType(mindustry.content.Liquids.slag) {{
+                    // ★ PU_V8 Bullets.slagShot 等效 (来自 PU特供v132版): damage=4.0f, drag=0.01f
+                    damage = 4.0f;
+                    drag = 0.01f;
+                }},
+                mindustry.content.Items.coal, new mindustry.entities.bullet.BulletType(3.35f, 32f) {{
+                    ammoMultiplier = 3;
+                    hitSize = 7f;
+                    lifetime = 24f;
+                    pierce = true;
+                    collidesAir = false;
+                    statusDuration = 60f * 4;
+                    // ★ PU_V8 shootSmallBlaze: 火焰色 (lightFlame/darkFlame/gray) 16粒子向射击方向喷射
+                    shootEffect = new mindustry.entities.Effect(22f, e -> {
+                        arc.graphics.g2d.Draw.color(Pal.lightFlame, Pal.darkFlame, Pal.gray, e.fin());
+                        arc.math.Angles.randLenVectors(e.id, 16, e.finpow() * 60f, e.rotation, 18f, (x, y) ->
+                            arc.graphics.g2d.Fill.circle(e.x + x, e.y + y, 0.85f + e.fout() * 3.5f));
+                    });
+                    hitEffect = mindustry.content.Fx.hitFlameSmall;
+                    despawnEffect = mindustry.content.Fx.none;
+                    status = mindustry.content.StatusEffects.burning;
+                    keepVelocity = true;
+                    hittable = false;
+                }},
+                mindustry.content.Items.pyratite, new mindustry.entities.bullet.BulletType(3.35f, 46f) {{
+                    ammoMultiplier = 3;
+                    hitSize = 7f;
+                    lifetime = 24f;
+                    pierce = true;
+                    collidesAir = false;
+                    statusDuration = 60f * 4;
+                    // ★ PU_V8 shootPyraBlaze: pyra 火焰色粒子
+                    shootEffect = new mindustry.entities.Effect(32f, e -> {
+                        arc.graphics.g2d.Draw.color(Pal.lightPyraFlame, Pal.darkPyraFlame, Pal.gray, e.fin());
+                        arc.math.Angles.randLenVectors(e.id, 16, e.finpow() * 60f, e.rotation, 18f, (x, y) ->
+                            arc.graphics.g2d.Fill.circle(e.x + x, e.y + y, 0.85f + e.fout() * 3.5f));
+                    });
+                    hitEffect = mindustry.content.Fx.hitFlameSmall;
+                    despawnEffect = mindustry.content.Fx.none;
+                    status = mindustry.content.StatusEffects.burning;
+                    keepVelocity = false;
+                    hittable = false;
+                }}
+            );
+            requirements(Category.turret, ItemStack.with(Z_Items.stone, 150, Z_Items.denseAlloy, 65, Items.graphite, 60));
+            size = 3;
+            health = 1200;
 
-            consumeItem(Items.phaseFabric).boost();
-            consumePower(5f);
+            reload = 6f;  // ★ PU_V8 reloadTime=6f (快速发射)
+            range = 80f;  // ★ PU_V8 range=80f
+            targetAir = false;
+            targetGround = true;
+            shootCone = 5f;
+            recoil = 0f;
+            coolantMultiplier = 2f;
+            shootSound = Sounds.shootFlame;  // ★ PU_V8 Sounds.flame → v158 Sounds.shootFlame (火焰喷射)
+            heatColor = mindustry.graphics.Pal.redderDust;
 
-            fromColor = Pal.lancerLaser;
-            toColor = zzw.content.graphics.UnityPal.diriumLight;
-            maxLevel = 30;
+            // ★ v158: shoot 默认为 ShootPattern (无 spread 字段), 需初始化为 ShootSpread
+            shoot = new mindustry.entities.pattern.ShootSpread(1, 0f);
+            maxLevel = 10;  // ★ PU_V8 maxLevel=10
             expFields = new EField[]{
-                    new ELinear(v -> radius = v, 60f, 0.75f, mindustry.world.meta.Stat.range, v -> arc.util.Strings.autoFixed(v / tilesize, 2) + " blocks"),
-                    new ELinear(v -> shieldHealth = v, 820f, 35f, mindustry.world.meta.Stat.shieldHealth),
-                    new ELinear(v -> deflectChance = v, 0f, 0.1f, mindustry.world.meta.Stat.baseDeflectChance, v -> arc.util.Strings.autoFixed(v * 100, 1) + "%")
+                new EList<>(v -> shoot.shots = v, new Integer[]{1, 1, 2, 2, 2, 3, 3, 4, 4, 5, 5}, mindustry.world.meta.Stat.shots),
+                new EList<>(v -> ((mindustry.entities.pattern.ShootSpread)shoot).spread = v, new Float[]{0f, 0f, 5f, 10f, 15f, 7f, 14f, 8f, 10f, 6f, 9f}, null)
             };
-            pregrade = shieldGenerator;
-            pregradeLevel = 5;
-            effectColors = new Color[]{Pal.lancerLaser, zzw.content.graphics.UnityPal.lancerDir1, zzw.content.graphics.UnityPal.lancerDir2, zzw.content.graphics.UnityPal.lancerDir3, zzw.content.graphics.UnityPal.diriumLight};
         }};
-        //endregion
     }
 }
