@@ -20,6 +20,7 @@ import zzw.content.blocks.units.MechPad;
 import zzw.content.blocks.units.ModularConstructor;
 import zzw.content.blocks.units.ModularConstructorPart;
 import zzw.content.blocks.units.TerraCore;
+import zzw.content.blocks.units.SelectableReconstructor;
 import zzw.content.exp.EField;
 import zzw.content.units.Z_KoruhUnits;
 import zzw.content.units.Z_Units;
@@ -105,6 +106,9 @@ public class Z_Blocks {
     // ===== PU132 移植: 强化器 (Reinforcer/supercharger, 为单位施加永久装甲化) =====
     public static zzw.content.blocks.effect.Reinforcer superCharger;
 
+    // ===== PU132 移植: 递归重构器 (SelectableReconstructor, T6/T7 合用升级工厂) =====
+    public static SelectableReconstructor recursiveReconstructor;
+
     // ===== PU132 移植: 灵魂系工厂 (Monolith 阵营) =====
     /** 灵魂灌注器: 从灵魂地板萃取灵魂, 输送给链接的灵魂持有建筑 */
     public static zzw.content.blocks.production.SoulInfuser soulInfuser;
@@ -133,6 +137,7 @@ public class Z_Blocks {
         createTerraCore();
         createReinforcer();
         createSoulFactories();
+        createRecursiveReconstructor();
         registerEventListeners();
     }
 
@@ -431,6 +436,50 @@ public class Z_Blocks {
             );
 
             consumePower(13f);
+        }};
+    }
+
+    /**
+     * 递归重构器 recursive-reconstructor (PU132 UnityBlocks L332-360, SelectableReconstructor)
+     * <p>T6/T7 合用: 配置按钮切换档位, T6 档按 upgrades (T5→T6),
+     * T7 档按 otherUpgrades (T6→T7)。
+     * ★ PU132 原版部分升级目标 (rex/excelsus/monument/colossus/bastion 等
+     * Scar/Monolith 系列单位) 尚未移植, 配方先写入已移植的单位, 后续移植后再补。</p>
+     */
+    private static void createRecursiveReconstructor() {
+        recursiveReconstructor = new SelectableReconstructor("recursive-reconstructor") {{
+            requirements(Category.units, ItemStack.with(Items.graphite, 1600, Items.silicon, 2000, Items.metaglass, 900, Items.thorium, 600, Items.lead, 1200, Items.plastanium, 3600));
+            size = 11;
+            liquidCapacity = 360f;
+            constructTime = 20000f;
+            minTier = 6;
+            // T5 → T6 (PU132 原版: reign→citadel, toxopid→araneidae, corvus→cygnus;
+            //   rex→excelsus/monument→colossus 因 Scar/Monolith 系列未移植暂缺)
+            upgrades.addAll(
+                new mindustry.type.UnitType[]{mindustry.content.UnitTypes.reign, Z_Units.citadel},
+
+                new mindustry.type.UnitType[]{mindustry.content.UnitTypes.toxopid, Z_Units.araneidae},
+
+                new mindustry.type.UnitType[]{mindustry.content.UnitTypes.corvus, Z_Units.cygnus},
+
+                new mindustry.type.UnitType[]{mindustry.content.UnitTypes.eclipse, Z_Units.mantle}
+            );
+            // T6 → T7 (PU132 原版: citadel→empire, araneidae→theraphosidae, colossus→bastion;
+            //   rex/excelsus 等未移植的单位暂缺, 已移植的 T6→T7 全部写入)
+            otherUpgrades.addAll(
+                new mindustry.type.UnitType[]{Z_Units.citadel, Z_Units.empire},
+
+                new mindustry.type.UnitType[]{Z_Units.araneidae, Z_Units.theraphosidae},
+
+                new mindustry.type.UnitType[]{Z_Units.cygnus, Z_Units.sagittarius},
+
+                new mindustry.type.UnitType[]{Z_Units.mantle, Z_Units.aphelion},
+
+                new mindustry.type.UnitType[]{Z_Units.sedec, Z_Units.trigintaduo}
+            );
+            consumePower(5f);
+            consume(new mindustry.world.consumers.ConsumeItems(ItemStack.with(Items.silicon, 1200, Items.metaglass, 800, Items.thorium, 700, Items.surgeAlloy, 400, Items.plastanium, 600, Items.phaseFabric, 350)));
+            consumeLiquid(mindustry.content.Liquids.cryofluid, 7f);
         }};
     }
 

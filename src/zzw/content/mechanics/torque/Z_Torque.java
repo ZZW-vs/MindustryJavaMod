@@ -25,6 +25,9 @@ import zzw.content.mechanics.torque.blocks.power.WindTurbine;
 import zzw.content.mechanics.torque.blocks.production.AugerDrill;
 import zzw.content.mechanics.torque.blocks.production.MechanicalExtractor;
 import zzw.content.mechanics.torque.graphs.GraphCrucible;
+import zzw.content.mechanics.torque.graphs.GraphFlux;
+import zzw.content.mechanics.torque.blocks.power.Magnet;
+import zzw.content.mechanics.torque.blocks.power.RotorBlock;
 import zzw.content.mechanics.torque.graphs.GraphHeat;
 import zzw.content.mechanics.torque.graphs.GraphTorque;
 import zzw.content.mechanics.torque.graphs.GraphTorqueConsume;
@@ -84,6 +87,20 @@ public class Z_Torque{
     public static CruciblePump cruciblePump;
     /** 铸模: 熔融物冷却铸回物品 */
     public static CastingMold castingMold;
+
+    // ===== PU132 磁力系统 =====
+    /** 镍定子: 永磁体 (2Wb) */
+    public static Magnet nickelStator;
+    /** 大型镍定子: 永磁体 (10Wb) */
+    public static Magnet nickelStatorLarge;
+    /** 镍电磁铁: 耗电强化磁体 (25Wb) */
+    public static Magnet nickelElectromagnet;
+    /** 钕定子: 沙盒永磁体 (200Wb) */
+    public static Magnet neodymiumStator;
+    /** 小型电力转子: 磁通→扭矩发电 (1x1) */
+    public static RotorBlock electricRotorSmall;
+    /** 大型电力转子: 磁通→扭矩发电 (3x3) */
+    public static RotorBlock electricRotor;
 
     public static void load(){
         // ===== 生产方块 (扭矩消耗) =====
@@ -290,6 +307,71 @@ public class Z_Torque{
             health = 700;
             addGraph(new GraphCrucible(2f, false).setAccept(0, 0, 0, 0, 1, 1, 0, 0));
             addGraph(new GraphHeat(55f, 0.2f, 0f).setAccept(1, 1, 1, 1, 1, 1, 1, 1));
+        }};
+
+        // ===== PU132 磁力系统 (UnityBlocks L3059-3108, 3181-3185 原版配置) =====
+
+        // nickel-stator: 镍定子 (永磁体, GraphFlux(2f) 只向正面输出)
+        nickelStator = new Magnet("nickel-stator"){{
+            requirements(Category.power, with(Z_Items.nickel, 30, Items.titanium, 20));
+            health = 450;
+            addGraph(new GraphFlux(2f).setAccept(1, 0, 0, 0));
+        }};
+
+        // nickel-stator-large: 大型镍定子 (永磁体, GraphFlux(10f) 四面输出)
+        nickelStatorLarge = new Magnet("nickel-stator-large"){{
+            requirements(Category.power, with(Z_Items.nickel, 250, Items.titanium, 150));
+            size = 2;
+            health = 1800;
+            addGraph(new GraphFlux(10f).setAccept(1, 1, 0, 0, 0, 0, 0, 0));
+        }};
+
+        // nickel-electromagnet: 镍电磁铁 (耗电强化, GraphFlux(25f) 电力满意度调谐磁通)
+        nickelElectromagnet = new Magnet("nickel-electromagnet"){{
+            requirements(Category.power, with(Z_Items.nickel, 250, Items.titanium, 200, Items.copper, 100, Z_Items.cupronickel, 50));
+            size = 2;
+            health = 1000;
+            consumePower(1.6f);
+            addGraph(new GraphFlux(25f).setAccept(1, 1, 0, 0, 0, 0, 0, 0));
+        }};
+
+        // neodymium-stator: 钕定子 (沙盒, GraphFlux(200f))
+        neodymiumStator = new Magnet("neodymium-stator"){{
+            requirements(Category.power, BuildVisibility.sandboxOnly, with());
+            health = 400;
+            addGraph(new GraphFlux(200f).setAccept(1, 0, 0, 0));
+        }};
+
+        // electric-rotor-small: 小型电力转子 (磁通→扭矩发电, 1x1)
+        electricRotorSmall = new RotorBlock("electric-rotor-small"){{
+            requirements(Category.power, with(Z_Items.nickel, 30, Items.copper, 50, Items.titanium, 10));
+            health = 120;
+            powerProduction = 2f;
+            fluxEfficiency = 10f;
+            rotPowerEfficiency = 0.8f;
+            torqueEfficiency = 0.7f;
+            baseTorque = 1f;
+            baseTopSpeed = 3f;
+            consumePower(1f);
+            addGraph(new GraphFlux(false).setAccept(0, 1, 0, 1));
+            addGraph(new GraphTorque(0.08f, 20f).setAccept(1, 0, 1, 0));
+        }};
+
+        // electric-rotor: 大型电力转子 (磁通→扭矩发电, 3x3)
+        electricRotor = new RotorBlock("electric-rotor"){{
+            requirements(Category.power, with(Z_Items.nickel, 200, Items.copper, 200, Items.titanium, 150, Items.graphite, 100));
+            size = 3;
+            health = 1000;
+            powerProduction = 32f;
+            big = true;
+            fluxEfficiency = 10f;
+            rotPowerEfficiency = 0.8f;
+            torqueEfficiency = 0.8f;
+            baseTorque = 5f;
+            baseTopSpeed = 15f;
+            consumePower(16f);
+            addGraph(new GraphFlux(false).setAccept(0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1));
+            addGraph(new GraphTorque(0.05f, 150f).setAccept(0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
         }};
     }
 }
