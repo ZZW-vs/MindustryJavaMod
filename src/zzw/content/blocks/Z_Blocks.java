@@ -64,7 +64,7 @@ public class Z_Blocks {
     // ===== 3D 模型展示方块 =====
     public static Block flywheelDisplay;
     public static Block wavefrontDisplay;
-    public static Block mmdDisplay;
+//    public static Block mmdDisplay;
     // ===== 2D图片展示方块 =====  (废弃)
     //public static Block imageDisplay;
 
@@ -194,11 +194,11 @@ public class Z_Blocks {
         wavefrontDisplay = flywheelDisplay;
 
         // MMD 模型专用展示台: 直接渲染 PMX 文件, 专用渲染设置
-        mmdDisplay = new MmdDisplayBlock("mmd-display") {{
-            requirements(Category.effect, ItemStack.with(Items.copper, 50, Items.lead, 30, Items.silicon, 20), true);
-            health = 800;
-            buildVisibility = BuildVisibility.shown;
-        }};
+//        mmdDisplay = new MmdDisplayBlock("mmd-display") {{
+//            requirements(Category.effect, ItemStack.with(Items.copper, 50, Items.lead, 30, Items.silicon, 20), true);
+//            health = 800;
+//            buildVisibility = BuildVisibility.shown;
+//        }};
         //2D图片展示台: 支持6张内置图片的展示，丰富的参数调节 (废弃但保留图片)
         //imageDisplay = new ImageDisplayBlock("image-display") {{
         //   requirements(Category.effect, ItemStack.with(Items.copper, 80, Items.lead, 50, Items.graphite, 30), true);

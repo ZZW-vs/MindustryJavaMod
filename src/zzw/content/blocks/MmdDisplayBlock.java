@@ -51,6 +51,7 @@ import zzw.util.WavefrontObject;
  * - 模型效果预览
  * - 自定义模型调节
  */
+/*
 public class MmdDisplayBlock extends Block {
 
     public TextureRegion baseRegion;
@@ -90,7 +91,7 @@ public class MmdDisplayBlock extends Block {
         static final float DEFAULT_SCALE = 15f;
         // 最大缩放倍率（30倍）
         static final float MAX_SCALE = 30f;
-
+        /*
         // MMD 模型列表: 2个人物各2形态
         private final WavefrontObject[] MODELS = {
             zzw.util.ZObjs.mikuBlack,
@@ -323,3 +324,4 @@ public class MmdDisplayBlock extends Block {
         }
     }
 }
+*/
