@@ -57,12 +57,15 @@ public class EmpBasicBulletType extends BasicBulletType {
 
     public EmpBasicBulletType(float speed, float damage) {
         this(speed, damage, "create-electric-shell");
-        trailLength = 7;
     }
 
     public EmpBasicBulletType(float speed, float damage, String sprite) {
         super(speed, damage, sprite);
         trailLength = 7;
+        // ★ EMP 弹是范围效果弹: 飞完全程自然消散时也在终点爆发 EMP + 光圈
+        //   (PU 原版观感 —— 子弹最终"变成一个光圈"消散;
+        //   v155 despawnHit 默认 false, 消散时完全静默)
+        despawnHit = true;
     }
 
     @Override

@@ -52,10 +52,14 @@ public class TestMod extends Mod{
 
     @Override
     public void loadContent(){
+        // ★ 加载顺序 = 物品栏/数据库显示顺序 (block id 递增)
+        //   排列原则: 自创内容(板材/南瓜/展示)在前 → PU 移植内容按类别集中在各类别末尾,
+        //   同类别内 PU 移植方块自成一个组, 与 PU 原版物品栏的分组观感一致
+
         // ★ 加载自定义音效 (必须在单位之前, 单位武器会引用)
         Z_Sounds.load();
 
-        // 加载自定义物品（基础资源）
+        // 加载自定义物品（基础资源; PU 物品在同文件内排在自创物品之后）
         Z_Items.load();
 
         // 加载自定义液体（需要物品之前或并行）
@@ -64,40 +68,45 @@ public class TestMod extends Mod{
         // 加载矿物（需要物品）
         Z_Mine.load();
 
-        // 加载自定义工厂（需要物品）
+        // ===== 自创方块 (各类别前部) =====
+
+        // 加载自定义工厂（需要物品; PU132 工厂在 Z_Factory 内部已排在自创工厂之后）
         Z_Factory.load();
 
         // 加载机械系统（需要物品和工厂）
         Z_Mechanics.load();
 
-        // 加载 PU_V8 扭矩系统 (需要物品)
-        Z_Torque.load();
-
-        // 加载 PU_V8 koruh 阵营单位 (需要在方块之前, MechPad 引用单位类型)
-        Z_KoruhUnits.load();
-
         // 加载自定义单位 (需要在方块之前, ModularConstructor/TerraCore 引用单位类型)
         Z_Units.load();
 
-        // 加载自定义方块（可能需要物品和工厂）
+        // PU_V8 koruh 阵营单位 (Z_Blocks 的 MechPad 引用其单位类型, 必须在方块前;
+        //   单位不占物品栏方块位, 放这里不影响方块排序)
+        Z_KoruhUnits.load();
+
+        // 加载自定义方块（可能需要物品和工厂; 含 ModConstructor/TerraCore/强化器/灵魂工厂）
         Z_Blocks.load();
 
-        // 加载 PU_V8 物品运输方块 (传送器 + 3 种传送带)
+        // ===== PU 移植内容 (各类别末尾, 依次成组) =====
+
+        // PU_V8 扭矩/热量/磁力系统 (power/crafting/production 类别末尾)
+        Z_Torque.load();
+
+        // PU_V8 物品运输方块 (传送器 + 3 种传送带)
         Z_Distribution.load();
 
-        // 加载 PU 炮台 (需要物品)
+        // PU 炮台 (turret 类别末尾, 紧凑成组)
         Z_Turrets.load();
 
-        // 加载 fmonolith 灵魂炮台 (需要物品)
+        // fmonolith 灵魂炮台
         zzw.content.blocks.Z_SoulTurrets.load();
 
-        // 加载高级炮台 (TractorBeam/oracle/recluse/prism/supernova)
+        // 高级炮台 (TractorBeam/oracle/recluse/prism/supernova)
         zzw.content.blocks.Z_AdvTurrets.load();
 
-        // 加载经验系统（需要物品）
+        // 经验系统 (effect 类别末尾)
         Z_Exp.load();
 
-        // 加载光学系统 (光照传播, 需要物品和工厂)
+        // 光学系统 (光照传播, 需要物品和工厂)
         zzw.content.optics.Z_Optics.load();
     }
     

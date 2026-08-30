@@ -36,6 +36,24 @@ public class LightHoldBlock extends GenericCrafter {
         return 0f;
     }
 
+    /** 受光输入条颜色 (偏暗的白色) */
+    public static final arc.graphics.Color LIGHT_BAR_COLOR = new arc.graphics.Color(0.72f, 0.72f, 0.72f, 1f);
+
+    /** 受光输入条: 显示当前光照输入比例 (需光的工厂如 light-forge) */
+    @Override
+    public void setBars() {
+        super.setBars();
+        // Block 层无法预知 slots (created 时才建), 用 acceptors 判断是否有需光槽
+        boolean requires = arc.util.Structs.contains(acceptors.toArray(), a -> a.required > 0f);
+        if (requires) {
+            addBar("light", (LightHoldBuild build) -> new mindustry.ui.Bar(
+                () -> arc.Core.bundle.get("bar.light", "Light") + " " + (int)(build.lightStatus() * 100) + "%",
+                () -> LIGHT_BAR_COLOR,
+                build::lightStatus
+            ));
+        }
+    }
+
     public class LightHoldBuild extends GenericCrafterBuild {
         public LightAcceptor[] slots;
         /** 光指向需重新交互 (转动后) */
@@ -87,6 +105,7 @@ public class LightHoldBlock extends GenericCrafter {
         public boolean requiresLight() {
             return !arc.util.Structs.contains(slots, e -> !e.requires());
         }
+
 
         @Override
         public void draw() {
