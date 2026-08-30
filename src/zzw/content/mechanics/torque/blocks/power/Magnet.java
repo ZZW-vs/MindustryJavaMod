@@ -41,8 +41,12 @@ public class Magnet extends GraphBlock{
     public class MagnetBuild extends GraphBuild{
         @Override
         public void updatePre(){
-            // 电力满意度调谐磁通 (PU132 原版; 无电力消费的永磁体 satisfaction 恒为 1)
-            if(hasPower) flux().mulFlux(power.graph.getSatisfaction());
+            // 电力满意度调谐磁通 (PU132 原版; 无电力消费的永磁体不调谐, 保持基础磁通)
+            // ★ v155.4 适配: 未接入电网时 power.graph 为 null, 直接调聚会 NPE
+            //   (NPE 会让建筑 update 中止 → 磁体完全失效, 子弹偏转也停)
+            if(hasPower && power != null && power.graph != null){
+                flux().mulFlux(power.graph.getSatisfaction());
+            }
         }
 
         @Override

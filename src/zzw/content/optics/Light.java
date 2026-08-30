@@ -207,6 +207,9 @@ public class Light implements QuadTree.QuadTreeObject {
         Tile tile = world.tileWorld(endX, endY);
         if (tile != null) {
             // 终点查重: 已有同角度光 → 收为间接 child (合并), 否则池化新直接 child
+            // ★ v155 arc 的 ObjectMap.Entries 禁止嵌套迭代: queueRemove → clearChildren
+            //   会再次迭代同一 children 表 → 嵌套异常; 先收集待移除光, 循环外统一移除
+            final Seq<Light> removeAfter = new Seq<>();
             children(children -> {
                 for (var e : children.entries()) {
                     Longf<Light> key = e.key;
@@ -218,7 +221,7 @@ public class Light implements QuadTree.QuadTreeObject {
                     LightProcess.lights.quad(quad -> quad.intersect(tile.worldx() - tilesize / 2f, tile.worldy() - tilesize / 2f, tilesize, tilesize, l -> {
                         if (l.valid && pair.key != l && pair.value != l && !isParent(l) && Angles.near(rot, l.rotation, 1f)) {
                             if (pair.key != null) {
-                                pair.key.queueRemove();
+                                removeAfter.add(pair.key);
                                 pair.key = null;
                             }
 
@@ -243,6 +246,7 @@ public class Light implements QuadTree.QuadTreeObject {
                     }
                 }
             });
+            for (Light l : removeAfter) l.queueRemove();
         }
 
         // 为直接 child 赋 queue 值
@@ -419,11 +423,14 @@ public class Light implements QuadTree.QuadTreeObject {
     }
 
     void clearChildren() {
+        // ★ 嵌套迭代防护: queueRemove 会递归 clearChildren 再次迭代同一表,
+        //   先摘出直接 child 引用, 清空表后再统一移除 (v155 arc Entries 禁止嵌套)
+        Seq<Light> directs = new Seq<>();
         children(children -> {
             for (var e : children.entries()) {
                 AtomicPair<Light, Light> pair = e.value;
                 if (pair.key != null) {
-                    pair.key.queueRemove();
+                    directs.add(pair.key);
                     pair.key = null;
                 }
                 if (pair.value != null) {
@@ -433,6 +440,7 @@ public class Light implements QuadTree.QuadTreeObject {
             }
             children.clear();
         });
+        for (Light d : directs) d.queueRemove();
     }
 
     void clearParents() {

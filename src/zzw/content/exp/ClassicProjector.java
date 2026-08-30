@@ -162,6 +162,64 @@ public class ClassicProjector extends mindustry.world.blocks.defense.ForceProjec
         ));
     }
 
+    /** 经验信息面板 (与 ExpTurret.addExpStats 相同结构: EField 折线图 + 升级来源 + 经验容量) */
+    @Override
+    public void checkStats(){
+        if(!stats.intialized){
+            setStats();
+            addExpStats();
+            stats.intialized = true;
+        }
+    }
+
+    public void addExpStats(){
+        var map = stats.toMap();
+        boolean removeAbil = false;
+        for(EField<?> f : expFields){
+            if(f.stat == null) continue;
+            if(map.containsKey(f.stat.category) && map.get(f.stat.category).containsKey(f.stat)){
+                if(f.stat == Stat.abilities){
+                    if(!removeAbil){
+                        stats.remove(f.stat);
+                        removeAbil = true;
+                    }
+                }else{
+                    stats.remove(f.stat);
+                }
+            }
+            if(f.hasTable){
+                stats.add(f.stat, t -> buildGraphTable(t, f));
+            }
+            else stats.add(f.stat, f.toString());
+        }
+
+        if(pregrade != null){
+            stats.add(Stat.buildCost, "[#84ff00]" + mindustry.gen.Iconc.up + Core.bundle.format("exp.upgradefrom", pregradeLevel, pregrade.localizedName) + "[]");
+            stats.add(Stat.buildCost, t -> {
+                t.button(mindustry.gen.Icon.infoCircleSmall, mindustry.ui.Styles.cleari, 20f, () -> mindustry.Vars.ui.content.show(pregrade)).size(26f).color(UnityPal.exp);
+            });
+        }
+
+        stats.add(Stat.itemCapacity, "@", Core.bundle.format("exp.expAmount", maxExp));
+        stats.add(Stat.itemCapacity, t -> {
+            t.add(Core.bundle.format("exp.lvlAmount", maxLevel)).tooltip(Core.bundle.get("exp.tooltip"));
+        });
+    }
+
+    /** EField 折线图折叠面板 (ExpTurret.buildGraphTable 同款) */
+    protected void buildGraphTable(arc.scene.ui.layout.Table t, EField<?> f){
+        arc.scene.ui.Label l = t.add(f.toString()).get();
+        arc.scene.ui.layout.Collapser c = new arc.scene.ui.layout.Collapser(tc -> {
+            f.buildTable(tc, maxLevel);
+        }, true);
+
+        Runnable toggle = () -> c.toggle(false);
+        l.clicked(toggle);
+        t.button(mindustry.gen.Icon.downOpenSmall, mindustry.ui.Styles.clearTogglei, 20f, toggle).size(26f).color(UnityPal.exp).padLeft(8f);
+        t.row();
+        t.add(c).colspan(2).left();
+    }
+
     @Override
     public void drawPlace(int x, int y, int rotation, boolean valid){
         drawPotentialLinks(x, y);

@@ -68,15 +68,22 @@ public class EmpBasicBulletType extends BasicBulletType {
     @Override
     public void hit(Bullet b, float x, float y) {
         super.hit(b, x, y);
-        boolean[] hitResults = hitTile(x, y, b.team, empRange, empDuration, empBatteryDamage,
-                empLogicDamage, empLogicInstructions, empDisconnectRange, empMaxRange, powerGridIteration);
+
+        // ★ 冲击波特效先于 EMP 逻辑执行: hitTile 扫描电力网络较重,
+        //   若中途抛异常也不吞掉原版 empShockwave 光圈 (子弹命中终点的蓝色扩散圆环)
+        if (empRange > 0f) zzw.content.graphics.UnityFx.empShockwave.at(b.x, b.y, empRange);
+
+        boolean[] hitResults = {false, false};
+        try {
+            hitResults = hitTile(x, y, b.team, empRange, empDuration, empBatteryDamage,
+                    empLogicDamage, empLogicInstructions, empDisconnectRange, empMaxRange, powerGridIteration);
+        } catch (Exception e) {
+            arc.util.Log.err("EMP hitTile error", e);
+        }
         boolean hitPowerGrid = hitResults[0];
         boolean hitDisconnect = hitResults[1];
 
-        // 冲击波特效 (PU_V8 UnityFx.empShockwave: 细线蓝色扩散圆环)
-        // ★ 之前误用 Fx.pointHit + Fx.spawnShockwave, 白色大冲击波过于醒目,
-        //   导致"子弹最后变成一个光圈"的观感, 现改回原版特效
-        if (empRange > 0f) zzw.content.graphics.UnityFx.empShockwave.at(b.x, b.y, empRange);
+        // 命中电网/断连的额外大范围光圈 (PU_V8 原版行为)
         if (hitDisconnect && empDisconnectRange > 0f) zzw.content.graphics.UnityFx.empShockwave.at(b.x, b.y, empDisconnectRange);
         if (hitPowerGrid && empMaxRange > 0f) zzw.content.graphics.UnityFx.empShockwave.at(b.x, b.y, empMaxRange);
     }

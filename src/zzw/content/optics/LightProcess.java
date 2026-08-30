@@ -164,7 +164,7 @@ public class LightProcess {
 
         // light-forge 四角受光贴图 (atlas 此时已就绪)
         for (int i = 0; i < 4; i++) {
-            Z_Optics.forgeTopRegions[i] = arc.Core.atlas.find("light-forge-top" + (i + 1));
+            Z_Optics.forgeTopRegions[i] = arc.Core.atlas.find("create-light-forge-top" + (i + 1));
         }
     }
 }
