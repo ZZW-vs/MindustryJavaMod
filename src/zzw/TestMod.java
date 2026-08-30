@@ -19,6 +19,7 @@ import zzw.content.mechanics.Z_Mechanics;
 import zzw.content.mechanics.torque.Z_Torque;
 import zzw.content.units.Z_Units;
 import zzw.content.units.Z_KoruhUnits;
+import zzw.content.units.Z_MonolithUnits;
 import zzw.util.ZObjs;
 
 
@@ -82,6 +83,10 @@ public class TestMod extends Mod{
         // PU_V8 koruh 阵营单位 (Z_Blocks 的 MechPad 引用其单位类型, 必须在方块前;
         //   单位不占物品栏方块位, 放这里不影响方块排序)
         Z_KoruhUnits.load();
+
+        // PU132 Monolith 阵营单位 (14 个, stele/pedestal/pylon/bastion 等;
+        //   同样不占物品栏方块位, 与 Koruh 单位并列)
+        Z_MonolithUnits.load();
 
         // 加载自定义方块（可能需要物品和工厂; 含 ModConstructor/TerraCore/强化器/灵魂工厂）
         Z_Blocks.load();
