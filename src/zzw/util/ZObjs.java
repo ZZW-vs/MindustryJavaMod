@@ -33,10 +33,10 @@ public class ZObjs {
     public static WavefrontObject crushingWheel;
     public static WavefrontObject cogwheel;
     public static WavefrontObject largeCogwheel;
-    /** ★ MMD 模型 (PMX): 2个人物各2形态, 从 blander/ 加载 */
-    public static WavefrontObject mikuBlack, mikuWhite, tetoNormal, tetoYandere;
+    /** ★ MMD 模型 (PMX): 2个人物各2形态, 从 blander/ 加载，废弃 */
+//    public static WavefrontObject mikuBlack, mikuWhite, tetoNormal, tetoYandere;
     /** ★ 初音模型 (OBJ): 2种服装颜色, 从 blander/ 加载 */
-    public static WavefrontObject mikuWhiteObj, mikuBlackObj;
+//    public static WavefrontObject mikuWhiteObj, mikuBlackObj;
 
     private static boolean loaded = false;
 
@@ -143,7 +143,7 @@ public class ZObjs {
         largeCogwheel.drawLayer = Layer.block;
         largeCogwheel.singleZLayer = true;
         largeCogwheel.cullBackfaces = false;
-
+        /*
         // ★ MMD 角色 (PMX): 4个模型, 2个人物各2形态
         // PMX 模型 boundRadius ~10, size=0.3: defaultScl(4)*0.3=1.2倍缩放, 模型高度 ~24单位
         // topLight 着色 + maxShade=0.3 保留贴图原色
@@ -154,7 +154,10 @@ public class ZObjs {
         // 初音OBJ模型
         mikuWhiteObj = createMikuObj("mikuWhiteObj");
         mikuBlackObj = createMikuObj("mikuBlackObj");
+         */
 
+        // ★ 此事件是所有 WavefrontObject (含简单模型 cube/prism/flywheel 等) 的 .obj 数据加载入口,
+        //   不能随 MMD 模型一起注释, 否则简单模型只有占位配置、无顶点数据, 完全不渲染
         Events.on(EventType.ClientLoadEvent.class, e -> {
             // ClientLoadEvent 时 atlas 贴图区域已注册, 避免 wavefront 等 hasTexture=true 对象加载失败
             Core.app.post(ZObjs::load);
@@ -177,6 +180,7 @@ public class ZObjs {
         loadObj(crushingWheel, "crushing_wheel");
         loadObj(cogwheel, "cogwheel");
         loadObj(largeCogwheel, "large_cogwheel");
+        /*
         // 加载OBJ模型 (暂时禁用初音的两个MMD模型)
         // loadObj(mikuBlack, "blander/初音未来/Black");
         // centerMmd(mikuBlack);
@@ -191,6 +195,7 @@ public class ZObjs {
         centerMmd(mikuWhiteObj);
         loadObj(mikuBlackObj, "blander/初音未来/初音未来_黑");
         centerMmd(mikuBlackObj);
+         */
     }
 
     /** 创建 MMD 模型配置 (topLight 着色, 双面渲染, 单 Z 层) */
