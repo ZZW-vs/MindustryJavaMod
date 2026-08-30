@@ -70,7 +70,18 @@ public class EmpBasicBulletType extends BasicBulletType {
 
     @Override
     public void hit(Bullet b, float x, float y) {
-        super.hit(b, x, y);
+        hit(b, x, y, true);
+    }
+
+    /**
+     * ★ EMP 逻辑必须覆写 4 参版本: 子弹飞完全程自然消散时
+     * BulletType.despawned() 直接调用 hit(b, x, y, false) (4 参),
+     * 不经过 3 参 hit(b, x, y) —— 之前只覆写 3 参版本导致消散时
+     * EMP 逻辑与 empShockwave 光圈 (显示影响范围的扩散圆环) 完全不触发。
+     */
+    @Override
+    public void hit(Bullet b, float x, float y, boolean createFrags) {
+        super.hit(b, x, y, createFrags);
 
         // ★ 冲击波特效先于 EMP 逻辑执行: hitTile 扫描电力网络较重,
         //   若中途抛异常也不吞掉原版 empShockwave 光圈 (子弹命中终点的蓝色扩散圆环)

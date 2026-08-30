@@ -6,7 +6,7 @@ import mindustry.type.Item;
 import mindustry.ui.Bar;
 import mindustry.world.blocks.storage.StorageBlock;
 import mindustry.world.meta.Stat;
-import zzw.content.entities.ExpHolder;
+import zzw.content.exp.ExpHolder;
 import zzw.content.graphics.UnityPal;
 
 /**
@@ -16,7 +16,7 @@ import zzw.content.graphics.UnityPal;
  *
  * <p>适配说明:
  * <ul>
- *   <li>unity.entities.ExpHolder → zzw.content.entities.ExpHolder (实现全部 5 个方法)</li>
+ *   <li>unity.entities.ExpHolder → zzw.content.exp.ExpHolder (真实经验球识别的接口)</li>
  *   <li>unity.graphics.UnityPal → zzw.content.graphics.UnityPal</li>
  *   <li>bars.add → addBar (v155.4 barMap API)</li>
  *   <li>setBars 中的 bar 函数引用修正为本类的 KoruhVaultBuild</li>
@@ -103,8 +103,8 @@ public class KoruhVault extends StorageBlock{
 
         @Override
         public void onDestroyed(){
-            // 销毁时散播经验球
-            zzw.content.entities.ExpOrbs.spreadExp(x, y, exp * 0.5f, 3 * size);
+            // 销毁时散播经验球 (真实经验球实体, 与 PU132 原版一致)
+            zzw.content.exp.ExpOrbs.spreadExp(x, y, exp * 0.5f, 3 * size);
             super.onDestroyed();
         }
 

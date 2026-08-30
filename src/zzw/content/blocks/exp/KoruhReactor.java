@@ -11,8 +11,8 @@ import mindustry.ui.Bar;
 import mindustry.world.blocks.power.ImpactReactor;
 import mindustry.world.meta.Stat;
 import mindustry.world.meta.StatUnit;
-import zzw.content.entities.ExpHolder;
-import zzw.content.entities.ExpOrbs;
+import zzw.content.exp.ExpHolder;
+import zzw.content.exp.ExpOrbs;
 import zzw.content.graphics.UnityFx;
 import zzw.content.graphics.UnityPal;
 
@@ -64,6 +64,9 @@ public class KoruhReactor extends ImpactReactor{
     }
 
     public class KoruhReactorBuild extends ImpactReactorBuild implements ExpHolder{
+        // ★ 之前误实现 zzw.content.entities.ExpHolder (简化接口), 经验球
+        //   (zzw.content.exp.ExpOrbs.ExpOrb) 只识别 zzw.content.exp.ExpHolder,
+        //   导致反应堆无法吸收经验球 —— 已改为正确接口
         public int exp;
 
         @Override

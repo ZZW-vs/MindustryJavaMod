@@ -8,8 +8,8 @@ import mindustry.content.Fx;
 import mindustry.entities.Effect;
 import mindustry.ui.Bar;
 import mindustry.world.blocks.production.GenericCrafter;
-import zzw.content.entities.ExpHolder;
-import zzw.content.entities.ExpOrbs;
+import zzw.content.exp.ExpHolder;
+import zzw.content.exp.ExpOrbs;
 import zzw.content.graphics.UnityPal;
 
 /**
@@ -20,8 +20,8 @@ import zzw.content.graphics.UnityPal;
  *
  * <p>适配说明:
  * <ul>
- *   <li>unity.entities.ExpHolder → zzw.content.entities.ExpHolder</li>
- *   <li>unity.entities.ExpOrbs → zzw.content.entities.ExpOrbs</li>
+ *   <li>unity.entities.ExpHolder → zzw.content.exp.ExpHolder (真实经验球识别的接口)</li>
+ *   <li>unity.entities.ExpOrbs → zzw.content.exp.ExpOrbs (真实经验球实体)</li>
  *   <li>unity.graphics.UnityPal → zzw.content.graphics.UnityPal</li>
  *   <li>bundle key explib.expAmount 不存在主 bundle, 用硬编码字符串兜底</li>
  * </ul></p>
