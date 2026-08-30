@@ -3,6 +3,7 @@ package zzw.content.exp;
 import arc.graphics.*;
 import arc.graphics.g2d.*;
 import arc.math.*;
+import arc.math.geom.*;
 import arc.struct.*;
 import arc.util.*;
 import arc.util.io.*;
@@ -81,10 +82,32 @@ public class ExpUnloader extends ExpTank {
                 }
             }
 
-            // 每 reloadTime tick 发射一个经验球 (朝向方向)
+            // 每 reloadTime tick 输出一颗经验 (朝向方向)
+            // ★ 输出优先级 (应用户要求):
+            //   1. 前方方块是 ExpHolder 且有剩余空间 → 直接注入经验空间 (不吐颗粒)
+            //   2. 否则朝向前方吐出经验颗粒 (前方颗粒堆叠过多时暂停, 防止堆积)
             if(reload >= reloadTime && ExpOrbs.orbs(exp) > 0){
-                int a = handleExp(-ExpOrbs.oneOrb(exp));
-                if(a < 0) ExpOrbs.dropExp(x, y, rotation * 90f, 4f, -a);
+                int one = ExpOrbs.oneOrb(exp);
+                int sent = 0;
+
+                // 检查输出方向的相邻方块 (proximity 中朝向匹配的)
+                Building front = front();
+                if(front instanceof ExpHolder e && !(front instanceof ExpTurret.ExpTurretBuild)
+                    && front.team == team && e.acceptOrb() && e.handleOrb(one)){
+                    sent = one;
+                }
+
+                // 前方不是可注入的经验方块 → 吐经验颗粒;
+                // 前方颗粒堆叠过多 (≥16) 时暂停输出, 等待拾取
+                if(sent == 0){
+                    if(frontExpOrbCount() < 16){
+                        int a = handleExp(-one);
+                        if(a < 0) ExpOrbs.dropExp(x, y, rotation * 90f, 4f, -a);
+                    }
+                }else{
+                    handleExp(-sent);
+                }
+
                 reload = 0f;
             }
         }
@@ -128,6 +151,23 @@ public class ExpUnloader extends ExpTank {
         @Override
         public boolean acceptOrb(){
             return false;  // 不接受经验球 (只发射)
+        }
+
+        /**
+         * 统计输出方向前方一格范围内的经验颗粒数量
+         *
+         * <p>用于防止颗粒无限堆积: 前方没有可注入的经验方块时才吐颗粒,
+         * 若前方已堆叠大量未被拾取的颗粒 (≥16) 则暂停输出, 等待拾取者清空。</p>
+         */
+        protected int frontExpOrbCount(){
+            float ex = x + Geometry.d4x(rotation) * tilesize;
+            float ey = y + Geometry.d4y(rotation) * tilesize;
+            final int[] count = {0};
+            // 半径 8px (约一格) 圆形范围内的经验球计数
+            Groups.bullet.intersect(ex - 8f, ey - 8f, 16f, 16f, b -> {
+                if(b.type() == ExpOrbs.expOrb()) count[0]++;
+            });
+            return count[0];
         }
 
         @Override

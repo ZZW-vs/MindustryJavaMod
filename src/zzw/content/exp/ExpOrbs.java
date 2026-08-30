@@ -75,6 +75,11 @@ public class ExpOrbs {
         return exp < expAmount ? 0 : expAmount;
     }
 
+    /** 获取经验球子弹类型实例 (供外部统计场景内经验球数量等) */
+    public static BulletType expOrb(){
+        return expOrb;
+    }
+
     public static final class ExpOrb extends BulletType{
         {
             absorbable = false;
