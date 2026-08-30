@@ -195,10 +195,13 @@ public class UnityFx{
         Lines.circle(e.x, e.y, e.rotation * Mathf.curve(e.fin(), 0f, 0.23f));
     }),
 
-    /** 装甲化粒子特效 (PU132 UnityFx.plated): e.color 颜色圆点渐隐, e.data(Float) 为半径 */
+    /** 装甲化粒子特效 (PU132 UnityFx.plated): e.color 颜色圆点渐隐, e.data(Float) 为半径
+     * <p>★ null 保护: 作为 StatusEffect.effect 使用时原版以 at(x,y) 无 data 调用
+     * (v132 arc 容忍 null, v158 直接 NPE), 缺省用小半径。</p> */
     platedFx = new Effect(30f, e -> {
         Draw.color(e.color);
-        Fill.circle(e.x, e.y, e.fout() * (float)e.data);
+        float r = e.data instanceof Float d ? d : 0.5f;
+        Fill.circle(e.x, e.y, e.fout() * r);
     }),
 
     /** 灵魂环特效 (PU132 UnityFx.monolithRingEffect): e.data(Float) 为强度缩放 */
