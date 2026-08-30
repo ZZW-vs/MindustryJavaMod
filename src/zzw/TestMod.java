@@ -44,6 +44,8 @@ public class TestMod extends Mod{
             Time.run(WELCOME_DIALOG_DELAY, this::showWelcomeDialog);
             // ★ 注册世界单位子世界鼠标交互 (悬停显示建筑状态 / 点击打开配置和物品界面)
             zzw.content.type.WorldUnitType.registerInteraction();
+            // ★ 注册光学系统 (光照传播 + 光束渲染, PU132 LightProcess)
+            zzw.content.optics.LightProcess.register();
         });
     }
 
@@ -94,6 +96,9 @@ public class TestMod extends Mod{
 
         // 加载经验系统（需要物品）
         Z_Exp.load();
+
+        // 加载光学系统 (光照传播, 需要物品和工厂)
+        zzw.content.optics.Z_Optics.load();
     }
     
     /**
