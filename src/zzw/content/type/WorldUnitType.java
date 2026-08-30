@@ -136,6 +136,15 @@ public class WorldUnitType extends UnityUnitType {
                 Batch old = Core.batch;
                 Core.batch = altBatch;
 
+                // ★ 混合模式修复: altBatch 的 blending 字段会跨帧保留 (flushRequests 结束时
+                //   恢复为 flush 前的值), 若上一帧某方块 draw() 泄漏了 additive 混合状态,
+                //   本帧最后的白色纹理批 (护盾多边形/范围圈/线段等 Fill/Lines 原语,
+                //   因无纹理切换而在 flush() 一次性渲染) 会以 preBlending=additive 渲染 ——
+                //   additive(ONE,ONE) 完全忽略 alpha, 0.09 透明度的力墙护盾以全亮度
+                //   叠加, 看起来就是"不透明实心色块" (建筑贴图随纹理切换分块渲染不受影响)。
+                //   渲染开始时强制重置为 normal, 保证每一帧都从干净状态开始。
+                Draw.blend();
+
                 Draw.proj(Core.camera);
 
                 Draw.proj().rotate(r);
@@ -227,6 +236,10 @@ public class WorldUnitType extends UnityUnitType {
                 // blend 修复 trick (PU132): 透明 quad 强制 batch 走完整混合管线,
                 // 防止上一个 draw 的混合状态污染
                 Draw.z(9999f);
+                // ★ 同上: 结尾再次强制 normal —— 最后的白色纹理批 (护盾/圈线原语)
+                //   以正常 alpha 混合渲染, 且 flushRequests 恢复的 preBlending 也是
+                //   normal, 不会把污染状态带入下一帧
+                Draw.blend();
                 Draw.color(Color.clear);
                 Fill.rect(0, 0, 0, 0);
 
