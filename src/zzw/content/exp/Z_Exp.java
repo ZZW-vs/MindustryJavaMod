@@ -11,6 +11,7 @@ import mindustry.type.ItemStack;
 import mindustry.world.Block;
 import mindustry.world.blocks.defense.turrets.Turret;
 import zzw.content.Z_Items;
+import zzw.content.blocks.exp.KoruhReactor;
 import zzw.content.units.bullets.ExpLaserBulletType;
 import zzw.content.units.bullets.GeyserBulletType;
 import zzw.content.units.bullets.GeyserLaserBulletType;
@@ -59,6 +60,8 @@ public class Z_Exp {
             expHub, expUnloader, expNode, expNodeLarge, expFountain, expVoid;
     // 经验焚化炉: 焚化物品/液体产经验球
     public static ExpIncinerator expIncinerator;
+    // 经验反应冲击堆发电机 (消耗铀+经验产电)
+    public static KoruhReactor uraniumReactor;
 
     // 经验炮台 (电力)
     public static ExpPowerTurret laserTurret, chargeLaserTurret, fractalLaserTurret, btLaserTurret;
@@ -155,6 +158,30 @@ public class Z_Exp {
             // 原版焚化炉 0.5 + 0.2 = 0.7/tick
             consumePower(0.7f);
             envEnabled |= mindustry.world.meta.Env.space;
+        }};
+
+        // 经验反应冲击堆发电机 (PU132 UnityBlocks L1766-1781, KoruhReactor)
+        // 消耗铀x2 + 水 + 电20 启动, 产电150; 维持反应持续消耗经验(expUse=2/次)
+        // 经验不足时受损伤, 摧毁时大量喷出经验球 (KoruhReactorBuild 内置逻辑)
+        uraniumReactor = new KoruhReactor("uranium-reactor"){{
+            requirements(Category.power, ItemStack.with(Items.plastanium, 80, Items.surgeAlloy, 100, Items.lead, 150, Z_Items.steel, 200));
+            size = 3;
+            itemDuration = 200f;
+            consumeItem(Z_Items.uranium, 2);
+            consumeLiquid(mindustry.content.Liquids.water, 0.7f);
+            consumePower(20f);
+            itemCapacity = 20;
+            powerProduction = 150f;
+            health = 1000;
+            // PU132 plasma1/plasma2 (v132 ImpactReactor 字段) → v155.4 移入 DrawPlasma drawer
+            drawer = new mindustry.world.draw.DrawMulti(
+                new mindustry.world.draw.DrawRegion("-bottom"),
+                new mindustry.world.draw.DrawPlasma(){{
+                    plasma1 = Color.valueOf("a5e1a2");
+                    plasma2 = Color.valueOf("869B84");
+                }},
+                new mindustry.world.draw.DrawDefault()
+            );
         }};
         //endregion
 

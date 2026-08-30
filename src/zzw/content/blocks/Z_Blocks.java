@@ -101,6 +101,9 @@ public class Z_Blocks {
     // ===== PU132 移植: 大地核心 (TerraCore, 世界单位召唤方块) =====
     public static TerraCore terraCore;
 
+    // ===== PU132 移植: 强化器 (Reinforcer/supercharger, 为单位施加永久装甲化) =====
+    public static zzw.content.blocks.effect.Reinforcer superCharger;
+
     // ===== PU_V8 移植: 地板 =====
     public static Floor electroTile;
     public static Floor sharpslate, infusedSharpslate, archaicSharpslate;
@@ -119,6 +122,7 @@ public class Z_Blocks {
         createMechPads();
         createModularConstructors();
         createTerraCore();
+        createReinforcer();
         registerEventListeners();
     }
 
@@ -417,6 +421,22 @@ public class Z_Blocks {
             );
 
             consumePower(13f);
+        }};
+    }
+
+    /**
+     * 强化器 supercharger (PU132 UnityBlocks L373-380, Reinforcer 完整移植)
+     * <p>旋转炮口对准范围内未装甲化的友方单位, 发射激光施加永久 plated 状态
+     * (血量x2/伤害x1.5/装填x1.2/速度x0.75), 每次消耗辐照电涌x10。</p>
+     */
+    private static void createReinforcer() {
+        superCharger = new zzw.content.blocks.effect.Reinforcer("supercharger") {{
+            requirements(Category.effect, ItemStack.with(Items.titanium, 60, Items.lead, 20, Items.silicon, 30));
+            size = 2;
+            itemCapacity = 15;
+            laserColor = Items.surgeAlloy.color;
+            consumePower(0.4f);
+            consumeItem(Z_Items.irradiantSurge, 10);
         }};
     }
 

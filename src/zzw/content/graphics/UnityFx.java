@@ -193,5 +193,11 @@ public class UnityFx{
         Draw.color(Pal.lancerLaser);
         Lines.stroke(e.fout() + 0.5f);
         Lines.circle(e.x, e.y, e.rotation * Mathf.curve(e.fin(), 0f, 0.23f));
+    }),
+
+    /** 装甲化粒子特效 (PU132 UnityFx.plated): e.color 颜色圆点渐隐, e.data(Float) 为半径 */
+    platedFx = new Effect(30f, e -> {
+        Draw.color(e.color);
+        Fill.circle(e.x, e.y, e.fout() * (float)e.data);
     });
 }
