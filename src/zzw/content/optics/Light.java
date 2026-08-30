@@ -77,6 +77,8 @@ public class Light implements QuadTree.QuadTreeObject {
     public volatile boolean casted = false;
     public volatile boolean valid = false;
     public volatile boolean removed = true;
+    /** 已排队移除 (防重复 queueRemove → 同一实例重复进池) */
+    public boolean pendingRemove = false;
 
     public volatile LightHoldBlock.LightHoldBuild pointed;
     public volatile boolean rotationChanged = false;
@@ -90,7 +92,18 @@ public class Light implements QuadTree.QuadTreeObject {
 
     /** 从池创建 */
     public static Light create() {
-        Light l = pool.isEmpty() ? new Light() : pool.pop();
+        Light l = null;
+        // ★ 只取已 removed 的池对象: 双重 queueRemove 会让同一实例进池两次,
+        //   弹出仍在活跃 (removed=false) 的陈旧条目会导致同一对象身兼两职,
+        //   reset0 的 children.clear() 会在其 cast 迭代中被触发 → key 为 null 的 NPE
+        while (!pool.isEmpty()) {
+            Light cand = pool.pop();
+            if (cand.removed) {
+                l = cand;
+                break;
+            }
+        }
+        if (l == null) l = new Light();
         l.reset0();
         return l;
     }
@@ -106,9 +119,12 @@ public class Light implements QuadTree.QuadTreeObject {
         casted = false;
         valid = false;
         removed = false;
+        pendingRemove = false;
         rotationChanged = false;
         parents.clear();
         children.clear();
+        // ★ 防御: 保证 active 中同一实例只出现一次 (陈旧池条目可能重复加入)
+        active.remove(this, true);
         active.add(this);
     }
 
@@ -214,6 +230,8 @@ public class Light implements QuadTree.QuadTreeObject {
                 for (var e : children.entries()) {
                     Longf<Light> key = e.key;
                     AtomicPair<Light, Light> pair = e.value;
+                    // ★ 防御: 若表在迭代中被 clear (池复用异常), key 可能为 null
+                    if (key == null || pair == null) continue;
                     long res = key.get(this);
 
                     float rot = Float2.x(res);
@@ -253,7 +271,7 @@ public class Light implements QuadTree.QuadTreeObject {
         children(children -> {
             for (var e : children.entries()) {
                 Light l = e.value.key;
-                if (l != null) {
+                if (l != null && e.key != null) {
                     l.queuePosition = SVec2.construct(endX, endY);
 
                     long res = e.key.get(this);
@@ -330,6 +348,10 @@ public class Light implements QuadTree.QuadTreeObject {
     }
 
     public void remove() {
+        // ★ 幂等: 双重移除会让同一实例进池两次, 后续 create() 把活跃光
+        //   重新发出去 → 身兼两职 → 各种 map/迭代错乱 (key 为 null 的 NPE)
+        if (removed) return;
+
         LightProcess.lights.quad(quad -> quad.remove(this));
         removed = true;
         active.remove(this, true);
@@ -337,6 +359,11 @@ public class Light implements QuadTree.QuadTreeObject {
     }
 
     public void queueRemove() {
+        // ★ 幂等: 光源被拆时 onRemoved 排队一次, 下一帧 cast 发现 source
+        //   失效又排队一次; 不拦截会重复 remove → 重复入池
+        if (pendingRemove || removed) return;
+        pendingRemove = true;
+
         valid = false;
         clearParents();
         clearChildren();
