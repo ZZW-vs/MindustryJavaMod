@@ -32,8 +32,8 @@ import zzw.content.blocks.units.ModularConstructorModule.ModularConstructorModul
  * - 链式连接逻辑 (placed/updateBack/removePart) 完整保留
  */
 public class ModularConstructorPart extends Block{
-    // 适配: UnityPal.advance → Color.valueOf("ff9b75")
-    public Color effectColor = Color.valueOf("ff9b75");
+    // UnityPal.advance = "a3e3ff" (浅蓝色, PU132 原版特效颜色)
+    public Color effectColor = Color.valueOf("a3e3ff");
     public TextureRegion topRegion, frontRegion, backRegion;
 
     public ModularConstructorPart(String name){
@@ -125,16 +125,16 @@ public class ModularConstructorPart extends Block{
             if(front instanceof ModularConstructorBuild mod && mod.consConnected(this)){
                 module.graph = mod.consModule().graph;
                 module.graph.all.add(this);
-                Fx.healBlockFull.at(mod.x, mod.y, mod.block.size, effectColor);
-                Fx.healBlockFull.at(x, y, size, effectColor);
+                Fx.healBlockFull.at(mod.x, mod.y, mod.block.size, effectColor, mod.block);
+                Fx.healBlockFull.at(x, y, size, effectColor, block);
             }
             if(front instanceof ModularConstructorPartBuild mod && mod.module.graph != null && mod.consConnected(this)){
                 module.graph = mod.module.graph;
                 module.graph.all.add(this);
                 mod.back = this;
                 this.front = mod;
-                Fx.healBlockFull.at(mod.x, mod.y, mod.block.size, effectColor);
-                Fx.healBlockFull.at(x, y, size, effectColor);
+                Fx.healBlockFull.at(mod.x, mod.y, mod.block.size, effectColor, mod.block);
+                Fx.healBlockFull.at(x, y, size, effectColor, block);
             }
 
             updateBack();

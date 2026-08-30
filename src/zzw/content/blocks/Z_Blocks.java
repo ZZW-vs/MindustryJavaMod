@@ -63,7 +63,7 @@ public class Z_Blocks {
     public static Block flywheelDisplay;
     public static Block wavefrontDisplay;
     public static Block mmdDisplay;
-    // ===== 2D图片展示方块 ===== (废弃)
+    // ===== 2D图片展示方块 =====  (废弃)
     //public static Block imageDisplay;
 
     // ===== PU_V8 移植: 墙体 =====

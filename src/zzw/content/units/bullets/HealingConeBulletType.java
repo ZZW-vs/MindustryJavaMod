@@ -140,7 +140,7 @@ public class HealingConeBulletType extends BulletType {
                             float healAmount = building.maxHealth / 100f * healPercent;
                             building.health = Math.min(building.maxHealth, building.health + healAmount);
                             building.healthChanged();
-                            Fx.healBlockFull.at(building.x, building.y, building.block.size, Pal.heal);
+                            Fx.healBlockFull.at(building.x, building.y, building.block.size, Pal.heal, building.block);
                         }
                     } else {
                         building.damage(b.damage * buildingDamageMultiplier);

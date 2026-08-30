@@ -24,11 +24,11 @@ import static mindustry.Vars.ui;
 
 /**
  * 大地核心方块 (PU132 unity.world.blocks.units.TerraCore 简化移植)
- *
+ * <p>
  * 功能: 点击按钮召唤一个携带建筑物的世界单位 (terra)
  * - configurable=true, 点击按钮创建 terra 单位并调用 setup() 初始化子世界
  * - 创建后自动接收单位身上的物品
- *
+ * <p>
  * 适配 v155.4:
  * - Worldc 接口 → WorldUnitEntity 直接类型转换
  * - 其余 API 兼容, 无需修改

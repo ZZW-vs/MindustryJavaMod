@@ -186,5 +186,12 @@ public class UnityFx{
                 );
             }
         }
-    }).layer(mindustry.graphics.Layer.blockOver);
+    }).layer(mindustry.graphics.Layer.blockOver),
+
+    /** EMP 冲击波特效 (PU_V8 UnityFx.empShockwave): 细线蓝色扩散圆环, e.rotation 为半径 */
+    empShockwave = new Effect(30f, 800f, e -> {
+        Draw.color(Pal.lancerLaser);
+        Lines.stroke(e.fout() + 0.5f);
+        Lines.circle(e.x, e.y, e.rotation * Mathf.curve(e.fin(), 0f, 0.23f));
+    });
 }

@@ -55,8 +55,8 @@ public class ModularConstructor extends Block{
     public float minSize = 24.5f - 7f;
     public Seq<ModularConstructorPlan> plans = new Seq<>(4);
     public float efficiencyPerTier = 80f, maxEfficiency = 5f * 60f;
-    // 适配: UnityPal.advance → Color.valueOf("ff9b75")
-    public Color buildColor = Color.valueOf("ff9b75");
+    // UnityPal.advance = "a3e3ff" (浅蓝色, PU132 原版升级预览/进度颜色)
+    public Color buildColor = Color.valueOf("a3e3ff");
     public Vec2[] moduleNodes = {new Vec2(3.5f, 9.5f)};
     public boolean mirrorNodes = true;
     public int moduleSize = 6, moduleConnections = 8;

@@ -37,7 +37,7 @@ public class SoulLifeStealerTurret extends SoulTractorBeamTurret {
     /** 治疗拉拽特效颜色 (PU_V8 UnityPal.monolithLight, 默认 Pal.heal) */
     public Color healColor = Pal.heal;
     /** 治疗拉拽特效 (从炮台指向目标, PU_V8 UnityFx.supernovaPullEffect) */
-    public Effect healTrnsEffect = Fx.healBlockFull;
+    public Effect healTrnsEffect = zzw.content.exp.UnityFx.supernovaPullEffect;
     /** 治疗命中特效 (在目标位置, PU_V8 Fx.healBlockFull) */
     public Effect healEffect = Fx.healBlockFull;
 
@@ -101,11 +101,11 @@ public class SoulLifeStealerTurret extends SoulTractorBeamTurret {
                 b -> b.health < b.maxHealth,
                 b -> {
                     // 拉拽特效: 从炮台指向目标 (PU_V8 用 SVec2.construct(b.x, b.y) 作为 data, 此处用 b 替代)
-                    healTrnsEffect.at(x, y, 2.5f + Mathf.range(0.3f), healColor, b);
+                    healTrnsEffect.at(x, y, 2.5f + Mathf.range(0.3f), new arc.math.geom.Vec2(b.x, b.y));
                     // 延迟触发治疗 (匹配 healEffect.lifetime, 与 PU_V8 一致)
                     Time.run(healEffect.lifetime, () -> {
                         if (b != null && b.isValid() && b.health < b.maxHealth) {
-                            healEffect.at(b.x, b.y, b.block.size, healColor);
+                            healEffect.at(b.x, b.y, b.block.size, healColor, b.block);
                             // ★ v158 修复: 直接修改 health 字段 + healthChanged (替代 b.healFract)
                             float healAmount = b.maxHealth * healPercent;
                             b.health = Math.min(b.maxHealth, b.health + healAmount);

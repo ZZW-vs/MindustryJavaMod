@@ -62,7 +62,7 @@ public class HealingNukeBulletType extends BulletType {
         // ★ 与 PU_V8 一致: 用 castCircle 一次性扫描所有建筑 + 射线遮挡
         float[] data = UnityUtils.castCircle(b.x, b.y, radius, rays, bd -> true, building -> {
             if (building.team == b.team) {
-                Fx.healBlockFull.at(building.x, building.y, building.block.size, Pal.heal);
+                Fx.healBlockFull.at(building.x, building.y, building.block.size, Pal.heal, building.block);
                 // ★ v158 修复: BuildingComp.heal(amount) 只调用 healthChanged(), 不修改 health 字段!
                 //   直接修改 health 字段, 然后调用 healthChanged() 通知显示更新
                 float healAmount = (healPercent / 100f) * building.maxHealth;

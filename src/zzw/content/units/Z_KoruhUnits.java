@@ -127,7 +127,11 @@ public class Z_KoruhUnits{
         cache = new UnityUnitType("cache"){{
             mineTier = -1;
             speed = 7f;
-            drag = 0.05f;  // v158适配: PU132原版0.001f在v158物理引擎下惯性过大(一动停不下来),调整为0.05f
+            drag = 0.001f;  // PU132原版值。
+            // ★ v132与v158的moveAt/VelComp物理公式完全一致, 无需调整;
+            //   之前误改为0.05f导致: drag>accel时终端速度只有目标的28%,
+            //   vel永远达不到MoveLightningAbility的minSpeed(3.6f), 冲刺闪电永不触发
+            //   (且移动速度明显变慢)。滑行惯性是PU132原版特性, 予以保留。
             health = 560;
             engineColor = Color.valueOf("d3ddff");
             flying = true;

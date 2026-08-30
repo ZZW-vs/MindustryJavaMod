@@ -12,7 +12,6 @@ import mindustry.entities.bullet.BasicBulletType;
 import mindustry.game.Team;
 import mindustry.gen.Bullet;
 import mindustry.gen.Building;
-import mindustry.graphics.Pal;
 import mindustry.world.Edges;
 import mindustry.world.blocks.power.PowerGraph;
 
@@ -74,17 +73,12 @@ public class EmpBasicBulletType extends BasicBulletType {
         boolean hitPowerGrid = hitResults[0];
         boolean hitDisconnect = hitResults[1];
 
-        // 冲击波特效 (与 PU_V8 UnityFx.empShockwave 等价: 简化为 rings 的 laser 圆环)
-        empShockwaveEffect(b.x, b.y, empRange);
-        if (hitDisconnect) empShockwaveEffect(b.x, b.y, empDisconnectRange);
-        if (hitPowerGrid) empShockwaveEffect(b.x, b.y, empMaxRange);
-    }
-
-    /** 简化的 empShockwave 特效: 用 Fx.circle 圆环替代 PU_V8 自定义特效 */
-    private void empShockwaveEffect(float x, float y, float range) {
-        if (range <= 0f) return;
-        Fx.pointHit.at(x, y, range, Pal.surge);
-        Fx.spawnShockwave.at(x, y, range, Pal.surge);
+        // 冲击波特效 (PU_V8 UnityFx.empShockwave: 细线蓝色扩散圆环)
+        // ★ 之前误用 Fx.pointHit + Fx.spawnShockwave, 白色大冲击波过于醒目,
+        //   导致"子弹最后变成一个光圈"的观感, 现改回原版特效
+        if (empRange > 0f) zzw.content.graphics.UnityFx.empShockwave.at(b.x, b.y, empRange);
+        if (hitDisconnect && empDisconnectRange > 0f) zzw.content.graphics.UnityFx.empShockwave.at(b.x, b.y, empDisconnectRange);
+        if (hitPowerGrid && empMaxRange > 0f) zzw.content.graphics.UnityFx.empShockwave.at(b.x, b.y, empMaxRange);
     }
 
     /**
