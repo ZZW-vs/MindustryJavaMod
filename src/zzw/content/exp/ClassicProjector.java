@@ -89,6 +89,9 @@ public class ClassicProjector extends mindustry.world.blocks.defense.ForceProjec
     protected float rangeStart, rangeEnd;
     public int pregradeLevel = -1;
 
+    /** 升级放置校验用的临时序列 (UWAGH 标准) */
+    private final arc.struct.Seq<mindustry.gen.Building> seqs = new arc.struct.Seq<>();
+
     public Color fromColor = UnityPal.exp, toColor = UnityPal.exp;
     /** 等级渐变色 (shield-generator 多级渐变) */
     public Color[] effectColors;
@@ -228,6 +231,57 @@ public class ClassicProjector extends mindustry.world.blocks.defense.ForceProjec
         Drawf.circles(x * tilesize + offset, y * tilesize + offset, rangeStart, fromColor);
 
         if(!valid && pregrade != null) drawPlaceText(Core.bundle.format("exp.pregrade", pregradeLevel, pregrade.localizedName), x, y, false);
+    }
+
+    /**
+     * 允许替换前置方块 (pregrade 升级链)。
+     *
+     * <p>PU132 原版通过 @Dupe(ExpTurret) 织入获得此机制;
+     * 手动移植时漏掉了, 导致 deflect-generator 无法从 shield-generator 升级放置。</p>
+     */
+    @Override
+    public boolean canReplace(mindustry.world.Block other){
+        return super.canReplace(other) || (pregrade != null && other == pregrade);
+    }
+
+    /**
+     * 前置方块升级放置校验 (PU132 ExpTurret.canPlaceOn 原版逻辑)。
+     *
+     * <p>有 pregrade 时, 整个放置区域内必须恰好存在一个
+     * 等级 ≥ pregradeLevel 的前置方块, 且核心资源足够, 才允许放置。</p>
+     */
+    @Override
+    public boolean canPlaceOn(mindustry.world.Tile tile, mindustry.game.Team team, int rotation){
+        if(tile == null) return false;
+        if(pregrade == null) return super.canPlaceOn(tile, team, rotation);
+
+        mindustry.world.blocks.storage.CoreBlock.CoreBuild core = team.core();
+        //必须拥有全部建造资源
+        if(core == null || (!mindustry.Vars.state.rules.infiniteResources && !core.items.has(requirements, mindustry.Vars.state.rules.buildCostMultiplier))) return false;
+
+        //检查将被替换的所有格子内是否恰好只有一个达到等级要求的 pregrade 方块 (UWAGH 标准)
+        seqs.clear();
+        tile.getLinkedTilesAs(this, inside -> {
+            if(inside.build == null || seqs.contains(inside.build) || seqs.size > 1) return; //已找到两个就没必要再查了
+            if(inside.block() == pregrade && ((ClassicProjectorBuild)inside.build).level() >= pregradeLevel) seqs.add(inside.build);
+        });
+        return seqs.size == 1; //不多不少, 一夫一妻制
+    }
+
+    /**
+     * 替换前置方块时立即完成放置 (PU132 ExpTurret.placeBegan 原版逻辑)。
+     *
+     * <p>升级放置不走正常建造流程, 直接 setBlock 并播放经验绿光特效。</p>
+     */
+    @Override
+    public void placeBegan(mindustry.world.Tile tile, mindustry.world.Block previous){
+        //替换方块时立即完成放置
+        if(pregrade != null && previous == pregrade){
+            tile.setBlock(this, tile.team());
+            UnityFx.placeShine.at(tile.drawx(), tile.drawy(), tile.block().size * tilesize, UnityPal.exp);
+            mindustry.content.Fx.upgradeCore.at(tile, tile.block().size);
+        }
+        else super.placeBegan(tile, previous);
     }
 
     public void setEFields(int l){
