@@ -1,7 +1,11 @@
 package zzw.content.units.effects;
 
+import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
+import arc.graphics.g2d.Lines;
+import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
+import arc.math.geom.Vec3;
 import arc.util.Tmp;
 import mindustry.graphics.Drawf;
 
@@ -112,5 +116,117 @@ public class UnityDrawf {
                 }
             }
         }
+    }
+
+    /**
+     * 绘制带厚度的圆弧线段 (PU132 UnityDrawf.arcLine)
+     * <p>
+     * 与 Lines.arc 不同, 该方法绘制的是"环形扇区"(内外半径差 = 线宽),
+     * 视觉上是一条有宽度的弧线。EnergyRingWeapon 能量环的核心绘制原语。
+     * <p>
+     * 参数:
+     * - x, y: 圆心
+     * - radius: 半径
+     * - arcAngle: 弧线跨度的角度 (度)
+     * - angle: 弧线中心角 (度)
+     */
+    public static void arcLine(float x, float y, float radius, float arcAngle, float angle) {
+        float arc = arcAngle / 360f;
+        int sides = Math.max((int) (Lines.circleVertices(radius) * arc), 1);
+        float space = arcAngle / sides;
+        // 半弦长修正: 保证相邻扇区拼接处无缝隙
+        float hstep = Lines.getStroke() / 2f / Mathf.cosDeg(space / 2f);
+        float r1 = radius - hstep, r2 = radius + hstep;
+
+        for (int i = 0; i < sides; i++) {
+            float a = angle - arcAngle / 2f + space * i,
+                cos = Mathf.cosDeg(a), sin = Mathf.sinDeg(a),
+                cos2 = Mathf.cosDeg(a + space), sin2 = Mathf.sinDeg(a + space);
+            Fill.quad(
+                x + r1 * cos, y + r1 * sin,
+                x + r1 * cos2, y + r1 * sin2,
+                x + r2 * cos2, y + r2 * sin2,
+                x + r2 * cos, y + r2 * sin);
+        }
+    }
+
+    /**
+     * 计算带符号的角度差 (PU132 Utils.angleDistSigned)
+     * <p>
+     * 返回 a 到 b 的最短旋转角度 (-180 ~ 180), 正值表示需要顺时针转。
+     */
+    public static float angleDistSigned(float a, float b) {
+        a = Mathf.mod(a, 360f);
+        b = Mathf.mod(b, 360f);
+        float diff = b - a;
+        if (diff > 180f) diff -= 360f;
+        if (diff < -180f) diff += 360f;
+        return diff;
+    }
+
+    /**
+     * 绘制 3D 透视旋转圆环 (PU132 UnityDrawf.panningCircle 简化移植)
+     * <p>
+     * 将一张贴图沿圆周排列成一个"环带", 每个分片先绕 rotationAxis 旋转 rotationAngle,
+     * 再做透视缩放 (z 越靠近观察者越大), 营造 3D 旋转环效果。
+     * 用于 JoiningBulletType 的能量球外壳 / monolith-soul 的链环。
+     * <p>
+     * ★ v158 适配: PU 用 Quat + Mat3D, 这里用 arc Vec3.rotate(axis, angle) 等效实现。
+     * <p>
+     * 参数:
+     * - region: 贴图 (通常为白色方块或 line-shade)
+     * - x, y: 圆心
+     * - w, h: 每个分片的宽高
+     * - radius: 环半径
+     * - arcCone: 环的角度跨度 (度, 360 = 完整环)
+     * - arcRotation: 环的起始角 (度)
+     * - rotationAxis: 3D 旋转轴 (Vec3.X/Y/Z)
+     * - rotationAngle: 绕轴旋转角 (度)
+     * - layerLow, layerHigh: 分片在 z<0 / z>=0 时的渲染层级
+     */
+    public static void panningCircle(TextureRegion region, float x, float y, float w, float h,
+                                      float radius, float arcCone, float arcRotation,
+                                      Vec3 rotationAxis, float rotationAngle,
+                                      float layerLow, float layerHigh) {
+        float z = Draw.z();
+        float perspectiveDst = 150f;
+
+        float arc = arcCone / 360f;
+        int sides = Math.max((int) ((Mathf.PI2 * radius * arc) / Math.max(w, 1f)), 1);
+        float space = arcCone / sides;
+        float hstep = (Lines.getStroke() * h / 2f) / Mathf.cosDeg(space / 2f);
+        float r1 = radius - hstep, r2 = radius + hstep;
+
+        for (int i = 0; i < sides; i++) {
+            float a = arcRotation - arcCone / 2f + space * i,
+                cos = Mathf.cosDeg(a), sin = Mathf.sinDeg(a),
+                cos2 = Mathf.cosDeg(a + space), sin2 = Mathf.sinDeg(a + space);
+
+            // 依次计算 4 个顶点: 绕轴旋转 + 透视缩放
+            Tmp.v31.set(r1 * cos, r1 * sin, 0f).rotate(rotationAxis, rotationAngle)
+                .scl(Math.max((perspectiveDst + Tmp.v31.z) / perspectiveDst, 0f));
+            float x1 = x + Tmp.v31.x, y1 = y + Tmp.v31.y;
+            float sumZ = Tmp.v31.z;
+
+            Tmp.v31.set(r1 * cos2, r1 * sin2, 0f).rotate(rotationAxis, rotationAngle)
+                .scl(Math.max((perspectiveDst + Tmp.v31.z) / perspectiveDst, 0f));
+            float x2 = x + Tmp.v31.x, y2 = y + Tmp.v31.y;
+            sumZ += Tmp.v31.z;
+
+            Tmp.v31.set(r2 * cos2, r2 * sin2, 0f).rotate(rotationAxis, rotationAngle)
+                .scl(Math.max((perspectiveDst + Tmp.v31.z) / perspectiveDst, 0f));
+            float x3 = x + Tmp.v31.x, y3 = y + Tmp.v31.y;
+            sumZ += Tmp.v31.z;
+
+            Tmp.v31.set(r2 * cos, r2 * sin, 0f).rotate(rotationAxis, rotationAngle)
+                .scl(Math.max((perspectiveDst + Tmp.v31.z) / perspectiveDst, 0f));
+            float x4 = x + Tmp.v31.x, y4 = y + Tmp.v31.y;
+            sumZ = (sumZ + Tmp.v31.z) / 4f;
+
+            Draw.z(sumZ >= 0f ? layerHigh : layerLow);
+            Fill.quad(region, x3, y3, x2, y2, x1, y1, x4, y4);
+        }
+
+        Draw.z(z);
     }
 }

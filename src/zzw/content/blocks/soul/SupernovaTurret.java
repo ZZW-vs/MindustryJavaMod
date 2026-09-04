@@ -135,7 +135,7 @@ public class SupernovaTurret extends SoulLaserTurret {
         supernovaBottomOutlineRegion = Core.atlas.find(name + "-bottom-outline");
 
         heatRegion = Core.atlas.find(name + "-heat");
-        baseRegion = Core.atlas.find(name + "-base", Core.atlas.find("unity-block-" + size));
+        baseRegion = Core.atlas.find(name + "-base", Core.atlas.find("block-" + size));
     }
 
     /**
@@ -239,7 +239,7 @@ public class SupernovaTurret extends SoulLaserTurret {
         @Override
         public TextureRegion[] icons(Block block) {
             return new TextureRegion[]{
-                Core.atlas.find(block.name + "-base", Core.atlas.find("unity-block-" + block.size)),
+                Core.atlas.find(block.name + "-base", Core.atlas.find("block-" + block.size)),
                 Core.atlas.find(block.name + "-bottom"),
                 Core.atlas.find(block.name + "-wing-left-bottom"),
                 Core.atlas.find(block.name + "-wing-right-bottom"),

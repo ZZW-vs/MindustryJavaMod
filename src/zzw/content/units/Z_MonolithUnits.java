@@ -1,16 +1,19 @@
 package zzw.content.units;
 
+import arc.Core;
 import arc.func.Floatf;
+import arc.graphics.Blending;
 import arc.graphics.Color;
-import arc.graphics.g2d.Draw;
-import arc.graphics.g2d.Fill;
-import arc.graphics.g2d.Lines;
+import arc.graphics.g2d.*;
 import arc.math.Interp;
 import arc.math.Mathf;
+import arc.math.geom.Vec2;
+import arc.math.geom.Vec3;
 import arc.struct.Seq;
 import arc.util.Time;
 import arc.util.Tmp;
 import mindustry.content.Fx;
+
 import mindustry.content.StatusEffects;
 import mindustry.entities.Lightning;
 import mindustry.entities.Units;
@@ -20,17 +23,20 @@ import mindustry.entities.bullet.LightningBulletType;
 import mindustry.entities.bullet.LaserBoltBulletType;
 import mindustry.entities.bullet.LaserBulletType;
 import mindustry.entities.pattern.ShootSpread;
-import mindustry.gen.Bullet;
-import mindustry.gen.Healthc;
-import mindustry.gen.Sounds;
+import mindustry.gen.*;
 import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
 import mindustry.graphics.Trail;
+import mindustry.type.UnitType;
 import mindustry.type.Weapon;
+import mindustry.world.Tile;
 import zzw.content.Z_Sounds;
+import zzw.content.units.entities.MonolithSoulEntity;
+import zzw.content.units.ai.MonolithSoulAI;
 import zzw.content.graphics.UnityPal;
 import zzw.content.type.UnityUnitType;
 import zzw.content.units.ai.MonolithSoulAI;
+import zzw.content.units.effects.UnityDrawf;
 import zzw.content.units.entities.MonolithSoulEntity;
 import zzw.content.units.bullets.JoiningBulletType;
 import zzw.content.units.bullets.RicochetBulletType;
@@ -86,13 +92,13 @@ public class Z_MonolithUnits{
     // 巨石辅助无人机 (飞行, PU132 为 Assistantc, 此处简化为普通飞行单位)
     public static UnityUnitType adsect, comitate;
 
-    // 巨石能量环单位 (飞行 CTrailc)
-    public static UnityUnitType stray, tendence, liminality, calenture;
+    // ★ 能量环单位 (stray/tendence/liminality/calenture) 按用户要求放弃移植
 
     public static void load(){
         // 子弹先于单位加载 (pylon/monument 武器引用 UnityBullets)
         UnityBullets.load();
 
+        monolithSoul();
         loadStele();
         loadAssistants();
         loadPedestal();
@@ -104,7 +110,7 @@ public class Z_MonolithUnits{
     private static void monolithSoul() {
         monolithSoul = new UnityUnitType("monolith-soul") {
             {
-                defaultController = MonolithSoulAI::new;
+                aiController = () -> new MonolithSoulAI();
                 constructor = MonolithSoulEntity::create;
 
                 health =300f;
@@ -115,13 +121,13 @@ public class Z_MonolithUnits{
                 flying =true;
                 lowAltitude =true;
                 fallSpeed =1f;
-                range =maxRange =miningRange =96f;
+                range =96f;
                 hitSize =12f;
                 omniMovement =false;
                 engineColor =UnityPal.monolithLight;
                 trailLength =24;
                 deathExplosionEffect =DeathFx.monolithSoulDeath;
-                forceWreckRegion =true;
+                
 
                 trailType = unit -> new MultiTrail(MultiTrail.rot(unit),
                     new TrailHold(Trails.soul(MultiTrail.rot(unit), 50, speed), engineColor),
@@ -140,25 +146,25 @@ public class Z_MonolithUnits{
                         MultiTrail copy = trail.copy();
                         copy.rotation = MultiTrail::calcRot;
 
-                        TrailFx.trailFadeLow.at(soul.x, soul.y, width, engineColor, copy);
+                        Fx.hitLancer.at(soul.x, soul.y, engineColor);
                         soul.trail = new MultiTrail(new TrailHold(Trails.soul(MultiTrail.rot(unit), trailLength, speed), engineColor));
                     }else if(trail.trails.length == 1 && !soul.corporeal()){
                         MultiTrail copy = trail.copy();
                         copy.rotation = MultiTrail::calcRot;
 
-                        TrailFx.trailFadeLow.at(soul.x, soul.y, width, engineColor, copy);
+                        Fx.hitLancer.at(soul.x, soul.y, engineColor);
                         soul.trail = trailType.get(soul);
                     }
 
                     if(!soul.corporeal()){
-                        if(Mathf.chance(Time.delta)) ParticleFx.monolithSoul.at(soul.x, soul.y, Time.time, new Vec2(soul.vel).scl(-0.3f)));
+                        if(Mathf.chance(Time.delta)) ParticleFx.monolithSoul.at(soul.x, soul.y, Time.time, new Vec2(soul.vel).scl(-0.3f));
                         if(soul.forming()){
                             for(Tile form : soul.forms()){
                                 if(Mathf.chanceDelta(0.17f)) ParticleFx.monolithSpark.at(form.drawx(), form.drawy(), 4f);
-                                if(Mathf.chanceDelta(0.67f)) LineFx.monolithSoulAbsorb.at(form.drawx(), form.drawy(), 0f, soul);
+                                if(Mathf.chanceDelta(0.67f)) Fx.hitLancer.at(form.drawx(), form.drawy());
                             }
                         }else if(soul.joining() && Mathf.chanceDelta(0.33f)){
-                            LineFx.monolithSoulAbsorb.at(soul.x + Mathf.range(6f), soul.y + Mathf.range(6f), 0f, soul.joinTarget());
+                            Fx.hitLancer.at(soul.x + Mathf.range(6f), soul.y + Mathf.range(6f), 0f);
                         }
                     }
                 }
@@ -215,26 +221,26 @@ public class Z_MonolithUnits{
 
                     Lines.stroke(1.5f, UnityPal.monolith);
 
-                    TextureRegion reg = Core.atlas.find("unity-monolith-chain");
-                    Quat rot = Utils.q1.set(Vec3.Z, soul.ringRotation() + 90f).mul(Utils.q2.set(Vec3.X, 75f));
+                    TextureAtlas.AtlasRegion reg = Core.atlas.find("monolith-chain");
                     float t = Interp.pow3Out.apply(soul.joinTime()), w = reg.width * Draw.scl * 0.5f * t, h = reg.height * Draw.scl * 0.5f * t,
                         rad = t * 25f, a = Mathf.curve(t, 0.33f);
 
                     Draw.alpha(a);
+                    UnityDrawf.panningCircle(reg, soul.x, soul.y, w, h, rad, 360f, soul.ringRotation() + 90f, Vec3.X, 75f, Layer.flyingUnitLow, Layer.flyingUnit);
                     UnityDrawf.panningCircle(reg,
                         soul.x, soul.y, w, h,
                         rad, 360f, Time.time * 6f * Mathf.sign(soul.id % 2 == 0) + soul.id * 30f,
-                        rot, Layer.flyingUnitLow - 0.01f, Layer.flyingUnit
+                        Vec3.Z, 0f, Layer.flyingUnitLow - 0.01f, Layer.flyingUnit
                     );
 
                     Draw.color(Color.black, UnityPal.monolithDark, 0.67f);
                     Draw.alpha(a);
 
                     Draw.blend(Blending.additive);
-                    UnityDrawf.panningCircle(Core.atlas.find("unity-line-shade"),
+                    UnityDrawf.panningCircle(Core.atlas.find("line-shade"),
                         soul.x, soul.y, w + 6f, h + 6f,
                         rad, 360f, 0f,
-                        rot, true, Layer.flyingUnitLow - 0.01f, Layer.flyingUnit
+                        Vec3.Z, 0f, Layer.flyingUnitLow - 0.01f, Layer.flyingUnit
                     );
 
                     Draw.blend();

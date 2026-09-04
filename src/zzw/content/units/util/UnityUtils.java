@@ -6,6 +6,7 @@ import arc.func.Cons2;
 import arc.func.Floatc;
 import arc.math.Angles;
 import arc.math.Mathf;
+import arc.math.Rand;
 import arc.math.geom.Rect;
 import arc.math.geom.Vec2;
 import arc.struct.IntSet;
@@ -178,5 +179,88 @@ public final class UnityUtils {
         }
         collidedBlocks.clear();
         return ref;
+    }
+
+    /**
+     * PU132 Utils.seedr: 全局复用的随机数发生器。
+     *
+     * <p>特效渲染中大量使用确定性随机 (每帧根据种子重放同一随机序列),
+     * 复用三个静态实例可避免每帧分配新对象。三个实例分别在不同嵌套层级使用,
+     * 防止外层循环的随机状态被内层覆盖。</p>
+     */
+    public static final Rand seedr = new Rand(), seedr2 = new Rand(), seedr3 = new Rand();
+
+    /** randLenVectors 专用的独立随机源 (对应 PU132 MathU.seedr, 与 seedr 隔离避免状态交叉)。 */
+    private static final Rand vecSeedr = new Rand();
+    /** randLenVectors 的临时向量 (对应 PU132 MathU.vec)。 */
+    private static final Vec2 vec = new Vec2();
+
+    /**
+     * PU132 Utils.with: 对对象应用一段配置代码后返回原对象。
+     *
+     * <p>用于在表达式内部完成 "创建 + 配置", 例如:
+     * {@code with(new Trail(...), t -> t.width = 5f)}。</p>
+     */
+    public static <T> T with(T inst, Cons<T> cons){
+        cons.get(inst);
+        return inst;
+    }
+
+    /**
+     * PU132 MathU.slope: 非对称三角波。
+     *
+     * <p>fin 在 {@code [0, bias]} 区间从 0 线性升至峰值 1,
+     * 在 {@code [bias, 1]} 区间从 1 线性降回 0。
+     * bias 越小, 上升沿越陡 (特效粒子 "快进慢出" 的核心曲线)。</p>
+     */
+    public static float slope(float fin, float bias){
+        return (fin < bias ? (fin / bias) : 1f - (fin - bias) / (1f - bias));
+    }
+
+    /**
+     * PU132 MathU.randLenVectors: 带个体生命曲线的辐射粒子生成器。
+     *
+     * <p>渲染算法 (逐步):</p>
+     * <ol>
+     *   <li>每个粒子先随机一个 "入场延迟窗口宽度" r ∈ [inRandMin, inRandMax],
+     *       再随机窗口内偏移 offset;</li>
+     *   <li>用 {@code Mathf.curve(in, offset, (1-r)+offset)} 把特效总进度 in
+     *       映射为该粒子的个体进度 fin —— 窗口不同, 粒子先后绽放;</li>
+     *   <li>径向距离 f = length(fin) 的返回值 (可任意整形, 如 f³*90),
+     *       并按 lengthRand 随机缩放;</li>
+     *   <li>角度全随机, 把 (x, y, fin) 回调给消费者绘制。</li>
+     * </ol>
+     *
+     * @param seed       确定性随机种子 (通常为 e.id * 常数)
+     * @param amount     粒子数量
+     * @param in         特效总进度 (0~1)
+     * @param inRandMin  粒子窗口宽度随机下限
+     * @param inRandMax  粒子窗口宽度随机上限
+     * @param lengthRand 径向距离随机缩放幅度 (<=0 时不缩放)
+     * @param length     个体进度 → 径向距离 的映射函数
+     * @param cons       粒子消费者 (相对坐标 x, y + 个体进度 fin)
+     */
+    public static void randLenVectors(long seed, int amount, float in, float inRandMin, float inRandMax,
+                                      float lengthRand, FloatFloatf length, UParticleConsumer cons){
+        vecSeedr.setSeed(seed);
+        for(int i = 0; i < amount; i++){
+            float r = vecSeedr.random(inRandMin, inRandMax);
+            float offset = r > 0 ? vecSeedr.nextFloat() * r : 0f;
+
+            float fin = Mathf.curve(in, offset, (1f - r) + offset);
+            float f = length.get(fin) * (lengthRand <= 0f ? 1f : vecSeedr.random(1f - lengthRand, 1f));
+            vec.trns(vecSeedr.random(360f), f);
+            cons.get(vec.x, vec.y, fin);
+        }
+    }
+
+    /** PU132 MathU.FloatFloatf: float → float 函数接口。 */
+    public interface FloatFloatf{
+        float get(float value);
+    }
+
+    /** PU132 MathU.UParticleConsumer: 粒子消费者 (相对坐标 + 个体进度)。 */
+    public interface UParticleConsumer{
+        void get(float x, float y, float fin);
     }
 }

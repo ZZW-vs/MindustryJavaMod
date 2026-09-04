@@ -9,9 +9,17 @@ import arc.util.*;
 import arc.util.io.*;
 import mindustry.core.*;
 import mindustry.entities.*;
+import mindustry.game.*;
 import mindustry.gen.*;
+import mindustry.type.*;
+import mindustry.world.*;
+import mindustry.world.blocks.distribution.*;
+import mindustry.world.blocks.production.*;
+import mindustry.world.blocks.storage.*;
 import mindustry.graphics.*;
 import mindustry.world.meta.*;
+import zzw.content.exp.ExpOrbs;
+import zzw.content.exp.ExpOrbs.ExpOrb;
 
 import static arc.Core.atlas;
 import static mindustry.Vars.*;
@@ -165,7 +173,7 @@ public class ExpUnloader extends ExpTank {
             final int[] count = {0};
             // 半径 8px (约一格) 圆形范围内的经验球计数
             Groups.bullet.intersect(ex - 8f, ey - 8f, 16f, 16f, b -> {
-                if(b.type() == ExpOrbs.expOrb()) count[0]++;
+                if(b.type() instanceof ExpOrbs.ExpOrb) count[0]++;
             });
             return count[0];
         }

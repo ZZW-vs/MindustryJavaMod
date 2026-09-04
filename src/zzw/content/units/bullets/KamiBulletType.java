@@ -32,6 +32,13 @@ public class KamiBulletType extends BulletType {
     public static float turn = 0f;
     /** 是否显示拖尾 (kamiBullet2=true, kamiBullet3=false) */
     public boolean hasTrail = false;
+    /**
+     * 出场延迟 (tick): PU132 原版 KamiBulletType.delay。
+     * <p>&gt;0 时子弹延迟加入世界, 期间由
+     * {@code SpecialFx.kamiBulletSpawn} 播放出場演出;
+     * -1 (默认) = 立即出场。</p>
+     */
+    public float delay = -1f;
 
     public KamiBulletType() {
         speed = 1f;

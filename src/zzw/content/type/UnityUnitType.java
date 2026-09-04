@@ -1,5 +1,6 @@
 package zzw.content.type;
 
+import arc.func.Func;
 import arc.graphics.g2d.*;
 import arc.struct.*;
 import arc.util.*;
@@ -10,6 +11,7 @@ import mindustry.gen.*;
 import mindustry.graphics.*;
 import mindustry.type.*;
 import mindustry.world.blocks.environment.*;
+import zzw.content.units.types.Engine;
 
 import static arc.Core.*;
 import static mindustry.Vars.content;
@@ -38,6 +40,19 @@ public class UnityUnitType extends UnitType{
 
     // For shoot armor ability
     public FloatSeq weaponXs = new FloatSeq();
+
+    /** 对象化引擎 (PU132): 非 null 时 drawEngine 走 Engine.draw 而非原版标量字段。 */
+    public Engine engine;
+    /** 拖尾工厂 (PU132 trailType): 替代原版 new Trail(trailLength), Monolith 用 TexturedTrail/MultiTrail。 */
+    public Func<Unit, Trail> trailType = unit -> new Trail(trailLength);
+
+    /**
+     * 最大容纳灵魂数 (PU132 UnitType.maxSouls)。
+     *
+     * <p>TODO: 灵魂机制 (MonolithSoul 聚合形成单位 / 单位死亡拆解为灵魂)
+     * 未移植, 此字段仅作为数据占位保留, 与 PU132 数值一致。</p>
+     */
+    public int maxSouls = 0;
 
     public UnityUnitType(String name){
         super(name);
@@ -107,5 +122,21 @@ public class UnityUnitType extends UnitType{
         }
 
         Draw.reset();
+    }
+
+    /**
+     * 引擎绘制 (PU132 UnityUnitType.drawEngine 移植, v158 签名为 drawEngines)。
+     *
+     * <p>engine 字段非 null 时走对象化引擎 (支持多引擎/自定义颜色),
+     * 否则回退到原版 engines/标量字段渲染。</p>
+     */
+    @Override
+    public void drawEngines(Unit unit){
+        if(!unit.isFlying()) return;
+        if(engine != null){
+            engine.draw(unit);
+        }else{
+            super.drawEngines(unit);
+        }
     }
 }

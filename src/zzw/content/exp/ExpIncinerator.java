@@ -23,9 +23,8 @@ import mindustry.world.blocks.production.Incinerator;
  * <ul>
  *   <li>耗电: 0.5 → 0.7 (每 tick, 比原版多 0.2)</li>
  *   <li>液体: 接受所有液体 (原版仅 incinerable), 容量 20</li>
- *   <li>产出: 每 15 个物品或 10 单位液体折算 1 颗粒, 弹出速率有上限
- *       (每秒最多 {@link #maxOrbsPerSecond} 个 —— 液体管道高速注入时
- *       也不会刷经验过快, 物品同样受此限速)</li>
+ *   <li>产出: 焚化积累到阈值时弹出经验球, 弹出速率有上限
+ *       (每秒最多 {@link #maxOrbsPerSecond} 个)</li>
  * </ul></p>
  *
  * <p>注: 经验球飞行时不会被本方块回收 (见 ExpOrbs.ExpOrb.update 的排除判断),
@@ -33,11 +32,11 @@ import mindustry.world.blocks.production.Incinerator;
  */
 public class ExpIncinerator extends Incinerator{
     /** 每焚化多少个物品产出一个经验球 (物品可为不同种类) */
-    public int itemsPerOrb = 15;
+    public int itemsPerOrb = 5;
     /** 每焚化多少液体单位产出一个经验球 */
     public float liquidPerOrb = 10f;
     /** 产出速率上限: 每秒最多弹出多少个经验球 */
-    public float maxOrbsPerSecond = 1f;
+    public float maxOrbsPerSecond = 1.2f;
 
     public ExpIncinerator(String name){
         super(name);

@@ -46,7 +46,11 @@ public class Z_Sounds {
         endgameActive,      // endgame 循环音效
         endgameShoot,       // endgame 主射击音效
         endgameSmallShoot,  // endgame 副射击音效
-        clang;              // 金属碰撞音效 (PU132 UnitySounds.clang)
+        clang,              // 金属碰撞音效 (PU132 UnitySounds.clang)
+        // Monolith 系列单位音效 (PU132 UnitySounds)
+        chainyShot,         // pedestal/pilaster 蓄力霰弹射击音效
+        energyCharge,       // tendence 能量环充能音效
+        energyBlast;        // tendence 能量环射击音效
 
     public static void load() {
         spaceFracture = loadSound("end/space-fracture");
@@ -89,6 +93,11 @@ public class Z_Sounds {
         endgameShoot = loadSound("end/endgame-shoot");
         endgameSmallShoot = loadSound("end/endgame-small-shoot");
         clang = loadSound("clang");
+
+        // Monolith 系列单位音效
+        chainyShot = loadSound("chainy-shot");
+        energyCharge = loadSound("energy-charge");
+        energyBlast = loadSound("energy-blast");
     }
 
     /**

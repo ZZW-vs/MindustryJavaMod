@@ -147,7 +147,7 @@ public class TexturedTrail extends Trail{
         if(forceCap || capRegion == Core.atlas.find("clear")) return;
 
         float width = baseWidth * widthMultiplier;
-        if(capRegion == null) capRegion = Core.atlas.find("unity-hcircle");
+        if(capRegion == null) capRegion = Core.atlas.find("hcircle");
 
         int psize = points.size;
         if(psize > 0){
