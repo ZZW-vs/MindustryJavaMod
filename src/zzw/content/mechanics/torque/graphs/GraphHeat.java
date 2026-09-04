@@ -33,7 +33,8 @@ public class GraphHeat extends Graph{
     @Override
     public void setStats(Table table){
         table.row().left();
-        table.add("Heat system").color(Pal.accent).fillX().row();
+        // ★ 汉化: 原版硬编码 "Heat system"
+        table.add("热量系统").color(Pal.accent).fillX().row();
         table.left();
         table.add("[lightgray]" + bundle.get("stat.unity.heatcapacity", "Heat Capacity") + ":[] ").left();
         table.add(baseHeatCapacity + "K J/K").row();

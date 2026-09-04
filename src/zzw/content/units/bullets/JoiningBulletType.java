@@ -117,7 +117,8 @@ public class JoiningBulletType extends BulletType {
         float z = Layer.flyingUnitLow - 0.01f;
 
         Lines.stroke(stroke);
-        TextureRegion reg = Core.atlas.white(), light = Core.atlas.find("line-shade");
+        // ★ mod 贴图在 atlas 中自动带 "create-" 前缀, 必须用前缀名查找
+        TextureRegion reg = Core.atlas.white(), light = Core.atlas.find("create-line-shade");
 
         // 中心: 径向渐变光球
         Fill.light(b.x, b.y, Lines.circleVertices(r), r, centerColor, edgeColor);

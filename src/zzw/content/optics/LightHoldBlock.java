@@ -39,6 +39,22 @@ public class LightHoldBlock extends GenericCrafter {
     /** 受光输入条颜色 (偏暗的白色) */
     public static final arc.graphics.Color LIGHT_BAR_COLOR = new arc.graphics.Color(0.72f, 0.72f, 0.72f, 1f);
 
+    /**
+     * 重写统计面板: 纯光路方块 (反射镜/分光镜等无产出) 不显示 "生产时间"。
+     *
+     * <p>GenericCrafter.setStats() 在 hasItems && itemCapacity > 0 时无条件添加
+     * Stat.productionTime, 导致反射镜等非生产方块也显示生产时间;
+     * 此处仅在真正有产出 (outputItem/outputLiquids) 时保留该条目。</p>
+     */
+    @Override
+    public void setStats(){
+        super.setStats();
+        // 无产出的光路方块移除生产时间显示 (有产出的 light-forge 正常保留)
+        if(outputItems == null && outputItem == null && outputLiquids == null && outputLiquid == null){
+            stats.remove(Stat.productionTime);
+        }
+    }
+
     /** 受光输入条: 显示当前光照输入比例 (需光的工厂如 light-forge) */
     @Override
     public void setBars() {

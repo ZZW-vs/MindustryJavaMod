@@ -34,8 +34,8 @@ public final class Trails{
      * @param length 拖尾长度 (点数)
      */
     public static TexturedTrail singlePhantasmal(int length){
-        // ★ 贴图名适配: PU132 "unity-phantasmal-trail" → 本项目实际贴图 "phantasmal-trail"
-        return new TexturedTrail(Core.atlas.find("phantasmal-trail"), length){{
+        // ★ 贴图名适配: PU132 "unity-phantasmal-trail" → "create-phantasmal-trail" (mod 贴图前缀规则)
+        return new TexturedTrail(Core.atlas.find("create-phantasmal-trail"), length){{
             blend = Blending.additive;
             fadeInterp = Interp.pow2In;
             sideFadeInterp = Interp.pow3In;
@@ -134,8 +134,8 @@ public final class Trails{
      * 单条灵魂拖尾 (unity-soul-trail 贴图)。
      */
     public static TexturedTrail singleSoul(int length){
-        // ★ 贴图名适配: PU132 "unity-soul-trail" → 本项目实际贴图 "soul-trail"
-        return new TexturedTrail(Core.atlas.find("soul-trail"), length){{
+        // ★ 贴图名适配: PU132 "unity-soul-trail" → "create-soul-trail" (mod 贴图前缀规则)
+        return new TexturedTrail(Core.atlas.find("create-soul-trail"), length){{
             blend = Blending.additive;
             fadeInterp = Interp.pow5In;
             sideFadeInterp = Interp.pow10In;

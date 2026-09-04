@@ -50,8 +50,10 @@ public class SoulTractorBeamTurret extends TractorBeamTurret implements ISoulTur
     public void load() {
         super.load();
         // 若未加载到自定义激光贴图, 使用 parallax 的激光贴图作为占位
+        // ★ v158 适配: 原版 laserStart 为 @Load("@-laser-start", fallback="@-laser-end"),
+        //   parallax-laser-start 贴图已不存在, 需带 fallback 否则显示错误贴图
         if (laser == null || !laser.found()) laser = Core.atlas.find("parallax-laser");
-        if (laserStart == null || !laserStart.found()) laserStart = Core.atlas.find("parallax-laser-start");
+        if (laserStart == null || !laserStart.found()) laserStart = Core.atlas.find("parallax-laser-start", "parallax-laser-end");
         if (laserEnd == null || !laserEnd.found()) laserEnd = Core.atlas.find("parallax-laser-end");
     }
 

@@ -245,7 +245,7 @@ public class Z_MonolithUnits{
                     backColor = UnityPal.monolith;
                     smokeEffect = hitEffect = despawnEffect = MonolithFx.hitMonolithLaser;
                 }};
-            }}, new Weapon("monolith-small-weapon-mount"){{
+            }}, new Weapon("create-monolith-small-weapon-mount"){{
                 top = false;
                 mirror = alternate = true;
                 x = 3f;
@@ -357,8 +357,8 @@ public class Z_MonolithUnits{
                     addedEffect = MonolithFx.monolithHitBig;
                     shootSound = Z_Sounds.chainyShot;
 
-                    // ★ 贴图名适配: "unity-twisting-shell" → "twisting-shell"
-                    bullet = new BasicBulletType(6f, 32f, "twisting-shell"){{
+                    // ★ 贴图名适配: "unity-twisting-shell" → "create-twisting-shell" (mod 贴图前缀规则)
+                    bullet = new BasicBulletType(6f, 32f, "create-twisting-shell"){{
                         width = 12f;
                         height = 16f;
                         shrinkY = 0f;
@@ -432,7 +432,7 @@ public class Z_MonolithUnits{
             // ★ v158 已移除单位弹药系统, ammoType = new PowerAmmoType(1000) 删除 (同上)
             outlineColor = UnityPal.darkOutline;
 
-            weapons.add(new Weapon("monolith-medium-weapon-mount"){{
+            weapons.add(new Weapon("create-monolith-medium-weapon-mount"){{
                 top = false;
                 x = 4f;
                 y = 7.5f;
@@ -450,7 +450,7 @@ public class Z_MonolithUnits{
                     sideAngle = 60f;
                     smokeEffect = MonolithFx.phantasmalLaserShoot;
                 }};
-            }}, new Weapon("monolith-large-weapon-mount"){{
+            }}, new Weapon("create-monolith-large-weapon-mount"){{
                 top = false;
                 x = 13f;
                 y = 2f;
@@ -462,8 +462,8 @@ public class Z_MonolithUnits{
                 reload = 120f;
                 shootSound = Z_Sounds.chainyShot;
 
-                // ★ 贴图名适配: "unity-twisting-shell" → "twisting-shell"
-                bullet = new BasicBulletType(2.7f, 32f, "twisting-shell"){
+                // ★ 贴图名适配: "unity-twisting-shell" → "create-twisting-shell" (mod 贴图前缀规则)
+                bullet = new BasicBulletType(2.7f, 32f, "create-twisting-shell"){
                     {
                         width = 16f;
                         height = 20f;
@@ -708,7 +708,7 @@ public class Z_MonolithUnits{
                 shoot.firstShotDelay = MonolithFx.pylonLaserCharge.lifetime / 2f;
 
                 bullet = UnityBullets.pylonLaser;
-            }}, new Weapon("monolith-large2-weapon-mount"){{
+            }}, new Weapon("create-monolith-large2-weapon-mount"){{
                 x = 14f;
                 y = 5f;
                 shootY = 14f;
@@ -756,7 +756,7 @@ public class Z_MonolithUnits{
             outlineColor = UnityPal.darkOutline;
 
             LaserBulletType laser = new LaserBulletType(640f);
-            weapons.add(new Weapon("monolith-large2-weapon-mount"){{
+            weapons.add(new Weapon("create-monolith-large2-weapon-mount"){{
                 top = false;
                 x = 14f;
                 y = 12f;
@@ -770,7 +770,7 @@ public class Z_MonolithUnits{
                 shootSound = Sounds.shootLaser;
 
                 bullet = laser;
-            }}, new Weapon("monolith-large2-weapon-mount"){{
+            }}, new Weapon("create-monolith-large2-weapon-mount"){{
                 top = false;
                 x = 20f;
                 y = 3f;
@@ -784,7 +784,7 @@ public class Z_MonolithUnits{
                 shootSound = Sounds.shootLaser;
 
                 bullet = laser;
-            }}, new Weapon("monolith-railgun-big"){{
+            }}, new Weapon("create-monolith-railgun-big"){{
                 mirror = false;
                 x = 0f;
                 y = -12f;

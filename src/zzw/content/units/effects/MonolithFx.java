@@ -231,7 +231,8 @@ public class MonolithFx{
      * Z 轴相位由 arcRotation 参数承担。</p>
      */
     tendenceShoot = new Effect(32f, e -> {
-        TextureRegion reg = Core.atlas.find("monolith-chain");
+        // ★ mod 贴图在 atlas 中自动带 "create-" 前缀, 必须用前缀名查找
+        TextureRegion reg = Core.atlas.find("create-monolith-chain");
         float t = e.finpow(), w = reg.width * 0.4f * t, h = reg.height * 0.4f * t, rad = 9f + t * 8f;
 
         color(UnityPal.monolithLight);
@@ -247,7 +248,7 @@ public class MonolithFx{
         alpha(e.foutpowdown());
 
         blend(Blending.additive);
-        UnityDrawf.panningCircle(Core.atlas.find("line-shade"),
+        UnityDrawf.panningCircle(Core.atlas.find("create-line-shade"),
             e.x, e.y, w + 6f, h + 6f,
             rad, 360f, 0f,
             Vec3.X, 75f, Layer.flyingUnitLow - 0.01f, Layer.flyingUnit

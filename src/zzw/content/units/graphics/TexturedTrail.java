@@ -94,7 +94,9 @@ public class TexturedTrail extends Trail{
     public TexturedTrail(TextureRegion region, int length){
         this(length);
         this.region = region;
-        if(!headless && region instanceof AtlasRegion reg) capRegion = Core.atlas.find(reg.name + "-cap", "unity-hcircle");
+        // ★ mod 贴图带 "create-" 前缀, 帽端贴图 (reg.name + "-cap") 也带前缀;
+        //   回退贴图 hcircle 同为 mod 贴图, 需用前缀名查找
+        if(!headless && region instanceof AtlasRegion reg) capRegion = Core.atlas.find(reg.name + "-cap", "create-hcircle");
     }
 
     public TexturedTrail(int length){
@@ -147,7 +149,8 @@ public class TexturedTrail extends Trail{
         if(forceCap || capRegion == Core.atlas.find("clear")) return;
 
         float width = baseWidth * widthMultiplier;
-        if(capRegion == null) capRegion = Core.atlas.find("hcircle");
+        // ★ hcircle 为 mod 贴图, 需用 "create-" 前缀名查找
+        if(capRegion == null) capRegion = Core.atlas.find("create-hcircle");
 
         int psize = points.size;
         if(psize > 0){

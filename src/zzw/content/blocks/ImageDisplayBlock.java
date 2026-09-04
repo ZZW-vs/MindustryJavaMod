@@ -85,8 +85,8 @@ public class ImageDisplayBlock extends Block {
     @Override
     public void load() {
         super.load();
-        // 使用3x3炮台底座贴图
-        baseRegion = Core.atlas.find("ripple-base");
+        // v158 原版已删除 ripple-base, 回退到 block-3 (3x3 底座)
+        baseRegion = Core.atlas.find("ripple-base", "block-3");
     }
 
     @Override

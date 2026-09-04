@@ -938,7 +938,8 @@ public class Z_Units {
             }});
 
             // destroyer-3: 导弹 (PU132 missileAntiCheat, 13连发)
-            weapons.add(new Weapon("oppression-destroyer-3") {{
+            // ★ 贴图名补 "create-" 前缀 (mod 贴图前缀规则)
+            weapons.add(new Weapon("create-oppression-destroyer-3") {{
                 x = 98f;
                 y = -26.25f;
                 shootY = 6f;

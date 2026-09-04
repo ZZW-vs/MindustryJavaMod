@@ -71,7 +71,8 @@ public class FixedTrail{
             int i = points.size - 4;
             float x1 = items[i], y1 = items[i + 1], w1 = items[i + 2], ai = items[i + 3], w = w1 * width / (points.size / 4) * i / 4f * 2f;
             if(w1 <= 0.001f) return;
-            Draw.rect("hcircle", x1, y1, w, w, -Mathf.radDeg * ai + 180f);
+            // ★ hcircle 为 mod 贴图, atlas 中带 "create-" 前缀
+            Draw.rect("create-hcircle", x1, y1, w, w, -Mathf.radDeg * ai + 180f);
             Draw.reset();
         }
     }

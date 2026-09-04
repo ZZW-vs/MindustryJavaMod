@@ -311,28 +311,31 @@ public class Z_Torque{
 
         // ===== PU132 磁力系统 (UnityBlocks L3059-3108, 3181-3185 原版配置) =====
 
-        // nickel-stator: 镍定子 (永磁体, GraphFlux(2f) 只向正面输出)
+        // nickel-stator: 镍定子 (永磁体, GraphFlux(6f) 只向正面输出)
+        // ★ 2026-09-05 用户要求: 磁通量 6Wb (PU132 原版 2Wb); 永磁体不耗电 (PU132 原版无 consumePower)
         nickelStator = new Magnet("nickel-stator"){{
             requirements(Category.power, with(Z_Items.nickel, 30, Items.titanium, 20));
             health = 450;
-            addGraph(new GraphFlux(2f).setAccept(1, 0, 0, 0));
+            addGraph(new GraphFlux(6f).setAccept(1, 0, 0, 0));
         }};
 
-        // nickel-stator-large: 大型镍定子 (永磁体, GraphFlux(10f) 四面输出)
+        // nickel-stator-large: 大型镍定子 (永磁体, GraphFlux(16f) 四面输出)
+        // ★ 2026-09-05 用户要求: 磁通量 16Wb (PU132 原版 10Wb); 永磁体不耗电
         nickelStatorLarge = new Magnet("nickel-stator-large"){{
             requirements(Category.power, with(Z_Items.nickel, 250, Items.titanium, 150));
             size = 2;
             health = 1800;
-            addGraph(new GraphFlux(10f).setAccept(1, 1, 0, 0, 0, 0, 0, 0));
+            addGraph(new GraphFlux(16f).setAccept(1, 1, 0, 0, 0, 0, 0, 0));
         }};
 
-        // nickel-electromagnet: 镍电磁铁 (耗电强化, GraphFlux(25f) 电力满意度调谐磁通)
+        // nickel-electromagnet: 镍电磁铁 (耗电强化, GraphFlux(48f) 电力满意度调谐磁通)
+        // ★ 2026-09-05 用户要求: 磁通量 48Wb (PU132 原版 25Wb); 耗电保持原版 1.6
         nickelElectromagnet = new Magnet("nickel-electromagnet"){{
             requirements(Category.power, with(Z_Items.nickel, 250, Items.titanium, 200, Items.copper, 100, Z_Items.cupronickel, 50));
             size = 2;
             health = 1000;
             consumePower(1.6f);
-            addGraph(new GraphFlux(25f).setAccept(1, 1, 0, 0, 0, 0, 0, 0));
+            addGraph(new GraphFlux(48f).setAccept(1, 1, 0, 0, 0, 0, 0, 0));
         }};
 
         // neodymium-stator: 钕定子 (沙盒, GraphFlux(200f))

@@ -26,7 +26,8 @@ public class GraphTorque extends Graph{
     @Override
     public void setStats(Table table){
         table.row().left();
-        table.add("Torque system").color(Pal.accent).fillX();
+        // ★ 汉化: 原版硬编码 "Torque system"
+        table.add("扭矩系统").color(Pal.accent).fillX();
         table.row().left();
         table.add("[lightgray]" + bundle.get("stat.unity.friction") + ":[] ").left();
         table.row().left();

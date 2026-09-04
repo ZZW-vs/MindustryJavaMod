@@ -78,8 +78,8 @@ public class ObjDisplayBlock extends Block {
     @Override
     public void load() {
         super.load();
-        // 使用 3x3 炮台底座贴图 (vanilla ripple-base 是 3x3 炮台底座)
-        baseRegion = Core.atlas.find("ripple-base");
+        // 使用 3x3 炮台底座贴图; v158 原版已删除 ripple-base, 按 @Load("@-base", fallback="block-@size") 规则回退到 block-3
+        baseRegion = Core.atlas.find("ripple-base", "block-3");
     }
 
     @Override

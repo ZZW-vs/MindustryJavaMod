@@ -38,7 +38,8 @@ public class GraphCrucible extends Graph{
     @Override
     public void setStats(Table table){
         table.row().left();
-        table.add("Crucible system").color(Pal.accent).fillX().row();
+        // ★ 汉化: 原版硬编码 "Crucible system"
+        table.add("坩埚系统").color(Pal.accent).fillX().row();
 
         table.left();
         table.add("[lightgray]" + bundle.get("stat.unity.liquidcapacity", "Liquid Capacity") + ":[] ").left();
