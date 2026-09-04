@@ -31,18 +31,13 @@ import mindustry.type.UnitType;
 import mindustry.type.Weapon;
 import mindustry.world.Tile;
 import zzw.content.Z_Sounds;
-import zzw.content.units.entities.MonolithSoulEntity;
-import zzw.content.units.ai.MonolithSoulAI;
 import zzw.content.graphics.UnityPal;
 import zzw.content.type.UnityUnitType;
-import zzw.content.units.ai.MonolithSoulAI;
 import zzw.content.units.effects.UnityDrawf;
-import zzw.content.units.entities.MonolithSoulEntity;
 import zzw.content.units.bullets.JoiningBulletType;
 import zzw.content.units.bullets.RicochetBulletType;
 import zzw.content.units.bullets.UnityBullets;
 import zzw.content.units.abilities.LightningSpawnAbility;
-import zzw.content.units.effects.DeathFx;
 import zzw.content.units.effects.MonolithFx;
 import zzw.content.units.effects.ParticleFx;
 import zzw.content.units.effects.UnityDrawf;
@@ -80,8 +75,8 @@ import static mindustry.Vars.headless;
  * @author GlennFolker (原作), 移植: zzw
  */
 public class Z_MonolithUnits{
-    /** 灵魂聚合体 (简化移植, 灵魂机制留 TODO)。 */
-    public static UnityUnitType monolithSoul;
+    // ★ monolithSoul (巨石灵魂) 已删除: 依赖 PU132 的 Soul/monolithWorld 系统
+    //   (单位死亡拆魂、灵魂加入容器增益) 未移植, 实际对局无用 (2026-09-05 用户决定删除)
 
     // 巨石机甲 (地面 Mechc)
     public static UnityUnitType stele, pedestal, pilaster;
@@ -98,7 +93,6 @@ public class Z_MonolithUnits{
         // 子弹先于单位加载 (pylon/monument 武器引用 UnityBullets)
         UnityBullets.load();
 
-        monolithSoul();
         loadStele();
         loadAssistants();
         loadPedestal();
@@ -107,150 +101,6 @@ public class Z_MonolithUnits{
         loadGiantUnits();
     }
 
-    private static void monolithSoul() {
-        monolithSoul = new UnityUnitType("monolith-soul") {
-            {
-                aiController = () -> new MonolithSoulAI();
-                constructor = MonolithSoulEntity::create;
-
-                health =300f;
-                speed =2.4f;
-                rotateSpeed =10f;
-                accel =0.2f;
-                drag =0.08f;
-                flying =true;
-                lowAltitude =true;
-                fallSpeed =1f;
-                range =96f;
-                hitSize =12f;
-                omniMovement =false;
-                engineColor =UnityPal.monolithLight;
-                trailLength =24;
-                deathExplosionEffect =DeathFx.monolithSoulDeath;
-                
-
-                trailType = unit -> new MultiTrail(MultiTrail.rot(unit),
-                    new TrailHold(Trails.soul(MultiTrail.rot(unit), 50, speed), engineColor),
-                    new TrailHold(Trails.soul(MultiTrail.rot(unit), 64, speed), -4.8f, 6f, 0.56f, engineColor),
-                    new TrailHold(Trails.soul(MultiTrail.rot(unit), 64, speed), 4.8f, 6f, 0.56f, engineColor)
-                );
-            }
-
-            @Override
-            public void update(Unit unit){
-                if(unit instanceof MonolithSoulEntity soul){
-                    if(!(soul.trail instanceof MultiTrail trail)) return;
-
-                    float width = (engineSize + Mathf.absin(Time.time, 2f, engineSize / 4f) * soul.elevation) * trailScl;
-                    if(trail.trails.length == 3 && soul.corporeal()){
-                        MultiTrail copy = trail.copy();
-                        copy.rotation = MultiTrail::calcRot;
-
-                        Fx.hitLancer.at(soul.x, soul.y, engineColor);
-                        soul.trail = new MultiTrail(new TrailHold(Trails.soul(MultiTrail.rot(unit), trailLength, speed), engineColor));
-                    }else if(trail.trails.length == 1 && !soul.corporeal()){
-                        MultiTrail copy = trail.copy();
-                        copy.rotation = MultiTrail::calcRot;
-
-                        Fx.hitLancer.at(soul.x, soul.y, engineColor);
-                        soul.trail = trailType.get(soul);
-                    }
-
-                    if(!soul.corporeal()){
-                        if(Mathf.chance(Time.delta)) ParticleFx.monolithSoul.at(soul.x, soul.y, Time.time, new Vec2(soul.vel).scl(-0.3f));
-                        if(soul.forming()){
-                            for(Tile form : soul.forms()){
-                                if(Mathf.chanceDelta(0.17f)) ParticleFx.monolithSpark.at(form.drawx(), form.drawy(), 4f);
-                                if(Mathf.chanceDelta(0.67f)) Fx.hitLancer.at(form.drawx(), form.drawy());
-                            }
-                        }else if(soul.joining() && Mathf.chanceDelta(0.33f)){
-                            Fx.hitLancer.at(soul.x + Mathf.range(6f), soul.y + Mathf.range(6f), 0f);
-                        }
-                    }
-                }
-
-                super.update(unit);
-            }
-
-            @Override
-            public void draw(Unit unit){
-                if(!(unit instanceof MonolithSoulEntity soul)) return;
-                if(!soul.corporeal()){
-                    float z = Draw.z();
-                    Draw.z(Layer.flyingUnitLow);
-
-                    float trailSize = (engineSize + Mathf.absin(Time.time, 2f, engineSize / 4f) * soul.elevation) * trailScl;
-                    soul.trail.drawCap(engineColor, trailSize);
-                    soul.trail.draw(engineColor, trailSize);
-
-                    Draw.z(Layer.effect - 0.01f);
-
-                    Draw.blend(Blending.additive);
-                    Draw.color(UnityPal.monolith);
-                    Fill.circle(soul.x, soul.y, 6f);
-
-                    Draw.color(UnityPal.monolithDark);
-                    Draw.rect(softShadowRegion, soul.x, soul.y, 10f, 10f);
-
-                    Draw.blend();
-                    Lines.stroke(1f, UnityPal.monolithDark);
-
-                    float rotation = Time.time * 3f * Mathf.sign(unit.id % 2 == 0);
-                    for(int i = 0; i < 5; i++){
-                        float r = rotation + 72f * i;
-                        UnityDrawf.arcLine(soul.x, soul.y, 10f, 60f, r);
-
-                        Tmp.v1.trns(r, 10f).add(soul);
-                        UnityDrawf.tri(Tmp.v1.x, Tmp.v1.y, 2.5f, 6f, r);
-                    }
-
-                    Draw.z(Layer.flyingUnit);
-                    Draw.reset();
-
-                    for(int i = 0; i < wreckRegions.length; i++){
-                        float off = (360f / wreckRegions.length) * i;
-                        float fin = soul.formProgress(), fout = 1f - fin;
-
-                        Tmp.v1.trns(soul.rotation + off, fout * 24f)
-                            .add(Tmp.v2.trns((Time.time + off) * 4f, fout * 3f))
-                            .add(soul);
-
-                        Draw.alpha(fin);
-                        Draw.rect(wreckRegions[i], Tmp.v1.x, Tmp.v1.y, soul.rotation - 90f);
-                    }
-
-                    Lines.stroke(1.5f, UnityPal.monolith);
-
-                    TextureAtlas.AtlasRegion reg = Core.atlas.find("monolith-chain");
-                    float t = Interp.pow3Out.apply(soul.joinTime()), w = reg.width * Draw.scl * 0.5f * t, h = reg.height * Draw.scl * 0.5f * t,
-                        rad = t * 25f, a = Mathf.curve(t, 0.33f);
-
-                    Draw.alpha(a);
-                    UnityDrawf.panningCircle(reg, soul.x, soul.y, w, h, rad, 360f, soul.ringRotation() + 90f, Vec3.X, 75f, Layer.flyingUnitLow, Layer.flyingUnit);
-                    UnityDrawf.panningCircle(reg,
-                        soul.x, soul.y, w, h,
-                        rad, 360f, Time.time * 6f * Mathf.sign(soul.id % 2 == 0) + soul.id * 30f,
-                        Vec3.Z, 0f, Layer.flyingUnitLow - 0.01f, Layer.flyingUnit
-                    );
-
-                    Draw.color(Color.black, UnityPal.monolithDark, 0.67f);
-                    Draw.alpha(a);
-
-                    Draw.blend(Blending.additive);
-                    UnityDrawf.panningCircle(Core.atlas.find("line-shade"),
-                        soul.x, soul.y, w + 6f, h + 6f,
-                        rad, 360f, 0f,
-                        Vec3.Z, 0f, Layer.flyingUnitLow - 0.01f, Layer.flyingUnit
-                    );
-
-                    Draw.blend();
-                    Draw.z(z);
-                }else{
-                    super.draw(soul);
-                }
-            }
-        };
-    }
     /**
      * stele — 石碑机甲 (PU132 L207-245)。
      *

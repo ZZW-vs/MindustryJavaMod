@@ -60,45 +60,6 @@ public class ParticleFx{
     })),
 
     /**
-     * Monolith 灵魂粒子 (48f) —— "黑芯 + 阴影圈" 双层画法。
-     *
-     * <p>data 携带 {@link Vec2} (灵魂飘移速度), rotation 携带出生时刻,
-     * 实际位置随全局时间匀速漂移 (time × vel)。</p>
-     *
-     * <p>绘制步骤:</p>
-     * <ol>
-     *   <li>开启加色混合, 颜色按 finpow 在 monolith → monolithDark → 黑
-     *       三段渐变 (越到后期越黑);</li>
-     *   <li>半径 5 + finpowdown×8 内取 1 个随机粒子锚点;</li>
-     *   <li>第一层: 不透明实心圆, 半径 (1-fin(pow2In))×2 收小;</li>
-     *   <li>第二层: 0.67 透明度的 circle-shadow 阴影圆 ×8 放大轮廓,
-     *   制造柔和外晕。</li>
-     * </ol>
-     *
-     * <p>图层位于 flyingUnit - 0.01, 压在飞行单位贴图之下。</p>
-     */
-    monolithSoul = new Effect(48f, e -> {
-        if(!(e.data instanceof Vec2 data)) return;
-
-        blend(Blending.additive);
-        color(UnityPal.monolith, UnityPal.monolithDark, Color.black, e.finpow());
-
-        // 灵魂随时间的漂移量: 出生至今的时间 × 速度向量
-        float time = Time.time - e.rotation, vx = data.x * time, vy = data.y * time;
-        randLenVectors(e.id, 1, 5f + e.finpowdown() * 8f, (x, y) -> {
-            float fin = 1f - e.fin(Interp.pow2In);
-
-            alpha(1f);
-            circle(e.x + x + vx, e.y + y + vy, fin * 2f);
-
-            alpha(0.67f);
-            rect("circle-shadow", e.x + x + vx, e.y + y + vy, fin * 8f, fin * 8f);
-        });
-
-        blend();
-    }).layer(Layer.flyingUnit - 0.01f),
-
-    /**
      * 雷电支点线 (36f): 3 条随机短线段, 分布半径随 foutpowdown 收缩,
      * 线段朝向指向粒子本身的方位角, 长度 fin×6 渐长。
      * 用作闪电类武器的中继 "支点" 视觉。
