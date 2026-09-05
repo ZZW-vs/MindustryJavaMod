@@ -1,5 +1,6 @@
 package zzw.content.blocks;
 
+import arc.struct.Seq;
 import mindustry.content.Items;
 import mindustry.content.Liquids;
 import mindustry.content.UnitTypes;
@@ -9,6 +10,7 @@ import mindustry.type.Category;
 import mindustry.type.ItemStack;
 import mindustry.type.UnitType;
 import mindustry.world.Block;
+import mindustry.world.blocks.units.UnitFactory;
 import mindustry.world.meta.BuildVisibility;
 import mindustry.world.blocks.defense.Wall;
 import mindustry.world.blocks.environment.Floor;
@@ -23,6 +25,7 @@ import zzw.content.blocks.units.TerraCore;
 import zzw.content.blocks.units.SelectableReconstructor;
 import zzw.content.exp.EField;
 import zzw.content.units.Z_KoruhUnits;
+import zzw.content.units.Z_MonolithUnits;
 import zzw.content.units.Z_Units;
 
 import arc.Events;
@@ -123,6 +126,9 @@ public class Z_Blocks {
     public static OverlayFloor archaicEnergy;
     public static Floor concreteBlank, concreteFill, concreteNumber, concreteStripe, concrete;
     public static Floor stoneFullTiles, stoneFull, stoneHalf, stoneTiles;
+
+    // ====单位工厂====
+    public static Block groundFactory, airFactory, navalFactory;
 
     public static void load() {
         // ★ 3D展示方块最先创建, 避免前面方法异常导致无法注册
@@ -456,17 +462,27 @@ public class Z_Blocks {
             // T5 → T6 (PU132 原版: reign→citadel, toxopid→araneidae, corvus→cygnus;
             //   rex→excelsus/monument→colossus 因 Scar/Monolith 系列未移植暂缺)
             upgrades.addAll(
+                new mindustry.type.UnitType[]{Z_Units.lepidoptera, Z_Units.mantodea},
+
+                new mindustry.type.UnitType[]{Z_MonolithUnits.monument, Z_MonolithUnits.colossus},
+
                 new mindustry.type.UnitType[]{mindustry.content.UnitTypes.reign, Z_Units.citadel},
+
+                new mindustry.type.UnitType[]{mindustry.content.UnitTypes.omura, Z_Units.fin},
 
                 new mindustry.type.UnitType[]{mindustry.content.UnitTypes.toxopid, Z_Units.araneidae},
 
                 new mindustry.type.UnitType[]{mindustry.content.UnitTypes.corvus, Z_Units.cygnus},
 
-                new mindustry.type.UnitType[]{mindustry.content.UnitTypes.eclipse, Z_Units.mantle}
+                new mindustry.type.UnitType[]{mindustry.content.UnitTypes.eclipse, Z_Units.mantle},
+
+                new mindustry.type.UnitType[]{mindustry.content.UnitTypes.oct, Z_Units.sedec}
             );
             // T6 → T7 (PU132 原版: citadel→empire, araneidae→theraphosidae, colossus→bastion;
             //   rex/excelsus 等未移植的单位暂缺, 已移植的 T6→T7 全部写入)
             otherUpgrades.addAll(
+                new mindustry.type.UnitType[]{Z_MonolithUnits.colossus, Z_MonolithUnits.bastion},
+
                 new mindustry.type.UnitType[]{Z_Units.citadel, Z_Units.empire},
 
                 new mindustry.type.UnitType[]{Z_Units.araneidae, Z_Units.theraphosidae},
@@ -475,7 +491,9 @@ public class Z_Blocks {
 
                 new mindustry.type.UnitType[]{Z_Units.mantle, Z_Units.aphelion},
 
-                new mindustry.type.UnitType[]{Z_Units.sedec, Z_Units.trigintaduo}
+                new mindustry.type.UnitType[]{Z_Units.sedec, Z_Units.trigintaduo},
+
+                new mindustry.type.UnitType[]{Z_Units.fin, Z_Units.blue}
             );
             consumePower(5f);
             consume(new mindustry.world.consumers.ConsumeItems(ItemStack.with(Items.silicon, 1200, Items.metaglass, 800, Items.thorium, 700, Items.surgeAlloy, 400, Items.plastanium, 600, Items.phaseFabric, 350)));
