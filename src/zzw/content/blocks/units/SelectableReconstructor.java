@@ -65,11 +65,8 @@ public class SelectableReconstructor extends Reconstructor {
                     upgradeRow.left();
                     
                     // 原单位（较大图标）
-                    upgradeRow.image(upgrade[0].uiIcon).size(32f).padRight(8f);
-                    upgradeRow.add("[lightgray]").left();
-                    upgradeRow.add("[").color(Pal.accent).left();
-                    upgradeRow.add(upgrade[0].localizedName).color(Pal.accent).left();
-                    upgradeRow.add("]").color(Pal.accent).left();
+                    upgradeRow.image(upgrade[0].uiIcon).size(40f).padRight(8f).scaling(arc.util.Scaling.fit);
+                    upgradeRow.add(upgrade[0].localizedName).color(arc.graphics.Color.white).left().padLeft(4f);
                     
                     // 升级箭头
                     upgradeRow.table(t -> {
@@ -77,11 +74,8 @@ public class SelectableReconstructor extends Reconstructor {
                     }).padLeft(8f).padRight(8f);
                     
                     // 升级单位（较大图标）
-                    upgradeRow.image(upgrade[1].uiIcon).size(32f).padRight(8f);
-                    upgradeRow.add("[lightgray]").left();
-                    upgradeRow.add("[").color(Pal.accent).left();
-                    upgradeRow.add(upgrade[1].localizedName).color(Pal.accent).left();
-                    upgradeRow.add("]").color(Pal.accent).left();
+                    upgradeRow.image(upgrade[1].uiIcon).size(40f).padRight(8f).scaling(arc.util.Scaling.fit);
+                    upgradeRow.add(upgrade[1].localizedName).color(arc.graphics.Color.white).left().padLeft(4f);
                     
                     table.add(upgradeRow).padLeft(10f).row();
                 }
@@ -101,11 +95,8 @@ public class SelectableReconstructor extends Reconstructor {
                     upgradeRow.left();
                     
                     // 原单位（较大图标）
-                    upgradeRow.image(upgrade[0].uiIcon).size(32f).padRight(8f);
-                    upgradeRow.add("[lightgray]").left();
-                    upgradeRow.add("[").color(Pal.accent).left();
-                    upgradeRow.add(upgrade[0].localizedName).color(Pal.accent).left();
-                    upgradeRow.add("]").color(Pal.accent).left();
+                    upgradeRow.image(upgrade[0].uiIcon).size(40f).padRight(8f).scaling(arc.util.Scaling.fit);
+                    upgradeRow.add(upgrade[0].localizedName).color(arc.graphics.Color.white).left().padLeft(4f);
                     
                     // 升级箭头
                     upgradeRow.table(t -> {
@@ -113,11 +104,8 @@ public class SelectableReconstructor extends Reconstructor {
                     }).padLeft(8f).padRight(8f);
                     
                     // 升级单位（较大图标）
-                    upgradeRow.image(upgrade[1].uiIcon).size(32f).padRight(8f);
-                    upgradeRow.add("[lightgray]").left();
-                    upgradeRow.add("[").color(Pal.accent).left();
-                    upgradeRow.add(upgrade[1].localizedName).color(Pal.accent).left();
-                    upgradeRow.add("]").color(Pal.accent).left();
+                    upgradeRow.image(upgrade[1].uiIcon).size(40f).padRight(8f).scaling(arc.util.Scaling.fit);
+                    upgradeRow.add(upgrade[1].localizedName).color(arc.graphics.Color.white).left().padLeft(4f);
                     
                     table.add(upgradeRow).padLeft(10f).row();
                 }
