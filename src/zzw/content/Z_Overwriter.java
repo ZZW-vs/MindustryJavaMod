@@ -44,7 +44,6 @@ public class Z_Overwriter{
         // ★ Blocks 中的字段声明为 Block 类型, 需强转为具体工厂类
         ((UnitFactory)airFactory).plans.add(
             new UnitFactory.UnitPlan(caelifera, 60f * 25f, ItemStack.with(Items.silicon, 15, Items.titanium, 25)),
-            new UnitFactory.UnitPlan(schistocerca, 60f * 25f, ItemStack.with(Items.silicon, 15, Items.titanium, 25)),
             new UnitFactory.UnitPlan(discharge, 60f * 25f, ItemStack.with(Items.silicon, 15, Items.titanium, 25))
         );
 
@@ -59,7 +58,7 @@ public class Z_Overwriter{
         // 加法重构器 (T1→T2): 直升机/巨石/EMP 系列第一步升级
         // PU132 原版: caelifera→schistocerca, stele→pedestal
         ((Reconstructor)additiveReconstructor).upgrades.add(
-            new UnitType[]{caelifera, schistocerca},
+            new UnitType[]{caelifera,schistocerca},
             new UnitType[]{stele, pedestal},
             new UnitType[]{discharge, pulse}
         );
@@ -84,7 +83,5 @@ public class Z_Overwriter{
             new UnitType[]{pylon, monument},
             new UnitType[]{waveform, ultraviolet}
         );
-
-        //endregion
     }
 }

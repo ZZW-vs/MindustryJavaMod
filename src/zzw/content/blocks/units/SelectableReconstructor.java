@@ -1,14 +1,23 @@
 package zzw.content.blocks.units;
 
+import arc.*;
 import arc.Core;
 import arc.scene.ui.layout.Table;
 import arc.struct.Seq;
 import arc.util.io.Reads;
 import arc.util.io.Writes;
+import arc.graphics.Color;
+import mindustry.game.EventType;
+import mindustry.game.EventType.Trigger;
+import mindustry.game.Team;
+import mindustry.gen.*;
+import mindustry.graphics.Pal;
 import mindustry.type.UnitType;
 import mindustry.ui.Styles;
 import mindustry.world.blocks.units.Reconstructor;
 import mindustry.world.meta.Stat;
+import mindustry.world.blocks.payloads.Payload;
+import mindustry.world.blocks.payloads.UnitPayload;
 
 /**
  * 可切换重构器 (PU132 unity.world.blocks.units.SelectableReconstructor 完整移植)
@@ -43,23 +52,46 @@ public class SelectableReconstructor extends Reconstructor {
 
     @Override
     public void setStats() {
+        // T6 档位统计
         stats.add(Stat.output, table -> {
             table.row();
-            table.add("[accent]T" + minTier);
+            table.add("[accent]T" + minTier + " 档位升级:");
+            table.row();
+            table.add("[lightgray]T5 → T6 升级路径:");
+            table.row();
+            upgrades.each(upgrade -> {
+                if (upgrade[0].unlockedNow() && upgrade[1].unlockedNow()) {
+                    float size = 20f;
+                    Table upgradeRow = new Table();
+                    upgradeRow.left();
+                    upgradeRow.image(upgrade[0].uiIcon).size(size).padRight(4f);
+                    upgradeRow.add(upgrade[0].localizedName).color(Pal.accent);
+                    upgradeRow.add(" [lightgray]→ ");
+                    upgradeRow.image(upgrade[1].uiIcon).size(size).padRight(4f);
+                    upgradeRow.add(upgrade[1].localizedName).color(Pal.accent);
+                    table.add(upgradeRow).padLeft(10f).row();
+                }
+            });
         });
-        super.setStats();
+        
+        // T7 档位统计
         stats.add(Stat.output, table -> {
-            float size = 8f * 3f;
             table.row();
-            table.add("[accent]T" + (minTier + 1)).row();
+            table.add("[accent]T" + (minTier + 1) + " 档位升级:");
+            table.row();
+            table.add("[lightgray]T6 → T7 升级路径:");
+            table.row();
             otherUpgrades.each(upgrade -> {
                 if (upgrade[0].unlockedNow() && upgrade[1].unlockedNow()) {
-                    table.image(upgrade[0].uiIcon).size(size).padRight(4f).padLeft(10f).scaling(arc.util.Scaling.fit).right();
-                    table.add(upgrade[0].localizedName).left();
-                    table.add("[lightgray] -> ");
-                    table.image(upgrade[1].uiIcon).size(size).padRight(4f).scaling(arc.util.Scaling.fit);
-                    table.add(upgrade[1].localizedName).left();
-                    table.row();
+                    float size = 20f;
+                    Table upgradeRow = new Table();
+                    upgradeRow.left();
+                    upgradeRow.image(upgrade[0].uiIcon).size(size).padRight(4f);
+                    upgradeRow.add(upgrade[0].localizedName).color(Pal.accent);
+                    upgradeRow.add(" [lightgray]→ ");
+                    upgradeRow.image(upgrade[1].uiIcon).size(size).padRight(4f);
+                    upgradeRow.add(upgrade[1].localizedName).color(Pal.accent);
+                    table.add(upgradeRow).padLeft(10f).row();
                 }
             });
         });
@@ -71,13 +103,74 @@ public class SelectableReconstructor extends Reconstructor {
 
         @Override
         public void buildConfiguration(Table table) {
-            table.button("T" + minTier, Styles.togglet, () -> tier = minTier)
-                .width(50f).height(50f)
-                .update(b -> b.setChecked(tier == minTier));
+            // 改进的档位切换按钮布局
+            Table tierTable = new Table();
+            tierTable.margin(4f);
+            
+            // T6 档位按钮
+            tierTable.button("[accent]T" + minTier, Styles.togglet, () -> tier = minTier)
+                .size(45f, 45f)
+                .update(b -> {
+                    b.setChecked(tier == minTier);
+                    // 添加视觉反馈
+                    if (tier == minTier) {
+                        b.getStyle().over = Styles.flatOver;
+                    }
+                })
+                .with(button -> {
+                    button.getCells().first().pad(2f);
+                });
+            
+            // 添加分隔符
+            tierTable.add().padLeft(8f);
+            
+            // T7 档位按钮
+            tierTable.button("[accent]T" + (minTier + 1), Styles.togglet, () -> tier = minTier + 1)
+                .size(45f, 45f)
+                .update(b -> {
+                    b.setChecked(tier == minTier + 1);
+                    // 添加视觉反馈
+                    if (tier == minTier + 1) {
+                        b.getStyle().over = Styles.flatOver;
+                    }
+                })
+                .with(button -> {
+                    button.getCells().first().pad(2f);
+                });
+            
+            table.add(tierTable);
+        }
 
-            table.button("T" + (minTier + 1), Styles.togglet, () -> tier = minTier + 1)
-                .width(50f).height(50f)
-                .update(b -> b.setChecked(tier == minTier + 1));
+        @Override
+        public boolean acceptPayload(Building source, Payload payload) {
+            if(!(this.payload == null
+            && (this.enabled || source == this)
+            && relativeTo(source) != rotation
+            && payload instanceof UnitPayload pay)){
+                return false;
+            }
+
+            UnitType upgrade = null;
+            if (tier == minTier) {
+                UnitType[] result = upgrades.find(u -> u[0] == pay.unit.type);
+                upgrade = result != null ? result[1] : null;
+            } else if (tier == minTier + 1) {
+                UnitType[] result = otherUpgrades.find(u -> u[0] == pay.unit.type);
+                upgrade = result != null ? result[1] : null;
+            }
+
+            if (upgrade != null) {
+                if(!upgrade.unlockedNowHost() && !team.isAI()){
+                    pay.showOverlay(Icon.tree);
+                    arc.Events.fire(Trigger.cannotUpgrade);
+                }
+
+                if(upgrade.isBanned()){
+                    pay.showOverlay(Icon.cancel);
+                }
+            }
+
+            return upgrade != null && (team.isAI() || upgrade.unlockedNowHost()) && !upgrade.isBanned();
         }
 
         @Override
