@@ -138,6 +138,10 @@ public class TestMod extends Mod{
 
         // 光学系统 (光照传播, 需要物品和工厂)
         zzw.content.optics.Z_Optics.load();
+
+        // ★ 原版方块覆盖 (必须在所有单位加载后): 向原版工厂/重构器注入
+        //   直升机(schistocerca)/EMP(discharge)/巨石(stele) 系列的生产与升级配方
+        zzw.content.Z_Overwriter.load();
     }
     
     /**
