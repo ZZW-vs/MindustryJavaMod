@@ -4624,7 +4624,7 @@ public class Z_Units {
             outlineColor = Color.valueOf("2e3142");
             constructor = CopterUnitEntity::create;
 
-            BulletType mantodeaFlak = new FlakBulletType(8f, 20f) {{
+            BulletType mantodeaFlak = new FlakBulletType(50f, 20f) {{
                 lifetime = 10f;
                 collidesGround = true;
                 lightning = 3;
@@ -4640,6 +4640,7 @@ public class Z_Units {
                 rotate = false;
                 x = 14.25f;
                 y = 26.5f;
+                range = 35f;
                 recoil = 2.5f;
                 shootY = 10f;
                 shootSound = Sounds.shoot;
@@ -4655,6 +4656,7 @@ public class Z_Units {
                 rotate = false;
                 x = 26.25f;
                 y = 19.5f;
+                range = 35f;
                 recoil = 2.5f;
                 shootY = 10f;
                 shootSound = Sounds.shoot;
