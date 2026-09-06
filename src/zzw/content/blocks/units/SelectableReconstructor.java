@@ -61,14 +61,28 @@ public class SelectableReconstructor extends Reconstructor {
             table.row();
             upgrades.each(upgrade -> {
                 if (upgrade[0].unlockedNow() && upgrade[1].unlockedNow()) {
-                    float size = 20f;
                     Table upgradeRow = new Table();
                     upgradeRow.left();
-                    upgradeRow.image(upgrade[0].uiIcon).size(size).padRight(4f);
-                    upgradeRow.add(upgrade[0].localizedName).color(Pal.accent);
-                    upgradeRow.add(" [lightgray]→ ");
-                    upgradeRow.image(upgrade[1].uiIcon).size(size).padRight(4f);
-                    upgradeRow.add(upgrade[1].localizedName).color(Pal.accent);
+                    
+                    // 原单位（较大图标）
+                    upgradeRow.image(upgrade[0].uiIcon).size(32f).padRight(8f);
+                    upgradeRow.add("[lightgray]").left();
+                    upgradeRow.add("[").color(Pal.accent).left();
+                    upgradeRow.add(upgrade[0].localizedName).color(Pal.accent).left();
+                    upgradeRow.add("]").color(Pal.accent).left();
+                    
+                    // 升级箭头
+                    upgradeRow.table(t -> {
+                        t.add("⇨").color(arc.graphics.Color.yellow).size(24f);
+                    }).padLeft(8f).padRight(8f);
+                    
+                    // 升级单位（较大图标）
+                    upgradeRow.image(upgrade[1].uiIcon).size(32f).padRight(8f);
+                    upgradeRow.add("[lightgray]").left();
+                    upgradeRow.add("[").color(Pal.accent).left();
+                    upgradeRow.add(upgrade[1].localizedName).color(Pal.accent).left();
+                    upgradeRow.add("]").color(Pal.accent).left();
+                    
                     table.add(upgradeRow).padLeft(10f).row();
                 }
             });
@@ -83,14 +97,28 @@ public class SelectableReconstructor extends Reconstructor {
             table.row();
             otherUpgrades.each(upgrade -> {
                 if (upgrade[0].unlockedNow() && upgrade[1].unlockedNow()) {
-                    float size = 20f;
                     Table upgradeRow = new Table();
                     upgradeRow.left();
-                    upgradeRow.image(upgrade[0].uiIcon).size(size).padRight(4f);
-                    upgradeRow.add(upgrade[0].localizedName).color(Pal.accent);
-                    upgradeRow.add(" [lightgray]→ ");
-                    upgradeRow.image(upgrade[1].uiIcon).size(size).padRight(4f);
-                    upgradeRow.add(upgrade[1].localizedName).color(Pal.accent);
+                    
+                    // 原单位（较大图标）
+                    upgradeRow.image(upgrade[0].uiIcon).size(32f).padRight(8f);
+                    upgradeRow.add("[lightgray]").left();
+                    upgradeRow.add("[").color(Pal.accent).left();
+                    upgradeRow.add(upgrade[0].localizedName).color(Pal.accent).left();
+                    upgradeRow.add("]").color(Pal.accent).left();
+                    
+                    // 升级箭头
+                    upgradeRow.table(t -> {
+                        t.add("⇨").color(arc.graphics.Color.yellow).size(24f);
+                    }).padLeft(8f).padRight(8f);
+                    
+                    // 升级单位（较大图标）
+                    upgradeRow.image(upgrade[1].uiIcon).size(32f).padRight(8f);
+                    upgradeRow.add("[lightgray]").left();
+                    upgradeRow.add("[").color(Pal.accent).left();
+                    upgradeRow.add(upgrade[1].localizedName).color(Pal.accent).left();
+                    upgradeRow.add("]").color(Pal.accent).left();
+                    
                     table.add(upgradeRow).padLeft(10f).row();
                 }
             });
