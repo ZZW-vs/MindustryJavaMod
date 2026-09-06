@@ -127,8 +127,6 @@ public class Z_Blocks {
     public static Floor concreteBlank, concreteFill, concreteNumber, concreteStripe, concrete;
     public static Floor stoneFullTiles, stoneFull, stoneHalf, stoneTiles;
 
-    // ====单位工厂====
-    public static Block groundFactory, airFactory, navalFactory;
 
     public static void load() {
         // ★ 3D展示方块最先创建, 避免前面方法异常导致无法注册
@@ -428,17 +426,55 @@ public class Z_Blocks {
             moduleBlock = advanceConstructorModule;
 
             plans.addAll(
-                // T0: UnitTypes.scepter (30分钟建造时间)
-                new ModularConstructorPlan(UnitTypes.scepter, 30f * 60f, 0,
-                ItemStack.with(Items.silicon, 690, Items.lead, 60, Items.graphite, 30, Items.titanium, 550, Items.metaglass, 40, Items.plastanium, 420)),
+                // 1级: 2分钟建造时间
+                new ModularConstructorPlan(Z_Units.arcnelidia, 120f, 0,
+                    ItemStack.with(Items.copper, 180, Items.lead, 120, Items.silicon, 100, Items.surgeAlloy, 20)),
+                
+                new ModularConstructorPlan(UnitTypes.fortress, 120f, 0,
+                    ItemStack.with(Items.copper, 200, Items.lead, 100, Items.silicon, 250, Items.metaglass, 50, Items.graphite, 100)),
+                
+                new ModularConstructorPlan(UnitTypes.quasar, 120f, 0,
+                    ItemStack.with(Items.copper, 200, Items.lead, 100, Items.silicon, 250, Items.metaglass, 50, Items.graphite, 100)),
+                
+                new ModularConstructorPlan(UnitTypes.spiroct, 120f, 0,
+                    ItemStack.with(Items.copper, 200, Items.lead, 100, Items.silicon, 250, Items.metaglass, 50, Items.graphite, 100)),
 
-                // T1: UnitTypes.reign (40分钟建造时间)
-                new ModularConstructorPlan(UnitTypes.reign, 40f * 60f, 1,
-                ItemStack.with(Items.silicon, 1350, Items.lead, 160, Items.graphite, 90, Items.titanium, 550, Items.metaglass, 100, Items.plastanium, 830, Items.surgeAlloy, 330, Items.phaseFabric, 250)),
+                // 2级: 5分钟建造时间
+                new ModularConstructorPlan(UnitTypes.zenith, 300f, 1,
+                    ItemStack.with(Items.copper, 180, Items.lead, 80, Items.silicon, 240, Items.metaglass, 60, Items.graphite, 50)),
+                
+                new ModularConstructorPlan(UnitTypes.mega, 300f, 1,
+                    ItemStack.with(Items.copper, 180, Items.lead, 80, Items.silicon, 240, Items.metaglass, 60, Items.graphite, 50)),
+                
+                new ModularConstructorPlan(Z_Units.anthophila, 300f, 1,
+                    ItemStack.with(Items.copper, 200, Items.lead, 100, Items.silicon, 200, Items.titanium, 50, Items.metaglass, 40, Items.graphite, 80)),
+                
+                new ModularConstructorPlan(Z_Units.emission, 300f, 1,
+                    ItemStack.with(Items.copper, 200, Items.lead, 100, Items.silicon, 200, Items.titanium, 50, Items.metaglass, 40, Items.graphite, 80)),
+                
+                new ModularConstructorPlan(Z_MonolithUnits.pilaster, 300f, 1,
+                    ItemStack.with(Items.copper, 100, Items.silicon, 280, Items.titanium, 200, Items.metaglass, 80, Items.graphite, 120)),
 
-                // T2: Z_Units.devourer (50分钟建造时间, 虫子单位作为终极单位)
-                new ModularConstructorPlan(Z_Units.devourer, 50f * 60f, 2,
-                ItemStack.with(Items.silicon, 2050, Items.graphite, 180, Items.titanium, 830, Items.metaglass, 150, Items.plastanium, 1250, Items.surgeAlloy, 500, Items.phaseFabric, 375))
+
+                // 3级: 8分钟建造时间
+                new ModularConstructorPlan(Z_Units.toxoswarmer, 480f, 2,
+                    ItemStack.with(Items.copper, 350, Items.silicon, 500, Items.metaglass, 110, Z_Items.uranium, 80, Items.plastanium, 80, Items.phaseFabric, 20, Items.thorium, 120)),
+                
+                new ModularConstructorPlan(Z_Units.catenapede, 480f, 2,
+                    ItemStack.with(Items.copper, 400, Items.silicon, 300, Items.metaglass, 50, Z_Items.uranium, 60, Items.plastanium, 50, Items.phaseFabric, 20, Items.thorium, 100)),
+
+                new ModularConstructorPlan(Z_Units.exowalker, 300f, 2,
+                    ItemStack.with(Items.copper, 200, Items.silicon, 180, Items.titanium, 150, Items.metaglass, 100, Z_Items.uranium, 50)),
+
+                new ModularConstructorPlan(Z_Units.toxobyte, 300f, 2,
+                    ItemStack.with(Items.copper, 300, Items.silicon, 500, Items.metaglass, 100, Z_Items.uranium, 100)),
+
+                // 4级: 15分钟建造时间
+                new ModularConstructorPlan(Z_Units.devourer, 900f, 3,
+                    ItemStack.with(Items.copper, 18000, Items.lead, 15000, Items.silicon, 9000, Items.metaglass, 5000, Items.plastanium, 3500, Items.surgeAlloy, 1900, Items.phaseFabric, 2000, Items.graphite, 5200, Items.thorium, 10000)),
+                
+                new ModularConstructorPlan(Z_Units.enigma, 900f, 3,
+                    ItemStack.with(Items.copper, 4000, Items.lead, 4500, Items.silicon, 3200, Items.metaglass, 1000, Items.plastanium, 800, Items.surgeAlloy, 500, Items.phaseFabric, 500, Items.graphite, 1000, Items.thorium, 3200))
             );
 
             consumePower(13f);

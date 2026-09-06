@@ -55,29 +55,38 @@ public class SelectableReconstructor extends Reconstructor {
         // T6 档位统计
         stats.add(Stat.output, table -> {
             table.row();
-            table.add("[accent]T" + minTier + " 档位升级:");
+            table.add("[accent]T" + minTier + " 档位升级:").left().padTop(10f);
             table.row();
-            table.add("[lightgray]T5 → T6 升级路径:");
+            table.add("[lightgray]T5 → T6 升级路径:").left().padBottom(5f);
             table.row();
             upgrades.each(upgrade -> {
                 if (upgrade[0].unlockedNow() && upgrade[1].unlockedNow()) {
                     Table upgradeRow = new Table();
                     upgradeRow.left();
                     
-                    // 原单位（较大图标）
-                    upgradeRow.image(upgrade[0].uiIcon).size(40f).padRight(8f).scaling(arc.util.Scaling.fit);
-                    upgradeRow.add(upgrade[0].localizedName).color(arc.graphics.Color.white).left().padLeft(4f);
+                    // 第一列：原单位
+                    Table firstColumn = new Table();
+                    firstColumn.left();
+                    firstColumn.image(upgrade[0].uiIcon).size(60f).scaling(arc.util.Scaling.fit);
+                    firstColumn.row();
+                    firstColumn.add(upgrade[0].localizedName).color(arc.graphics.Color.white).left().fontScale(1.3f);
+                    table.add(firstColumn).padLeft(15f).padBottom(8f);
                     
-                    // 升级箭头
-                    upgradeRow.table(t -> {
-                        t.add("⇨").color(arc.graphics.Color.yellow).size(24f);
-                    }).padLeft(8f).padRight(8f);
+                    // 第二列：升级箭头
+                    Table arrowColumn = new Table();
+                    arrowColumn.left();
+                    arrowColumn.add("⇨").color(arc.graphics.Color.yellow).size(32f);
+                    table.add(arrowColumn).padBottom(8f);
                     
-                    // 升级单位（较大图标）
-                    upgradeRow.image(upgrade[1].uiIcon).size(40f).padRight(8f).scaling(arc.util.Scaling.fit);
-                    upgradeRow.add(upgrade[1].localizedName).color(arc.graphics.Color.white).left().padLeft(4f);
+                    // 第三列：升级单位
+                    Table secondColumn = new Table();
+                    secondColumn.left();
+                    secondColumn.image(upgrade[1].uiIcon).size(60f).scaling(arc.util.Scaling.fit);
+                    secondColumn.row();
+                    secondColumn.add(upgrade[1].localizedName).color(arc.graphics.Color.white).left().fontScale(1.3f);
+                    table.add(secondColumn).padBottom(8f);
                     
-                    table.add(upgradeRow).padLeft(10f).row();
+                    table.row();
                 }
             });
         });
@@ -85,29 +94,38 @@ public class SelectableReconstructor extends Reconstructor {
         // T7 档位统计
         stats.add(Stat.output, table -> {
             table.row();
-            table.add("[accent]T" + (minTier + 1) + " 档位升级:");
+            table.add("[accent]T" + (minTier + 1) + " 档位升级:").left().padTop(10f);
             table.row();
-            table.add("[lightgray]T6 → T7 升级路径:");
+            table.add("[lightgray]T6 → T7 升级路径:").left().padBottom(5f);
             table.row();
             otherUpgrades.each(upgrade -> {
                 if (upgrade[0].unlockedNow() && upgrade[1].unlockedNow()) {
                     Table upgradeRow = new Table();
                     upgradeRow.left();
                     
-                    // 原单位（较大图标）
-                    upgradeRow.image(upgrade[0].uiIcon).size(40f).padRight(8f).scaling(arc.util.Scaling.fit);
-                    upgradeRow.add(upgrade[0].localizedName).color(arc.graphics.Color.white).left().padLeft(4f);
+                    // 第一列：原单位
+                    Table firstColumn = new Table();
+                    firstColumn.left();
+                    firstColumn.image(upgrade[0].uiIcon).size(60f).scaling(arc.util.Scaling.fit);
+                    firstColumn.row();
+                    firstColumn.add(upgrade[0].localizedName).color(arc.graphics.Color.white).left().fontScale(1.3f);
+                    table.add(firstColumn).padLeft(15f).padBottom(8f);
                     
-                    // 升级箭头
-                    upgradeRow.table(t -> {
-                        t.add("⇨").color(arc.graphics.Color.yellow).size(24f);
-                    }).padLeft(8f).padRight(8f);
+                    // 第二列：升级箭头
+                    Table arrowColumn = new Table();
+                    arrowColumn.left();
+                    arrowColumn.add("⇨").color(arc.graphics.Color.yellow).size(32f);
+                    table.add(arrowColumn).padBottom(8f);
                     
-                    // 升级单位（较大图标）
-                    upgradeRow.image(upgrade[1].uiIcon).size(40f).padRight(8f).scaling(arc.util.Scaling.fit);
-                    upgradeRow.add(upgrade[1].localizedName).color(arc.graphics.Color.white).left().padLeft(4f);
+                    // 第三列：升级单位
+                    Table secondColumn = new Table();
+                    secondColumn.left();
+                    secondColumn.image(upgrade[1].uiIcon).size(60f).scaling(arc.util.Scaling.fit);
+                    secondColumn.row();
+                    secondColumn.add(upgrade[1].localizedName).color(arc.graphics.Color.white).left().fontScale(1.3f);
+                    table.add(secondColumn).padBottom(8f);
                     
-                    table.add(upgradeRow).padLeft(10f).row();
+                    table.row();
                 }
             });
         });

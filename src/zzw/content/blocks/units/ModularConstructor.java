@@ -22,6 +22,7 @@ import mindustry.world.*;
 import mindustry.world.blocks.units.UnitFactory.*;
 import mindustry.world.consumers.*;
 // 适配: 显式导入内部类 (同包但内部类不会自动导入)
+import mindustry.world.meta.Stat;
 import zzw.content.blocks.units.ModularConstructorModule.ModularConstructorModuleInterface;
 import zzw.content.blocks.units.ModularConstructorPart.ModularConstructorPartBuild;
 // 适配: 以下 unity.* import 已移除 (UnityPal 用 Color.valueOf 替代, 其余同包)
@@ -135,12 +136,76 @@ public class ModularConstructor extends Block{
     }
 
     @Override
+    public void setStats(){
+        super.setStats();
+        
+        // 按等级分组显示生产计划
+        Seq<Seq<ModularConstructorPlan>> tierPlans = new Seq<>();
+        for(int i = 0; i <= maxTier; i++){
+            tierPlans.add(new Seq<ModularConstructorPlan>());
+        }
+        
+        for(ModularConstructorPlan plan : plans){
+            if(plan.tier < tierPlans.size){
+                tierPlans.get(plan.tier).add(plan);
+            }
+        }
+        
+        stats.add(Stat.productionTime, table -> {
+            for(int i = 0; i < tierPlans.size; i++){
+                Seq<ModularConstructorPlan> tierPlanList = tierPlans.get(i);
+                if(tierPlanList.size == 0) continue;
+                
+                table.row();
+                table.add("[accent]T" + (i + 1) + " 级生产 (" + tierPlanList.size + " 个单位):").left().padTop(8f);
+                table.row();
+                
+                for(ModularConstructorPlan plan : tierPlanList){
+                    if(plan.unit.unlockedNow()){
+                        Table planTable = new Table();
+                        planTable.left();
+                        
+                        // 单位图标
+                        planTable.image(plan.unit.uiIcon).size(32f).padRight(8f).scaling(arc.util.Scaling.fit);
+                        // 单位名称
+                        planTable.add(plan.unit.localizedName).color(Color.yellow.cpy().mul(0.8f)).left().padLeft(4f).fontScale(1.1f);
+                        // 生产时间
+                        planTable.add("[" + formatTime(plan.time) + "]").color(Color.lightGray).right().padLeft(8f);
+                        
+                        table.add(planTable).padLeft(12f).padBottom(4f).row();
+                        
+                        // 材料消耗
+                        Table materialsTable = new Table();
+                        materialsTable.left();
+                        materialsTable.add("[lightgray]材料: ").left().padLeft(20f);
+                        
+                        for(ItemStack stack : plan.requirements){
+                            materialsTable.image(stack.item.uiIcon).size(20f).padRight(4f).scaling(arc.util.Scaling.fit);
+                            materialsTable.add(stack.amount + "x").color(Color.lightGray).left().padRight(8f);
+                        }
+                        
+                        table.add(materialsTable).padLeft(12f).padBottom(6f).row();
+                    }
+                }
+            }
+        });
+    }
+    
+    private String formatTime(float seconds) {
+        if (seconds >= 60) {
+            int minutes = (int) (seconds / 60);
+            return minutes + "分钟";
+        }
+        return (int) seconds + "秒";
+    }
+
+    @Override
     public boolean outputsItems(){
         return false;
     }
 
     /**
-     * 放置预览：绘制模块挂载点位置框（橙色虚线框）
+     * 放置预览：绘制模块挂载点位置框（蓝色虚线框）
      * 主方块的蓝色框由 InputHandler 绘制，这里只画模块位置提示
      */
     @Override

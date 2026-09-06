@@ -5,6 +5,7 @@ import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Angles;
+import arc.math.Mathf;
 import arc.util.Time;
 import mindustry.entities.abilities.Ability;
 import mindustry.entities.abilities.UnitSpawnAbility;
@@ -4425,7 +4426,7 @@ public class Z_Units {
         // ===== vespula (T4, 大机枪+钍弹+激光) =====
         vespula = new CopterUnitType("vespula") {{
             speed = 3.5f;
-            drag = 0.07f;
+            drag = 0.1f;
             accel = 0.03f;
             fallSpeed = 0.003f;
             health = 4000f;
@@ -4505,7 +4506,7 @@ public class Z_Units {
         // ===== lepidoptera (T5, 机枪+导弹+榴弹) =====
         lepidoptera = new CopterUnitType("lepidoptera") {{
             speed = 3f;
-            drag = 0.07f;
+            drag = 0.1f;
             accel = 0.03f;
             health = 9500f;
             engineSize = 0f;
@@ -4611,26 +4612,28 @@ public class Z_Units {
         // ===== mantodea (T6, 双联防空炮) =====
         mantodea = new CopterUnitType("mantodea") {{
             speed = 5f;
-            drag = 0.1f;
+            drag = 0.15f;
             accel = 0.03f;
             fallSpeed = 0.0025f;
             fallRotateSpeed = 0.8f;
-            health = 25000f;
+            health = 25500f;
             engineSize = 0f;
             flying = true;
             hitSize = 45f;
             lowAltitude = true;
-            rotateSpeed = 2.2f;
+            rotateSpeed = 2.3f;
             outlineColor = Color.valueOf("2e3142");
             constructor = CopterUnitEntity::create;
+            // 使用 Mathf.random(最小值, 最大值) 生成随机伤害
+            // 基础伤害在 40f 到 60f 之间随机
 
-            BulletType mantodeaFlak = new FlakBulletType(50f, 20f) {{
+            BulletType mantodeaFlak = new FlakBulletType(30f, 50f) {{
                 lifetime = 10f;
                 collidesGround = true;
-                lightning = 3;
-                lightningLength = 4;
-                lightningLengthRand = 2;
-                lightningDamage = 15f;
+                lightning = 4;
+                lightningLength = 5;
+                lightningLengthRand = 3;
+                lightningDamage = 25f;
                 lightningColor = Pal.surge;
             }};
 
@@ -4640,13 +4643,13 @@ public class Z_Units {
                 rotate = false;
                 x = 14.25f;
                 y = 26.5f;
-                range = 35f;
+                range = 25f;
                 recoil = 2.5f;
                 shootY = 10f;
                 shootSound = Sounds.shoot;
-                shoot.shots = 3;
-                shoot.shotDelay = 3f;
-                reload = 25f;
+                shoot.shots = 5;
+                shoot.shotDelay = 2f;
+                reload = 20f;
                 bullet = mantodeaFlak;
             }});
 
@@ -4656,13 +4659,13 @@ public class Z_Units {
                 rotate = false;
                 x = 26.25f;
                 y = 19.5f;
-                range = 35f;
+                range = 25f;
                 recoil = 2.5f;
                 shootY = 10f;
                 shootSound = Sounds.shoot;
-                shoot.shots = 2;
-                shoot.shotDelay = 3f;
-                reload = 15f;
+                shoot.shots = 5;
+                shoot.shotDelay = 2f;
+                reload = 20f;
                 bullet = mantodeaFlak;
             }});
 
