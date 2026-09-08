@@ -5,6 +5,7 @@ import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
+import arc.math.geom.Vec2;
 import arc.math.geom.Vec3;
 import arc.util.Tmp;
 import mindustry.graphics.Drawf;
@@ -228,5 +229,24 @@ public class UnityDrawf {
         }
 
         Draw.z(z);
+    }
+    
+    public static void dashCircleAngle(float x, float y, float radius, float rotation){
+        float scaleFactor = 0.6f;
+        int sides = 10 + (int)(radius * scaleFactor);
+        if(sides % 2 == 1) sides++;
+
+        Vec2 vec1 = new Vec2();
+
+        for(int i = 0; i < sides; i++){
+            if(i % 2 == 0) continue;
+            vec1.set(radius, 0).setAngle((360f / sides * i + 90) + rotation);
+            float x1 = vec1.x;
+            float y1 = vec1.y;
+
+            vec1.set(radius, 0).setAngle((360f / sides * (i + 1) + 90) + rotation);
+
+            Lines.line(x1 + x, y1 + y, vec1.x + x, vec1.y + y);
+        }
     }
 }

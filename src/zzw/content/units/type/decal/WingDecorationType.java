@@ -19,12 +19,6 @@ public class WingDecorationType extends UnitDecorationType{
 
     public WingDecorationType(String name, int variants){
         super(name);
-        decalType = new Func<Object, UnitDecoration>() {
-            @Override
-            public UnitDecoration get(Object obj) {
-                return new WingDecoration(WingDecorationType.this);
-            }
-        };
         this.name = name;
         textureVariants = variants;
     }

@@ -12,6 +12,7 @@ public abstract class UnitDecorationType{
 
     public UnitDecorationType(String name){
         this.name = name;
+        this.decalType = obj -> new UnitDecoration(this);
     }
 
     public void load(){}

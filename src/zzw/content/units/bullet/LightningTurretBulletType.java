@@ -13,17 +13,19 @@ import mindustry.gen.*;
 import mindustry.graphics.*;
 import mindustry.world.*;
 import zzw.content.units.effects.TrailFx;
+import zzw.content.units.effects.UnityDrawf;
+import zzw.content.units.util.UnityUtils;
 
 public class LightningTurretBulletType extends BulletType{
     public float range = 100f, reload = 15f, duration = 120f, size = 9f;
-    public Effect lightningEffect = TrailFx.trailFadeLow;
+    public Effect lightningEffect = Fx.chainLightning;
     public Sound lightningSound = Sounds.none;
     public Color color = Pal.lancerLaser;
     private static Healthc tmp;
 
     public LightningTurretBulletType(float speed, float damage){
         super(speed, damage);
-        pierce = true;
+        // scaleVelocity = true;
     }
 
     @Override
@@ -32,32 +34,26 @@ public class LightningTurretBulletType extends BulletType{
             super.update(b);
         }else{
             if(b.timer(1, reload)){
-                final float[] bestDst = {range * range};
-                final Healthc[] target = {null};
-                
-                Units.nearbyEnemies(b.team, b.x, b.y, range, u -> {
-                    float dst = u.dst2(b.x, b.y);
-                    if(dst < bestDst[0]){
-                        bestDst[0] = dst;
-                        target[0] = u;
-                    }
-                });
-                
-                if(target[0] != null){
-                    tmp = target[0];
-                    Building block = Vars.world.buildWorld(tmp.x(), tmp.y());
-                    if(block != null && block.block.absorbLasers){
-                        tmp = block;
-                    }
-                    
+                Seq<Healthc> seq = UnityUtils.nearbyEnemySorted(b.team, b.x, b.y, range, 1f);
+                for(int i = 0; i < Math.min(seq.size, lightning); i++){
+                    tmp = seq.get(i);
+                    Vars.world.raycastEachWorld(b.x, b.y, tmp.x(), tmp.y(), (cx, cy) -> {
+                        Building bl = Vars.world.build(cx, cy);
+                        if(bl != null && bl.block.absorbLasers){
+                            tmp = bl;
+                            return true;
+                        }
+                        return false;
+                    });
                     lightningSound.at(b.x, b.y, Mathf.random(0.9f, 1.1f));
-                    lightningEffect.at(b.x, b.y, 0f, color, tmp);
-                    tmp.damage(damage);
+                    lightningEffect.at(b.x, b.y, 0f, lightningColor, tmp);
+                    tmp.damage(lightningDamage);
                     hit(b, tmp.x(), tmp.y());
                     if(tmp instanceof Unit u){
                         u.apply(status, statusDuration);
                     }
                 }
+                seq.clear();
             }
         }
     }
@@ -75,6 +71,7 @@ public class LightningTurretBulletType extends BulletType{
     public void hit(Bullet b, float x, float y){
         hitEffect.at(x, y, b.rotation(), hitColor);
         hitSound.at(x, y, hitSoundPitch, hitSoundVolume);
+
         Effect.shake(hitShake, hitShake, b);
 
         if(b.fdata > 0f){
@@ -135,7 +132,7 @@ public class LightningTurretBulletType extends BulletType{
             float in = Mathf.clamp(b.time / 15f) * range,
             fin = ((b.time % reload) / reload) * size;
             Lines.stroke(1.5f);
-            Lines.circle(b.x, b.y, in);
+            UnityDrawf.dashCircleAngle(b.x, b.y, in, (b.time / 20f) * Mathf.signs[Mathf.randomSeed(b.id, 0, 1)]);
 
             Draw.color(Color.white);
             Lines.circle(b.x, b.y, fin);

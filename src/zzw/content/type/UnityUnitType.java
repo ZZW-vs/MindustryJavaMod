@@ -12,6 +12,7 @@ import mindustry.graphics.*;
 import mindustry.type.*;
 import mindustry.world.blocks.environment.*;
 import zzw.content.units.types.Engine;
+import zzw.content.units.type.decal.UnitDecorationType;
 
 import static arc.Core.*;
 import static mindustry.Vars.content;
@@ -40,6 +41,9 @@ public class UnityUnitType extends UnitType{
 
     // For shoot armor ability
     public FloatSeq weaponXs = new FloatSeq();
+    
+    // For decorations system
+    public Seq<UnitDecorationType> decorations = new Seq<>();
 
     /** 对象化引擎 (PU132): 非 null 时 drawEngine 走 Engine.draw 而非原版标量字段。 */
     public Engine engine;

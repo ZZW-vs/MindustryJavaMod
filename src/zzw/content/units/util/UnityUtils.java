@@ -10,7 +10,13 @@ import arc.math.Rand;
 import arc.math.geom.Rect;
 import arc.math.geom.Vec2;
 import arc.struct.IntSet;
+import arc.struct.Seq;
+import mindustry.Vars;
 import mindustry.gen.Building;
+import mindustry.gen.Healthc;
+import mindustry.game.Team;
+import mindustry.gen.Unit;
+import mindustry.entities.Units;
 import mindustry.world.Tile;
 
 import static mindustry.Vars.world;
@@ -34,6 +40,9 @@ public final class UnityUtils {
     private static final Rect rect = new Rect(), rectAlt = new Rect();
     private static final IntSet collidedBlocks = new IntSet();
     private static int idx = 0;
+    
+    private static final Seq<Healthc> tmpUnitSeq = new Seq<>();
+    private static int randSeed = 1;
 
     private UnityUtils() {}
 
@@ -262,5 +271,20 @@ public final class UnityUtils {
     /** PU132 MathU.UParticleConsumer: 粒子消费者 (相对坐标 + 个体进度)。 */
     public interface UParticleConsumer{
         void get(float x, float y, float fin);
+    }
+    
+    public static Seq<Healthc> nearbyEnemySorted(Team team, float x, float y, float radius, float variance){
+        tmpUnitSeq.clear();
+        Units.nearbyEnemies(team, x, y, radius, tmpUnitSeq::add);
+        indexer.allBuildings(x, y, radius, b -> {
+            if(b.team != team){
+                tmpUnitSeq.add(b);
+            }
+        });
+        randSeed++;
+        return tmpUnitSeq.sort(h -> {
+            float r = Mathf.randomSeedRange(randSeed + h.id(), variance);
+            return h.dst2(x, y) + (r * r);
+        });
     }
 }
