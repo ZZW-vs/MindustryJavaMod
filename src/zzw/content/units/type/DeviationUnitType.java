@@ -34,7 +34,7 @@ public class DeviationUnitType extends UnityUnitType{
         // ★ 装饰实体: 持有 decors[] 驱动翅膀动画, 没有它翅膀不会显示!
         constructor = DecorationUnitEntity::create;
 
-        health = 8000f;
+        health = 9500f;
         speed = 2.7f;
         accel = 0.07f;
         drag = 0.04f;
@@ -56,16 +56,16 @@ public class DeviationUnitType extends UnityUnitType{
             inaccuracy = 1f;
 
             // 闪电炮弹: 发射一枚光球, 命中后驻留原地持续闪电攻击周围敌人
-            bullet = new LightningTurretBulletType(6f, 30f){{
+            bullet = new LightningTurretBulletType(8f, 32f){{
                 range = 120f;
-                trailLength = 12;
+                trailLength = 15;
                 trailColor = color = lightningColor = Pal.lancerLaser;
                 lightningDamage = 20f;
-                lightning = 5;
-                splashDamage = 20f;
+                lightning = 8;
+                splashDamage = 25f;
                 splashDamageRadius = 35f;
                 status = StatusEffects.shocked;
-                reload = 30f;
+                reload = 85f;
                 duration = 5f * 60f;
             }};
         }});
