@@ -67,6 +67,7 @@ import zzw.content.units.entities.SegmentUnitEntity;
 import zzw.content.units.entities.SegmentWormEntity;
 import zzw.content.units.entities.SlowLightningEntity;
 import zzw.content.units.entities.TimeReflect;
+import zzw.content.units.entities.DecorationUnitEntity;
 import zzw.content.units.entities.WorldUnitEntity;
 import zzw.content.type.WorldUnitType;
 import zzw.content.units.rotor.Rotor;
@@ -176,6 +177,8 @@ public class Z_Units {
         ZEntityRegister.register(CopterUnitEntity.class, CopterUnitEntity::create);
         // ★ 注册 WorldUnitEntity (世界单位, extends UnitEntity, 携带子世界)
         ZEntityRegister.register(WorldUnitEntity.class, WorldUnitEntity::create);
+        // ★ 注册 DecorationUnitEntity (装饰单位, extends UnitEntity, 持有 decors[] 驱动翅膀等装饰动画)
+        ZEntityRegister.register(DecorationUnitEntity.class, DecorationUnitEntity::create);
         // ★ TimeReflect: 反射初始化 Time.runs / DelayRun.delay / DelayRun.finish 字段
         //   让世界单位子世界中建筑物的 Time.run 进入单位自己的队列 (PU132 原版机制)
         TimeReflect.init();

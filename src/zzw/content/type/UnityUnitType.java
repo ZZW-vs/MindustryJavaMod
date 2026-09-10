@@ -11,8 +11,10 @@ import mindustry.gen.*;
 import mindustry.graphics.*;
 import mindustry.type.*;
 import mindustry.world.blocks.environment.*;
-import zzw.content.units.types.Engine;
+import zzw.content.units.entities.DecorationUnitEntity;
 import zzw.content.units.type.decal.UnitDecorationType;
+import zzw.content.units.type.decal.UnitDecorationType.UnitDecoration;
+import zzw.content.units.types.Engine;
 
 import static arc.Core.*;
 import static mindustry.Vars.content;
@@ -50,6 +52,9 @@ public class UnityUnitType extends UnitType{
     /** 拖尾工厂 (PU132 trailType): 替代原版 new Trail(trailLength), Monolith 用 TexturedTrail/MultiTrail。 */
     public Func<Unit, Trail> trailType = unit -> new Trail(trailLength);
 
+    /** 调试用: 装饰绘制日志计数 (只打印前 3 次, 避免刷屏) */
+    private int decorDrawLogs = 0;
+
     /**
      * 最大容纳灵魂数 (PU132 UnitType.maxSouls)。
      *
@@ -63,6 +68,55 @@ public class UnityUnitType extends UnitType{
         outlines = false;
         // v155.4 适配: PU132 通过注解处理器自动设置, 简化版需手动指定默认构造器
         constructor = mindustry.gen.UnitEntity::create;
+    }
+
+    /**
+     * 加载阶段: 加载装饰贴图 (PU132 原版 load() 的 decorations.each 段)。
+     *
+     * <p>★ 调试: 打印装饰数量, 方便确认装饰系统已接入。</p>
+     */
+    @Override
+    public void load(){
+        super.load();
+        if(decorations.size > 0){
+            boolean decorEntity = constructor != null && constructor.get() instanceof DecorationUnitEntity;
+            Log.info("[deco-debug] 单位 @ 开始加载装饰, 数量: @ (实体构造器: @)",
+                name, decorations.size,
+                decorEntity ? "DecorationUnitEntity OK" : "非装饰实体 (装饰不会工作!)");
+        }
+        decorations.each(UnitDecorationType::load);
+    }
+
+    /**
+     * 绘制身体下方的装饰 (PU132 原版 drawOutline: top=false 的装饰, 如翅膀)。
+     *
+     * <p>★ 调试: 前 3 次绘制打印日志, 确认绘制链路接通。</p>
+     */
+    @Override
+    public void drawOutline(Unit unit){
+        if(unit instanceof DecorationUnitEntity d){
+            for(UnitDecoration decor : d.decors){
+                if(!decor.type.top) decor.type.draw(unit, decor);
+            }
+            if(decorDrawLogs < 3){
+                decorDrawLogs++;
+                Log.info("[deco-debug] @ drawOutline 绘制下方装饰, decors: @", name, d.decors.length);
+            }
+        }
+        super.drawOutline(unit);
+    }
+
+    /**
+     * 绘制身体上方的装饰 (PU132 原版 drawBody: top=true 的装饰)。
+     */
+    @Override
+    public void drawBody(Unit unit){
+        super.drawBody(unit);
+        if(unit instanceof DecorationUnitEntity d){
+            for(UnitDecoration decor : d.decors){
+                if(decor.type.top) decor.type.draw(unit, decor);
+            }
+        }
     }
 
     @Override
