@@ -33,6 +33,8 @@ public class EnergyChargeWeapon extends Weapon {
     /** 自定义充能条件 (null 时走原生 update) */
     public Cons2<Unit, WeaponMount> chargeCondition;
     public boolean drawTop = true, startUncharged = true, drawRegion = true;
+    /** v158.1 运行时 Weapon 已无 useAmmo 字段, 这里声明本类自己的字段, 充能武器不吃弹药 */
+    public boolean useAmmo = false;
 
     public EnergyChargeWeapon(String name) {
         super(name);

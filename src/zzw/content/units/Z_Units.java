@@ -48,6 +48,7 @@ import zzw.content.units.bullets.HealingConeBulletType;
 import zzw.content.units.bullets.HealingNukeBulletType;
 import zzw.content.units.bullets.OppressionLaserBulletType;
 import zzw.content.units.bullets.ReflectingLaserBulletType;
+import zzw.content.units.type.AnomalyUnitType;
 import zzw.content.units.type.DeviationUnitType;
 import zzw.content.units.bullets.SagittariusLaserBulletType;
 import zzw.content.units.bullets.SlowLightningBulletType;
@@ -131,7 +132,7 @@ public class Z_Units {
         trigintaduo,           // T7 Payload (治疗锥+核弹)
         // —— PU_V8 advance 派系单位 (deviation/anomaly) ——
         deviation = new DeviationUnitType("deviation"),             // T6 Flying (闪电炮弹+4翼装饰)
-        // anomaly = new UnitType("anomaly");               // T7 Flying (牵引光束+充能武器) (待实现)
+        anomaly = new AnomalyUnitType("anomaly"),                   // T7 Flying (牵引光束+充能激光+6翼装饰)
         // —— PU_V8 mantodea 直升机系列 (T1-T6, 带旋翼动画) ——
         caelifera,             // T1 直升机 (机枪+导弹)
         schistocerca,          // T2 直升机 (双机枪+燃烧弹)
