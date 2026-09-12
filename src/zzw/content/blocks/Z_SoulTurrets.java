@@ -17,7 +17,9 @@ import mindustry.type.Category;
 import mindustry.type.ItemStack;
 import zzw.content.Z_Items;
 import zzw.content.Z_Sounds;
-import zzw.content.blocks.soul.RicochetBulletType;
+import zzw.content.blocks.soul.RicochetBulletType;import zzw.content.blocks.soul.RicochetBulletType;
+import zzw.content.units.effects.MonolithFx;
+import zzw.content.units.effects.ParticleFx;
 import zzw.content.blocks.soul.SoulTurretPowerTurret;
 
 import static mindustry.Vars.tilesize;
@@ -76,6 +78,7 @@ public class Z_SoulTurrets {
                 height = 12f;
                 ammoMultiplier = 4;
                 lifetime = 30f;
+                trailEffect = ParticleFx.ricochetTrailSmall;  // PU132 粒子拖尾
                 frontColor = Color.white;
                 backColor = trailColor = Pal.lancerLaser;
             }};
@@ -196,6 +199,7 @@ public class Z_SoulTurrets {
                 lifetime = 35f;
                 pierceCap = 5;
                 trailLength = 7;
+                trailEffect = ParticleFx.ricochetTrailMedium;  // PU132 粒子拖尾
                 frontColor = Color.white;
                 backColor = trailColor = Pal.lancerLaser;
             }};
@@ -228,6 +232,7 @@ public class Z_SoulTurrets {
                 lifetime = 40f;
                 pierceCap = 8;
                 trailLength = 8;
+                trailEffect = MonolithFx.ricochetTrailBig;  // PU132 粒子拖尾
                 frontColor = Color.white;
                 backColor = trailColor = Pal.lancerLaser;
             }};

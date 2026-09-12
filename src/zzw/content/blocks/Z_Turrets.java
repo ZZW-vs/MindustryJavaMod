@@ -36,6 +36,11 @@ import zzw.content.Z_Bullets.VelocityLaserBoltBulletType;
 import zzw.content.Z_Bullets.AcceleratingLaserBulletType;
 import zzw.content.Z_Items;
 import zzw.content.Z_Sounds;
+import zzw.content.Z_StatusEffects;
+import zzw.content.units.effects.ChargeFx;
+import zzw.content.units.effects.HitEffect;
+import zzw.content.units.effects.ParticleFx;
+import zzw.content.units.effects.ShootEffect;
 import zzw.content.units.bullets.ChangeTeamLaserBulletType;
 import zzw.content.blocks.turrets.AbsorberTurret;
 import zzw.content.blocks.turrets.BarrelsItemTurret;
@@ -431,6 +436,8 @@ public class Z_Turrets {
             requirements(Category.turret, ItemStack.with(Items.copper, 1250, Items.lead, 1320, Items.graphite, 1100, Items.titanium, 1340, Items.surgeAlloy, 1240, Items.silicon, 1350, Items.thorium, 770, Z_Items.darkAlloy, 370));
             shootType = new SparkingContinuousLaserBulletType(240f) {{
                 length = 340f;
+                // TODO PU132: strokes = 默认值 ×1.4 (光束四层粗细) — v158 原生
+                // ContinuousLaserBulletType 无 strokes 字段, 需给 Sparking 类加 draw 支持后启用
                 incendSpread = 7f;
                 incendAmount = 2;
             }};
@@ -459,6 +466,8 @@ public class Z_Turrets {
             requirements(Category.turret, ItemStack.with(Items.copper, 2800, Items.lead, 2970, Items.graphite, 2475, Items.titanium, 3100, Items.surgeAlloy, 2790, Items.silicon, 3025, Items.thorium, 1750, Z_Items.darkAlloy, 1250));
             shootType = new SparkingContinuousLaserBulletType(580f) {{
                 length = 450f;
+                // PU132: strokes ×1.7 + spaceMag=70 (TODO: v158 原生类无 strokes/spaceMag 字段)
+                lightStroke = 70f;
                 fromBlockChance = 0.5f;
                 fromBlockDamage = 34f;
                 fromLaserChance = 0.8f;
@@ -495,6 +504,8 @@ public class Z_Turrets {
             loopSoundVolume = 2f;
             shootType = new SparkingContinuousLaserBulletType(770f) {{
                 length = 560f;
+                // PU132: strokes ×2.2 + spaceMag=70 (TODO: v158 原生类无 strokes/spaceMag 字段)
+                lightStroke = 90f;
                 fromBlockChance = 0.5f;
                 fromBlockDamage = 76f;
                 fromLaserChance = 0.8f;
@@ -530,6 +541,7 @@ public class Z_Turrets {
                 length = 130f;
                 width = 4f;
                 colors = new Color[]{Pal.lancerLaser.cpy().a(3.75f), Pal.lancerLaser, Color.white};
+                // TODO PU132: strokes = {0.92, 0.6, 0.28} 三明治细光束 (v158 原生类无 strokes 字段)
                 lightColor = hitColor = Pal.lancerLaser;
             }};
             consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability < 0.1f, 0.2f)).boost().update(false);
@@ -572,7 +584,7 @@ public class Z_Turrets {
             range = 170f;
             consumePower(6.6f);
             heatColor = Pal.turretHeat;
-            shootEffect = Fx.lancerLaserShoot;
+            shootEffect = ShootEffect.blueTriangleShoot;
             shootSound = Sounds.shootArc;  // ★ v158 无 Sounds.pew, 用 shootArc (电弧炮音效) 替代
             shootType = new BasicBulletType(9f, 34f) {{
                 lifetime = 22f;
@@ -582,8 +594,18 @@ public class Z_Turrets {
                 shrinkY = 0f;
                 backColor = lightColor = hitColor = Pal.lancerLaser;
                 frontColor = Color.white;
-                hitEffect = Fx.hitLancer;
-            }};
+                hitEffect = HitEffect.electronHit;
+            }
+
+            // PU132: 飞行中每 2~3.5tick 撒蓝三角拖尾
+            @Override
+            public void update(mindustry.gen.Bullet b){
+                super.update(b);
+                if(b.timer(0, 2f + b.fslope() * 1.5f)){
+                    ParticleFx.blueTriangleTrail.at(b.x, b.y, b.rotation());
+                }
+            }
+        };
         }};
 
         // ===== proton (T2 质子炮, PU132 L664-705) =====
@@ -601,7 +623,7 @@ public class Z_Turrets {
             recoil = 4f;
             consumePower(4.9f);
             targetAir = false;
-            shootEffect = Fx.lancerLaserShoot;
+            shootEffect = ShootEffect.blueTriangleShoot;
             shootType = new ArtilleryBulletType(8f, 44f) {{
                 lifetime = 35f;
                 width = 18f;
@@ -611,7 +633,7 @@ public class Z_Turrets {
                 shrinkX = 0f;
                 shrinkY = 0f;
                 hitSize = 15f;
-                hitEffect = Fx.hitLancer;
+                hitEffect = HitEffect.protonHit;
                 hittable = false;
                 collides = false;
                 backColor = lightColor = hitColor = lightningColor = Pal.lancerLaser;
@@ -620,7 +642,17 @@ public class Z_Turrets {
                 lightningDamage = 18f;
                 lightningLength = 10;
                 lightningLengthRand = 6;
-            }};
+            }
+
+            // PU132: 飞行中每 2~3.5tick 撒蓝三角拖尾
+            @Override
+            public void update(mindustry.gen.Bullet b){
+                super.update(b);
+                if(b.timer(0, 2f + b.fslope() * 1.5f)){
+                    ParticleFx.blueTriangleTrail.at(b.x, b.y, b.rotation());
+                }
+            }
+        };
         }};
 
         // ===== neutron (T3 中子炮, PU132 L707-746) =====
@@ -637,7 +669,7 @@ public class Z_Turrets {
             recoil = 4f;
             consumePower(4.9f);
             inaccuracy = 3.4f;
-            shootEffect = Fx.lancerLaserShoot;
+            shootEffect = ShootEffect.blueTriangleShoot;
             shootType = new FlakBulletType(8.7f, 7f) {{
                 lifetime = 30f;
                 width = 8f;
@@ -647,13 +679,23 @@ public class Z_Turrets {
                 shrinkX = 0f;
                 shrinkY = 0f;
                 hitSize = 7f;
-                hitEffect = Fx.hitLancer;
+                hitEffect = HitEffect.neutronHit;
                 collides = true;
                 collidesGround = true;
                 hittable = false;
                 backColor = lightColor = hitColor = Pal.lancerLaser;
                 frontColor = Color.white;
-            }};
+            }
+
+            // PU132: 飞行中每 2~3.5tick 撒蓝三角拖尾
+            @Override
+            public void update(mindustry.gen.Bullet b){
+                super.update(b);
+                if(b.timer(0, 2f + b.fslope() * 1.5f)){
+                    ParticleFx.blueTriangleTrail.at(b.x, b.y, b.rotation());
+                }
+            }
+        };
         }};
 
         // ===== gluon (T4 胶子炮, PU132 L748-763) =====
@@ -710,8 +752,10 @@ public class Z_Turrets {
                 backColor = trailColor = hitColor = lightColor = Pal.lancerLaser;
                 shootEffect = smokeEffect = Fx.none;
                 hitEffect = Fx.hitLancer;
-                despawnEffect = Fx.hitLancer;
+                despawnEffect = HitEffect.lightHitLarge;
                 frontColor = Color.white;
+                // PU132 decayEffect: 主弹沿途撒衰变小拖尾
+                decayEffect = ParticleFx.wBosonEffectLong;
                 height = 13f;
                 width = 12f;
                 decayBullet = new BasicBulletType(4.8f, 24f) {{
@@ -723,9 +767,18 @@ public class Z_Turrets {
                     width = 8f;
                     backColor = trailColor = hitColor = lightColor = Pal.lancerLaser;
                     hitEffect = Fx.hitLancer;
-                    despawnEffect = Fx.hitLancer;
+                    despawnEffect = HitEffect.wBosonDecayHit;
                     frontColor = Color.white;
                     hittable = false;
+                }
+
+                // PU132: 衰变子弹 80% 概率撒短拖尾
+                @Override
+                public void update(mindustry.gen.Bullet b){
+                    super.update(b);
+                    if(Mathf.chance(0.8f)){
+                        ParticleFx.wBosonEffect.at(b, b.rotation() + 180f);
+                    }
                 }};
                 fragBullet = decayBullet;
                 fragBullets = 12;
@@ -841,6 +894,10 @@ public class Z_Turrets {
                     if (mindustry.entities.Units.closestTarget(b.team, b.x, b.y, 20f) != null) {
                         b.remove();
                     }
+                    // PU132: 每 2~3.5tick 撒六边形光尾 (半径随速度)
+                    if (b.timer.get(0, 2f + b.fslope() * 1.5f)) {
+                        ParticleFx.lightHexagonTrail.at(b.x, b.y, 1f + b.fslope() * 4f, backColor);
+                    }
                 }
 
                 @Override
@@ -920,7 +977,7 @@ public class Z_Turrets {
                 hitEffect = Fx.hitLancer;
                 despawnEffect = smokeEffect = Fx.none;
                 // v158 充能特效在 BulletType.chargeEffect 上 (原 PU_V8 block.chargeBeginEffect)
-                chargeEffect = Fx.sparkShoot;
+                chargeEffect = ChargeFx.ephmeronCharge;
 
                 positive = new EphemeronPairBulletType(4f) {{
                     positive = true;
@@ -962,8 +1019,11 @@ public class Z_Turrets {
                     damage = 23;
                     pierce = true;
                     hittable = false;
-                    hitEffect = Fx.hitLancer;
+                    hitEffect = HitEffect.orbHit;
+                    trailEffect = ParticleFx.orbTrail;
                     trailChance = 0.4f;
+                    // PU132 chargeBeginEffect: 充能完成瞬间在炮口播收缩圆点 (v158 充能循环特效不可复刻, 取发射时刻近似)
+                    chargeEffect = ParticleFx.orbChargeBegin;
                 }
 
                 @Override
@@ -988,7 +1048,7 @@ public class Z_Turrets {
             };
             shootSound = Sounds.shootLancer;
             heatColor = Pal.turretHeat;
-            shootEffect = Fx.sparkShoot;
+            shootEffect = ShootEffect.orbShoot;
             smokeEffect = Fx.none;
         }};
 
@@ -1014,7 +1074,7 @@ public class Z_Turrets {
                 maxLightningDamage = damage / 1.2f;
                 color = Pal.surge;
             }};
-            shootSound = Sounds.shootLancer;
+            shootSound = Sounds.shootLancer;  // ★ 原版 Sounds.thruster, v158 无此音效
             consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability <= 0.1f, 0.4f)).boost().update(false);
         }};
 
@@ -1048,8 +1108,8 @@ public class Z_Turrets {
                 sideWidth = 0f;
                 sideLength = 0f;
                 colors = new Color[]{Pal.surge.cpy(), Pal.surge, Color.white};
-                // v158 充能特效在 BulletType.chargeEffect 上
-                chargeEffect = Fx.lightningShoot;
+                // PU132 chargeBeginEffect: 充能圈在发射时刻播 (v158 充能循环特效不可复刻, 取近似)
+                chargeEffect = ParticleFx.currentChargeBegin;
             }};
             shootSound = Sounds.shootMeltdown;  // ★ 原版 Sounds.laserbig, v158 用 shootMeltdown (大型激光射击) 替代
             consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability <= 0.1f, 0.52f)).boost();
@@ -1074,19 +1134,19 @@ public class Z_Turrets {
                 trailLength = 14;
                 homingPower = 0.06f;
                 hitSound = Sounds.explosion;
-                hitEffect = Fx.hitLancer;
+                hitEffect = HitEffect.plasmaTriangleHit;
                 despawnEffect = Fx.none;
                 castsLightning = true;
                 fragBullet = new TriangleBulletType(11, 10, 4.5f, 90f) {{
                     lifetime = 160f;
+                    lifetimeRand = 40f;
                     trailWidth = 3f;
                     trailLength = 8;
                     drag = 0.05f;
                     collides = false;
                     castsLightning = true;
-                    shootEffect = Fx.sparkShoot;
-                    hitEffect = Fx.hitLancer;
-                    despawnEffect = Fx.hitLancer;
+                    shootEffect = ParticleFx.plasmaFragAppear;
+                    hitEffect = despawnEffect = ParticleFx.plasmaFragDisappear;
                 }};
                 fragBullets = 8;
             }};
@@ -1120,7 +1180,7 @@ public class Z_Turrets {
                 despawnShake = 4f;
                 collidesAir = false;
                 lifetime = 70f;
-                despawnEffect = Fx.massiveExplosion;
+                despawnEffect = ParticleFx.surgeSplash;
                 hitEffect = Fx.massiveExplosion;
                 keepVelocity = false;
                 collides = false;
@@ -1137,10 +1197,13 @@ public class Z_Turrets {
                 // ★ v158 BulletType 无 scaleVelocity 字段, 省略 (效果: fragBullet 继承母弹速度)
                 fragBullet = new TriangleBulletType(11, 10, 4.5f, 90f) {{
                     lifetime = 160f;
+                    lifetimeRand = 40f;
                     trailWidth = 3f; trailLength = 8;
                     drag = 0.05f;
                     collides = false;
                     castsLightning = true;
+                    shootEffect = ParticleFx.plasmaFragAppear;
+                    hitEffect = despawnEffect = ParticleFx.plasmaFragDisappear;
                 }};
             }});
         }};
@@ -1167,6 +1230,7 @@ public class Z_Turrets {
                 hitEffect = Fx.hitLiquid;
                 maxRadius = 10f;
                 shieldHealth = 3000f;
+                // breakSound = Sounds.wave; // TODO: PU132 原版护盾破碎音效, v158 无此音效
                 // v158 充能特效在 BulletType.chargeEffect 上 (原 PU_V8 block.chargeEffect)
                 chargeEffect = new mindustry.entities.Effect(38f, e -> {
                     arc.graphics.g2d.Draw.color(Pal.accent);
@@ -1240,7 +1304,8 @@ public class Z_Turrets {
                 collidesAir = true;
                 pierce = true;
                 statusDuration = 770f;
-                status = mindustry.content.StatusEffects.burning;  // ★ 原版 blueBurn, 用 burning 替代 (v158 无自定义 blueBurn)
+                status = Z_StatusEffects.blueBurn;  // PU132 原版 blueBurn (已移植到 Z_StatusEffects)
+                hitEffect = HitEffect.hitAdvanceFlame;
             }};
         }};
 
@@ -1273,7 +1338,8 @@ public class Z_Turrets {
                 collidesAir = true;
                 pierce = true;
                 statusDuration = 770f;
-                status = mindustry.content.StatusEffects.burning;  // ★ 原版 blueBurn, 用 burning 替代
+                status = Z_StatusEffects.blueBurn;  // PU132 原版 blueBurn
+                hitEffect = HitEffect.hitAdvanceFlame;
             }};
         }};
 
@@ -1297,6 +1363,8 @@ public class Z_Turrets {
             shootType = new ArcBulletType(4.6f, 8f) {{
                 lifetime = 43f;
                 hitSize = 21f;
+                // PU132 arcCharge: 充能六边形群在发射时刻播 (v158 充能循环特效不可复刻, 取近似)
+                chargeEffect = ParticleFx.arcCharge;
                 lightningChance1 = 0.5f;
                 lightningDamage1 = 29f;
                 lightningChance2 = 0.2f;
@@ -1330,6 +1398,7 @@ public class Z_Turrets {
                 lifetime = 53f;
                 hitSize = 28f;
                 radius = 13f;
+                chargeEffect = ParticleFx.arcCharge;
                 lightningChance1 = 0.7f;
                 lightningDamage1 = 31f;
                 lightningChance2 = 0.3f;
@@ -1372,7 +1441,7 @@ public class Z_Turrets {
                 maxLength = 490f;
                 shootEffect = Fx.none;
                 smokeEffect = Fx.none;
-                hitEffect = Fx.hitLancer;
+                hitEffect = HitEffect.eclipseHit;
             }};
             consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.4f && liquid.flammability < 0.1f, 2.1f)).boost().update(false);
         }};

@@ -84,7 +84,8 @@ public class EndInvisibleUnit extends UnitEntity {
 
     @Override
     public void destroy() {
-        if (antiCheat.lastHealth > 0f) {
+        // ★ 死亡拒绝: 原始血量(lastHealth) > 0 时不允许销毁 (PU132 EndComp 机制)
+        if (lastHealth > 0f) {
             antiCheat.immunity += 3500f;
             return;
         }
@@ -93,7 +94,7 @@ public class EndInvisibleUnit extends UnitEntity {
 
     @Override
     public void kill() {
-        if (antiCheat.lastHealth > 0f) {
+        if (lastHealth > 0f) {
             antiCheat.immunity += 3500f;
             return;
         }
@@ -102,7 +103,7 @@ public class EndInvisibleUnit extends UnitEntity {
 
     @Override
     public void remove() {
-        if (antiCheat.lastHealth > 0f) {
+        if (lastHealth > 0f) {
             antiCheat.immunity += 3500f;
             return;
         }
@@ -111,5 +112,47 @@ public class EndInvisibleUnit extends UnitEntity {
 
     public float getAlphaLerp() {
         return alphaLerp;
+    }
+
+    // ===== 供子类 (ApocalypseUnit) 使用的受保护访问器 =====
+
+    /** @return 无敌帧计时 (PU132 InvisibleComp.invFrame) */
+    protected float getInvFrame() {
+        return invFrame;
+    }
+
+    /** 重置无敌帧 (PU132: invFrame = 0f) */
+    protected void resetInvFrame() {
+        invFrame = 0f;
+    }
+
+    /**
+     * 原始扣血: 同时维护 lastHealth 原始血量追踪 (PU132: lastHealth -= v; health -= v)。
+     *
+     * @param v 要扣除的血量
+     */
+    protected void subtractHealthRaw(float v) {
+        health -= v;
+        lastHealth = health;
+    }
+
+    /**
+     * 仅扣减原始血量追踪值 (PU132 ApocalypseUnit.damage: lastHealth -= trueAmount),
+     * 血量本身由 {@link #damageMindustry(float)} 走 Mindustry 原版路径扣除。
+     *
+     * @param v 要从原始血量追踪中扣除的值
+     */
+    protected void subtractLastHealth(float v) {
+        lastHealth -= v;
+    }
+
+    /**
+     * 绕过子类防作弊覆写, 直接调用 Mindustry 原版扣血
+     * (PU132 ApocalypseUnit.damage 末尾的 superDamage(trueAmount))。
+     *
+     * @param amount 实际造成的伤害
+     */
+    protected void damageMindustry(float amount) {
+        super.damage(amount);
     }
 }

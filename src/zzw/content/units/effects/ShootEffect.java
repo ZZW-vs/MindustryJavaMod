@@ -6,6 +6,7 @@ import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
+import arc.math.Angles;
 import arc.math.Interp;
 import arc.math.Mathf;
 import arc.math.Rand;
@@ -99,6 +100,44 @@ public class ShootEffect {
 
         Draw.reset();
     }).followParent(true).rotWithParent(true);
+
+
+    /**
+     * electron/proton/neutron 系射击特效 (23f) — PU132 ShootFx.blueTriangleShoot。
+     * lancerLaser 色三角形收缩 + 双层白芯圆。
+     */
+    public static final Effect blueTriangleShoot = new Effect(23f, e -> {
+        Draw.color(mindustry.graphics.Pal.lancerLaser);
+        Fill.poly(e.x, e.y, 3, e.fout() * 24f, e.rotation);
+        Fill.circle(e.x, e.y, e.fout() * 11f);
+
+        Draw.color(Color.white);
+        Fill.circle(e.x, e.y, e.fout() * 9f);
+    });
+
+    /**
+     * orb 射击特效 (21f) — PU132 ShootFx.orbShoot。
+     * surge 色双斜向三角 (±67°)。
+     */
+    public static final Effect orbShoot = new Effect(21f, e -> {
+        Draw.color(mindustry.graphics.Pal.surge);
+        for(int i = 0; i < 2; i++){
+            int l = Mathf.signs[i];
+            mindustry.graphics.Drawf.tri(e.x, e.y, 4f * e.fout(), 29f, e.rotation + 67 * l);
+        }
+    });
+
+    /**
+     * 虚空碎裂弹发射特效 (20f) — PU132 ShootFx.voidShoot (L403-409)。
+     * 纯黑色锥形 (20°) 粒子团, void-fracture 弹发射用。
+     */
+    public static final Effect voidShoot = new Effect(20f, e -> {
+        Draw.color(Color.black);
+        Angles.randLenVectors(e.id, 14, e.finpow() * 20f, e.rotation, 20f * Mathf.curve(e.fin(), 0f, 0.2f), (x, y) -> {
+            Fill.circle(e.x + x, e.y + y, e.fout() * 5f);
+            Fill.circle(e.x + x / 2f, e.y + y / 2f, e.fout() * 3f);
+        });
+    });
 
     /** Mathf.slope 的简化实现 (PU132 MathU.slope) */
     private static float slope(float fin, float offset) {

@@ -81,7 +81,7 @@ public class Z_ScarUnits {
         //region scar 腿部单位
 
         // Hovos (T1) - 基础腿部单位, 单管磁轨炮
-        hovos = new UnityUnitType("create-hovos"){{
+        hovos = new UnityUnitType("hovos"){{
             aiController = DistanceGroundAI::new;
             speed = 0.8f;
             health = 340;
@@ -120,7 +120,7 @@ public class Z_ScarUnits {
         }};
 
         // Ryzer (T2) - 进阶腿部单位, 磁轨炮 + 导弹发射器
-        ryzer = new UnityUnitType("create-ryzer"){{
+        ryzer = new UnityUnitType("ryzer"){{
             aiController = DistanceGroundAI::new;
             speed = 0.7f;
             health = 640;
@@ -176,7 +176,7 @@ public class Z_ScarUnits {
         }};
 
         // Zena (T3) - 高级腿部单位, 中央重磁轨 + 侧磁轨 + 导弹发射器
-        zena = new UnityUnitType("create-zena"){{
+        zena = new UnityUnitType("zena"){{
             aiController = DistanceGroundAI::new;
             speed = 0.7f;
             health = 1220;
@@ -250,7 +250,7 @@ public class Z_ScarUnits {
         }};
 
         // Sundown (T4) - 精英腿部单位, 大型导弹巢 + 重磁轨炮 + 方向护盾
-        sundown = new UnityUnitType("create-sundown"){{
+        sundown = new UnityUnitType("sundown"){{
             aiController = DistanceGroundAI::new;
             speed = 0.6f;
             health = 9400;
@@ -316,7 +316,7 @@ public class Z_ScarUnits {
         }};
 
         // Rex (T5) - 重型悬浮腿部单位, 重型磁轨炮 + 破片机炮 + 双导弹巢 + 方向护盾
-        rex = new UnityUnitType("create-rex"){{
+        rex = new UnityUnitType("rex"){{
             aiController = DistanceGroundAI::new;
             speed = 0.55f;
             health = 23000;
@@ -426,7 +426,7 @@ public class Z_ScarUnits {
         }};
 
         // Excelsus (T6) - 顶级悬浮腿部单位, 双导弹巢 + 双连续激光 + 方向护盾
-        excelsus = new UnityUnitType("create-excelsus"){{
+        excelsus = new UnityUnitType("excelsus"){{
             aiController = DistanceGroundAI::new;
             speed = 0.6f;
             health = 38000;
@@ -550,7 +550,7 @@ public class Z_ScarUnits {
         //region scar 飞行单位
 
         // Whirlwind (T1) - 基础飞行单位, saber 持续激光 + 导弹
-        whirlwind = new UnityUnitType("create-whirlwind"){{
+        whirlwind = new UnityUnitType("whirlwind"){{
             health = 280;
             rotateSpeed = 4.5f;
             faceTarget = false;
@@ -609,7 +609,7 @@ public class Z_ScarUnits {
         }};
 
         // Jetstream (T2) - 进阶飞行单位, swipe saber 激光 + 导弹
-        jetstream = new UnityUnitType("create-jetstream"){{
+        jetstream = new UnityUnitType("jetstream"){{
             health = 670;
             rotateSpeed = 12.5f;
             flying = true;
@@ -669,7 +669,7 @@ public class Z_ScarUnits {
         }};
 
         // Vortex (T3) - 高级飞行单位, swipe saber 激光
-        vortex = new UnityUnitType("create-vortex"){{
+        vortex = new UnityUnitType("vortex"){{
             health = 1200;
             rotateSpeed = 12.5f;
             flying = true;

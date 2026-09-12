@@ -1044,7 +1044,7 @@ public class Z_MonolithUnits{
      */
     private static void loadEnergyRingUnits(){
         // stray — 游荡者 (T1 能量环单位, 环绕散射追踪弹)
-        stray = new UnityUnitType("create-stray"){{
+        stray = new UnityUnitType("stray"){{
             constructor = DecorationUnitEntity::create;
 
             health = 300f;
@@ -1155,7 +1155,7 @@ public class Z_MonolithUnits{
         }};
 
         // tendence — 趋势者 (T2 能量环单位, 充能追踪重弹 + 3D 透视旋转圆环弹体)
-        tendence = new UnityUnitType("create-tendence"){{
+        tendence = new UnityUnitType("tendence"){{
             constructor = DecorationUnitEntity::create;
 
             health = 1200f;
@@ -1314,7 +1314,7 @@ public class Z_MonolithUnits{
         }};
 
         // liminality — 阈限者 (T3 能量环单位, 螺旋激光主炮 + 三层符环)
-        liminality = new UnityUnitType("create-liminality"){{
+        liminality = new UnityUnitType("liminality"){{
             constructor = DecorationUnitEntity::create;
 
             health = 2000f;

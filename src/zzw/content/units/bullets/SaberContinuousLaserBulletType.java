@@ -4,6 +4,7 @@ import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Lines;
 import arc.math.Angles;
 import arc.math.Mathf;
+import arc.util.Log;
 import arc.util.Time;
 import arc.util.Tmp;
 import mindustry.content.Fx;
@@ -47,6 +48,14 @@ public class SaberContinuousLaserBulletType extends ContinuousLaserBulletType {
     protected float oscScl = 2f;
     protected float oscMag = 1f;
     protected float spaceMag = 4f;
+
+    /** 数组长度不一致警告只输出一次 (避免刷屏), 记录已警告的实例 */
+    private static final java.util.Set<SaberContinuousLaserBulletType> warnedMismatch =
+        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+
+    /** 缺少 SaberData 警告只输出一次 */
+    private static final java.util.Set<SaberContinuousLaserBulletType> warnedData =
+        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
 
     public SaberContinuousLaserBulletType(float damage) {
         super(damage);
@@ -144,7 +153,14 @@ public class SaberContinuousLaserBulletType extends ContinuousLaserBulletType {
 
     @Override
     public void draw(Bullet b) {
-        if (!(b.data instanceof SaberData temp)) return;
+        if (!(b.data instanceof SaberData temp)) {
+            // ★ 诊断日志: data 不是 SaberData 说明 update 未先初始化 (激光将不可见), 便于用户汇报
+            if (warnedData.add(this)) {
+                Log.warn("SaberContinuousLaserBulletType.draw: b.data=@ (期望 SaberData), 子弹类型=@",
+                    b.data, b.type);
+            }
+            return;
+        }
         
         float realLength = Damage.findLaserLength(b, temp.f);
         float fout = Mathf.clamp(b.time > b.lifetime - fadeTime ? 
@@ -157,10 +173,23 @@ public class SaberContinuousLaserBulletType extends ContinuousLaserBulletType {
         // 绘制激光主体
         Lines.lineAngle(b.x, b.y, b.rotation(), baseLen);
         
+        // ★ 防御性检查: colors/strokes 与 tscales/lenscales 由外部配置, 长度可能不一致
+        //   (jetstream 配置 lenscales=4 而 tscales=5 曾导致 ArrayIndexOutOfBoundsException)
+        //   遍历上限取各数组最小长度, 并输出警告日志方便定位配置错误
+        if (strokes.length < colors.length || lenscales.length < tscales.length) {
+            if (warnedMismatch.add(this)) {
+                Log.warn("SaberContinuousLaserBulletType 数组长度不一致: colors=@ strokes=@ tscales=@ lenscales=@ (单位: @)",
+                    colors.length, strokes.length, tscales.length, lenscales.length,
+                    b.owner instanceof mindustry.gen.Unit u ? u.type.name : b.owner);
+            }
+        }
+
         // 绘制激光效果层
-        for (int s = 0; s < colors.length; s++) {
+        int layers = Math.min(colors.length, strokes.length);
+        int inner = Math.min(tscales.length, lenscales.length);
+        for (int s = 0; s < layers; s++) {
             Draw.color(Tmp.c1.set(colors[s]).mul(1f + Mathf.absin(1f, 0.1f)));
-            for (int i = 0; i < tscales.length; i++) {
+            for (int i = 0; i < inner; i++) {
                 Tmp.v1.trns(b.rotation() + 180f, (lenscales[i] - 1f) * spaceMag);
                 Lines.stroke((width + Mathf.absin(oscScl, oscMag)) * fout * strokes[s] * tscales[i]);
                 Lines.lineAngle(b.x + Tmp.v1.x, b.y + Tmp.v1.y, b.rotation(), baseLen * lenscales[i], false);

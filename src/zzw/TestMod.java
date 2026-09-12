@@ -10,6 +10,7 @@ import zzw.content.blocks.Z_Blocks;
 import zzw.content.blocks.Z_Turrets;
 import zzw.content.blocks.distribution.Z_Distribution;
 import zzw.content.Z_Items;
+import zzw.content.Z_StatusEffects;
 import zzw.content.Z_Factory;
 import zzw.content.Z_Liquids;
 import zzw.content.Z_Mine;
@@ -63,6 +64,9 @@ public class TestMod extends Mod{
         // 加载自定义物品（基础资源; PU 物品在同文件内排在自创物品之后）
         Z_Items.load();
 
+        // 加载自定义状态效果 (blueBurn 等, 炮台子弹引用; 必须在炮台之前)
+        Z_StatusEffects.load();
+
         // 加载自定义液体（需要物品之前或并行）
         Z_Liquids.load();
 
@@ -91,6 +95,10 @@ public class TestMod extends Mod{
         // PU132 Scar 阵营单位 (9 个, hovos/ryzer/zena/sundown/rex/excelsus/whirlwind/jetstream/vortex;
         //   腿部单位和飞行单位, 不占物品栏方块位)
         zzw.content.units.Z_ScarUnits.load();
+
+        // PU132 End 最终单位 (2 个, apocalypse 天启 + thalassophobia 深海恐惧;
+        //   End 阵营最后两个 BOSS, 收尾后 end 阵营 10 个单位全部移植完毕)
+        zzw.content.units.Z_EndUnits.load();
 
         // 加载自定义方块（可能需要物品和工厂; 含 ModConstructor/TerraCore/强化器/灵魂工厂）
         Z_Blocks.load();

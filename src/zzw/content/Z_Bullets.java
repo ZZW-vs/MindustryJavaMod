@@ -298,6 +298,8 @@ public class Z_Bullets {
         public float decayMinVel = 0.9f, decayMaxVel = 1.1f;
         public float decayMinLife = 0.3f, decayMaxLife = 1.3f;
         public BulletType decayBullet;
+        /** PU132 decayEffect: 主弹沿途播放的拖尾特效 (w-boson 用) */
+        public Effect decayEffect = Fx.none;
 
         public DecayBasicBulletType(float speed, float damage) {
             super(speed, damage);
@@ -314,6 +316,10 @@ public class Z_Bullets {
         @Override
         public void update(Bullet b) {
             super.update(b);
+            // PU132 decayEffect: 随衰减计时播放拖尾
+            if (decayEffect != Fx.none && b.timer(2, minInterval)) {
+                decayEffect.at(b.x, b.y, b.rotation() + 180f);
+            }
             if (decayBullet != null && b.timer(1, Mathf.lerp(maxInterval, minInterval, b.fin()))) {
                 decayBullet.create(b, b.team, b.x, b.y, b.rotation() + Mathf.range(180f), Mathf.random(decayMinVel, decayMaxVel), Mathf.lerp(decayMaxLife, decayMinLife, b.fin()));
             }

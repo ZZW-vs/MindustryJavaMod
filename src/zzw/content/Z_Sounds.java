@@ -21,6 +21,8 @@ public class Z_Sounds {
         endBasicSmall,    // 基础小型子弹射击音效
         endBasic,         // 基础子弹射击音效
         devourerMainLaser, // 噬界虫主激光射击音效
+        continuousLaserB, // end 系持续激光武器射击音效 (apocalypseLaser/quetzalcoatl 主炮, PU132 UnitySounds.continuousLaserB)
+        thalassophobiaLaser, // thalassophobia 主炮充能+射击音效 (PU132 UnitySounds.thalassophobiaLaser)
         xenoBeam,         // 西诺腐蚀者激光循环音效
         energyBolt,       // fmonolith 能量弹射击音效
         heatRay,          // fmonolith heat-ray 持续激光音效
@@ -63,6 +65,8 @@ public class Z_Sounds {
         endBasicSmall = loadSound("end/end-basic-small");
         endBasic = loadSound("end/end-basic");
         devourerMainLaser = loadSound("end/devourer-main-laser");
+        continuousLaserB = loadSound("continuous-laser-b");
+        thalassophobiaLaser = loadSound("end/thalassophobia-laser");
         xenoBeam = loadSound("advance/xeno-beam");
         energyBolt = loadSound("energy-bolt");
         heatRay = loadSound("heat-ray");

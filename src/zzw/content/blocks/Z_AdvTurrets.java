@@ -1,7 +1,13 @@
 package zzw.content.blocks;
 
 import arc.graphics.Color;
+import arc.math.Angles;
+import arc.math.Mathf;
+import arc.util.Time;
+import arc.graphics.g2d.Draw;
+import arc.graphics.g2d.Fill;
 import mindustry.content.Fx;
+import mindustry.entities.Lightning;
 import mindustry.content.Items;
 import mindustry.entities.bullet.BasicBulletType;
 import mindustry.entities.bullet.BulletType;
@@ -389,22 +395,59 @@ public class Z_AdvTurrets {
             efficiencyFrom = 0.7f;
             efficiencyTo = 1.8f;
             // ★ supernovaLaser: 持续激光, 3200 伤害, 长度 280, 多色叠加 + 闪电
-            shootType = new ContinuousLaserBulletType(3200f) {{
-                length = 280f;
-                colors = new Color[]{
-                    Color.valueOf("4be3ca55"),
-                    Color.valueOf("91eedeaa"),
-                    Pal.lancerLaser.cpy(),
-                    Color.white
-                };
-                hitEffect = Fx.hitLancer;
-                hitSize = 8f;
-                lifetime = 16f;
-                drawSize = 600f;
-                incendAmount = 0;
-                incendSpread = 0f;
-                incendChance = 0f;
-            }};
+            shootType = new ContinuousLaserBulletType(3200f) {
+                // PU132 supernovaLaser: 光束沿途随机闪电 + 等离子粒子拖尾 (内联特效)
+                final mindustry.entities.Effect plasmaEffect = new mindustry.entities.Effect(36f, e -> {
+                    Draw.color(Color.white, Pal.lancerLaser, e.fin());
+                    Fill.circle(
+                        e.x + Angles.trnsx(e.rotation, e.fin() * 24f),
+                        e.y + Angles.trnsy(e.rotation, e.fin() * 24f),
+                        e.fout() * 5f
+                    );
+                });
+
+                {
+                    length = 280f;
+                    colors = new Color[]{
+                        Color.valueOf("4be3ca55"),
+                        Color.valueOf("91eedeaa"),
+                        Pal.lancerLaser.cpy(),
+                        Color.white
+                    };
+                    hitEffect = Fx.hitLancer;
+                    hitSize = 8f;
+                    lifetime = 16f;
+                    drawSize = 600f;
+                    incendAmount = 0;
+                    incendSpread = 0f;
+                    incendChance = 0f;
+                }
+
+                @Override
+                public void update(mindustry.gen.Bullet b){
+                    super.update(b);
+
+                    // 每 tick 沿光束随机位置起一道闪电
+                    if(b.timer(2, 1f)){
+                        float start = Mathf.randomSeed((long)(b.id + Time.time), length);
+                        Lightning.create(b.team, Pal.lancerLaser, 12f,
+                            b.x + Angles.trnsx(b.rotation(), start),
+                            b.y + Angles.trnsy(b.rotation(), start),
+                            b.rotation() + Mathf.randomSeedRange((long)(b.id + Time.time + 1f), 15f), Mathf.randomSeed((long)(b.id + Time.time + 2f), 10, 19)
+                        );
+                    }
+
+                    // 每 tick 2 个等离子粒子
+                    for(int i = 0; i < 2; i++){
+                        float f = Mathf.random(length * b.fout());
+                        plasmaEffect.at(
+                            b.x + Angles.trnsx(b.rotation(), f) + Mathf.range(6f),
+                            b.y + Angles.trnsy(b.rotation(), f) + Mathf.range(6f),
+                            b.rotation() + Mathf.range(85f)
+                        );
+                    }
+                }
+            };
         }};
     }
 
