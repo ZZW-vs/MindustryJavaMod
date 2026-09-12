@@ -1,5 +1,6 @@
 package zzw.content.type;
 
+import arc.Core;
 import arc.func.Func;
 import arc.graphics.g2d.*;
 import arc.struct.*;
@@ -11,6 +12,7 @@ import mindustry.gen.*;
 import mindustry.graphics.*;
 import mindustry.type.*;
 import mindustry.world.blocks.environment.*;
+import zzw.content.units.AbilityTextures;
 import zzw.content.units.entities.DecorationUnitEntity;
 import zzw.content.units.type.decal.UnitDecorationType;
 import zzw.content.units.type.decal.UnitDecorationType.UnitDecoration;
@@ -47,6 +49,13 @@ public class UnityUnitType extends UnitType{
     // For decorations system
     public Seq<UnitDecorationType> decorations = new Seq<>();
 
+    // For ability system (PU132)
+    /** 能力贴图数组 */
+    public TextureRegion[] abilityRegions = new TextureRegion[AbilityTextures.values().length];
+    
+    /** 自定义后腿贴图 */
+    public TextureRegion customBackLegs;
+
     /** 对象化引擎 (PU132): 非 null 时 drawEngine 走 Engine.draw 而非原版标量字段。 */
     public Engine engine;
     /** 拖尾工厂 (PU132 trailType): 替代原版 new Trail(trailLength), Monolith 用 TexturedTrail/MultiTrail。 */
@@ -78,6 +87,18 @@ public class UnityUnitType extends UnitType{
     @Override
     public void load(){
         super.load();
+        
+        // 加载能力贴图 (PU132)
+        for(AbilityTextures type : AbilityTextures.values()){
+            String regionName = name + "-" + type.name();
+            abilityRegions[type.ordinal()] = Core.atlas.find(regionName, (arc.graphics.g2d.TextureRegion)null);
+        }
+        
+        // 加载自定义后腿贴图
+        if(customBackLegs == null){
+            customBackLegs = Core.atlas.find(name + "-backlegs", (arc.graphics.g2d.TextureRegion)null);
+        }
+        
         if(decorations.size > 0){
             boolean decorEntity = constructor != null && constructor.get() instanceof DecorationUnitEntity;
             Log.info("[deco-debug] 单位 @ 开始加载装饰, 数量: @ (实体构造器: @)",

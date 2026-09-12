@@ -22,6 +22,7 @@ import mindustry.entities.bullet.BasicBulletType;
 import mindustry.entities.bullet.BulletType;
 import mindustry.entities.bullet.ContinuousLaserBulletType;
 import mindustry.entities.bullet.LaserBulletType;
+import mindustry.entities.bullet.ShrapnelBulletType;
 import mindustry.gen.Bullet;
 import mindustry.gen.Healthc;
 import mindustry.gen.Hitboxc;
@@ -30,6 +31,7 @@ import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
 
+import zzw.content.graphics.UnityPal;
 import zzw.content.units.bullets.KamiBulletType;
 
 import static mindustry.Vars.tilesize;
@@ -52,6 +54,19 @@ public class Z_Bullets {
     // ===== kami 弹幕子弹 (PU132 移植) =====
     public static BulletType kamiBullet2 = new KamiBulletType();
     public static BulletType kamiBullet3 = new KamiBulletType();
+
+    /**
+     * Scar 方向护盾爆炸反射破片弹 (PU132 UnityBullets.scarShrapnel)。
+     *
+     * <p>DirectionShieldAbility 在护盾反弹高伤害 (>= explosiveDamageThreshold) 子弹时,
+     * 向偏转角两侧各 20 度共发射 3 发此破片弹, 伤害 = 造成的护盾伤害 x 0.7 倍率。</p>
+     */
+    public static BulletType scarShrapnel = new ShrapnelBulletType(){{
+        fromColor = UnityPal.endColor;
+        toColor = UnityPal.scarColor;
+        damage = 1f;
+        length = 110f;
+    }};
 
     static {
         // kamiBullet2 有拖尾 (PU132 trailLength=12), kamiBullet3 无拖尾

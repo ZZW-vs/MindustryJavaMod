@@ -88,6 +88,10 @@ public class TestMod extends Mod{
         //   同样不占物品栏方块位, 与 Koruh 单位并列)
         Z_MonolithUnits.load();
 
+        // PU132 Scar 阵营单位 (9 个, hovos/ryzer/zena/sundown/rex/excelsus/whirlwind/jetstream/vortex;
+        //   腿部单位和飞行单位, 不占物品栏方块位)
+        zzw.content.units.Z_ScarUnits.load();
+
         // 加载自定义方块（可能需要物品和工厂; 含 ModConstructor/TerraCore/强化器/灵魂工厂）
         Z_Blocks.load();
 

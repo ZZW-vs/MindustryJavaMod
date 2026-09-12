@@ -3999,7 +3999,7 @@ public class Z_Units {
                 reload = 8f;
                 mirror = true;
                 shootCone = 30f;
-                bullet = new mindustry.entities.bullet.BasicBulletType(4f, 5f) {{
+                bullet = new mindustry.entities.bullet.BasicBulletType(5f, 8f) {{
                     lifetime = 36f;
                     shrinkY = 0.2f;
                 }};
@@ -4013,7 +4013,7 @@ public class Z_Units {
                 reload = 12f;
                 mirror = true;
                 shootCone = 30f;
-                bullet = new mindustry.entities.bullet.BasicBulletType(4f, 8f) {{
+                bullet = new mindustry.entities.bullet.BasicBulletType(4f, 12f) {{
                     width = 7f;
                     height = 9f;
                     lifetime = 36f;
@@ -4350,7 +4350,7 @@ public class Z_Units {
                 shootY = 2.25f;
                 mirror = true;
                 shootCone = 30f;
-                bullet = new mindustry.entities.bullet.MissileBulletType(3f, 1f) {{
+                bullet = new mindustry.entities.bullet.MissileBulletType(3f, 2f) {{
                     speed = 3f;
                     lifetime = 45f;
                     splashDamage = 40f;
@@ -4492,7 +4492,7 @@ public class Z_Units {
                 shootY = 4.5f;
                 reload = 60f;
                 shootSound = Sounds.shootLaser;
-                bullet = new LaserBulletType(240f) {{
+                bullet = new LaserBulletType(150f) {{
                     sideAngle = 45f;
                     length = 200f;
                 }};
@@ -4537,7 +4537,7 @@ public class Z_Units {
                 shootCone = 30f;
                 shootSound = Sounds.shootSpectre;  // ★ 原版 Sounds.shootBig, v158 无此音效用 shootSpectre 替代
                 ejectEffect = mindustry.content.Fx.casing3Double;
-                bullet = new mindustry.entities.bullet.BasicBulletType(7f, 80f) {{
+                bullet = new mindustry.entities.bullet.BasicBulletType(7.5f, 90f) {{
                     lifetime = 30f;
                     width = 18f;
                     height = 22f;
@@ -4587,7 +4587,7 @@ public class Z_Units {
                 // PU_V8: shots=3, spacing=15f, shotDelay=0f (3发同时发射, 角度间隔15度)
                 shoot = new mindustry.entities.pattern.ShootSpread(3, 15f);
                 bullet = new mindustry.entities.bullet.ShrapnelBulletType() {{
-                    damage = 150f;
+                    damage = 180f;
                     length = 150f;
                     toColor = mindustry.graphics.Pal.accent;
                     keepVelocity = false;
@@ -4635,8 +4635,8 @@ public class Z_Units {
             // 使用 Mathf.random(最小值, 最大值) 生成随机伤害
             // 基础伤害在 40f 到 60f 之间随机
 
-            BulletType mantodeaFlak = new FlakBulletType(30f, 50f) {{
-                lifetime = 10f;
+            BulletType mantodeaFlak = new FlakBulletType(15f, 100f) {{
+                lifetime = 20f;
                 collidesGround = true;
                 lightning = 4;
                 lightningLength = 5;
@@ -4651,7 +4651,7 @@ public class Z_Units {
                 rotate = false;
                 x = 14.25f;
                 y = 26.5f;
-                range = 25f;
+                range = 40f;
                 recoil = 2.5f;
                 shootY = 10f;
                 shootSound = Sounds.shoot;
@@ -4667,7 +4667,7 @@ public class Z_Units {
                 rotate = false;
                 x = 26.25f;
                 y = 19.5f;
-                range = 25f;
+                range = 40f;
                 recoil = 2.5f;
                 shootY = 10f;
                 shootSound = Sounds.shoot;

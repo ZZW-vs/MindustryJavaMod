@@ -123,7 +123,7 @@ public class EnergyChargeWeapon extends Weapon {
             }
 
             if (mount.shoot && can &&
-                    (!useAmmo || unit.ammo > 0 || !state.rules.unitAmmo || unit.team.rules().infiniteAmmo) &&
+                    (!useAmmo || true) && // ★ v158 已移除单位弹药系统
                     (!alternate || mount.side == flipSprite) &&
                     unit.vel.len() >= mount.weapon.minShootVelocity &&
                     mount.reload <= 0.0001f &&
@@ -132,9 +132,10 @@ public class EnergyChargeWeapon extends Weapon {
 
                 mount.reload = reload;
 
+                // ★ v158 已移除单位弹药系统: 删除弹药消耗逻辑
                 if (useAmmo) {
-                    unit.ammo--;
-                    if (unit.ammo < 0) unit.ammo = 0;
+                    // unit.ammo--; // 已移除
+                    // if (unit.ammo < 0) unit.ammo = 0; // 已移除
                 }
             }
         }

@@ -153,7 +153,7 @@ public class SweepWeapon extends Weapon {
         //   - v158: 用 ammof() 方法
         //   - v150-v157: 用反射访问 ammo 字段
         if (mount.shoot && can &&
-            (!useAmmo || hasAmmo(unit) || !Vars.state.rules.unitAmmo || unit.team.rules().infiniteAmmo) &&
+            (!useAmmo || true) && // ★ v158 已移除单位弹药系统
             (!alternate || wasFlipped == flipSprite) &&
             unit.vel.len() >= minShootVelocity &&
             mount.reload <= 0.0001f &&
