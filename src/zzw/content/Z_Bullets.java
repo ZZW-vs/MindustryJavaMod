@@ -22,6 +22,7 @@ import mindustry.entities.bullet.BasicBulletType;
 import mindustry.entities.bullet.BulletType;
 import mindustry.entities.bullet.ContinuousLaserBulletType;
 import mindustry.entities.bullet.LaserBulletType;
+import mindustry.entities.bullet.MissileBulletType;
 import mindustry.entities.bullet.ShrapnelBulletType;
 import mindustry.gen.Bullet;
 import mindustry.gen.Healthc;
@@ -66,6 +67,28 @@ public class Z_Bullets {
         toColor = UnityPal.scarColor;
         damage = 1f;
         length = 110f;
+    }};
+
+    /**
+     * Scar 通用导弹 (PU132 UnityBullets.scarMissile)。
+     *
+     * <p>sundown/rex/excelsus 的 scar-large-launcher 武器弹体:
+     * 微织运动 (weave) + 溅射 + 可贯穿 3 个建筑。</p>
+     */
+    public static BulletType scarMissile = new MissileBulletType(6f, 12f){{
+        lifetime = 70f;
+        speed = 5f;
+        width = 7f;
+        height = 12f;
+        shrinkY = 0f;
+        backColor = trailColor = UnityPal.scarColor;
+        frontColor = UnityPal.endColor;
+        splashDamage = 36f;
+        splashDamageRadius = 20f;
+        weaveMag = 3f;
+        weaveScale = 6f;
+        pierceBuilding = true;
+        pierceCap = 3;
     }};
 
     static {
