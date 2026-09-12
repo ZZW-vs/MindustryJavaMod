@@ -20,7 +20,12 @@ import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
 import mindustry.graphics.Trail;
 import zzw.content.graphics.UnityPal;
+import zzw.content.units.graphics.TexturedTrail;
+import zzw.content.units.graphics.MultiTrail;
+import zzw.content.units.graphics.MultiTrail.TrailHold;
+import zzw.content.units.graphics.TexturedTrail;
 import zzw.content.units.graphics.Trails;
+import zzw.util.UnityUtils;
 
 import static arc.graphics.g2d.Draw.alpha;
 import static arc.graphics.g2d.Draw.blend;
@@ -235,13 +240,16 @@ public class MonolithFx{
         TextureRegion reg = Core.atlas.find("create-monolith-chain");
         float t = e.finpow(), w = reg.width * 0.4f * t, h = reg.height * 0.4f * t, rad = 9f + t * 8f;
 
+        // PU132 组合四元数: 先绕 X 轴倾斜 75° (q2), 再绕世界 Z 轴旋转 (q1)
+        UnityUtils.q1.set(Vec3.Z, e.rotation + 90f).mul(UnityUtils.q2.set(Vec3.X, 75f));
+
         color(UnityPal.monolithLight);
         alpha(e.foutpowdown());
 
         UnityDrawf.panningCircle(reg,
             e.x, e.y, w, h,
             rad, 360f, e.fin(Interp.pow2Out) * 90f * Mathf.sign(e.id % 2 == 0) + e.id * 30f,
-            Vec3.X, 75f, Layer.flyingUnitLow - 0.01f, Layer.flyingUnit
+            UnityUtils.q1, Layer.flyingUnitLow - 0.01f, Layer.flyingUnit
         );
 
         color(Color.black, UnityPal.monolithDark, 0.67f);
@@ -251,11 +259,90 @@ public class MonolithFx{
         UnityDrawf.panningCircle(Core.atlas.find("create-line-shade"),
             e.x, e.y, w + 6f, h + 6f,
             rad, 360f, 0f,
-            Vec3.X, 75f, Layer.flyingUnitLow - 0.01f, Layer.flyingUnit
+            UnityUtils.q1, true, Layer.flyingUnitLow - 0.01f, Layer.flyingUnit
         );
 
         blend();
     }).layer(Layer.flyingUnit),
+
+    /**
+     * tendence 能量环充能特效 (40f) —— ChargeFx.tendenceCharge 完整移植。
+     *
+     * <p>发射瞬间触发 (挂在子弹 shootEffect 上), 步骤:</p>
+     * <ol>
+     *   <li>inst() 时生成 12 条随机方向的 soul 拖尾 (锚点距中心 24~64, 宽度随机 1~2)
+     *       存入 state.data, 主带 trailChance 降为 0.1 减少粒子干扰;</li>
+     *   <li>渲染: 8 个能量光点向外扩散; 12 条拖尾锚点 = 初始方向 * 收束插值
+     *       (foutpowdown: 起始最远, 随时间收向中心) + 正弦波动, 每帧推进并绘制;</li>
+     *   <li>后半程 (fin>0.5) 一道白色圆环从中心扫出 (半径 fout*64);</li>
+     *   <li>特效结束时 remove() 把 12 条拖尾复制交给 Fx.trailFade 渐隐,
+     *       避免拖尾突然消失。</li>
+     * </ol>
+     */
+    tendenceCharge = new CustomStateEffect(() -> {
+        class State extends EffectState{
+            @Override
+            public void remove(){
+                if(data instanceof TrailHold[] data) for(TrailHold trail : data) Fx.trailFade.at(x, y, trail.width, UnityPal.monolithLight, trail.trail.copy());
+                super.remove();
+            }
+        } return Pools.obtain(State.class, State::new);
+    }, 40f, e -> {
+        if(!(e.data instanceof TrailHold[] data)) return;
+
+        color(UnityPal.monolith, UnityPal.monolithLight, e.fin());
+        randLenVectors(e.id, 8, 8f + e.foutpow() * 32f, (x, y) ->
+            Fill.circle(e.x + x, e.y + y, 0.5f + e.fin() * 2.5f)
+        );
+
+        color();
+        for(TrailHold hold : data){
+            Tmp.v1.set(hold.x, hold.y);
+            Tmp.v2.trns(Tmp.v1.angle() - 90f, Mathf.sin(hold.width * 2.6f, hold.width * 8f * Interp.pow2Out.apply(e.fslope())));
+            Tmp.v1.scl(e.foutpowdown()).add(Tmp.v2).add(e.x, e.y);
+
+            float w = hold.width * e.fin();
+            // 游戏暂停时不再推进拖尾 (对应 PU132 的 !state.isPaused() 检查)
+            if(!state.isPaused()) hold.trail.update(Tmp.v1.x, Tmp.v1.y, w);
+
+            Tmp.c1.set(UnityPal.monolith).lerp(UnityPal.monolithLight, e.finpowdown());
+            hold.trail.drawCap(Tmp.c1, w);
+            hold.trail.draw(Tmp.c1, w);
+        }
+
+        stroke(Mathf.curve(e.fin(), 0.5f) * 1.4f, UnityPal.monolithLight);
+        Lines.circle(e.x, e.y, e.fout() * 64f);
+    }){
+        @Override
+        protected EffectState inst(float x, float y, float rotation, Color color, Object data){
+            TrailHold[] trails = new TrailHold[12];
+            for(int i = 0; i < trails.length; i++){
+                Tmp.v1.trns(Mathf.random(360f), Mathf.random(24f, 64f));
+                trails[i] = new TrailHold(Trails.with(Trails.soul(26), t -> {
+                    if(t.trails[t.trails.length - 1].trail instanceof TexturedTrail tr){
+                        tr.trailChance = 0.1f;
+                    }
+                }), Tmp.v1.x, Tmp.v1.y, Mathf.random(1f, 2f));
+            }
+
+            EffectState effectState = super.inst(x, y, rotation, color, data);
+            effectState.data = trails;
+            return effectState;
+        }
+    },
+
+    /**
+     * monolith 火花拖尾特效 (60f) —— ParticleFx.monolithSpark。
+     *
+     * <p>子弹 trailEffect 用: 沿弹道 (e.rotation 为散布半径) 随机散落
+     * 2 个渐大的 45° 旋转小方块, monolith → monolithDark 渐变。</p>
+     */
+    monolithSpark = new Effect(60f, e -> randLenVectors(e.id, 2, e.rotation, (x, y) -> {
+        color(UnityPal.monolith, UnityPal.monolithDark, e.fin());
+
+        float w = 1f + e.fout() * 4f;
+        Fill.rect(e.x + x, e.y + y, w, w, 45f);
+    })),
 
     /**
      * pedestal 蓄力霰弹装填特效 (25f) —— ShootFx.pedestalShootAdd。

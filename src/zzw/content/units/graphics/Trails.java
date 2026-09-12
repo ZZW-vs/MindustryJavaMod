@@ -4,6 +4,7 @@ import arc.Core;
 import arc.func.Cons;
 import arc.graphics.Blending;
 import arc.graphics.Color;
+import arc.graphics.g2d.TextureRegion;
 import arc.math.Interp;
 import arc.math.Mathf;
 import arc.util.Time;
@@ -34,8 +35,8 @@ public final class Trails{
      * @param length 拖尾长度 (点数)
      */
     public static TexturedTrail singlePhantasmal(int length){
-        // ★ 贴图名适配: PU132 "unity-phantasmal-trail" → "create-phantasmal-trail" (mod 贴图前缀规则)
-        return new TexturedTrail(Core.atlas.find("create-phantasmal-trail"), length){{
+        // ★ 贴图名适配: assets 实际文件为 "phantasmal-trail.png" (无 mod 前缀), 双查找兜底
+        return new TexturedTrail(region("phantasmal-trail"), length){{
             blend = Blending.additive;
             fadeInterp = Interp.pow2In;
             sideFadeInterp = Interp.pow3In;
@@ -134,8 +135,8 @@ public final class Trails{
      * 单条灵魂拖尾 (unity-soul-trail 贴图)。
      */
     public static TexturedTrail singleSoul(int length){
-        // ★ 贴图名适配: PU132 "unity-soul-trail" → "create-soul-trail" (mod 贴图前缀规则)
-        return new TexturedTrail(Core.atlas.find("create-soul-trail"), length){{
+        // ★ 贴图名适配: assets 实际文件为 "soul-trail.png" (无 mod 前缀), 双查找兜底
+        return new TexturedTrail(region("soul-trail"), length){{
             blend = Blending.additive;
             fadeInterp = Interp.pow5In;
             sideFadeInterp = Interp.pow10In;
@@ -216,9 +217,19 @@ public final class Trails{
     }
 
     /** 对对象应用配置后返回原对象 (等价 PU Utils.with)。 */
-    private static <T> T with(T obj, Cons<T> cons){
+    public static <T> T with(T obj, Cons<T> cons){
         cons.get(obj);
         return obj;
+    }
+
+    /**
+     * 双前缀贴图查找: 先按原名 (assets 实际文件名), 找不到再退回 "create-" 前缀版本。
+     * <p>scar/monolith 系贴图直接拷贝自 PU132 (文件名不带前缀), 而自绘贴图带
+     * create- 前缀, 两种命名并存, 因此统一走双查找。</p>
+     */
+    public static TextureRegion region(String name){
+        TextureRegion r = Core.atlas.find(name);
+        return r.found() ? r : Core.atlas.find("create-" + name);
     }
 
     private Trails(){

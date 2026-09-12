@@ -21,6 +21,8 @@ import mindustry.gen.Unit;
  * @author PU132 原作, 移植: zzw
  */
 public class UnityUtils{
+    /** 复用四元数 (PU132 Utils.q1/q2), 3D 透视圆环旋转用 —— 每帧重复利用避免分配。 */
+    public static final Quat q1 = new Quat(), q2 = new Quat();
     /** 复用临时向量 (避免每帧分配) */
     private static final Vec2 tV = new Vec2();
     /** 复用临时矩形 */

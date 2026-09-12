@@ -22,6 +22,7 @@ import mindustry.entities.bullet.BulletType;
 import mindustry.entities.bullet.LightningBulletType;
 import mindustry.entities.bullet.LaserBoltBulletType;
 import mindustry.entities.bullet.LaserBulletType;
+import mindustry.entities.pattern.ShootPattern;
 import mindustry.entities.pattern.ShootSpread;
 import mindustry.gen.*;
 import mindustry.graphics.Layer;
@@ -37,15 +38,24 @@ import zzw.content.units.effects.UnityDrawf;
 import zzw.content.units.bullets.JoiningBulletType;
 import zzw.content.units.bullets.RicochetBulletType;
 import zzw.content.units.bullets.UnityBullets;
+import zzw.content.units.bullets.HelixLaserBulletType;
 import zzw.content.units.abilities.LightningSpawnAbility;
 import zzw.content.units.effects.MonolithFx;
 import zzw.content.units.effects.ParticleFx;
 import zzw.content.units.effects.UnityDrawf;
 import zzw.content.units.graphics.MultiTrail;
 import zzw.content.units.graphics.MultiTrail.TrailHold;
+import zzw.content.units.graphics.TexturedTrail;
 import zzw.content.units.graphics.Trails;
+import zzw.content.units.types.Engine;
+import zzw.content.units.types.Engine.MultiEngine;
+import zzw.content.units.entities.DecorationUnitEntity;
+import zzw.content.units.type.decal.UnitDecalType;
 import zzw.content.units.weapons.ChargeShotgunWeapon;
 import zzw.content.units.weapons.ChargeShotgunWeapon.ChargeShotgunMount;
+import zzw.content.units.weapons.EnergyRingWeapon;
+import zzw.content.units.weapons.EnergyRingWeapon.Ring;
+import zzw.util.UnityUtils;
 
 import static mindustry.Vars.headless;
 
@@ -87,7 +97,8 @@ public class Z_MonolithUnits{
     // 巨石辅助无人机 (飞行, PU132 为 Assistantc, 此处简化为普通飞行单位)
     public static UnityUnitType adsect, comitate;
 
-    // ★ 能量环单位 (stray/tendence/liminality/calenture) 按用户要求放弃移植
+    // 巨石能量环单位 (飞行, 无贴图 EnergyRingWeapon = 旋转符环 + 中心眼睛)
+    public static UnityUnitType stray, tendence, liminality;
 
     public static void load(){
         // 子弹先于单位加载 (pylon/monument 武器引用 UnityBullets)
@@ -99,6 +110,7 @@ public class Z_MonolithUnits{
         loadPilaster();
         loadLegUnits();
         loadGiantUnits();
+        loadEnergyRingUnits();
     }
 
     /**
@@ -1017,6 +1029,396 @@ public class Z_MonolithUnits{
                     }
                 };
             }});
+        }};
+    }
+
+    /**
+     * 能量环单位三连 — stray / tendence / liminality (PU132 MonolithUnitTypes L983-1336 完整移植)。
+     *
+     * <p>无贴图 {@link EnergyRingWeapon} (旋转符环 + 中心眼睛) 是三者的共同视觉核心;
+     * 拖尾为 phantasmal/soul 多重丝带, 实体为 DecorationUnitEntity (承载 decal 顶层贴图)。</p>
+     *
+     * <p>★ v158 适配: PU132 的 chargeShootEffect → v158.1 BulletType.chargeEffect;
+     * Weapon.shots/shotDelay/firstShotDelay → ShootPattern; Sounds.laser → shootLaser;
+     * HelixLaserBulletType (PU 自定义螺旋激光) 一并移植。</p>
+     */
+    private static void loadEnergyRingUnits(){
+        // stray — 游荡者 (T1 能量环单位, 环绕散射追踪弹)
+        stray = new UnityUnitType("create-stray"){{
+            constructor = DecorationUnitEntity::create;
+
+            health = 300f;
+            speed = 5f;
+            accel = 0.08f;
+            drag = 0.045f;
+            rotateSpeed = 8f;
+            flying = true;
+            hitSize = 12f;
+            lowAltitude = true;
+            // rotateShooting = false; // v158 无该字段 (默认行为等价)
+            outlineColor = UnityPal.darkOutline;
+
+            // 步骤 1: 三引擎组合 (1 主 + 2 侧), 主引擎参数写回 type 标量供拖尾使用
+            engine = new Engine.MultiEngine(
+                new Engine.MultiEngine.EngineHold(ringEngine(2.5f, 11f, 0f, UnityPal.monolithLight), 0f),
+                new Engine.MultiEngine.EngineHold(ringEngine(2.5f * 0.6f, 11f, 2.5f, UnityPal.monolithLight), -4.5f),
+                new Engine.MultiEngine.EngineHold(ringEngine(2.5f * 0.6f, 11f, 2.5f, UnityPal.monolithLight), 4.5f)
+            ){{
+                color = UnityPal.monolithLight;
+                size = 2.5f;
+                offset = 11f;
+            }}.apply(this);
+
+            // 步骤 2: 幻影多重拖尾 (主带 + 两侧丝带)
+            trailType = unit -> new MultiTrail(MultiTrail.rot(unit),
+                new TrailHold(Trails.phantasmal(MultiTrail.rot(unit), 16, 3.6f, 6f, unit.type.speed, 2f), engineColor),
+                new TrailHold(Trails.with(Trails.singlePhantasmal(24), t -> {
+                    t.trailChance = 0f;
+                    t.fadeInterp = e -> (1f - Interp.pow5In.apply(e)) * Interp.pow2In.apply(e);
+                    t.sideFadeInterp = e -> (1f - Interp.pow4In.apply(e)) * Interp.pow3In.apply(e);
+                }), -4.5f, 2.5f, 0.44f, UnityPal.monolithLight),
+                new TrailHold(Trails.with(Trails.singlePhantasmal(24), t -> {
+                    t.trailChance = 0f;
+                    t.fadeInterp = e -> (1f - Interp.pow5In.apply(e)) * Interp.pow2In.apply(e);
+                    t.sideFadeInterp = e -> (1f - Interp.pow4In.apply(e)) * Interp.pow3In.apply(e);
+                }), 4.5f, 2.5f, 0.44f, UnityPal.monolithLight)
+            );
+            trailLength = 24;
+
+            // 步骤 3: 能量环武器 (内环 4 刺 + 内 2 段弧) + 环绕散射追踪弹
+            weapons.add(new EnergyRingWeapon(){{
+                rings.add(new Ring(){{
+                    radius = 5.5f;
+                    thickness = 1f;
+                    spikes = 4;
+                    spikeOffset = 1.5f;
+                    spikeWidth = 2f;
+                    spikeLength = 4f;
+                    color = UnityPal.monolithDark.cpy().lerp(UnityPal.monolith, 0.5f);
+                }}, new Ring(){{
+                    shootY = radius = 2.5f;
+                    rotate = false;
+                    thickness = 1f;
+                    divisions = 2;
+                    divisionSeparation = 30f;
+                    angleOffset = 90f;
+                    color = UnityPal.monolith;
+                }});
+
+                x = y = 0f;
+                mirror = false;
+                rotate = true;
+                reload = 60f;
+                shoot = new ShootPattern(){{ shots = 6; shotDelay = 1f; }};
+                inaccuracy = 30f;
+                layerOffset = 10f;
+                eyeRadius = 1.8f;
+
+                shootSound = Z_Sounds.energyBolt;
+                bullet = new BasicBulletType(1f, 6f, "shell"){
+                    {
+                        drag = -0.08f; // 负阻力 = 持续加速
+                        lifetime = 35f;
+                        width = 8f;
+                        height = 13f;
+
+                        homingDelay = 6f;
+                        homingPower = 0.09f;
+                        homingRange = 160f;
+                        weaveMag = 6f;
+                        keepVelocity = false;
+
+                        frontColor = trailColor = UnityPal.monolith;
+                        backColor = UnityPal.monolithDark;
+                        trailChance = 0.3f;
+                        trailParam = 1.5f;
+                        trailWidth = 2f;
+                        trailLength = 12;
+
+                        shootEffect = Fx.lightningShoot;
+                        hitEffect = despawnEffect = Fx.hitLancer;
+                    }
+
+                    @Override
+                    public void updateTrail(Bullet b){
+                        if(!headless && trailLength > 0 && b.trail == null) b.trail = Trails.singlePhantasmal(trailLength);
+                        super.updateTrail(b);
+                    }
+
+                    @Override
+                    public void removed(Bullet b){
+                        super.removed(b);
+                        b.trail = null;
+                    }
+                };
+            }});
+        }};
+
+        // tendence — 趋势者 (T2 能量环单位, 充能追踪重弹 + 3D 透视旋转圆环弹体)
+        tendence = new UnityUnitType("create-tendence"){{
+            constructor = DecorationUnitEntity::create;
+
+            health = 1200f;
+            // rotateShooting = false; // v158 无该字段
+            lowAltitude = true;
+            flying = true;
+            maxSouls = 4; // 灵魂容量 (灵魂系统字段, 随灵魂系统生效)
+
+            hitSize = 16f;
+            speed = 4.2f;
+            rotateSpeed = 7.2f;
+            drag = 0.045f;
+            accel = 0.08f;
+
+            outlineColor = UnityPal.darkOutline;
+            // ★ v158 已移除单位弹药系统, PU132 ammoType = PowerAmmoType(1000) 删除
+
+            engine = new Engine.MultiEngine(
+                new Engine.MultiEngine.EngineHold(ringEngine(2.5f, 10f, 0f, UnityPal.monolith), -5f),
+                new Engine.MultiEngine.EngineHold(ringEngine(2.5f, 10f, 0f, UnityPal.monolith), 5f)
+            ){{
+                offset = 10f;
+                size = 2.5f;
+                color = UnityPal.monolith;
+            }}.apply(this);
+
+            trailType = unit -> new MultiTrail(MultiTrail.rot(unit),
+                new TrailHold(Trails.soul(MultiTrail.rot(unit), 24, unit.type.speed), -5f, 0f, 1f, UnityPal.monolithLight),
+                new TrailHold(Trails.soul(MultiTrail.rot(unit), 24, unit.type.speed), 5f, 0f, 1f, UnityPal.monolithLight)
+            );
+            trailLength = 24;
+
+            // 顶部装饰贴图 (身体上方, 子弹层之下)
+            decorations.add(new UnitDecalType(name + "-top", 0f, 0f, 0f, Layer.bullet - 0.02f, Color.white));
+
+            weapons.add(new EnergyRingWeapon(){{
+                rings.add(new Ring(){{
+                    radius = 6.5f;
+                    thickness = 1f;
+                    spikes = 8;
+                    spikeOffset = 1.5f;
+                    spikeWidth = 2f;
+                    spikeLength = 4f;
+                    color = UnityPal.monolithDark.cpy().lerp(UnityPal.monolith, 0.5f);
+                }}, new Ring(){{
+                    shootY = radius = 3f;
+                    rotate = false;
+                    thickness = 1f;
+                    divisions = 2;
+                    divisionSeparation = 30f;
+                    angleOffset = 90f;
+                    color = UnityPal.monolith;
+                }});
+
+                x = 0f;
+                y = 1f;
+                mirror = false;
+                rotate = true;
+                reload = 72f;
+                shoot = new ShootPattern(){{ firstShotDelay = 35f; }};
+                inaccuracy = 15f;
+                layerOffset = 10f;
+                eyeRadius = 1.8f;
+                parentizeEffects = true;
+
+                chargeSound = Z_Sounds.energyCharge;
+                shootSound = Z_Sounds.energyBlast;
+                bullet = new BasicBulletType(4.8f, 72f, "shell"){
+                    {
+                        lifetime = 48f;
+                        width = 16f;
+                        height = 25f;
+                        keepVelocity = false;
+                        homingPower = 0.03f;
+                        homingRange = speed * lifetime * 2f; // PU132: range() * 2f, v158 手动换算
+
+                        lightning = 3;
+                        lightningColor = UnityPal.monolithLight;
+                        lightningDamage = 12f;
+                        lightningLength = 12;
+
+                        frontColor = trailColor = UnityPal.monolith;
+                        backColor = UnityPal.monolithDark;
+                        trailEffect = MonolithFx.monolithSpark;
+                        trailChance = 0.4f;
+                        trailParam = 6f;
+                        trailWidth = 5f;
+                        trailLength = 32;
+
+                        hitEffect = despawnEffect = MonolithFx.tendenceHit;
+                        // PU132 chargeShootEffect → v158.1 chargeEffect (发射时 3D 链环)
+                        chargeEffect = MonolithFx.tendenceShoot;
+                        shootEffect = MonolithFx.tendenceCharge;
+                    }
+
+                    @Override
+                    public void draw(Bullet b){
+                        super.draw(b);
+                        long seed = Mathf.rand.getState(0);
+
+                        TextureRegion reg = Core.atlas.white(), light = Core.atlas.find("create-line-shade");
+
+                        Lines.stroke(2f);
+                        for(int i = 0; i < 2; i++){
+                            Mathf.rand.setSeed(b.id);
+                            Tmp.v31.set(1f, 0f, 0f).setToRandomDirection();
+
+                            float r = b.id * 20f + Time.time * 6f * Mathf.sign(b.id % 2 == 0);
+                            UnityUtils.q1.set(i == 0 ? Vec3.X : Vec3.Y, r).mul(UnityUtils.q2.set(Tmp.v31, r * Mathf.signs[i]));
+
+                            Draw.color(i == 0 ? UnityPal.monolith : UnityPal.monolithDark);
+                            UnityDrawf.panningCircle(reg,
+                                b.x, b.y, 1f, 1f,
+                                10f + i * 4f, 360f, 0f,
+                                UnityUtils.q1, true, Layer.flyingUnitLow - 0.01f, Layer.flyingUnit
+                            );
+
+                            Draw.color(Color.black, UnityPal.monolithDark, i == 0 ? 0.5f : 0.25f);
+                            Draw.blend(Blending.additive);
+
+                            UnityDrawf.panningCircle(light,
+                                b.x, b.y, 5f, 5f,
+                                10f + i * 4f, 360f, 0f,
+                                UnityUtils.q1, true, Layer.flyingUnitLow - 0.01f, Layer.flyingUnit
+                            );
+
+                            Draw.blend();
+                        }
+
+                        Draw.reset();
+                        Mathf.rand.setSeed(seed);
+                    }
+
+                    @Override
+                    public void updateTrail(Bullet b){
+                        if(!headless && trailLength > 0 && b.trail == null){
+                            MultiTrail mt = Trails.soul(trailLength, 6f, trailWidth - 0.3f, speed);
+                            for(TrailHold hold : mt.trails){
+                                if(hold.trail instanceof TexturedTrail tt) tt.forceCap = true;
+                            }
+                            b.trail = mt;
+                            // 预推进一圈, 拖尾从炮口就有完整形态
+                            for(int i = 0; i < mt.trails.length; i++) mt.update(b.x, b.y, 0f);
+                        }
+
+                        super.updateTrail(b);
+                    }
+
+                    @Override
+                    public void removed(Bullet b){
+                        super.removed(b);
+                        b.trail = null;
+                    }
+                };
+            }});
+        }};
+
+        // liminality — 阈限者 (T3 能量环单位, 螺旋激光主炮 + 三层符环)
+        liminality = new UnityUnitType("create-liminality"){{
+            constructor = DecorationUnitEntity::create;
+
+            health = 2000f;
+            // rotateShooting = false; // v158 无该字段
+            lowAltitude = true;
+            flying = true;
+            maxSouls = 5; // 灵魂容量 (灵魂系统字段, 随灵魂系统生效)
+
+            strafePenalty = 0.1f;
+            hitSize = 36f;
+            speed = 3.5f;
+            rotateSpeed = 3.6f;
+            drag = 0.06f;
+            accel = 0.08f;
+
+            outlineColor = UnityPal.darkOutline;
+            // ★ v158 已移除单位弹药系统, PU132 ammoType = PowerAmmoType(2000) 删除
+
+            engine = new Engine.MultiEngine(
+                new Engine.MultiEngine.EngineHold(new Engine(){{
+                    offset = 89f / 4f;
+                    size = 4f;
+                    color = UnityPal.monolithLight;
+                }}, 0f),
+                new Engine.MultiEngine.EngineHold(ringEngine(3f, 85f / 4f, 65f / 4f, UnityPal.monolith), -71f / 4f),
+                new Engine.MultiEngine.EngineHold(ringEngine(3f, 85f / 4f, 65f / 4f, UnityPal.monolith), 71f / 4f)
+            ){{
+                offset = 85f / 4f;
+                size = 4f;
+                color = UnityPal.monolithLight;
+            }}.apply(this);
+
+            trailType = unit -> new MultiTrail(MultiTrail.rot(unit),
+                new TrailHold(Trails.phantasmal(MultiTrail.rot(unit), 32, 5.6f, 8f, unit.type.speed, 0f), engineColor),
+                new TrailHold(Trails.soul(MultiTrail.rot(unit), 48, 6f, 3.2f, unit.type.speed), -71f / 4f, (89f - 65f) / 4f, 0.75f, engineColor),
+                new TrailHold(Trails.soul(MultiTrail.rot(unit), 48, 6f, 3.2f, unit.type.speed), 71f / 4f, (89f - 65f) / 4f, 0.75f, engineColor)
+            );
+            trailLength = 48;
+
+            // 两层装饰贴图: -middle (子弹层下) 与 -top (特效层上)
+            decorations.add(
+                new UnitDecalType(name + "-middle", 0f, 0f, 0f, Layer.bullet - 0.02f, Color.white),
+                new UnitDecalType(name + "-top", 0f, 0f, 0f, Layer.effect + 0.0199f, Color.white)
+            );
+
+            weapons.add(new EnergyRingWeapon(){{
+                rings.add(new Ring(){{
+                    radius = 9f;
+                    thickness = 1f;
+                    spikes = 6;
+                    spikeOffset = 1.5f;
+                    spikeWidth = 2f;
+                    spikeLength = 4f;
+                    color = UnityPal.monolithDark.cpy().lerp(UnityPal.monolith, 0.5f);
+                }}, new Ring(){{
+                    shootY = radius = 5.6f;
+                    rotate = false;
+                    thickness = 1f;
+                    divisions = 2;
+                    divisionSeparation = 30f;
+                    angleOffset = 90f;
+                    color = UnityPal.monolith;
+                }}, new Ring(){{
+                    radius = 2f;
+                    thickness = 1f;
+                    spikes = 4;
+                    spikeOffset = 0.4f;
+                    spikeWidth = 1f;
+                    spikeLength = 1.5f;
+                    flip = true;
+                    color = UnityPal.monolithDark;
+                }});
+
+                x = 0f;
+                y = 5f;
+                mirror = false;
+                rotate = true;
+                reload = 72f;
+                layerOffset = 10f;
+                eyeRadius = 2f;
+
+                // ★ v155.4: Sounds.laser → Sounds.shootLaser
+                shootSound = Sounds.shootLaser;
+                bullet = new HelixLaserBulletType(240f){{
+                    sideWidth = 1.4f;
+                    sideAngle = 30f;
+                }};
+            }});
+        }};
+    }
+
+    /**
+     * 能量环单位子引擎构造辅助 (PU132 MonolithUnitTypes 内的 EngineType lambda 展开)。
+     *
+     * @param size 引擎半径
+     * @param offsetBase 引擎基准后向偏移 (PU132 字面量 11f/10f/85f/4f 等)
+     * @param offsetY 偏移修正 (实际 offset = offsetBase - offsetY)
+     * @param color 引擎颜色
+     */
+    private static Engine ringEngine(float size, float offsetBase, float offsetY, Color color){
+        return new Engine(){{
+            this.color = color;
+            this.size = size;
+            this.offset = offsetBase - offsetY;
         }};
     }
 }

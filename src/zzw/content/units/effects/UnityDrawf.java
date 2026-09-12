@@ -1,5 +1,6 @@
 package zzw.content.units.effects;
 
+import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
@@ -7,8 +8,10 @@ import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
 import arc.math.geom.Vec2;
 import arc.math.geom.Vec3;
+import arc.struct.FloatSeq;
 import arc.util.Tmp;
 import mindustry.graphics.Drawf;
+import zzw.util.Quat;
 
 /**
  * PU132 UnityDrawf 辅助渲染工具 (简化版)
@@ -151,6 +154,84 @@ public class UnityDrawf {
         }
     }
 
+    // ===== 多段线渲染 (PU132 UnityDrawf.beginLine/linePoint/endLine 适配版) =====
+    /** 多段线构建缓冲: 每个点 4 个 float (x, y, colorBits, z)。 */
+    private static final FloatSeq lineBuilder = new FloatSeq(40);
+    /** 是否正在构建多段线。 */
+    private static boolean buildingLine;
+    /** 多段线展开用的临时颜色。 */
+    private static final Color lc1 = new Color(), lc2 = new Color();
+
+    /** 开始构建多段线 (PU132 原版接口)。 */
+    public static void beginLine(){
+        lineBuilder.clear();
+        buildingLine = true;
+    }
+
+    /**
+     * 添加多段线顶点 (PU132 原版接口)。
+     *
+     * @param x, y 顶点位置
+     * @param col 顶点颜色 (toFloatBits, 支持逐点渐变)
+     * @param z 渲染深度 (用于前后穿插分层)
+     */
+    public static void linePoint(float x, float y, float col, float z){
+        if(!buildingLine) throw new IllegalStateException("Not building.");
+        lineBuilder.add(x, y, col, z);
+    }
+
+    /**
+     * 结束构建并绘制多段线 (PU132 UnityDrawf.endLine 适配版)。
+     *
+     * <p>★ v158 适配: PU132 用点连接 (pointy join) + 逐顶点深度排序渲染;
+     * 本实现把每对相邻顶点展开为一个四边形 (线段外扩 stroke/2 宽),
+     * 颜色取两端平均 (相邻点色差极小, 渐变视觉一致), z 取两端平均后
+     * 用 Draw.z 分层 —— z >= 0 画在前、z < 0 画在后, 保留螺旋丝带
+     * "绕杆穿插"的 3D 视觉。wrap 参数保留接口兼容 (当前未使用环绕)。</p>
+     */
+    public static void endLine(boolean wrap){
+        if(!buildingLine) throw new IllegalStateException("Not building.");
+        buildingLine = false;
+
+        float[] items = lineBuilder.items;
+        int len = lineBuilder.size;
+        if(len < 8) return;
+
+        float halfWidth = 0.5f * Lines.getStroke();
+
+        for(int i = 4; i < len - 4; i += 4){
+            float x1 = items[i - 4], y1 = items[i - 3], z1 = items[i - 1];
+            float x2 = items[i], y2 = items[i + 1], z2 = items[i + 3];
+
+            float dx = x2 - x1, dy = y2 - y1;
+            float d = Mathf.len(dx, dy);
+            if(d < 0.001f) continue;
+
+            // 线段法线方向外扩半宽, 构造四边形
+            float nx = -dy / d * halfWidth, ny = dx / d * halfWidth;
+
+            // arc Color.toFloatBits 为 ABGR 位模式打包, 手动反解为 0~1 分量
+            int ia = Float.floatToRawIntBits(items[i - 2]);
+            int ib = Float.floatToRawIntBits(items[i + 2]);
+            lc1.set((ia & 0xff) / 255f, ((ia >>> 8) & 0xff) / 255f, ((ia >>> 16) & 0xff) / 255f, ((ia >>> 24) & 0xff) / 255f);
+            lc2.set((ib & 0xff) / 255f, ((ib >>> 8) & 0xff) / 255f, ((ib >>> 16) & 0xff) / 255f, ((ib >>> 24) & 0xff) / 255f);
+            lc1.lerp(lc2, 0.5f);
+
+            Draw.z((z1 + z2) / 2f);
+            Draw.color(lc1);
+            Fill.quad(
+                x1 + nx, y1 + ny,
+                x2 + nx, y2 + ny,
+                x2 - nx, y2 - ny,
+                x1 - nx, y1 - ny
+            );
+        }
+
+        // 逐段 Draw.z 后不再恢复 —— 调用方 (如 HelixLaserBulletType.draw)
+        // 自行用开头快照的 z 收尾复位
+        Draw.color();
+    }
+
     /**
      * 计算带符号的角度差 (PU132 Utils.angleDistSigned)
      * <p>
@@ -248,5 +329,91 @@ public class UnityDrawf {
 
             Lines.line(x1 + x, y1 + y, vec1.x + x, vec1.y + y);
         }
+    }
+
+    /**
+     * 绘制 3D 透视旋转圆环 (PU132 UnityDrawf.panningCircle Quat 完整版, 11 参数)。
+     *
+     * <p>与上方"轴+角度"简化版的区别: 本版本接收任意组合四元数
+     * (如 PU132 tendenceShoot 的 "绕 Z 旋转 90 度再绕 X 倾斜 75 度" 两级旋转),
+     * 倾斜圆环等复杂姿态只有它能表达。</p>
+     */
+    public static void panningCircle(TextureRegion region, float x, float y, float w, float h,
+                                     float radius, float arcCone, float arcRotation,
+                                     Quat rotation, float layerLow, float layerHigh){
+        panningCircle(region, x, y, w, h, radius, arcCone, arcRotation, rotation, false, layerLow, layerHigh, 150f);
+    }
+
+    /** {@link #panningCircle(TextureRegion, float, float, float, float, float, float, float, Quat, boolean, float, float, float)} 的默认透视距离 (150f) 版本。 */
+    public static void panningCircle(TextureRegion region, float x, float y, float w, float h,
+                                     float radius, float arcCone, float arcRotation,
+                                     Quat rotation, boolean useLinePrecision, float layerLow, float layerHigh){
+        panningCircle(region, x, y, w, h, radius, arcCone, arcRotation, rotation, useLinePrecision, layerLow, layerHigh, 150f);
+    }
+
+    /**
+     * 绘制 3D 透视旋转圆环 (PU132 UnityDrawf.panningCircle 原版逻辑)。
+     *
+     * <p>渲染步骤 (逐步解释):</p>
+     * <ol>
+     *   <li>按周长/分片宽算出分片数 sides (useLinePrecision 时按 Lines 圆顶点精度);</li>
+     *   <li>每个分片取环带上 4 个顶点 (内外半径 r1/r2, 相邻角度 a/a+space);</li>
+     *   <li>用四元数 rotation 旋转顶点 (v' = v + 2w(q×v) + 2q×(q×v)),
+     *       再按透视公式 scl = (perspectiveDst + z) / perspectiveDst 缩放
+     *       (z 越大越靠近观察者, 分片越大);</li>
+     *   <li>4 顶点平均 z 决定渲染层级: z>=0 画在 layerHigh (单位前),
+     *       z<0 画在 layerLow (单位后), 实现"环绕穿插"效果;</li>
+     *   <li>Fill.quad 填充分片 (顶点顺序 x3,x2,x1,x4 保持贴图朝向)。</li>
+     * </ol>
+     *
+     * @param perspectiveDst 透视距离 (越大透视越弱)
+     */
+    public static void panningCircle(TextureRegion region, float x, float y, float w, float h,
+                                     float radius, float arcCone, float arcRotation,
+                                     Quat rotation, boolean useLinePrecision, float layerLow, float layerHigh, float perspectiveDst){
+        float z = Draw.z();
+
+        float arc = arcCone / 360f;
+        int sides = useLinePrecision
+            ? Math.max((int)(Lines.circleVertices(radius) * arc), 1)
+            : Math.max((int)((Mathf.PI2 * radius * arc) / Math.max(w, 1f)), 1);
+        float space = arcCone / sides;
+        float hstep = (Lines.getStroke() * h / 2f) / Mathf.cosDeg(space / 2f);
+        float r1 = radius - hstep, r2 = radius + hstep;
+
+        for(int i = 0; i < sides; i++){
+            float a = arcRotation - arcCone / 2f + space * i,
+                cos = Mathf.cosDeg(a), sin = Mathf.sinDeg(a),
+                cos2 = Mathf.cosDeg(a + space), sin2 = Mathf.sinDeg(a + space);
+
+            Tmp.v31.set(r1 * cos, r1 * sin, 0f);
+            rotation.transform(Tmp.v31);
+            Tmp.v31.scl(Math.max((perspectiveDst + Tmp.v31.z) / perspectiveDst, 0f));
+            float x1 = x + Tmp.v31.x, y1 = y + Tmp.v31.y;
+            float sumZ = Tmp.v31.z;
+
+            Tmp.v31.set(r1 * cos2, r1 * sin2, 0f);
+            rotation.transform(Tmp.v31);
+            Tmp.v31.scl(Math.max((perspectiveDst + Tmp.v31.z) / perspectiveDst, 0f));
+            float x2 = x + Tmp.v31.x, y2 = y + Tmp.v31.y;
+            sumZ += Tmp.v31.z;
+
+            Tmp.v31.set(r2 * cos2, r2 * sin2, 0f);
+            rotation.transform(Tmp.v31);
+            Tmp.v31.scl(Math.max((perspectiveDst + Tmp.v31.z) / perspectiveDst, 0f));
+            float x3 = x + Tmp.v31.x, y3 = y + Tmp.v31.y;
+            sumZ += Tmp.v31.z;
+
+            Tmp.v31.set(r2 * cos, r2 * sin, 0f);
+            rotation.transform(Tmp.v31);
+            Tmp.v31.scl(Math.max((perspectiveDst + Tmp.v31.z) / perspectiveDst, 0f));
+            float x4 = x + Tmp.v31.x, y4 = y + Tmp.v31.y;
+            sumZ = (sumZ + Tmp.v31.z) / 4f;
+
+            Draw.z(sumZ >= 0f ? layerHigh : layerLow);
+            Fill.quad(region, x3, y3, x2, y2, x1, y1, x4, y4);
+        }
+
+        Draw.z(z);
     }
 }

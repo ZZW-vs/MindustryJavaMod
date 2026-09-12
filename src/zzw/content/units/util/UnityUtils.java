@@ -1,9 +1,11 @@
 package zzw.content.units.util;
 
+import arc.Core;
 import arc.func.Boolf;
 import arc.func.Cons;
 import arc.func.Cons2;
 import arc.func.Floatc;
+import arc.graphics.g2d.TextureRegion;
 import arc.math.Angles;
 import arc.math.Mathf;
 import arc.math.Rand;
@@ -286,5 +288,18 @@ public final class UnityUtils {
             float r = Mathf.randomSeedRange(randSeed + h.id(), variance);
             return h.dst2(x, y) + (r * r);
         });
+    }
+
+    /**
+     * 双前缀贴图查找: 本 mod 贴图打包时 atlas 会自动加 mod 名前缀 ("create-"),
+     * 但部分拷贝自 PU132 的贴图引用源码写的是原名 —— 先查 create- 前缀版本,
+     * 找不到再退回原名, 两种命名都能命中。
+     *
+     * @param name 贴图名 (不含前缀)
+     * @return 贴图 (未找到时为 atlas 的 error 区域, 调用方用 found() 判断)
+     */
+    public static TextureRegion findRegion(String name){
+        TextureRegion r = Core.atlas.find("create-" + name);
+        return r.found() ? r : Core.atlas.find(name);
     }
 }

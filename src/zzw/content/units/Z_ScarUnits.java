@@ -81,7 +81,7 @@ public class Z_ScarUnits {
         //region scar 腿部单位
 
         // Hovos (T1) - 基础腿部单位, 单管磁轨炮
-        hovos = new UnityUnitType("hovos"){{
+        hovos = new UnityUnitType("create-hovos"){{
             aiController = DistanceGroundAI::new;
             speed = 0.8f;
             health = 340;
@@ -93,7 +93,7 @@ public class Z_ScarUnits {
             legLength = 30f;
             legExtension = -4.3f;
 
-            weapons.add(new Weapon("small-scar-railgun"){{
+            weapons.add(new Weapon("create-small-scar-railgun"){{
                 reload = 60f * 2;
                 x = 0f;
                 y = -2f;
@@ -120,7 +120,7 @@ public class Z_ScarUnits {
         }};
 
         // Ryzer (T2) - 进阶腿部单位, 磁轨炮 + 导弹发射器
-        ryzer = new UnityUnitType("ryzer"){{
+        ryzer = new UnityUnitType("create-ryzer"){{
             aiController = DistanceGroundAI::new;
             speed = 0.7f;
             health = 640;
@@ -150,7 +150,7 @@ public class Z_ScarUnits {
                     hitEffect = Fx.massiveExplosion;
                     pierceDamageFactor = 0.3f;
                 }};
-            }}, new Weapon("scar-missile-launcher"){{
+            }}, new Weapon("create-scar-missile-launcher"){{
                 reload = 50f;
                 x = 6.25f;
                 // PU132: shots = 5, shotDelay = 3f → ShootPattern 体系
@@ -176,7 +176,7 @@ public class Z_ScarUnits {
         }};
 
         // Zena (T3) - 高级腿部单位, 中央重磁轨 + 侧磁轨 + 导弹发射器
-        zena = new UnityUnitType("zena"){{
+        zena = new UnityUnitType("create-zena"){{
             aiController = DistanceGroundAI::new;
             speed = 0.7f;
             health = 1220;
@@ -224,7 +224,7 @@ public class Z_ScarUnits {
                         hitEffect = Fx.massiveExplosion;
                         pierceDamageFactor = 0.5f;
                     }};
-                }}, new Weapon("scar-missile-launcher"){{
+                }}, new Weapon("create-scar-missile-launcher"){{
                     x = 12.25f;
                     y = -5f;
                     rotate = true;
@@ -250,7 +250,7 @@ public class Z_ScarUnits {
         }};
 
         // Sundown (T4) - 精英腿部单位, 大型导弹巢 + 重磁轨炮 + 方向护盾
-        sundown = new UnityUnitType("sundown"){{
+        sundown = new UnityUnitType("create-sundown"){{
             aiController = DistanceGroundAI::new;
             speed = 0.6f;
             health = 9400;
@@ -270,7 +270,7 @@ public class Z_ScarUnits {
             groundLayer = Layer.legUnit;
             // visualElevation = 0.65f; // v158.1 已移除该字段
 
-            weapons.add(new Weapon("scar-large-launcher"){{
+            weapons.add(new Weapon("create-scar-large-launcher"){{
                 x = 13.5f;
                 y = -6.5f;
                 shootY = 5f;
@@ -286,7 +286,7 @@ public class Z_ScarUnits {
                 shootSound = Sounds.shootMissile;
 
                 bullet = Z_Bullets.scarMissile;
-            }}, new Weapon("scar-railgun"){{
+            }}, new Weapon("create-scar-railgun"){{
                 x = 7f;
                 y = -9.25f;
                 shootY = 10.75f;
@@ -316,7 +316,7 @@ public class Z_ScarUnits {
         }};
 
         // Rex (T5) - 重型悬浮腿部单位, 重型磁轨炮 + 破片机炮 + 双导弹巢 + 方向护盾
-        rex = new UnityUnitType("rex"){{
+        rex = new UnityUnitType("create-rex"){{
             aiController = DistanceGroundAI::new;
             speed = 0.55f;
             health = 23000;
@@ -340,7 +340,7 @@ public class Z_ScarUnits {
             legMoveSpace = 0.57f;
             legPairOffset = 0.8f;
 
-            weapons.add(new Weapon("rex-railgun"){{
+            weapons.add(new Weapon("create-rex-railgun"){{
                 x = 31.25f;
                 y = -12.25f;
                 shootY = 23.25f;
@@ -364,7 +364,7 @@ public class Z_ScarUnits {
                     // v158.1 原生 RailBulletType.init 已内置 fdata 记录 + pointEffect
                     // 分段释放, 无需再覆盖
                 }};
-            }}, new Weapon("scar-large-launcher"){{
+            }}, new Weapon("create-scar-large-launcher"){{
                 x = 12.25f;
                 y = 13f;
                 shootY = 5f;
@@ -383,7 +383,7 @@ public class Z_ScarUnits {
                     pierceBuilding = true;
                     pierceCap = 2;
                 }};
-            }}, new Weapon("scar-large-launcher"){{
+            }}, new Weapon("create-scar-large-launcher"){{
                 x = 15.75f;
                 y = -17.5f;
                 shootY = 5f;
@@ -399,7 +399,7 @@ public class Z_ScarUnits {
                 shootSound = Sounds.shootMissile;
 
                 bullet = Z_Bullets.scarMissile;
-            }}, new Weapon("scar-large-launcher"){{
+            }}, new Weapon("create-scar-large-launcher"){{
                 x = 9.25f;
                 y = -13.75f;
                 shootY = 5f;
@@ -426,7 +426,7 @@ public class Z_ScarUnits {
         }};
 
         // Excelsus (T6) - 顶级悬浮腿部单位, 双导弹巢 + 双连续激光 + 方向护盾
-        excelsus = new UnityUnitType("excelsus"){{
+        excelsus = new UnityUnitType("create-excelsus"){{
             aiController = DistanceGroundAI::new;
             speed = 0.6f;
             health = 38000;
@@ -457,7 +457,7 @@ public class Z_ScarUnits {
 
             immunities = ObjectSet.with(StatusEffects.burning);
 
-            weapons.add(new Weapon("scar-large-launcher"){{
+            weapons.add(new Weapon("create-scar-large-launcher"){{
                 x = 8.25f;
                 y = -18.5f;
                 shootY = 5f;
@@ -473,7 +473,7 @@ public class Z_ScarUnits {
                 shootSound = Sounds.shootMissile;
 
                 bullet = Z_Bullets.scarMissile;
-            }}, new Weapon("scar-large-launcher"){{
+            }}, new Weapon("create-scar-large-launcher"){{
                 x = 13.75f;
                 y = -24.5f;
                 shootY = 5f;
@@ -489,7 +489,7 @@ public class Z_ScarUnits {
                 shootSound = Sounds.shootMissile;
 
                 bullet = Z_Bullets.scarMissile;
-            }}, new Weapon("scar-small-laser-weapon"){{
+            }}, new Weapon("create-scar-small-laser-weapon"){{
                 x = 18.25f;
                 y = 11.75f;
                 shootY = 4f;
@@ -513,7 +513,7 @@ public class Z_ScarUnits {
                     lightColor = UnityPal.scarColorAlpha;
                     hitEffect = ScarFx.scarHitSmall;
                 }};
-            }}, new Weapon("excelsus-laser-weapon"){{
+            }}, new Weapon("create-excelsus-laser-weapon"){{
                 x = 29.75f;
                 y = -20.5f;
                 shootY = 7f;
@@ -550,7 +550,7 @@ public class Z_ScarUnits {
         //region scar 飞行单位
 
         // Whirlwind (T1) - 基础飞行单位, saber 持续激光 + 导弹
-        whirlwind = new UnityUnitType("whirlwind"){{
+        whirlwind = new UnityUnitType("create-whirlwind"){{
             health = 280;
             rotateSpeed = 4.5f;
             faceTarget = false;
@@ -609,7 +609,7 @@ public class Z_ScarUnits {
         }};
 
         // Jetstream (T2) - 进阶飞行单位, swipe saber 激光 + 导弹
-        jetstream = new UnityUnitType("jetstream"){{
+        jetstream = new UnityUnitType("create-jetstream"){{
             health = 670;
             rotateSpeed = 12.5f;
             flying = true;
@@ -644,7 +644,7 @@ public class Z_ScarUnits {
 
                 reload = 60f * 3.2f;
                 shootStatusDuration = bullet.lifetime;
-            }}, new Weapon("small-scar-weapon"){{
+            }}, new Weapon("create-small-scar-weapon"){{
                 rotate = true;
                 x = 7.25f;
                 y = -3.5f;
@@ -669,7 +669,7 @@ public class Z_ScarUnits {
         }};
 
         // Vortex (T3) - 高级飞行单位, swipe saber 激光
-        vortex = new UnityUnitType("vortex"){{
+        vortex = new UnityUnitType("create-vortex"){{
             health = 1200;
             rotateSpeed = 12.5f;
             flying = true;
