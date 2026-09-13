@@ -158,8 +158,10 @@ public class InvisibleUnitType extends UnityUnitType{
             }
 
             // 本体: 隐身时透明度 = 1 - alphaLerp (轮廓颜色保持, 本体渐隐)
+            // ★ found() 守卫: PU132 原版无条件绘制, 但 opticaecus 的无贴图匿名武器
+            //   (中间激光炮) 会画出错误贴图 — 原版 v158 Weapon.draw 有此判断
             if(unit instanceof EndInvisibleUnit e && outlineFound) Draw.alpha(1f - e.getAlphaLerp());
-            Draw.rect(weapon.region,
+            if(weapon.region.found()) Draw.rect(weapon.region,
             wx, wy,
             weapon.region.width * Draw.scl * -Mathf.sign(weapon.flipSprite),
             weapon.region.height * Draw.scl,
