@@ -257,6 +257,12 @@ public class Z_Units {
             hitSize = 19.75f;
             armor = 5f;
             flying = false;  // 修复: 改为陆军单位
+            // ★ 绘制层级修复: 头部必须画在整条虫的最上层
+            //   其他多节虫头部 flying=true 时 z=flyingLayer(90/115), 高于建筑阴影层 darkness(80);
+            //   本单位是陆军, 默认 groundLayer=groundUnit(60), 会被墙体阴影(80)和自己段身
+            //   (SegmentWormEntity.draw 用 flyingLayer=115 绘制段身)盖住, 看起来"头进墙里"。
+            //   提到 flyingUnit+1 (116) 让头部压住段身与一切墙体阴影。
+            groundLayer = mindustry.graphics.Layer.flyingUnit + 1f;
             // PU132: engineSize=-1f (不显示引擎喷射效果)
             engineSize = -1f;
             range = 210f;
