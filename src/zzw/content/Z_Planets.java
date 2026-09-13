@@ -2,11 +2,16 @@ package zzw.content;
 
 import arc.graphics.Blending;
 import arc.graphics.Color;
+import arc.math.geom.Vec3;
 import mindustry.content.Planets;
 import mindustry.graphics.Pal;
+import mindustry.graphics.Shaders;
 import mindustry.graphics.g3d.HexMesh;
+import mindustry.graphics.g3d.HexMesher;
 import mindustry.type.Planet;
 import zzw.content.graphics.UnityPal;
+
+import static mindustry.Vars.*;
 
 /**
  * PU132 行星移植版 (unity.content.UnityPlanets)。
@@ -28,11 +33,27 @@ import zzw.content.graphics.UnityPal;
 public class Z_Planets{
     public static Planet megalith, electrode, inert;
 
+    /**
+     * 单色六边形贴图器 (无地形生成器的行星用):
+     * Planet.mesher 为 null 时 HexMesh 构建会 NPE (MeshBuilder.buildHex 调 mesher.isEmissive()),
+     * 因此每个行星必须挂一个 mesher; 这里统一返回行星基色的纯色表面。
+     */
+    private static HexMesher solidMesher(Color color){
+        return new HexMesher(){
+            @Override
+            public void getColor(Vec3 position, Color out){
+                out.set(color);
+            }
+        };
+    }
+
     public static void load(){
         // megalith — monolith 母星 (起始区块 200, 可进入)
         megalith = new Planet("megalith", Planets.sun, 1f, 3){{
             // PU132: CompositeMesh + 星环 → v158 用原生六边形网格替代
-            meshLoader = () -> new HexMesh(this, 6);
+            // ★ v158.1: HexMesh(planet, divisions) 会取 planet.generator 当贴图器,
+            //   本行星无生成器 → 必须用 4 参构造显式传入 HexMesher, 否则图标生成 NPE
+            meshLoader = () -> new HexMesh(this, solidMesher(UnityPal.monolithDark), 6, Shaders.planet);
             accessible = true;
             atmosphereColor = UnityPal.monolithAtmosphere;
             startSector = 200;
@@ -42,7 +63,7 @@ public class Z_Planets{
 
         // electrode — imber 行星 (起始区块 30, 可进入)
         electrode = new Planet("electrode", Planets.sun, 1f, 3){{
-            meshLoader = () -> new HexMesh(this, 6);
+            meshLoader = () -> new HexMesh(this, solidMesher(Pal.surge), 6, Shaders.planet);
             accessible = true;
             atmosphereColor = Pal.surge;
             startSector = 30;
@@ -53,7 +74,7 @@ public class Z_Planets{
             atmosphereColor = Color.white.cpy();
             accessible = false;
             // PU132: ColorMesh 多面单色网格 → v158 用低细分 HexMesh 替代
-            meshLoader = () -> new HexMesh(this, 3);
+            meshLoader = () -> new HexMesh(this, solidMesher(Color.valueOf("3a3a45")), 3, Shaders.planet);
         }};
     }
 }
