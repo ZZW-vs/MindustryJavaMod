@@ -177,6 +177,9 @@ public class Z_TechTree{
                 nodeProduce(Z_Items.irradiantSurge);
             });
         });
+
+        // ★ 兜底: 没挂科技节点的 PU 内容统一 alwaysUnlocked (普罗塞直接可造)
+        unlockRemaining();
     }
 
     /** 把 children 挂到 parent (原版内容) 的科技树节点下。 */
@@ -209,6 +212,26 @@ public class Z_TechTree{
 
     private static void node(UnlockableContent content, Seq<Objective> objectives){
         node(content, content.researchRequirements(), objectives, () -> {});
+    }
+
+    /**
+     * ★ 兜底解锁 (用户要求: PU 内容必须能在普罗塞世界直接使用):
+     * 遍历全部本模组内容, 没挂科技节点的 (墙/炮台/单位等) 统一 alwaysUnlocked —
+     * 普罗塞战役里无需研究即可建造/生产。
+     */
+    private static void unlockRemaining(){
+        int[] count = {0};
+        mindustry.Vars.content.each(c -> {
+            if(!(c instanceof mindustry.ctype.UnlockableContent u)) return;
+            if(!u.name.startsWith("create-")) return;
+            // 段身等 hidden 内容保持隐藏
+            if(u instanceof mindustry.type.UnitType ut && ut.hidden) return;
+            if(u.techNode == null && !u.alwaysUnlocked){
+                u.alwaysUnlocked = true;
+                count[0]++;
+            }
+        });
+        arc.util.Log.info("[techtree] 兜底解锁 @ 个未挂科技树的 PU 内容 (普罗塞可直接建造)", count[0]);
     }
 
     private static void node(UnlockableContent content){

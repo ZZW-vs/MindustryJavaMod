@@ -2810,6 +2810,7 @@ public class Z_Units {
             mechSideSway = 0.7f;
             mechStride = (4f + (49f - 8f) / 2.1f) / 1.25f;
             mechStepParticles = true;
+            canDrown = false;               // PU_V8: citadel 不可被淹没
             immunities.add(mindustry.content.StatusEffects.burning);
             outlineColor = Color.valueOf("2e3142");
             constructor = mindustry.gen.MechUnit::create;
@@ -2835,7 +2836,7 @@ public class Z_Units {
                     splashDamageRadius = 50f;
                     hitEffect = mindustry.content.Fx.hitBulletBig;
                     shootEffect = mindustry.content.Fx.instShoot;
-                    trailEffect = mindustry.content.Fx.smoke;
+                    trailEffect = zzw.content.units.effects.TrailFx.coloredRailgunSmallTrail;   // PU_V8 TrailFx.coloredRailgunSmallTrail
                     width = 9f;
                     height = 17f;
                     shrinkY = 0f;
@@ -2881,6 +2882,7 @@ public class Z_Units {
             mechSideSway = 0.7f;
             mechStride = (4f + (49f - 8f) / 2.1f) / 1.3f;
             mechStepParticles = true;
+            canDrown = false;               // PU_V8: empire 不可被淹没
             immunities.addAll(mindustry.content.StatusEffects.burning, mindustry.content.StatusEffects.melting);
             outlineColor = Color.valueOf("2e3142");
             constructor = mindustry.gen.MechUnit::create;
@@ -2917,6 +2919,7 @@ public class Z_Units {
                     particleSizeScl = 8f;
                     particleSpread = 11f;
                     hitSize = 9f;
+                    layer = mindustry.graphics.Layer.bullet - 0.001f;  // PU_V8: 火焰绘制在弹道层略下方
                     status = mindustry.content.StatusEffects.melting;
                     smokeColors = new Color[]{
                         mindustry.graphics.Pal.darkFlame,
@@ -2966,6 +2969,7 @@ public class Z_Units {
                         width = 12f;
                         toColor = mindustry.graphics.Pal.missileYellow;
                         hitColor = mindustry.graphics.Pal.bulletYellow;
+                        hitEffect = zzw.content.units.effects.ScarFx.coloredHitSmall;   // PU_V8 HitFx.coloredHitSmall
                         serrationLenScl = 5f;
                         serrationSpaceOffset = 45f;
                         serrationSpacing = 5f;
@@ -3043,7 +3047,7 @@ public class Z_Units {
                     splashDamage = 70f;
                     splashDamageRadius = 30f;
                     lightningDamage = 75f;
-                    hitEffect = Fx.hitLancer;
+                    hitEffect = zzw.content.units.effects.ScarFx.coloredHitLarge;   // PU_V8 HitFx.coloredHitLarge
                     hitColor = lightningColor = mindustry.graphics.Pal.heal;
                     pierceCap = 3;
                     collidesTeam = true;
@@ -3270,6 +3274,7 @@ public class Z_Units {
                     splashDamage = 90f;
                     hitEffect = mindustry.content.Fx.sapExplosion;
                     ammoMultiplier = 4f;
+                    trailEffect = zzw.content.units.effects.TrailFx.coloredRailgunSmallTrail;   // PU_V8 TrailFx.coloredRailgunSmallTrail
                     trailSpacing = 15f;
                     backColor = trailColor = mindustry.graphics.Pal.sapBulletBack;
                     frontColor = lightningColor = mindustry.graphics.Pal.sapBullet;
@@ -3393,12 +3398,11 @@ public class Z_Units {
                 angleCone = 60f;
                 rotate = true;
                 continuous = true;
-                shootSound = Z_Sounds.continuousLaserA;  // PU132 UnitySounds.continuousLaserA
+                shootSound = Z_Sounds.continuousLaserA;  // PU_V8 UnitySounds.continuousLaserA
                 alternate = false;
                 rotateSpeed = 1.5f;
                 recoil = 5f;
                 mirror = true;
-                shootSound = Sounds.shootLaser;
                 bullet = new ContinuousSapLaserBulletType(60f) {{
                     colors = new Color[]{
                         mindustry.graphics.Pal.sapBulletBack.cpy().a(0.3f),
@@ -3428,6 +3432,7 @@ public class Z_Units {
                 rotateSpeed = 0.9f;
                 shake = 6f;
                 recoil = 8f;
+                cooldownTime = 90f;     // PU_V8: 射击后武器冷却时间
                 shootSound = Sounds.shootForeshadow;
                 bullet = new SlowRailBulletType(15f, 95f) {{
                     lifetime = 23f;
@@ -3435,6 +3440,7 @@ public class Z_Units {
                     splashDamage = 90f;
                     hitEffect = mindustry.content.Fx.sapExplosion;
                     ammoMultiplier = 4f;
+                    trailEffect = zzw.content.units.effects.TrailFx.coloredRailgunSmallTrail;   // PU_V8 TrailFx.coloredRailgunSmallTrail
                     trailSpacing = 15f;
                     backColor = trailColor = mindustry.graphics.Pal.sapBulletBack;
                     frontColor = lightningColor = mindustry.graphics.Pal.sapBullet;
@@ -3493,13 +3499,18 @@ public class Z_Units {
             hitSize = 80f;
             engineOffset = 42.75f;
             engineSize = 5.75f;
+            // PU_V8: 优先攻击反应堆
+            targetFlags = new mindustry.world.meta.BlockFlag[]{mindustry.world.meta.BlockFlag.reactor, null};
             outlineColor = Color.valueOf("2e3142");
             constructor = mindustry.gen.UnitEntity::create;
             range = 380f;
 
-            // 共享子弹: scepter bullet copy (PU_V8 原版)
-            // 注意: 必须在 {{}} 外创建以共享, 但 UnitType 初始化不允许局部变量
-            // → 在两个 Weapon 中分别 inline 同样参数的 BasicBulletType
+            // PU_V8: 共享子弹 = 原版 scepter 主炮子弹拷贝, 覆写速度/伤害/生存时间
+            // (直接拷贝原版子弹保证 intervalBullet/闪电等所有字段与原版一致)
+            BulletType mantleBullet = mindustry.content.UnitTypes.scepter.weapons.get(0).bullet.copy();
+            mantleBullet.speed = 6.5f;
+            mantleBullet.damage = 60f;
+            mantleBullet.lifetime = 47f;
 
             // 武器1: 加速激光 (PU_V8 AcceleratingLaserBulletType, maxLength=380f, width=27f)
             weapons.add(new BlankWeapon() {{
@@ -3510,6 +3521,9 @@ public class Z_Units {
                 reload = 4f * 60f;
                 continuous = true;
                 recoil = 0f;
+                // PU_V8: 射击期间自身减速
+                shootStatus = mindustry.content.StatusEffects.slow;
+                shootStatusDuration = 180f;
                 bullet = new AcceleratingLaserBulletType(230f) {{
                     lifetime = 180f;
                     maxLength = 380f;
@@ -3520,11 +3534,12 @@ public class Z_Units {
                     width = 27f;
                     collisionWidth = 10f;
                     pierceCap = 2;
+                    hitEffect = zzw.content.units.effects.ScarFx.coloredHitLarge;   // PU_V8 HitFx.coloredHitLarge
                     hitColor = mindustry.graphics.Pal.meltdownHit;
                 }};
             }});
 
-            // 武器2: scepter bullet copy (PU_V8 原版: speed=6.5f, damage=60f, lifetime=47f, 带黄色闪电)
+            // 武器2: scepter bullet copy (PU_V8 原版)
             weapons.add(new Weapon("create-mantle-mount") {{
                 x = 30.75f;
                 y = -6.25f;
@@ -3537,20 +3552,10 @@ public class Z_Units {
                 shoot.shotDelay = 4f;
                 rotateSpeed = 3f;
                 shadow = 22f;
-                bullet = new BasicBulletType(6.5f, 60f) {{
-                    lifetime = 47f;
-                    width = 12f;
-                    height = 15f;
-                    shrinkY = 0f;
-                    // scepter 闪电 (PU_V8 原版: lightning=2, lightningDamage=20, lightningColor=Pal.surge)
-                    lightning = 2;
-                    lightningLength = 6;
-                    lightningDamage = 20;
-                    lightningColor = mindustry.graphics.Pal.surge;
-                }};
+                bullet = mantleBullet;
             }});
 
-            // 武器3: scepter bullet copy (同上)
+            // 武器3: scepter bullet copy (同上, 与武器2共享同一子弹类型)
             weapons.add(new Weapon("create-mantle-mount") {{
                 x = 19f;
                 y = -18f;
@@ -3563,16 +3568,7 @@ public class Z_Units {
                 shoot.shotDelay = 4f;
                 rotateSpeed = 3f;
                 shadow = 22f;
-                bullet = new BasicBulletType(6.5f, 60f) {{
-                    lifetime = 47f;
-                    width = 12f;
-                    height = 15f;
-                    shrinkY = 0f;
-                    lightning = 2;
-                    lightningLength = 6;
-                    lightningDamage = 20;
-                    lightningColor = mindustry.graphics.Pal.surge;
-                }};
+                bullet = mantleBullet;
             }});
         }};
 
@@ -3590,9 +3586,49 @@ public class Z_Units {
             hitSize = 96f;
             engineOffset = 46.5f;
             engineSize = 6.75f;
+            // PU_V8: 优先攻击反应堆
+            targetFlags = new mindustry.world.meta.BlockFlag[]{mindustry.world.meta.BlockFlag.reactor, null};
             outlineColor = Color.valueOf("2e3142");
             constructor = mindustry.gen.UnitEntity::create;
             range = 430f;
+
+            // PU_V8: 共享子弹 = 原版 scepter 主炮子弹拷贝, 覆写 + 黄色闪电 (3道 360° 全向)
+            // lightningType 覆写: 命中时 30% 概率额外分裂一圈闪电, hit() 置空避免二次伤害
+            BulletType aphelionBullet = mindustry.content.UnitTypes.scepter.weapons.get(0).bullet.copy();
+            aphelionBullet.speed = 6.5f;
+            aphelionBullet.damage = 40f;
+            aphelionBullet.lightning = 3;
+            aphelionBullet.lightningDamage = 27f;
+            aphelionBullet.lightningCone = 360f;
+            aphelionBullet.lifetime = 50f;
+            aphelionBullet.lightningLength = 14;
+            aphelionBullet.lightningType = new BulletType(0f, 10f){
+                {
+                    lifetime = mindustry.content.Fx.lightning.lifetime;
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                    despawnEffect = Fx.none;
+                    status = mindustry.content.StatusEffects.shocked;
+                    statusDuration = 60f;
+                    hittable = false;
+                    lightningColor = aphelionBullet.lightningColor;
+                    lightning = 1;
+                    lightningCone = 65f;
+                    lightningLength = 6;
+                    lightningLengthRand = 3;
+                }
+
+                @Override
+                public void init(mindustry.gen.Bullet b){
+                    // PU_V8 原版: 30% 概率在命中点再分裂一道闪电
+                    if(Mathf.chance(0.3f)) mindustry.entities.Lightning.create(b.team, lightningColor, damage,
+                        b.x, b.y, b.rotation() + Mathf.range(lightningCone), lightningLength + Mathf.random(lightningLengthRand));
+                }
+
+                @Override
+                public void hit(mindustry.gen.Bullet b, float x, float y){
+                    // 置空: 分裂闪电本身不再触发命中特效/伤害
+                }
+            };
 
             // 武器1: 加速激光 (PU_V8 AcceleratingLaserBulletType, maxLength=430f, width=37f, accel=60f, laserSpeed=20f)
             weapons.add(new Weapon("create-aphelion-laser") {{
@@ -3619,8 +3655,12 @@ public class Z_Units {
                     splashDamage = 40f;
                     splashDamageRadius = 50f;
                     pierceCap = 5;
+                    hitEffect = zzw.content.units.effects.ScarFx.coloredHitLarge;   // PU_V8 HitFx.coloredHitLarge
                     hitColor = mindustry.graphics.Pal.meltdownHit;
                 }};
+                // PU_V8: 射击期间自身减速, 持续整个激光生存期 (4*60 tick)
+                shootStatus = mindustry.content.StatusEffects.slow;
+                shootStatusDuration = 4f * 60f;
             }});
 
             // 武器2: 黄色闪电炮弹 (PU_V8 原版: scepter bullet + lightning=3 + lightningType, 黄色)
@@ -3634,33 +3674,7 @@ public class Z_Units {
                 reload = 2f;
                 xRand = 3f;
                 inaccuracy = 4f;
-                bullet = new BasicBulletType(6.5f, 40f) {{
-                    lifetime = 50f;
-                    width = 12f;
-                    height = 15f;
-                    shrinkY = 0f;
-                    lightning = 3;
-                    lightningDamage = 27f;
-                    lightningCone = 360f;
-                    lightningLength = 14;
-                    lightningColor = mindustry.graphics.Pal.surge;
-                    backColor = mindustry.graphics.Pal.surge;
-                    frontColor = Color.white;
-                    // 自定义闪电类型 (PU_V8 原版 lightningType: shocked 状态 + 30% 概率分裂闪电)
-                    lightningType = new BulletType(0f, 10f) {{
-                        lifetime = mindustry.content.Fx.lightning.lifetime;
-                        hitEffect = mindustry.content.Fx.hitLancer;
-                        despawnEffect = Fx.none;
-                        status = mindustry.content.StatusEffects.shocked;
-                        statusDuration = 60f;
-                        hittable = false;
-                        lightning = 1;
-                        lightningCone = 65f;
-                        lightningLength = 6;
-                        lightningLengthRand = 3;
-                        lightningColor = mindustry.graphics.Pal.surge;
-                    }};
-                }};
+                bullet = aphelionBullet;
             }});
         }};
 
