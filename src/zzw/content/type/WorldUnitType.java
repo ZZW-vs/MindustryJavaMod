@@ -7,19 +7,25 @@ import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
 import arc.graphics.g2d.SpriteBatch;
+import arc.math.Angles;
 import arc.math.Mat;
 import arc.math.Mathf;
 import arc.math.geom.Point2;
 import arc.math.geom.Vec2;
+import arc.scene.Element;
+import arc.scene.event.Touchable;
 import arc.scene.ui.layout.Table;
 import arc.struct.Seq;
+import arc.util.Align;
 import arc.util.Tmp;
 import arc.util.Time;
 import arc.Core;
 import arc.Events;
 import mindustry.Vars;
+import mindustry.content.Blocks;
 import mindustry.core.World;
 import mindustry.entities.units.BuildPlan;
+import mindustry.game.EventType;
 import mindustry.game.EventType.Trigger;
 import mindustry.gen.Building;
 import mindustry.gen.Groups;
@@ -31,9 +37,13 @@ import mindustry.graphics.Pal;
 import mindustry.input.Binding;
 import mindustry.input.DesktopInput;
 import mindustry.input.InputHandler;
+import mindustry.input.Placement;
 import mindustry.ui.Styles;
+import mindustry.ui.fragments.BlockConfigFragment;
+import mindustry.ui.fragments.BlockInventoryFragment;
 import mindustry.ui.fragments.PlacementFragment;
 import mindustry.world.Block;
+import mindustry.world.Tile;
 import zzw.content.units.entities.WorldUnitEntity;
 
 import java.lang.reflect.Field;
@@ -209,28 +219,55 @@ public class WorldUnitType extends UnityUnitType {
                     hoveredSubBuild.drawSelect();
                 }
 
-                // ★ 放置预览: 鼠标在本子世界区域且处于放置模式 → 在子世界网格上画 ghost
-                //   (吸附到子世界自己的网格; 在投影上下文中绘制, 坐标即子世界坐标)
-                if (buildPreviewUnit == w && buildPreviewBlock != null) {
+                // ★ 放置预览: 建造模式下在子世界网格上画原版风格 ghost (投影上下文内,
+                //   坐标即子世界坐标): 未拖拽 = 单格跟随光标; 拖拽放置 = 整条线的计划预览
+                if (buildPreviewUnit == w && (subDragMode == dragNone || subDragMode == dragPlace)) {
                     Draw.z(Layer.plans);
-                    Block pb = buildPreviewBlock;
-                    // ★ 与原版 BuildPlan.drawx() 完全一致: tile 参考点 + 多方块偏移
-                    //   (= tile*8 + offset, 建筑实际落位 drawx 同公式, ghost 与实位零偏差)
-                    float px = buildPreviewX * Vars.tilesize + pb.offset;
-                    float py = buildPreviewY * Vars.tilesize + pb.offset;
+                    for (int i = 0; i < subLinePlans.size; i++) {
+                        BuildPlan plan = subLinePlans.get(i);
+                        if (plan.block == null) continue;
+                        boolean valid = w.canBuildSub(plan.block, plan.x, plan.y);
+                        float px = plan.x * Vars.tilesize + plan.block.offset;
+                        float py = plan.y * Vars.tilesize + plan.block.offset;
 
-                    // ghost 贴图 (呼吸透明度, 同原版预览观感)
-                    Draw.alpha(0.45f + Mathf.absin(Time.time, 3f, 0.1f));
-                    Draw.rect(pb.fullIcon, px, py, pb.rotate ? buildPreviewRot * 90f : 0f);
-                    Draw.alpha(1f);
-
-                    // 无效位置: ghost 上叠半透明红色方块 (原版 drawPlanTop 无效计划反馈风格,
-                    // 不再画虚线框; 建造模式下原版鼠标预览已被输入补丁抑制, 仅此一处预览)
-                    if (!buildPreviewValid) {
-                        Draw.color(Pal.remove, 0.3f);
-                        Fill.square(px, py, pb.size * Vars.tilesize / 2f);
-                        Draw.color();
+                        // 原版 Block.drawPlan 观感: 白色混合 + 呼吸; 无效时红色混合 + 红色底块
+                        Draw.mixcol(!valid ? Pal.breakInvalid : Color.white,
+                            (!valid ? 0.4f : 0.24f) + Mathf.absin(Time.globalTime, 6f, 0.28f));
+                        Draw.rect(plan.block.fullIcon, px, py,
+                            plan.block.rotate ? plan.rotation * 90f : 0f);
+                        Draw.mixcol();
+                        if (!valid) {
+                            Draw.color(Pal.remove, 0.3f);
+                            Fill.square(px, py, plan.block.size * Vars.tilesize / 2f);
+                            Draw.color();
+                        }
                     }
+                    Draw.reset();
+                }
+
+                // ★ 拆除框选预览: 红色双层边框 + 框内建筑红色选中高亮 (复刻原版 drawBreakSelection)
+                if (buildPreviewUnit == w && subDragMode == dragBreak) {
+                    int maxLen = Math.max(w.unitWorld.width(), w.unitWorld.height());
+                    Placement.NormalizeResult area = Placement.normalizeArea(
+                        dragStartX, dragStartY, subDragCursorX, subDragCursorY, 0, false, maxLen);
+                    Placement.NormalizeDrawResult rect = Placement.normalizeDrawArea(
+                        Blocks.air, dragStartX, dragStartY, subDragCursorX, subDragCursorY, false, maxLen, 1f);
+
+                    Draw.z(Layer.plans);
+                    for (int x = area.x; x <= area.x2; x++) {
+                        for (int y = area.y; y <= area.y2; y++) {
+                            Tile t = w.unitWorld.tile(x, y);
+                            if (t != null && t.build != null) {
+                                Drawf.selected(x, y, t.block(), Pal.remove);
+                            }
+                        }
+                    }
+                    Lines.stroke(2f);
+                    Draw.color(Pal.removeBack);
+                    Lines.rect(rect.x, rect.y - 1, rect.x2 - rect.x, rect.y2 - rect.y);
+                    Draw.color(Pal.remove);
+                    Lines.rect(rect.x, rect.y, rect.x2 - rect.x, rect.y2 - rect.y);
+                    Draw.reset();
                 }
 
                 // blend 修复 trick (PU132): 透明 quad 强制 batch 走完整混合管线,
@@ -320,15 +357,30 @@ public class WorldUnitType extends UnityUnitType {
 
     // ===== 建造接管状态 =====
 
-    /** 建造预览状态 (handleSubWorldBuildInput 每帧写入, drawBody 读取绘制) */
+    /** 拖拽状态: 无 */
+    private static final int dragNone = 0;
+    /** 拖拽状态: 画线放置 (点击放置键 → 线预览 → 松开整条提交) */
+    private static final int dragPlace = 1;
+    /** 拖拽状态: 框选拆除 (点击拆解键 → 红框预览 → 松开拆除框内全部) */
+    private static final int dragBreak = 2;
+
+    /** 当前子世界拖拽模式 (复刻原版 DesktopInput 的拖线/框选体验) */
+    private static int subDragMode = dragNone;
+    /** 拖拽所属单位 */
+    private static WorldUnitEntity subDragUnit;
+    /** 拖拽起点 (子世界 tile 坐标) */
+    private static int dragStartX, dragStartY;
+    /** 框选拆除的当前光标 (子世界 tile 坐标) */
+    private static int subDragCursorX, subDragCursorY;
+    /** 拖拽中手动旋转覆盖 (按旋转键后预览/提交改用手动朝向, 同原版 overrideLineRotation) */
+    private static boolean subOverrideLineRotation;
+    /** 子世界预览计划 (悬停单格 / 拖拽画线共用, drawBody 投影上下文中绘制) */
+    private static final Seq<BuildPlan> subLinePlans = new Seq<>();
+    /** 悬停预览去重 (光标 tile/方块/朝向不变时跳过重算, 避免每帧分配) */
+    private static int lastPreviewTx, lastPreviewTy, lastPreviewRot = -1;
+    private static Block lastPreviewBlock;
+    /** 预览所属单位 (handleSubWorldBuildInput 每帧写入, drawBody 读取绘制) */
     private static WorldUnitEntity buildPreviewUnit;
-    private static Block buildPreviewBlock;
-    /** 子世界内部朝向 (已扣除单位朝向, 渲染投影后与玩家选的朝向一致) */
-    private static int buildPreviewRot;
-    private static int buildPreviewX, buildPreviewY;
-    private static boolean buildPreviewValid;
-    /** 防按住拆解键重复拆除 (子世界 tile packed 坐标) */
-    private static int lastBreakPos = -1;
     /** 临时坐标缓冲 (避免每帧分配) */
     private static final Vec2 tmpVec = new Vec2();
 
@@ -344,15 +396,23 @@ public class WorldUnitType extends UnityUnitType {
 
     /**
      * 建造接管主逻辑 (每帧由 {@link #updateInteraction} 调用).
-     * <p>光标落在平台范围内时, 放置/拆除/预览直接作用于子世界 ——
-     * 平台可自由移动和旋转, 通过连续坐标映射 ({@link WorldUnitEntity#worldToSubPixel})
-     * 把光标换算到子世界网格, 预览自动吸附。</p>
+     * <p>复刻原版拖拽体验 (光标落在平台范围内时作用于子世界):
+     * <ul>
+     *   <li>放置: 点击放置键开始拖拽 → 整条线预览 (松开前不落块) → 松开提交整条线;</li>
+     *   <li>拆除: 点击拆解键开始框选 → 红框预览 → 松开拆除框内全部建筑;</li>
+     *   <li>未按住时: 选中方块的 ghost 单格预览跟随光标 (原版放置观感)。</li>
+     * </ul>
+     * 拖拽一旦开始, 光标移出平台也继续 (坐标连续映射, 与原版拖出地图边缘的行为一致);
+     * 松开时越界计划由 placeSub 的边界检查自然丢弃。平台可自由移动和旋转,
+     * 通过连续坐标映射 ({@link WorldUnitEntity#worldToSubPixel}) 把光标换算到子世界网格。</p>
      */
     private static void handleSubWorldBuildInput(float mx, float my) {
-        buildPreviewUnit = null;
-        buildPreviewBlock = null;
         InputHandler in = Vars.control == null ? null : Vars.control.input;
-        if (in == null || Vars.player == null || Vars.player.dead()) return;
+        if (in == null || Vars.player == null || Vars.player.dead()) {
+            resetSubDrag();
+            buildPreviewUnit = null;
+            return;
+        }
 
         int mtx = World.toTile(mx), mty = World.toTile(my);
 
@@ -372,117 +432,208 @@ public class WorldUnitType extends UnityUnitType {
 
         // ★ 建造模式 gate: 玩家附生该单位且建造模式已激活才能建造/拆除
         //   (未附生/未激活时只保留方块交互: 悬停/点击配置/物品界面)
-        if (hit != null && hit.buildMode && hit == Vars.player.unit() && !Core.scene.hasMouse()) {
-            int tx = World.toTile(tmpVec.x), ty = World.toTile(tmpVec.y);
-
-            // 即时放置: 按住放置键 → 放进子世界 (平台区域整体接管, 与主世界地形无关;
-            // 重复按住由 canBuildSub 的占用检查天然去重)
-            if (in.isPlacing() && in.block != null && Core.input.keyDown(Binding.select)) {
-                hit.placeSub(in.block, tx, ty, subRotation(hit, in.rotation), null);
-            }
-
-            // 即时拆除: 按住拆解键, 光标每进入一个新 tile 拆一次 (拖动连拆)
-            if (Core.input.keyDown(Binding.breakBlock)) {
-                int pos = Point2.pack(tx, ty);
-                if (pos != lastBreakPos) {
-                    lastBreakPos = pos;
-                    hit.breakSub(tx, ty);
-                }
-            } else {
-                lastBreakPos = -1;
-            }
-
-            // 预览状态 (光标在平台范围内 → ghost 吸附到子世界网格)
-            if (in.isPlacing() && in.block != null) {
-                buildPreviewUnit = hit;
-                buildPreviewBlock = in.block;
-                buildPreviewRot = subRotation(hit, in.rotation);
-                buildPreviewX = tx;
-                buildPreviewY = ty;
-                buildPreviewValid = hit.canBuildSub(in.block, tx, ty);
-            }
-        } else {
-            lastBreakPos = -1;
+        boolean buildActive = hit != null && hit.buildMode && hit == Vars.player.unit()
+                              && !Core.scene.hasMouse();
+        int tx = 0, ty = 0;
+        if (hit != null) {
+            tx = World.toTile(tmpVec.x);
+            ty = World.toTile(tmpVec.y);
         }
 
-        // plans 清扫 (覆盖单点/拖线/蓝图粘贴): 建造模式的单位转译进子世界;
-        // 未激活的单位也移除计划 —— 防止原版玩家单位把方块建到平台下方的主世界 tile 上
+        // ===== 拖拽开始 =====
+        if (subDragMode == dragNone) {
+            if (buildActive && in.isPlacing() && in.block != null && Core.input.keyTap(Binding.select)) {
+                subDragMode = dragPlace;
+                subDragUnit = hit;
+                dragStartX = tx;
+                dragStartY = ty;
+                subOverrideLineRotation = false;
+            } else if (buildActive && Core.input.keyTap(Binding.breakBlock)) {
+                subDragMode = dragBreak;
+                subDragUnit = hit;
+                dragStartX = tx;
+                dragStartY = ty;
+                subDragCursorX = tx;
+                subDragCursorY = ty;
+            }
+        }
+
+        // ===== 拖拽进行 / 提交 =====
+        if (subDragMode == dragPlace) {
+            buildPreviewUnit = subDragUnit;
+            if (Core.input.keyDown(Binding.select)) {
+                // 光标移出平台也继续拖拽 (worldToSubPixel 越界时仍写出连续映射坐标)
+                subDragUnit.worldToSubPixel(mx, my, tmpVec);
+                updateSubLinePlans(subDragUnit, in.block, dragStartX, dragStartY,
+                    World.toTile(tmpVec.x), World.toTile(tmpVec.y), in.rotation);
+                // 拖拽中手动旋转 → 后续预览/提交改用手动朝向 (原版 overrideLineRotation 行为)
+                if ((int)Core.input.axisTap(Binding.rotate) != 0) {
+                    subOverrideLineRotation = true;
+                }
+            } else {
+                commitSubPlace(subDragUnit, subLinePlans);
+                resetSubDrag();
+                buildPreviewUnit = null;
+            }
+        } else if (subDragMode == dragBreak) {
+            buildPreviewUnit = subDragUnit;
+            if (Core.input.keyDown(Binding.breakBlock)) {
+                subDragUnit.worldToSubPixel(mx, my, tmpVec);
+                subDragCursorX = World.toTile(tmpVec.x);
+                subDragCursorY = World.toTile(tmpVec.y);
+            } else {
+                commitSubBreak(subDragUnit, dragStartX, dragStartY, subDragCursorX, subDragCursorY);
+                resetSubDrag();
+                buildPreviewUnit = null;
+            }
+        } else {
+            buildPreviewUnit = null;
+            // 未拖拽: 建造模式下 ghost 单格预览跟随光标 (原版放置观感);
+            // 光标 tile/方块/朝向未变化时跳过重算 (悬停每帧调用, 避免无谓分配)
+            if (buildActive && in.isPlacing() && in.block != null) {
+                int rot = subRotation(hit, in.rotation);
+                if (tx != lastPreviewTx || ty != lastPreviewTy || rot != lastPreviewRot
+                    || in.block != lastPreviewBlock) {
+                    lastPreviewTx = tx;
+                    lastPreviewTy = ty;
+                    lastPreviewRot = rot;
+                    lastPreviewBlock = in.block;
+                    updateSubLinePlans(hit, in.block, tx, ty, tx, ty, in.rotation);
+                }
+                buildPreviewUnit = hit;
+            }
+        }
+
+        // plans 清扫 (原版输入在主世界网格产生的计划): 建造模式整体屏蔽, 平时防平台下误建
         sweepPlans();
     }
 
     /**
-     * plans 清扫: 玩家建造队列中落在平台区域的计划, 按所属单位分别处理.
-     * <p>★ 锚点布局保持: 同一批计划 (拖线/蓝图) 在主世界网格上是直线/矩形布局,
-     * 逐点独立映射到旋转的子世界网格会变成"斜线" —— 这里以第一个落在平台的计划为锚点,
-     * 其余计划按【相对锚点的 tile 偏移旋转到子世界朝向】落位, 保持布局的相对形状
-     * (拖线仍是直线, 蓝图不扭曲)。</p>
-     * <p>让位规则: 该处主世界 tile 有建筑时保留原版计划 (玩家想操作的是地面建筑)。</p>
+     * 重算子世界预览计划 (复刻原版 InputHandler.iterateLine 的子世界版).
+     * <p>支持直线 (Bresenham, 与原版 normalizeLine 同源) 和矩形放置 (allowRectanglePlacement);
+     * 旋转沿用原版规则: 起点==终点 或 手动旋转覆盖时用玩家所选朝向, 否则朝向跟随拖拽方向
+     * (Tile.relativeTo 指向线上的下一个点, 与原版传送带画线一致); 多方块计划相互重叠时跳过
+     * (原版 Tmp.r3 防重叠逻辑)。</p>
+     * <p>差异: 原版按住 diagonalPlacement 走 pathfindLine (A* 寻路查询主世界), 子世界
+     * 坐标系独立, 这里退化为普通直线 (仅影响按住对角线键拖传送带的视觉路径)。</p>
+     */
+    private static void updateSubLinePlans(WorldUnitEntity w, Block block,
+                                           int startX, int startY, int endX, int endY, int inRot) {
+        subLinePlans.clear();
+        if (w == null || w.unitWorld == null || block == null) return;
+
+        int defaultRot = subRotation(w, inRot);
+        boolean diagonal = Core.input.keyDown(Binding.diagonalPlacement);
+
+        Seq<Point2> points;
+        if (block.allowRectanglePlacement) {
+            points = Placement.normalizeRectangle(startX, startY, endX, endY, block.size);
+        } else {
+            points = Placement.normalizeLine(startX, startY, endX, endY);
+        }
+        block.changePlacementPath(points, defaultRot, diagonal);
+
+        // 基准朝向 (原版规则, 在子世界空间内计算 —— 保证画出的线在平台网格上是直的)
+        float angle = Angles.angle(startX, startY, endX, endY);
+        int baseRot = (!subOverrideLineRotation && !(startX == endX && startY == endY))
+            ? ((int)((angle + 45f) / 90f)) % 4
+            : defaultRot;
+
+        Tmp.r3.set(-1, -1, 0, 0);
+
+        for (int i = 0; i < points.size; i++) {
+            Point2 point = points.get(i);
+
+            // 多方块计划重叠: 与前一个已入列计划的占用区重叠 → 跳过 (原版同款防重叠)
+            if (block.size > 1 && Tmp.r2.setSize(block.size * Vars.tilesize)
+                .setCenter(point.x * Vars.tilesize + block.offset, point.y * Vars.tilesize + block.offset)
+                .overlaps(Tmp.r3)) {
+                continue;
+            }
+
+            Point2 next = i == points.size - 1 ? null : points.get(i + 1);
+            int rot = baseRot;
+            if (!subOverrideLineRotation && !block.ignoreLineRotation && next != null) {
+                int result = Tile.relativeTo(point.x, point.y, next.x, next.y);
+                if (result != -1) rot = result;
+            }
+
+            BuildPlan plan = new BuildPlan(point.x, point.y, rot, block, block.nextConfig());
+            plan.animScale = 1f;
+            subLinePlans.add(plan);
+
+            Tmp.r3.setSize(block.size * Vars.tilesize)
+                .setCenter(point.x * Vars.tilesize + block.offset, point.y * Vars.tilesize + block.offset);
+        }
+    }
+
+    /**
+     * 提交子世界拖拽放置: 逐个计划落位.
+     * <p>placeSub 自带占用去重 / quickRotate / 脚手架流程, 与原版 flushPlans 等价;
+     * 完成后触发原版 LineConfirmEvent (个别方块监听此事件做收尾)。</p>
+     */
+    private static void commitSubPlace(WorldUnitEntity w, Seq<BuildPlan> plans) {
+        if (w == null || w.unitWorld == null) return;
+        for (int i = 0; i < plans.size; i++) {
+            BuildPlan plan = plans.get(i);
+            if (plan.block == null) continue;
+            w.placeSub(plan.block, plan.x, plan.y, plan.rotation, plan.config);
+        }
+        Events.fire(new EventType.LineConfirmEvent());
+    }
+
+    /**
+     * 提交子世界框选拆除: 矩形内每个 tile 调用 breakSub.
+     * <p>主大地核心保护 / 队伍检查 / 拆除中脚手架去重都在 breakSub 内部,
+     * 与原版 removeSelection 的逐格 tryBreakBlock 等价。</p>
+     */
+    private static void commitSubBreak(WorldUnitEntity w, int x1, int y1, int x2, int y2) {
+        if (w == null || w.unitWorld == null) return;
+        int maxLen = Math.max(w.unitWorld.width(), w.unitWorld.height());
+        Placement.NormalizeResult area = Placement.normalizeArea(x1, y1, x2, y2, 0, false, maxLen);
+        for (int x = area.x; x <= area.x2; x++) {
+            for (int y = area.y; y <= area.y2; y++) {
+                if (w.valid(x, y)) w.breakSub(x, y);
+            }
+        }
+    }
+
+    /** 复位子世界拖拽状态 */
+    private static void resetSubDrag() {
+        subDragMode = dragNone;
+        subDragUnit = null;
+        subLinePlans.clear();
+    }
+
+    /**
+     * plans 清扫: 原版输入在主世界网格产生的建造计划 (点击/拖线 flush/蓝图粘贴) 按规则处理.
+     * <p>★ 附生建造模式: 主世界建造完全屏蔽, 计划一律清除 —— 原版拖线 flush 出的计划也在这
+     * 拦下, 子世界内的拖拽放置由 {@link #commitSubPlace} 直接落位。两套路径不再叠加:
+     * 否则计划转译 (按主世界网格旋转换算) 与子世界直绘拖拽会因换算差异在同一格上先后落位,
+     * 触发 quickRotate 把刚放好的方块转错方向。</p>
+     * <p>★ 未激活建造模式: 只移除落在平台区域的计划 (防止把方块建到平台下方的主世界 tile 上;
+     * terra buildSpeed=0 无法自行推进, 残留计划会卡出永远 0% 的脚手架), 平台外计划照常保留。</p>
      */
     private static void sweepPlans() {
         Unit pu = Vars.player.unit();
         if (pu == null || pu.plans.size <= 0) return;
 
-        // ★ 附生建造模式的大地单位: 主世界建造完全屏蔽 (保留"只能往子世界放方块"特性) ——
-        //   canBuild 覆写放行后原版输入会往 plans 里塞主世界计划, 这里把平台外的计划
-        //   全部清掉, 平台上的计划照常转译进子世界; terra buildSpeed=0 无法自行推进,
-        //   残留的主世界计划会让 BuilderComp 生成永远卡在 0% 的脚手架
         boolean controllingBuild = pu instanceof WorldUnitEntity cw && cw.buildMode;
-
-        // 锚点: 第一个落在平台内 (且建造模式) 的计划; 同帧内同批计划围绕锚点布局
-        WorldUnitEntity anchorOwner = null;
-        int anchorPX = 0, anchorPY = 0, anchorSX = 0, anchorSY = 0;
+        if (controllingBuild) {
+            pu.plans.clear();
+            return;
+        }
 
         for (int i = pu.plans.size - 1; i >= 0; i--) {
             BuildPlan plan = pu.plans.get(i);
-            // 让位: 主世界该处有建筑 → 保留原版计划 (玩家想操作的是地面建筑);
-            //   附生建造模式时例外 —— 主世界计划一律清除, 建造全部收归子世界
-            if (!controllingBuild && Vars.world.build(plan.x, plan.y) != null) continue;
-
-            WorldUnitEntity owner = null;
             for (Unit u : Groups.unit) {
                 if (u instanceof WorldUnitEntity w && w.unitWorld != null
                     && w.team() == Vars.player.team()
                     && w.worldToSubPixel(plan.x * Vars.tilesize + Vars.tilesize / 2f,
                                          plan.y * Vars.tilesize + Vars.tilesize / 2f, tmpVec)) {
-                    owner = w;
+                    pu.plans.removeIndex(i);
                     break;
                 }
-            }
-            if (owner == null) {
-                // 平台之外的纯主世界计划: 附生建造模式 → 移除 (屏蔽主世界建造)
-                if (controllingBuild) pu.plans.removeIndex(i);
-                continue;
-            }
-
-            pu.plans.removeIndex(i);
-
-            // ★ 未激活建造模式 → 只移除 (防止主世界误建), 不转译
-            if (!owner.buildMode) continue;
-
-            int ptx, pty;
-            if (anchorOwner != owner) {
-                // 锚点重置: 新单位或第一批计划的第一个 → 光标映射落位
-                ptx = World.toTile(tmpVec.x);
-                pty = World.toTile(tmpVec.y);
-                anchorOwner = owner;
-                anchorPX = plan.x;
-                anchorPY = plan.y;
-                anchorSX = ptx;
-                anchorSY = pty;
-            } else {
-                // 同批后续计划: 相对锚点的主世界 tile 偏移 → 旋转到子世界朝向 → 平移到锚点
-                float dx = (plan.x - anchorPX) * Vars.tilesize;
-                float dy = (plan.y - anchorPY) * Vars.tilesize;
-                tmpVec.set(dx, dy).rotate(-(owner.rotation - 90f));
-                ptx = World.toTile(anchorSX * Vars.tilesize + tmpVec.x);
-                pty = World.toTile(anchorSY * Vars.tilesize + tmpVec.y);
-            }
-
-            if (plan.breaking) {
-                owner.breakSub(ptx, pty);
-            } else if (plan.block != null) {
-                owner.placeSub(plan.block, ptx, pty,
-                    subRotation(owner, plan.rotation), plan.config);
             }
         }
     }
@@ -501,6 +652,101 @@ public class WorldUnitType extends UnityUnitType {
             lastDisplayStateField.set(ui.hudfrag.blockfrag, null);
         } catch (Throwable ignored) {
         }
+    }
+
+    // ===== 子世界建筑 UI 定位修复 (分类器/物品源等配置界面可正常弹出和操作) =====
+
+    /** UI 定位修复元素 (挂在场景根部最后, act 于所有原版 fragment 之后) */
+    private static Element subUiFixer;
+    /** 反射字段: BlockConfigFragment.table / BlockInventoryFragment.table 与 .build (包私有) */
+    private static Field configTableField, invTableField, invBuildField;
+
+    /**
+     * 安装子世界建筑 UI 定位修复.
+     * <p>★ 问题根源: 原版 BlockConfigFragment 的 updateTableAlign / BlockInventoryFragment 的
+     * updateTablePosition 都按建筑自身的 x/y 世界坐标定位 UI —— 子世界建筑的 x/y 是子世界空间
+     * 坐标 (数值很小), 配置界面每帧被定位到主地图原点附近, 表现为"分类器/物品源点开配置后
+     * 界面飞到角落/看不见、改不了配置"。</p>
+     * <p>方案: 场景根部追加一个 act 顺序最后的元素 (原版 config/inv 表都在 UI 初始化时加入,
+     * 本元素后加入 → 每帧在其后执行), 当选中的是子世界建筑时, 用投影后的主世界坐标
+     * (绕单位旋转) 重新定位表 —— 单位移动/旋转时跟随, 观感与原世界一致。
+     * fragment 字段是包私有, 用一次性反射缓存访问。</p>
+     */
+    private static void installSubUiFixer() {
+        if (subUiFixer != null || Core.scene == null) return;
+        try {
+            configTableField = BlockConfigFragment.class.getDeclaredField("table");
+            configTableField.setAccessible(true);
+            invTableField = BlockInventoryFragment.class.getDeclaredField("table");
+            invTableField.setAccessible(true);
+            invBuildField = BlockInventoryFragment.class.getDeclaredField("build");
+            invBuildField.setAccessible(true);
+        } catch (Throwable e) {
+            return;
+        }
+
+        subUiFixer = new Element() {
+            @Override
+            public void act(float delta) {
+                fixSubUiPositions();
+            }
+        };
+        subUiFixer.touchable = Touchable.disabled;
+        Core.scene.add(subUiFixer);
+    }
+
+    /** 每帧修正: 子世界建筑的配置界面 / 物品栏界面重新定位到投影后的主世界坐标 */
+    private static void fixSubUiPositions() {
+        if (!Vars.state.isPlaying()) return;
+        InputHandler in = Vars.control == null ? null : Vars.control.input;
+        if (in == null) return;
+
+        try {
+            // 配置界面 (分类器/物品源/卸除器等): 复刻 updateTableAlign 公式,
+            // 把建筑坐标换成投影后的主世界坐标
+            if (in.config.isShown()) {
+                Building sel = in.config.getSelected();
+                WorldUnitEntity owner = sel == null ? null : findSubOwner(sel);
+                if (owner != null) {
+                    Table table = (Table)configTableField.get(in.config);
+                    projectToOwner(owner, sel, tmpVec);
+                    Vec2 pos = Core.input.mouseScreen(tmpVec.x,
+                        tmpVec.y - sel.block.size * Vars.tilesize / 2f - 1);
+                    table.setPosition(pos.x, pos.y, Align.top);
+                }
+            }
+
+            // 物品栏界面 (仓库/容器等): 复刻 updateTablePosition 公式
+            Building ib = (Building)invBuildField.get(in.inv);
+            if (ib != null && ib.isValid()) {
+                WorldUnitEntity owner = findSubOwner(ib);
+                if (owner != null) {
+                    Table table = (Table)invTableField.get(in.inv);
+                    projectToOwner(owner, ib, tmpVec);
+                    Vec2 pos = Core.input.mouseScreen(
+                        tmpVec.x + ib.block.size * Vars.tilesize / 2f,
+                        tmpVec.y + ib.block.size * Vars.tilesize / 2f);
+                    table.setPosition(pos.x, pos.y, Align.topLeft);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** 查找建筑所属的世界单位 (O(建筑数) 遍历, 每帧最多调用两次) */
+    private static WorldUnitEntity findSubOwner(Building b) {
+        if (b == null || b.dead) return null;
+        for (Unit u : Groups.unit) {
+            if (u instanceof WorldUnitEntity w && w.unitWorld != null && w.ownsBuilding(b)) {
+                return w;
+            }
+        }
+        return null;
+    }
+
+    /** 子世界建筑坐标 → 投影后的主世界坐标 (绕单位中心旋转, 与渲染投影公式一致) */
+    private static void projectToOwner(WorldUnitEntity w, Building b, Vec2 out) {
+        out.set(b.x - w.subCX(), b.y - w.subCY()).rotate(w.rotation - 90f).add(w.x, w.y);
     }
 
     /**
@@ -576,6 +822,8 @@ public class WorldUnitType extends UnityUnitType {
                 Core.app.post(() -> {
                     if (found.dead) return;
                     if (found.block.configurable && found.shouldShowConfigure(Vars.player)) {
+                        // 原版 tileTapped 的配置音效 (在点击的主世界位置播放)
+                        found.block.configureSound.at(mx, my);
                         Vars.control.input.config.showConfig(found);
                     } else {
                         // 非配置建筑: 显示物品栏
@@ -666,6 +914,7 @@ public class WorldUnitType extends UnityUnitType {
         Events.run(Trigger.update, WorldUnitType::updateInteraction);
         Events.run(Trigger.draw, WorldUnitType::drawHighlight);
         installInputPatch();
+        installSubUiFixer();
     }
 
     /** 输入补丁是否已安装 (ClientLoadEvent 只触发一次, 标记防重入) */
@@ -713,11 +962,22 @@ public class WorldUnitType extends UnityUnitType {
             @Override
             public void drawTop() {
                 // 建造模式: 跳过批量拆除红框 (drawBreakSelection) 和蓝图选框 ——
-                // 拆除由子世界网格接管, 原版红框按主世界网格画, 位置不对且视觉混乱;
-                // 保留光标类型重置 (跳过会残留上帧的非箭头光标)
+                // 拆除/放置由子世界网格接管; 光标复刻原版反馈: 放置模式 → 手型,
+                // 悬停可配置的子世界建筑 → 手型, 悬停 UI → 箭头
                 if (subBuildMode()) {
-                    if (cursorType != SystemCursor.arrow && Core.scene.hasMouse()) {
-                        Core.graphics.cursor(cursorType = SystemCursor.arrow);
+                    SystemCursor cur = SystemCursor.arrow;
+                    if (isPlacing() && Vars.player.isBuilder()) {
+                        cur = SystemCursor.hand;
+                    }
+                    if (hoveredSubBuild != null && !hoveredSubBuild.dead
+                        && hoveredSubBuild.block.configurable) {
+                        cur = SystemCursor.hand;
+                    }
+                    if (Core.scene.hasMouse()) {
+                        cur = SystemCursor.arrow;
+                    }
+                    if (cursorType != cur) {
+                        Core.graphics.cursor(cursorType = cur);
                     }
                     Draw.reset();
                     return;

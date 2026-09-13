@@ -214,25 +214,25 @@ public class Z_Blocks {
     // ===== PU_V8 移植: 墙体 (简化版, 用 vanilla Wall 或 LimitWall) =====
     private static void createPUWalls() {
         // dark-wall: 暗色墙 (umbrium, 简化为 vanilla Wall, 移除光照交互)
-        darkWall = new Wall("dark-wall") {{
+        darkWall = new Wall("create-dark-wall") {{
             requirements(Category.defense, ItemStack.with(Z_Items.umbrium, 6));
             health = 120 * 4;
         }};
-        darkWallLarge = new Wall("dark-wall-large") {{
+        darkWallLarge = new Wall("create-dark-wall-large") {{
             requirements(Category.defense, ItemStack.with(Z_Items.umbrium, 24));
             health = 120 * 4 * 4;
             size = 2;
         }};
 
         // ustone-wall: 石头墙 (LimitWall maxDamage=40)
-        stoneWall = new LimitWall("ustone-wall") {{
+        stoneWall = new LimitWall("create-ustone-wall") {{
             requirements(Category.defense, ItemStack.with(Z_Items.stone, 6));
             maxDamage = 40f;
             health = 200;
         }};
 
         // dense-wall: 致密合金墙 (LimitWall maxDamage=32)
-        denseWall = new LimitWall("dense-wall") {{
+        denseWall = new LimitWall("create-dense-wall") {{
             requirements(Category.defense, ItemStack.with(Z_Items.denseAlloy, 6));
             maxDamage = 32f;
             health = 560;
@@ -240,7 +240,7 @@ public class Z_Blocks {
 
         // steel-wall: 钢墙 (LevelLimitWall 经验等级墙)
         // PU_V8: maxLevel=6, expFields=[ERational(maxDamage 48→24, axis=-3)]
-        steelWall = new LevelLimitWall("steel-wall") {{
+        steelWall = new LevelLimitWall("create-steel-wall") {{
             requirements(Category.defense, ItemStack.with(Z_Items.steel, 6));
             maxDamage = 24f;
             health = 810;
@@ -249,7 +249,7 @@ public class Z_Blocks {
                 new EField.ERational(v -> maxDamage = v, 48f, 24f, -3f, Stat.abilities, v -> arc.Core.bundle.format("stat.unity.maxdamage", v)).formatAll(false)
             };
         }};
-        steelWallLarge = new LevelLimitWall("steel-wall-large") {{
+        steelWallLarge = new LevelLimitWall("create-steel-wall-large") {{
             requirements(Category.defense, ItemStack.with(Z_Items.steel, 24));
             maxDamage = 48f;
             health = 3240;
@@ -262,7 +262,7 @@ public class Z_Blocks {
 
         // dirium-wall: 迪里姆合金墙 (LevelLimitWall 经验等级墙)
         // PU_V8: maxLevel=6, blinkFrame=30, expFields=[ERational(maxDamage 152→50, axis=-3), ELinearCap(blinkFrame 10→10, cap=2)]
-        diriumWall = new LevelLimitWall("dirium-wall") {{
+        diriumWall = new LevelLimitWall("create-dirium-wall") {{
             requirements(Category.defense, ItemStack.with(Z_Items.dirium, 6));
             maxDamage = 76f;
             blinkFrame = 30f;
@@ -273,7 +273,7 @@ public class Z_Blocks {
                 new EField.ELinearCap(v -> blinkFrame = v, 10f, 10f, 2, Stat.abilities, v -> arc.Core.bundle.format("stat.unity.blinkframe", v)).formatAll(false)
             };
         }};
-        diriumWallLarge = new LevelLimitWall("dirium-wall-large") {{
+        diriumWallLarge = new LevelLimitWall("create-dirium-wall-large") {{
             requirements(Category.defense, ItemStack.with(Z_Items.dirium, 24));
             maxDamage = 152f;
             blinkFrame = 30f;
@@ -289,7 +289,7 @@ public class Z_Blocks {
         // shielded-wall: 护盾墙 (ShieldWall 护盾+经验等级)
         // PU_V8 shieldWall: maxLevel=10, shieldHealth=500, expFields=[ERational(maxDamage 100→25), ELinear(repair 50→10), ELinear(shieldHealth 500→25)]
         // 贴图: shielded-wall.png + shielded-wall-top.png (PU132/PU_V8 原版)
-        shieldedWall = new ShieldWall("shielded-wall") {{
+        shieldedWall = new ShieldWall("create-shielded-wall") {{
             requirements(Category.defense, ItemStack.with(Z_Items.dirium, 8, Z_Items.steel, 6, Items.silicon, 4));
             health = 500;
             shieldHealth = 500;
@@ -301,7 +301,7 @@ public class Z_Blocks {
                 new EField.ELinear(v -> shieldHealth = v, 500, 25, Stat.shieldHealth)
             };
         }};
-        shieldedWallLarge = new ShieldWall("shielded-wall-large") {{
+        shieldedWallLarge = new ShieldWall("create-shielded-wall-large") {{
             requirements(Category.defense, ItemStack.with(Z_Items.dirium, 32, Z_Items.steel, 24, Items.silicon, 16));
             health = 2000;
             maxDamage = 100f;
@@ -316,44 +316,44 @@ public class Z_Blocks {
         }};
 
         // metaglass-wall: 玻璃墙 (简化为 vanilla Wall, 移除光照交互)
-        metaglassWall = new Wall("metaglass-wall") {{
+        metaglassWall = new Wall("create-metaglass-wall") {{
             requirements(Category.defense, ItemStack.with(Items.lead, 6, Items.metaglass, 6));
             health = 350;
         }};
-        metaglassWallLarge = new Wall("metaglass-wall-large") {{
+        metaglassWallLarge = new Wall("create-metaglass-wall-large") {{
             requirements(Category.defense, ItemStack.with(Items.lead, 24, Items.metaglass, 24));
             health = 1400;
             size = 2;
         }};
 
         // electrophobic-wall: 单极子墙 (简化为 vanilla Wall, 移除热图/能量倍率)
-        electrophobicWall = new Wall("electrophobic-wall") {{
+        electrophobicWall = new Wall("create-electrophobic-wall") {{
             requirements(Category.defense, ItemStack.with(Z_Items.monolite, 4, Items.silicon, 2));
             health = 400;
         }};
-        electrophobicWallLarge = new Wall("electrophobic-wall-large") {{
+        electrophobicWallLarge = new Wall("create-electrophobic-wall-large") {{
             requirements(Category.defense, ItemStack.with(Z_Items.monolite, 16, Items.silicon, 8));
             health = 1600;
             size = 2;
         }};
 
         // cupronickel-wall: 铜镍合金墙 (简化为 vanilla Wall, 移除热图)
-        cupronickelWall = new Wall("cupronickel-wall") {{
+        cupronickelWall = new Wall("create-cupronickel-wall") {{
             requirements(Category.defense, ItemStack.with(Z_Items.cupronickel, 8, Z_Items.nickel, 5));
             health = 500;
         }};
-        cupronickelWallLarge = new Wall("cupronickel-wall-large") {{
+        cupronickelWallLarge = new Wall("create-cupronickel-wall-large") {{
             requirements(Category.defense, ItemStack.with(Z_Items.cupronickel, 36, Z_Items.nickel, 20));
             health = 2000;
             size = 2;
         }};
 
         // sharpslate-wall: 锐板岩墙 (StaticWall 环境墙, vanilla)
-        sharpslateWall = new StaticWall("sharpslate-wall") {{
+        sharpslateWall = new StaticWall("create-sharpslate-wall") {{
             variants = 2;
             sharpslate.asFloor().wall = this;
         }};
-        infusedSharpslateWall = new StaticWall("infused-sharpslate-wall") {{
+        infusedSharpslateWall = new StaticWall("create-infused-sharpslate-wall") {{
             variants = 2;
             infusedSharpslate.asFloor().wall = this;
             archaicSharpslate.asFloor().wall = this;
@@ -746,15 +746,15 @@ public class Z_Blocks {
     // ===== PU_V8 移植: 地板 (vanilla Floor / OverlayFloor) =====
     private static void createPUFloors() {
         // electro-tile: 电子地板 (vanilla Floor, 默认 3 variants)
-        electroTile = new Floor("electro-tile");
+        electroTile = new Floor("create-electro-tile");
 
         // sharpslate: 锐板岩 (variants=3)
-        sharpslate = new Floor("sharpslate") {{
+        sharpslate = new Floor("create-sharpslate") {{
             variants = 3;
         }};
 
         // infused-sharpslate: 灌注锐板岩 (variants=3, 发光)
-        infusedSharpslate = new Floor("infused-sharpslate") {{
+        infusedSharpslate = new Floor("create-infused-sharpslate") {{
             variants = 3;
             emitLight = true;
             lightRadius = 24f;
@@ -762,7 +762,7 @@ public class Z_Blocks {
         }};
 
         // archaic-sharpslate: 远古锐板岩 (variants=3, 发光)
-        archaicSharpslate = new Floor("archaic-sharpslate") {{
+        archaicSharpslate = new Floor("create-archaic-sharpslate") {{
             variants = 3;
             emitLight = true;
             lightRadius = 24f;
@@ -770,7 +770,7 @@ public class Z_Blocks {
         }};
 
         // archaic-energy: 远古能量覆盖层 (OverlayFloor, variants=3, 发光)
-        archaicEnergy = new OverlayFloor("archaic-energy") {{
+        archaicEnergy = new OverlayFloor("create-archaic-energy") {{
             variants = 3;
             emitLight = true;
             lightRadius = 24f;
@@ -778,21 +778,21 @@ public class Z_Blocks {
         }};
 
         // concrete 系列 (vanilla Floor)
-        concreteBlank = new Floor("concrete-blank");
-        concreteFill = new Floor("concrete-fill") {{
+        concreteBlank = new Floor("create-concrete-blank");
+        concreteFill = new Floor("create-concrete-fill") {{
             variants = 0;
         }};
-        concreteNumber = new Floor("concrete-number") {{
+        concreteNumber = new Floor("create-concrete-number") {{
             variants = 10;
         }};
-        concreteStripe = new Floor("concrete-stripe");
-        concrete = new Floor("concrete");
+        concreteStripe = new Floor("create-concrete-stripe");
+        concrete = new Floor("create-concrete");
 
         // stone-* 系列 (vanilla Floor)
-        stoneFullTiles = new Floor("stone-full-tiles");
-        stoneFull = new Floor("stone-full");
-        stoneHalf = new Floor("stone-half");
-        stoneTiles = new Floor("stone-tiles");
+        stoneFullTiles = new Floor("create-stone-full-tiles");
+        stoneFull = new Floor("create-stone-full");
+        stoneHalf = new Floor("create-stone-half");
+        stoneTiles = new Floor("create-stone-tiles");
     }
 
     private static void registerEventListeners() {

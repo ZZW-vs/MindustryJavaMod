@@ -10,7 +10,11 @@ import zzw.content.blocks.Z_Blocks;
 import zzw.content.blocks.Z_Turrets;
 import zzw.content.blocks.distribution.Z_Distribution;
 import zzw.content.Z_Items;
+import zzw.content.Z_Planets;
+import zzw.content.Z_SectorPresets;
 import zzw.content.Z_StatusEffects;
+import zzw.content.Z_TechTree;
+import zzw.content.Z_Weathers;
 import zzw.content.Z_Factory;
 import zzw.content.Z_Liquids;
 import zzw.content.Z_Mine;
@@ -145,6 +149,9 @@ public class TestMod extends Mod{
         // end 派系 (2): tenmeikiri, endgame
         zzw.content.blocks.Z_AdvTurrets.loadEnd();
 
+        // ★ imber 吸收器 (power 类别; 之前 loadPower 未被调用导致 absorber 未注册, 已修复)
+        Z_Turrets.loadPower();
+
         // 经验系统 (effect 类别末尾)
         Z_Exp.load();
 
@@ -154,6 +161,20 @@ public class TestMod extends Mod{
         // ★ 原版方块覆盖 (必须在所有单位加载后): 向原版工厂/重构器注入
         //   直升机(schistocerca)/EMP(discharge)/巨石(stele) 系列的生产与升级配方
         zzw.content.Z_Overwriter.load();
+
+        // ===== PU132 行星 / 区块 / 天气 / 科技树 (内容全注册后再挂载) =====
+
+        // 行星 (megalith/electrode/inert; 必须在区块预设之前)
+        Z_Planets.load();
+
+        // 区块预设 (accretion/salvaged-laboratory, msav 地图驱动)
+        Z_SectorPresets.load();
+
+        // 天气 (timeStorm/debrisStorm)
+        Z_Weathers.load();
+
+        // ★ 科技树 (必须最后: 把全部 PU 内容挂到原版科技树, 引用所有内容类)
+        Z_TechTree.load();
     }
     
     /**
