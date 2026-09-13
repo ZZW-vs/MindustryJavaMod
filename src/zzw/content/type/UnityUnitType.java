@@ -218,4 +218,20 @@ public class UnityUnitType extends UnitType{
             super.drawEngines(unit);
         }
     }
+
+    /**
+     * 拖尾绘制 (PU132 行为补全: trailType 工厂接入)。
+     *
+     * <p>原版 v158 的 drawTrail 只会创建普通 Trail 并用队伍色绘制,
+     * PU132 的 trailType 工厂 (MultiTrail/TexturedTrail, 幻影/灵魂蓝色拖尾) 永远不会被调用。
+     * 这里在拖尾为空时优先用 trailType 工厂创建, 再走原版绘制路径
+     * (MultiTrail.draw 内部每个 TrailHold 优先用自己的颜色, 覆盖队伍色)。</p>
+     */
+    @Override
+    public void drawTrail(Unit unit){
+        if(trailLength > 0 && unit.trail == null){
+            unit.trail = trailType.get(unit);
+        }
+        super.drawTrail(unit);
+    }
 }

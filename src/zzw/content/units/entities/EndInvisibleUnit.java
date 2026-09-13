@@ -23,6 +23,11 @@ public class EndInvisibleUnit extends UnitEntity {
 
     public boolean isInvisible = false;
 
+    /** 攻击结束后保持现身的时间 (tick)。计时结束后才开始渐隐 (用户要求, 默认 3 秒) */
+    public float fadeDelay = 3f * 60f;
+    /** 现身保持计时器 */
+    protected float revealTimer = 0f;
+
     @Override
     public void setType(mindustry.type.UnitType type) {
         super.setType(type);
@@ -64,7 +69,22 @@ public class EndInvisibleUnit extends UnitEntity {
         }
 
         // 隐身: 血量高 + 不在攻击 + 没有 disabled
-        if (!isShooting() && health > maxHealth / 2f && disabledTime <= 0f) {
+        // ★ 攻击后延迟变透明 (用户要求): 开火或持续弹存在时刷新现身保持计时,
+        //   计时结束后才开始渐隐 (而不是停火下一帧就变透明)
+        boolean attacking = isShooting();
+        for (mindustry.entities.units.WeaponMount mount : mounts) {
+            if (mount.bullet != null) {
+                attacking = true;
+                break;
+            }
+        }
+        if (attacking) {
+            revealTimer = fadeDelay;
+        } else {
+            revealTimer = Math.max(revealTimer - Time.delta, 0f);
+        }
+
+        if (!attacking && health > maxHealth / 2f && disabledTime <= 0f && revealTimer <= 0f) {
             alphaLerp = Mathf.lerpDelta(alphaLerp, 1f, 0.1f);
         } else {
             alphaLerp = Mathf.lerpDelta(alphaLerp, 0f, 0.1f);

@@ -45,10 +45,11 @@ public class ApocalypseUnitType extends UnityUnitType{
     /**
      * 可见度系数 (PU132 InvisibleUnitType.fade L28-31)。
      *
-     * <p>己方单位最低可见 0.1 (方便辨认), 敌方最低 0.01 (几乎全隐)。</p>
+     * <p>PU132 原版己方单位最低可见 0.1; 按用户要求潜行时更透明, 己方降到 0.05
+     * (敌方保持 PU132 原版 0.01, 几乎全隐)。</p>
      */
     protected float fade(ApocalypseUnit unit){
-        float minimum = Vars.player.team() == unit.team() ? 0.1f : 0.01f;
+        float minimum = Vars.player.team() == unit.team() ? 0.05f : 0.01f;
         return Mathf.clamp(1f - unit.getAlphaLerp(), minimum, 1f);
     }
 

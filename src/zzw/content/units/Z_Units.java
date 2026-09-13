@@ -2156,13 +2156,13 @@ public class Z_Units {
                 segmentLength = 44.5f;  // PU132 原版
                 angleLimit = 30f;       // PU132 原版
                 firstSegmentAngleLimit = 17f;  // PU132 原版
-                // ★ 降低移动速度+增大drag让动态更慢更稳定丝滑
-                rotationSpeed = 1.5f;   // 2.5→1.5 减慢旋转追踪
-                speed = 3f;             // 6→3 减慢末端移动
-                accel = 0.1f;           // 0.2→0.1 减小加速度
-                drag = 0.15f;           // 0.06→0.15 增大阻力让动态更稳定
+                // ★ 恢复 PU132 原版动态参数 (调慢后追踪迟钝, 用户反馈"不智能")
+                rotationSpeed = 2.5f;   // PU132 原版
+                speed = 6f;             // PU132 原版
+                accel = 0.2f;           // PU132 原版
+                // drag 使用 PU132 默认 0.06
                 swayScl = 120f;
-                swayMag = 0.08f;        // 减小摆动 (更硬)
+                swayMag = 0.2f;         // PU132 原版
                 mirror = true;
                 top = true;
                 automatic = false;  // PU132 原版
@@ -2186,6 +2186,7 @@ public class Z_Units {
                         Color.valueOf("ff786e"),    // endColor (浅红)
                         Color.black                 // 黑色核心
                     };
+                    hitEffect = HitEffect.endHitRedSmall;  // PU132 原版
                 }};
                 reload = 3f * 60f;
                 range = 320f;  // PU132: bullet.range()
@@ -2203,11 +2204,11 @@ public class Z_Units {
                 segmentLength = 37.25f;  // PU132 原版
                 // PU132 原版: 不设置angleLimit, 使用默认65f, 让鞭子能自然向外弯曲
                 firstSegmentAngleLimit = 20f;  // PU132 原版
-                // ★ 降低速度+增大drag让动态更慢更稳定
-                rotationSpeed = 1.5f;   // 3→1.5
-                speed = 4f;             // 8→4
-                accel = 0.1f;           // 0.2→0.1
-                drag = 0.15f;           // 0.06→0.15
+                // ★ 恢复 PU132 原版动态参数 (调慢后追踪迟钝)
+                rotationSpeed = 3f;     // PU132 原版
+                speed = 4f * 2f;        // PU132 原版 (8)
+                accel = 0.2f;           // PU132 原版
+                // drag 使用 PU132 默认 0.06
                 mirror = true;
                 top = true;
                 automatic = false;
@@ -2245,11 +2246,11 @@ public class Z_Units {
                 // PU132 原版: 不设置angleLimit, 使用默认65f
                 firstSegmentAngleLimit = 18f;
                 swayOffset = 45f;
-                // ★ 降低速度+增大drag
-                rotationSpeed = 1.5f;
-                speed = 4f;
-                accel = 0.1f;
-                drag = 0.15f;
+                // ★ 恢复 PU132 原版动态参数 (调慢后追踪迟钝)
+                rotationSpeed = 3f;     // PU132 原版
+                speed = 4f * 2f;        // PU132 原版 (8)
+                accel = 0.2f;           // PU132 原版
+                // drag 使用 PU132 默认 0.06
                 mirror = true;
                 top = true;
                 automatic = false;
@@ -2284,11 +2285,11 @@ public class Z_Units {
                 // PU132 原版: 不设置angleLimit, 使用默认65f
                 firstSegmentAngleLimit = 16f;
                 swayOffset = 90f;
-                // ★ 降低速度+增大drag
-                rotationSpeed = 1.5f;
-                speed = 4f;
-                accel = 0.1f;
-                drag = 0.15f;
+                // ★ 恢复 PU132 原版动态参数 (调慢后追踪迟钝)
+                rotationSpeed = 3f;     // PU132 原版
+                speed = 4f * 2f;        // PU132 原版 (8)
+                accel = 0.2f;           // PU132 原版
+                // drag 使用 PU132 默认 0.06
                 mirror = true;
                 top = true;
                 automatic = false;

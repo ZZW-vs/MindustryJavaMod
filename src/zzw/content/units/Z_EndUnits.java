@@ -29,7 +29,7 @@ import zzw.content.units.effects.HitEffect;
 import zzw.content.units.effects.ShootEffect;
 import zzw.content.units.effects.UnityDrawf;
 import zzw.content.units.entities.ApocalypseUnit;
-import zzw.content.units.entities.DecorationUnitEntity;
+import zzw.content.units.entities.ThalassophobiaUnit;
 import zzw.content.units.types.ApocalypseUnitType;
 import zzw.content.units.types.ThalassophobiaUnitType;
 import zzw.content.units.type.decal.FlagellaDecorationType;
@@ -90,6 +90,7 @@ public class Z_EndUnits {
     public static void load(){
         // ★ 自定义实体注册 (v155.4+ 要求, 取唯一 classId)
         ZEntityRegister.register(ApocalypseUnit.class, ApocalypseUnit::create);
+        ZEntityRegister.register(ThalassophobiaUnit.class, ThalassophobiaUnit::create);
 
         apocalypse();
         thalassophobia();
@@ -393,8 +394,9 @@ public class Z_EndUnits {
                 immunities.add(st);
             }
 
-            // PU132: WaterMovec + Decorationc → 装饰实体 (尾巴动画需要)
-            constructor = DecorationUnitEntity::create;
+            // PU132: WaterMovec + Decorationc → 水中移动装饰实体
+            // (实现原版 WaterMovec 接口, UnitType.init 自动设置 naval=true/omniMovement=false/免溺水)
+            constructor = ThalassophobiaUnit::create;
 
             // ===== 鞭毛尾巴 (PU132 decorations.add FlagellaDecorationType) =====
             // 4 段贴图 × 15 节 × 45.75 节长, 挂载点 (0, -172) (身体正后方)
