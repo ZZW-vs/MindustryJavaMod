@@ -39,12 +39,13 @@ import mindustry.input.DesktopInput;
 import mindustry.input.InputHandler;
 import mindustry.input.Placement;
 import mindustry.ui.Styles;
-import mindustry.ui.fragments.BlockConfigFragment;
-import mindustry.ui.fragments.BlockInventoryFragment;
 import mindustry.ui.fragments.PlacementFragment;
 import mindustry.world.Block;
 import mindustry.world.Tile;
+import mindustry.world.blocks.defense.turrets.Turret.TurretBuild;
 import zzw.content.units.entities.WorldUnitEntity;
+import zzw.ui.SubConfigFragment;
+import zzw.ui.SubInventoryFragment;
 
 import java.lang.reflect.Field;
 
@@ -190,7 +191,26 @@ public class WorldUnitType extends UnityUnitType {
                 for (int i = 0; i < build.size; i++) {
                     Building b = build.get(i);
                     Draw.z(Layer.block);
+
+                    // ★ 光束端点子空间变换: TurretBuild.targetPos 是主世界坐标
+                    //   (update 阶段写入的索敌/玩家瞄准点), 而本投影期望子世界坐标 ——
+                    //   画激光/光束类武器前把端点逆变换回子空间, 画完恢复;
+                    //   不变换时光束会连向偏离很远的主世界坐标方向 (端点两套坐标系混用)
+                    boolean isTurret = b instanceof TurretBuild;
+                    float aimX = 0f, aimY = 0f;
+                    if (isTurret) {
+                        TurretBuild t = (TurretBuild) b;
+                        aimX = t.targetPos.x;
+                        aimY = t.targetPos.y;
+                        t.targetPos.set(aimX - w.x, aimY - w.y)
+                            .rotate(-(w.rotation - 90f)).add(w.subCX(), w.subCY());
+                    }
+
                     b.draw();
+
+                    if (isTurret) {
+                        ((TurretBuild) b).targetPos.set(aimX, aimY);
+                    }
                 }
 
                 Vars.renderer.animateShields = oldAnimateShields;
@@ -654,87 +674,34 @@ public class WorldUnitType extends UnityUnitType {
         }
     }
 
-    // ===== 子世界建筑 UI 定位修复 (分类器/物品源等配置界面可正常弹出和操作) =====
+    // ===== 子世界建筑 UI (配置界面/物品栏, 自适应定位 + 取物) =====
 
-    /** UI 定位修复元素 (挂在场景根部最后, act 于所有原版 fragment 之后) */
-    private static Element subUiFixer;
-    /** 反射字段: BlockConfigFragment.table / BlockInventoryFragment.table 与 .build (包私有) */
-    private static Field configTableField, invTableField, invBuildField;
+    /** 子世界建筑配置界面 (电力节点手动连接的配置宿主; 配置可视化由 drawBody 在投影内绘制) */
+    private static final SubConfigFragment subConfig = new SubConfigFragment();
+    /** 子世界建筑物品栏 (容器/仓库取物; 原版 requestItem 的距离校验按子世界坐标算, 永远失败) */
+    private static final SubInventoryFragment subInv = new SubInventoryFragment();
 
     /**
-     * 安装子世界建筑 UI 定位修复.
-     * <p>★ 问题根源: 原版 BlockConfigFragment 的 updateTableAlign / BlockInventoryFragment 的
-     * updateTablePosition 都按建筑自身的 x/y 世界坐标定位 UI —— 子世界建筑的 x/y 是子世界空间
-     * 坐标 (数值很小), 配置界面每帧被定位到主地图原点附近, 表现为"分类器/物品源点开配置后
-     * 界面飞到角落/看不见、改不了配置"。</p>
-     * <p>方案: 场景根部追加一个 act 顺序最后的元素 (原版 config/inv 表都在 UI 初始化时加入,
-     * 本元素后加入 → 每帧在其后执行), 当选中的是子世界建筑时, 用投影后的主世界坐标
-     * (绕单位旋转) 重新定位表 —— 单位移动/旋转时跟随, 观感与原世界一致。
-     * fragment 字段是包私有, 用一次性反射缓存访问。</p>
+     * 安装子世界建筑 UI: 配置界面 + 物品栏表加入场景根部, 注入投影坐标解析器.
+     * <p>★ 为什么不用原版 config/inv Fragment: 原版按建筑自身 x/y 定位 (子世界坐标 →
+     * 地图原点), 取物有主世界距离校验 (永远失败), 配置可视化画在地图原点 ——
+     * 三个问题都源于"子世界建筑坐标不在主世界坐标系", 独立 Fragment 一次解决。</p>
      */
-    private static void installSubUiFixer() {
-        if (subUiFixer != null || Core.scene == null) return;
-        try {
-            configTableField = BlockConfigFragment.class.getDeclaredField("table");
-            configTableField.setAccessible(true);
-            invTableField = BlockInventoryFragment.class.getDeclaredField("table");
-            invTableField.setAccessible(true);
-            invBuildField = BlockInventoryFragment.class.getDeclaredField("build");
-            invBuildField.setAccessible(true);
-        } catch (Throwable e) {
-            return;
-        }
+    private static void installSubUi() {
+        if (Core.scene == null) return;
 
-        subUiFixer = new Element() {
-            @Override
-            public void act(float delta) {
-                fixSubUiPositions();
-            }
+        subConfig.build(Core.scene.root);
+        subInv.build(Core.scene.root);
+
+        // 子世界建筑 → 投影后主世界坐标 (非子世界建筑返回 null → UI 走原版行为)
+        SubInventoryFragment.subPositionResolver = b -> {
+            WorldUnitEntity owner = findSubOwner(b);
+            return owner == null ? null : projectToOwner(owner, b, new Vec2());
         };
-        subUiFixer.touchable = Touchable.disabled;
-        Core.scene.add(subUiFixer);
     }
 
-    /** 每帧修正: 子世界建筑的配置界面 / 物品栏界面重新定位到投影后的主世界坐标 */
-    private static void fixSubUiPositions() {
-        if (!Vars.state.isPlaying()) return;
-        InputHandler in = Vars.control == null ? null : Vars.control.input;
-        if (in == null) return;
-
-        try {
-            // 配置界面 (分类器/物品源/卸除器等): 复刻 updateTableAlign 公式,
-            // 把建筑坐标换成投影后的主世界坐标
-            if (in.config.isShown()) {
-                Building sel = in.config.getSelected();
-                WorldUnitEntity owner = sel == null ? null : findSubOwner(sel);
-                if (owner != null) {
-                    Table table = (Table)configTableField.get(in.config);
-                    projectToOwner(owner, sel, tmpVec);
-                    Vec2 pos = Core.input.mouseScreen(tmpVec.x,
-                        tmpVec.y - sel.block.size * Vars.tilesize / 2f - 1);
-                    table.setPosition(pos.x, pos.y, Align.top);
-                }
-            }
-
-            // 物品栏界面 (仓库/容器等): 复刻 updateTablePosition 公式
-            Building ib = (Building)invBuildField.get(in.inv);
-            if (ib != null && ib.isValid()) {
-                WorldUnitEntity owner = findSubOwner(ib);
-                if (owner != null) {
-                    Table table = (Table)invTableField.get(in.inv);
-                    projectToOwner(owner, ib, tmpVec);
-                    Vec2 pos = Core.input.mouseScreen(
-                        tmpVec.x + ib.block.size * Vars.tilesize / 2f,
-                        tmpVec.y + ib.block.size * Vars.tilesize / 2f);
-                    table.setPosition(pos.x, pos.y, Align.topLeft);
-                }
-            }
-        } catch (Throwable ignored) {
-        }
-    }
-
-    /** 查找建筑所属的世界单位 (O(建筑数) 遍历, 每帧最多调用两次) */
-    private static WorldUnitEntity findSubOwner(Building b) {
+    /** 查找建筑所属的世界单位 (O(建筑数) 遍历, 每帧最多调用几次) */
+    public static WorldUnitEntity findSubOwner(Building b) {
         if (b == null || b.dead) return null;
         for (Unit u : Groups.unit) {
             if (u instanceof WorldUnitEntity w && w.unitWorld != null && w.ownsBuilding(b)) {
@@ -745,8 +712,8 @@ public class WorldUnitType extends UnityUnitType {
     }
 
     /** 子世界建筑坐标 → 投影后的主世界坐标 (绕单位中心旋转, 与渲染投影公式一致) */
-    private static void projectToOwner(WorldUnitEntity w, Building b, Vec2 out) {
-        out.set(b.x - w.subCX(), b.y - w.subCY()).rotate(w.rotation - 90f).add(w.x, w.y);
+    public static Vec2 projectToOwner(WorldUnitEntity w, Building b, Vec2 out) {
+        return out.set(b.x - w.subCX(), b.y - w.subCY()).rotate(w.rotation - 90f).add(w.x, w.y);
     }
 
     /**
@@ -818,16 +785,54 @@ public class WorldUnitType extends UnityUnitType {
 
                 // ★ 延迟打开配置界面 (Core.app.post): Trigger.update 早于原版输入处理,
                 //   同帧原版点击空地会触发 tileTapped(null) → hideConfig 把刚打开的
-                //   界面立即关掉 (表现为"配置界面打不开"); post 到帧末尾打开则不会被关
+                //   界面立即关掉 (表现为"配置界面打不开"); post 到帧末尾打开则不会被关。
+                //   ★ 已有配置界面打开时, 必须在本帧同步捕获选中建筑 (原版 tileTapped(null)
+                //   随后会把它关掉), 复刻原版 tileTapped 的 onConfigureBuildTapped 流程:
+                //   电力节点 → 点范围内另一个节点 = 连接 (返回 false), 双击自身 = 汇总/清除
+                //   链接, 其余返回 true = 切换选中
+                Building selectedConfig = Vars.control.input.config.isShown()
+                                          ? Vars.control.input.config.getSelected() : null;
                 Core.app.post(() -> {
                     if (found.dead) return;
+                    InputHandler in = Vars.control.input;
+
+                    if (selectedConfig != null && selectedConfig.isValid()) {
+                        // 电力节点 configure/getPotentialLinks 内部有 world.build 查询
+                        // → 选中建筑属于子世界时切到其子世界执行
+                        WorldUnitEntity owner = findSubOwner(selectedConfig);
+                        World ow = Vars.world;
+                        if (owner != null) Vars.world = owner.unitWorld;
+                        boolean switchSel;
+                        try {
+                            switchSel = selectedConfig.onConfigureBuildTapped(found);
+                        } finally {
+                            Vars.world = ow;
+                        }
+
+                        if (switchSel) {
+                            // 切换选中 (原版: showConfig 只在 configurable 时调用)
+                            if (found.block.configurable && found.shouldShowConfigure(Vars.player)) {
+                                found.block.configureSound.at(mx, my);
+                                in.config.showConfig(found);
+                            }
+                        } else if (found != selectedConfig) {
+                            // 连接成功 (原版保留配置界面方便继续连下一个) ——
+                            // 本帧原版 tileTapped(null) 已把它关掉, 这里重新打开
+                            if (selectedConfig.block.configurable && selectedConfig.isValid()) {
+                                in.config.showConfig(selectedConfig);
+                            }
+                        }
+                        // found == selectedConfig: 双击自身 → deselect 意图, 保持关闭
+                        return;
+                    }
+
                     if (found.block.configurable && found.shouldShowConfigure(Vars.player)) {
                         // 原版 tileTapped 的配置音效 (在点击的主世界位置播放)
                         found.block.configureSound.at(mx, my);
-                        Vars.control.input.config.showConfig(found);
+                        in.config.showConfig(found);
                     } else {
-                        // 非配置建筑: 显示物品栏
-                        Vars.control.input.inv.showFor(found);
+                        // 非配置建筑: 显示物品栏 (子世界版, 支持拿取物品)
+                        subInv.showFor(found);
                     }
                 });
             }
@@ -914,7 +919,7 @@ public class WorldUnitType extends UnityUnitType {
         Events.run(Trigger.update, WorldUnitType::updateInteraction);
         Events.run(Trigger.draw, WorldUnitType::drawHighlight);
         installInputPatch();
-        installSubUiFixer();
+        installSubUi();
     }
 
     /** 输入补丁是否已安装 (ClientLoadEvent 只触发一次, 标记防重入) */

@@ -44,6 +44,7 @@ import mindustry.world.blocks.defense.turrets.ReloadTurret.ReloadTurretBuild;
 import mindustry.world.blocks.defense.turrets.Turret.TurretBuild;
 import mindustry.world.blocks.power.PowerNode.PowerNodeBuild;
 import mindustry.world.blocks.storage.CoreBlock.CoreBuild;
+import zzw.content.Z_Bullets;
 import zzw.content.blocks.units.TerraCore;
 
 import java.io.ByteArrayInputStream;
@@ -238,7 +239,10 @@ public class WorldUnitEntity extends UnitEntity {
 
         if ((dx != 0f || dy != 0f || dr != 0f) && buildingIds.size > 0) {
             for (Bullet blt : Groups.bullet) {
-                if (blt.owner instanceof Building ob && buildingIds.contains(ob.id)) {
+                if (blt.owner instanceof Building ob && buildingIds.contains(ob.id)
+                    // ★ 护盾力场子弹 (Shielder) 排除: 长寿命驻场子弹, 停在原地保护目标 ——
+                    //   拖拽会让力场悬空挂在单位旁边跟着跑 (原版无子弹跟随, 力场留在原地)
+                    && !(blt.type instanceof Z_Bullets.ShieldBulletType)) {
                     if (dr != 0f) {
                         // 绕单位中心旋转 (与子世界渲染投影公式一致)
                         Tmp.v1.set(blt.x, blt.y).sub(this).rotate(dr).add(this);
@@ -351,6 +355,33 @@ public class WorldUnitEntity extends UnitEntity {
         for (Runnable r : tmpr) {
             r.run();
         }
+
+        // ★ 邻近关系全量重建 (PU132 setup 同款, 原移植遗漏):
+        //   Building.updateProximity 重建 proximity 并触发 onProximityAdded →
+        //   updatePowerGraph (电力图合并); 传送带的 blends/nextc (下游引用,
+        //   决定物品交接) 也依赖它。缺失会导致: 传送带互相不传递/卡停
+        //   (看上去有的快有的慢)、电力图孤立不通电
+        for (int i = 0; i < buildings.size; i++) {
+            buildings.get(i).updateProximity();
+        }
+
+        // ★ 电力节点链接重映射真正写入 (PU132 setup 的 configureAny 步骤, 原移植只算未写):
+        //   absorb 前半段只把重映射后的链接坐标存进 tmpLinks, 节点 power.links 仍是
+        //   主世界旧坐标 —— 子世界里 world.build 查不到目标 → 激光连线不显示、图不通
+        for (int i = 0; i < buildings.size; i++) {
+            Building b = buildings.get(i);
+            if (b instanceof PowerNodeBuild) {
+                IntSeq seq = tmpLinks.get(b.id);
+                if (seq != null && b.power != null) {
+                    b.power.links.clear();
+                    for (int j = 0; j < seq.size; j++) {
+                        // configureAny → Integer 配置 → world.build(pos) 查目标 (子世界上下文)
+                        b.configureAny(seq.get(j));
+                    }
+                }
+            }
+        }
+
         rebuildFromBuildings();
 
         Vars.world = ow;
@@ -497,6 +528,10 @@ public class WorldUnitEntity extends UnitEntity {
                     registerBuilding(tile.build);
                     tile.build.updateProximity();
                     tile.build.noSleep();
+                    // ★ 原版即时放置流程包含 placed() (Build.beginPlace 的组成部分):
+                    //   电力节点靠 placed() 自动连接范围内邻近节点 (getPotentialLinks →
+                    //   configureAny); 漏调导致子世界新放的节点从不自动连线
+                    tile.build.placed();
                 }
                 block.placeEffect.at(tile.drawx(), tile.drawy(), block.size);
                 arc.Events.fire(new BlockBuildEndEvent(tile, this, team, false, config));

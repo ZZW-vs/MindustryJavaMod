@@ -407,9 +407,9 @@ public class Z_EndUnits {
             // (实现原版 WaterMovec 接口, UnitType.init 自动设置 naval=true/omniMovement=false/免溺水)
             constructor = ThalassophobiaUnit::create;
 
-            // ===== 鞭毛尾巴 (PU132 decorations.add FlagellaDecorationType) =====
+            // ===== 鞭毛尾巴 (FlagellaDecorationType 运动学重写版) =====
             // 4 段贴图 × 15 节 × 45.75 节长, 挂载点 (0, -172) (身体正后方)
-            // swayScl = hitSize / speed (PU132 原版写法, 242.5/1.9 ≈ 127.6, 单位越慢摆得越慢)
+            // swayScl 沿用 PU132 写法 (hitSize/speed ≈ 127.6), phaseSpeed=3 → 摆动周期约 0.7 秒
             decorations.add(new FlagellaDecorationType("create-thalassophobia-tail", 4, 15, 45.75f){{
                 x = 0f;
                 y = -172f;
