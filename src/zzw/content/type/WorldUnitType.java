@@ -477,7 +477,10 @@ public class WorldUnitType extends UnityUnitType {
                 dragStartX = tx;
                 dragStartY = ty;
                 subOverrideLineRotation = false;
-            } else if (buildActive && Core.input.keyTap(Binding.breakBlock)) {
+            } else if (buildActive && !in.isPlacing() && Core.input.keyTap(Binding.breakBlock)) {
+                // ★ 原版右键语义 (DesktopInput 分支顺序): deselect 与 breakBlock 同绑右键,
+                //   放置模式下右键先命中 deselect 分支 = 取消选中方块 (不开始拆除);
+                //   未选中放置方块时右键才是框选拆除 —— 这里同步该顺序
                 subDragMode = dragBreak;
                 subDragUnit = hit;
                 dragStartX = tx;
@@ -489,20 +492,26 @@ public class WorldUnitType extends UnityUnitType {
 
         // ===== 拖拽进行 / 提交 =====
         if (subDragMode == dragPlace) {
-            buildPreviewUnit = subDragUnit;
-            if (Core.input.keyDown(Binding.select)) {
-                // 光标移出平台也继续拖拽 (worldToSubPixel 越界时仍写出连续映射坐标)
-                subDragUnit.worldToSubPixel(mx, my, tmpVec);
-                updateSubLinePlans(subDragUnit, in.block, dragStartX, dragStartY,
-                    World.toTile(tmpVec.x), World.toTile(tmpVec.y), in.rotation);
-                // 拖拽中手动旋转 → 后续预览/提交改用手动朝向 (原版 overrideLineRotation 行为)
-                if ((int)Core.input.axisTap(Binding.rotate) != 0) {
-                    subOverrideLineRotation = true;
-                }
-            } else {
-                commitSubPlace(subDragUnit, subLinePlans);
+            if (in.block == null) {
+                // ★ 拖线中右键取消 (原版: deselect 置 block=null → 松开时不 flush, 线清空)
                 resetSubDrag();
                 buildPreviewUnit = null;
+            } else {
+                buildPreviewUnit = subDragUnit;
+                if (Core.input.keyDown(Binding.select)) {
+                    // 光标移出平台也继续拖拽 (worldToSubPixel 越界时仍写出连续映射坐标)
+                    subDragUnit.worldToSubPixel(mx, my, tmpVec);
+                    updateSubLinePlans(subDragUnit, in.block, dragStartX, dragStartY,
+                        World.toTile(tmpVec.x), World.toTile(tmpVec.y), in.rotation);
+                    // 拖拽中手动旋转 → 后续预览/提交改用手动朝向 (原版 overrideLineRotation 行为)
+                    if ((int)Core.input.axisTap(Binding.rotate) != 0) {
+                        subOverrideLineRotation = true;
+                    }
+                } else {
+                    commitSubPlace(subDragUnit, subLinePlans);
+                    resetSubDrag();
+                    buildPreviewUnit = null;
+                }
             }
         } else if (subDragMode == dragBreak) {
             buildPreviewUnit = subDragUnit;

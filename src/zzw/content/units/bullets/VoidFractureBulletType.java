@@ -255,6 +255,13 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
         // ===== Phase 2 结束: 生成 spikes + 播放 voidFractureEffect (PU132 L141-186) =====
         // ★ 用 dashed 标志代替 fdata>=1 (fdata 可能被外部系统改写导致 0 坐标连线)
         // ★ 数据退化防护: 冲刺起点为 (0,0) 时跳过余晖特效, 避免画出到地图原点的黑线
+        // ★ 调试日志: 每次移除都记录 (dashed/起终点/fdata/hit), 便于定位"地图边界拉丝"
+        if (b.data() instanceof FractureData data) {
+            arc.util.Log.info("[fracture-debug] removed: dashed=@ start=(@, @) end=(@, @) fdata=@ hit=@ last=(@, @)",
+                data.dashed,
+                (int)data.x, (int)data.y, (int)b.x(), (int)b.y(),
+                (int)b.fdata(), b.hit, (int)b.lastX(), (int)b.lastY());
+        }
         if (b.data() instanceof FractureData data && data.dashed
             && !(data.x == 0f && data.y == 0f)) {
             VoidFractureData d = new VoidFractureData();

@@ -8,29 +8,28 @@ import arc.graphics.g2d.Lines;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Angles;
 import arc.math.Mathf;
-import arc.util.Tmp;
+import arc.math.geom.Vec2;
 import arc.util.Time;
+import arc.util.Tmp;
 import mindustry.gen.Unit;
 import mindustry.graphics.Drawf;
 import mindustry.graphics.Layer;
 import mindustry.type.UnitType;
 
 /**
- * 鞭毛尾巴装饰 (PU132 type/decal/FlagellaDecorationType 的运动学重写版,
+ * 鞭毛尾巴装饰 (PU132 FlagellaDecorationType 的"跟随链"重写版, 参考多节单位的跟随写法,
  * thalassophobia 的 4 段贴图 × 15 节长尾)
  *
- * <p>★ 为什么重写: PU132 原版用"目标点物理模拟"(两遍约束求解),
- * 在 v158 的海军单位上问题很多 — 转向时目标点滞后导致尾巴抽搐蜷缩
- * (摆动方向与转向相反时最明显), 上岸时碰撞抖动会让尾巴完全错乱。</p>
+ * <p>★ 演进记录: PU132 原版"目标点物理模拟"在海军单位上抽搐蜷缩 → 纯运动学直链
+ * 又太硬 (相邻节折角大, 看起来像硬链接)。本版取两者折中:</p>
  *
- * <p>运动学原理 (无状态、纯计算, 任何情况下都平滑):</p>
- * <p>1. 尾根锚定在单位后方 (x, y 局部偏移), 朝向 = 单位正后方 (rotation + 180°);
- * <br>2. 逐节向外延伸: 每节沿 (正后方 + 摆动角) 方向走 segmentLength,
- *    摆动角 = sin(progress - idx×swayOffset, swayScl, 强度渐变),
- *    强度从根部 startIntensity 渐变到末端 endIntensity (末端甩得最厉害);
- * <br>3. progress 纯时间驱动 (phaseSpeed/tick), 与移动速度/水深完全解耦 —
- *    水里陆上、加减速、原地转身全程匀速丝滑;
- * <br>4. 单位转向时整条尾巴跟着旋转, 不会出现方向反打。</p>
+ * <p>1. <b>跟随链</b> (多节单位 syncToHead 同思路): 每单位持久保存各节位置,
+ *    每帧第 i 节 = 第 i-1 节 + 旋转方向 × 节长 — 节与节首尾相接无缝隙;
+ * <br>2. <b>基础朝向滞后</b>: 尾巴基准方向用 Vec2 向单位正后方 lerp (0.12/tick),
+ *    转身时尾巴平滑甩过去 (鞭子感), 且用向量插值自动处理角度环绕, 不抽搐;
+ * <br>3. <b>波形平滑</b>: 摆动角先算原始 sin 波, 再做一次邻域平均
+ *    (类似多节虫 anglePhysicsSmooth), 相邻节折角大幅减小;
+ * <br>4. 相位纯时间驱动 (phaseSpeed/tick), 与移动/水深/陆地完全解耦。</p>
  */
 public class FlagellaDecorationType extends UnitDecorationType{
     /** 尾巴根部的挂载偏移 (单位局部坐标) */
@@ -41,6 +40,8 @@ public class FlagellaDecorationType extends UnitDecorationType{
     public float swayScl = 40f, swayOffset;
     /** 摆动相位速率 (tick): progress += Time.delta × phaseSpeed */
     public float phaseSpeed = 3f;
+    /** 基础朝向滞后系数 (0-1, 越小转身越"甩") */
+    public float followLerp = 0.12f;
     /** 贴图名 (含 create- 前缀) */
     public String name;
     /** 每节长度 / 总节数 */
@@ -48,6 +49,9 @@ public class FlagellaDecorationType extends UnitDecorationType{
     int segments;
     TextureRegion[] regions;
     TextureRegion end;
+
+    // 摆动角临时数组 (自备, 不用 Tmp.floats 避免与其它系统互相踩踏; 64 > 最大节数)
+    private static final float[] tmpAngles = new float[64], tmpSmooth = new float[64];
 
     public FlagellaDecorationType(String name, int textures, int segments, float length){
         this.name = name;
@@ -66,22 +70,65 @@ public class FlagellaDecorationType extends UnitDecorationType{
         end = Core.atlas.find(name + "-end");
     }
 
-    /** 摆动相位推进 (纯时间驱动) */
+    /** 每帧: 推进相位 + 跟随链求解 (参考多节单位 syncToHead) */
     @Override
     public void update(Unit unit, UnitDecoration deco){
-        ((FlagellaDecoration)deco).progress += Time.delta * phaseSpeed;
+        FlagellaDecoration d = (FlagellaDecoration)deco;
+        d.progress += Time.delta * phaseSpeed;
+
+        // 首帧初始化: 各节排成直线在单位正后方
+        if(!d.inited){
+            d.inited = true;
+            d.dir.set(Angles.trnsx(unit.rotation + 180f, 1f), Angles.trnsy(unit.rotation + 180f, 1f));
+            d.xs = new float[segments + 1];
+            d.ys = new float[segments + 1];
+            float rx = unit.x + Angles.trnsx(unit.rotation - 90f, x, y),
+            ry = unit.y + Angles.trnsy(unit.rotation - 90f, x, y);
+            for(int i = 0; i <= segments; i++){
+                d.xs[i] = rx + Angles.trnsx(unit.rotation + 180f, i * segmentLength);
+                d.ys[i] = ry + Angles.trnsy(unit.rotation + 180f, i * segmentLength);
+            }
+        }
+
+        // 1) 基础朝向滞后: 向量插值 (自动处理角度环绕), 转身时尾巴平滑甩动
+        Tmp.v1.set(Angles.trnsx(unit.rotation + 180f, 1f), Angles.trnsy(unit.rotation + 180f, 1f));
+        d.dir.lerp(Tmp.v1, Mathf.clamp(followLerp * Time.delta, 0f, 1f));
+        if(d.dir.len() > 0.001f) d.dir.nor();
+        float baseRot = d.dir.angle();
+
+        // 2) 尾根锚定 (单位后方偏移)
+        d.xs[0] = unit.x + Angles.trnsx(unit.rotation - 90f, x, y);
+        d.ys[0] = unit.y + Angles.trnsy(unit.rotation - 90f, x, y);
+
+        // 3) 摆动角: 原始 sin 波 → 邻域平均平滑 (消除相邻节硬折角)
+        for(int i = 0; i < segments; i++){
+            tmpAngles[i] = swayAngle(d, i);
+        }
+        for(int i = 0; i < segments; i++){
+            float prev = i > 0 ? tmpAngles[i - 1] : tmpAngles[0],
+            next = i < segments - 1 ? tmpAngles[i + 1] : tmpAngles[i];
+            tmpSmooth[i] = (prev + tmpAngles[i] * 2f + next) / 4f;
+        }
+
+        // 4) 跟随链: 第 i 节 = 第 i-1 节 + (基准方向 + 平滑摆动角) × 节长
+        for(int i = 0; i < segments; i++){
+            float a = baseRot + tmpSmooth[i];
+            d.xs[i + 1] = d.xs[i] + Angles.trnsx(a, segmentLength);
+            d.ys[i + 1] = d.ys[i] + Angles.trnsy(a, segmentLength);
+        }
     }
 
     @Override
     public void added(Unit unit, UnitDecoration deco){}
 
     /**
-     * 逐节绘制: 从尾根到尾尖, 每节用 Lines.line 沿贴图拉伸
+     * 逐节绘制: 相邻节点之间用 Lines.line 沿贴图拉伸
      * (贴图从尾根 tail-0 过渡到尾尖 tail-end), 每节独立阴影。
      */
     @Override
     public void draw(Unit unit, UnitDecoration deco){
         FlagellaDecoration d = (FlagellaDecoration)deco;
+        if(!d.inited) return;
 
         int regL = regions.length - 1;
         UnitType t = unit.type;
@@ -90,34 +137,21 @@ public class FlagellaDecorationType extends UnitDecorationType{
         float sz = unit.elevation > 0.5f ? (t.lowAltitude ? Layer.flyingUnitLow : Layer.flyingUnit) : t.groundLayer + Mathf.clamp(t.hitSize / 4000f, 0, 0.01f);
         sz = Math.min(sz - 0.01f, Layer.bullet - 1f);
 
-        // 尾根位置 (单位局部偏移) + 基础朝向 (单位正后方)
-        float px = unit.x + Angles.trnsx(unit.rotation - 90f, x, y),
-        py = unit.y + Angles.trnsy(unit.rotation - 90f, x, y);
-        float baseRot = unit.rotation + 180f;
-
         for(int idx = 0; idx < segments; idx++){
             // 贴图按节数比例从 tail-0 (根部) 过渡到 tail-end (尾尖)
             TextureRegion region = idx == segments - 1 ? end
                 : regions[Mathf.clamp(Mathf.round(idx / (float)(segments - 1) * regL), 0, regL)];
             float ssize = Math.max(region.width, region.height) * Draw.scl * 1.6f;
 
-            // 本节方向 = 正后方 + 摆动角 (强度根部→末端渐变)
-            float ang = baseRot + swayAngle(d, idx);
-            float nx = px + Angles.trnsx(ang, segmentLength),
-            ny = py + Angles.trnsy(ang, segmentLength);
-
             unit.type.applyColor(unit);
             Lines.stroke(region.height * Draw.scl);
 
-            // 节段中点阴影 (尾根下方)
+            // 节段中点阴影
             Draw.z(sz);
-            Drawf.shadow((px + nx) / 2f, (py + ny) / 2f, ssize, 0.6f);
+            Drawf.shadow((d.xs[idx] + d.xs[idx + 1]) / 2f, (d.ys[idx] + d.ys[idx + 1]) / 2f, ssize, 0.6f);
             Draw.z(z);
 
-            Lines.line(region, px, py, nx, ny, false);
-
-            px = nx;
-            py = ny;
+            Lines.line(region, d.xs[idx], d.ys[idx], d.xs[idx + 1], d.ys[idx + 1], false);
         }
         Draw.reset();
     }
@@ -136,9 +170,15 @@ public class FlagellaDecorationType extends UnitDecorationType{
         outliner.get(end);
     }
 
-    /** 鞭毛尾巴状态实例 (每单位独立, 只存摆动相位) */
+    /**
+     * 鞭毛尾巴状态实例 (每单位独立):
+     * progress = 摆动相位; dir = 滞后的基础朝向; xs/ys = 各节绘制位置 (含尾根共 segments+1 点)。
+     */
     static class FlagellaDecoration extends UnitDecoration{
         float progress;
+        final Vec2 dir = new Vec2();
+        float[] xs, ys;
+        boolean inited;
 
         public FlagellaDecoration(UnitDecorationType type){
             super(type);
