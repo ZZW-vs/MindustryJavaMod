@@ -115,7 +115,7 @@ public class Z_AdvTurrets {
             targetGround = true;
             laserColor = Pal.lancerLaser;
             status = mindustry.content.StatusEffects.none;
-            shootSound = Sounds.beamParallax;
+            shootSound = Z_Sounds.cubeBlast;  // PU132 UnitySounds.cubeBlast
             requireSoul = false;
             efficiencyFrom = 0.8f;
             efficiencyTo = 1.5f;
@@ -196,7 +196,7 @@ public class Z_AdvTurrets {
             targetAir = true;
             targetGround = true;
             laserColor = Pal.lancerLaser;
-            shootSound = Sounds.beamParallax;
+            shootSound = Z_Sounds.cubeBlast;  // PU132 UnitySounds.cubeBlast
             requireSoul = false;
             efficiencyFrom = 0.8f;
             efficiencyTo = 1.6f;

@@ -10,6 +10,7 @@ import mindustry.type.Category;
 import mindustry.type.ItemStack;
 import mindustry.world.Block;
 import mindustry.world.blocks.defense.turrets.Turret;
+import zzw.content.Z_Sounds;
 import zzw.content.Z_Items;
 import zzw.content.blocks.exp.KoruhReactor;
 import zzw.content.units.bullets.ExpLaserBulletType;
@@ -330,6 +331,8 @@ public class Z_Exp {
             ammo(mindustry.content.Liquids.cryofluid, new ExpLaserBulletType(160f, 20f){{
                 colors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser.cpy().a(0.4f), mindustry.graphics.Pal.lancerLaser, arc.graphics.Color.white};
                 hitEffect = mindustry.content.Fx.hitLancer;
+                // PU132: 冻结圈产生时播 laserFreeze (freezePos 机制未移植, 用命中音近似)
+                hitSound = Z_Sounds.laserFreeze;
                 hitSize = 4;
                 lifetime = 16f;
                 drawSize = 400f;

@@ -681,6 +681,7 @@ public class Z_Units {
                 y = 16.5f;
                 reload = 2f * 60f;
                 continuous = true;
+                shootSound = Z_Sounds.continuousLaserA;  // PU132 UnitySounds.continuousLaserA
 
                 bullet = new EndContinuousLaserBulletType(85f) {{
                     lifetime = 2f * 60f;
@@ -1018,6 +1019,7 @@ public class Z_Units {
             // PU132 第4272-4289行: damage=120, 5发, inaccuracy=15, range=870
             // ★ 快闪电优化: 伤害×6.67, 持续时间大幅缩短, 节点间距增大, 分裂减少
             weapons.add(new Weapon("create-oppression-destroyer-4") {{
+                shootSound = Z_Sounds.oppressionLightning;  // PU132 UnitySounds.oppressionLightning
                 x = 98f;
                 y = -26.25f;
                 shootY = 17.5f;
@@ -3358,6 +3360,7 @@ public class Z_Units {
                 angleCone = 60f;
                 rotate = true;
                 continuous = true;
+                shootSound = Z_Sounds.continuousLaserA;  // PU132 UnitySounds.continuousLaserA
                 alternate = false;
                 rotateSpeed = 1.5f;
                 recoil = 5f;
