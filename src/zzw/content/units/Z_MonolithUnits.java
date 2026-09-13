@@ -31,6 +31,7 @@ import mindustry.graphics.Trail;
 import mindustry.type.UnitType;
 import mindustry.type.Weapon;
 import mindustry.world.Tile;
+import zzw.content.units.weapons.BlankWeapon;
 import zzw.content.Z_Sounds;
 import zzw.content.graphics.UnityPal;
 import zzw.content.type.UnityUnitType;
@@ -197,7 +198,7 @@ public class Z_MonolithUnits{
             engineColor = UnityPal.monolith;
             outlineColor = UnityPal.darkOutline;
 
-            weapons.add(new Weapon(){{
+            weapons.add(new BlankWeapon() {{
                 mirror = false;
                 rotate = false;
                 x = 0f;
@@ -237,7 +238,7 @@ public class Z_MonolithUnits{
             engineColor = UnityPal.monolith;
             outlineColor = UnityPal.darkOutline;
 
-            weapons.add(new Weapon(){{
+            weapons.add(new BlankWeapon() {{
                 mirror = false;
                 rotate = false;
                 x = 0f;

@@ -24,6 +24,7 @@ import mindustry.graphics.Layer;
 import mindustry.type.UnitType;
 import mindustry.type.Weapon;
 
+import zzw.content.units.weapons.BlankWeapon;
 import zzw.content.units.abilities.CustomLegsAbility;
 import zzw.content.units.abilities.TimeStopAbility;
 import zzw.content.units.anticheat.AntiCheatBulletModule;
@@ -222,9 +223,9 @@ public class Z_Units {
             hittable = true;
 
             // ===== 段身武器: BombBullet (PU132 第3039-3045行, 匿名武器无贴图) =====
-            // PU132 原版: 段身武器是匿名的 new Weapon(){{...}}, 没有 name, 不加载炮台贴图
+            // PU132 原版: 段身武器是匿名的 new BlankWeapon() {{...}}, 没有 name, 不加载炮台贴图
             // 电弧虫段身投弹: splashDamage=25, 爆炸色同电弧
-            weapons.add(new Weapon() {{
+            weapons.add(new BlankWeapon() {{
                 x = 0f;
                 rotate = true;
                 mirror = false;
@@ -282,7 +283,7 @@ public class Z_Units {
 
             // ===== 头部武器: 双激光 (PU132 原配置) =====
             // PU132 UnityUnitTypes.java 第3024-3037行: 匿名武器, 无炮台贴图
-            weapons.add(new Weapon() {{
+            weapons.add(new BlankWeapon() {{
                 x = 0f;
                 reload = 10f;
                 rotateSpeed = 50f;
@@ -372,7 +373,7 @@ public class Z_Units {
             // ===== 段身武器: ArtilleryBullet (PU132 第3269-3281行, 匿名武器无贴图) =====
             // PU132 原版: 段身武器是匿名的, 没有 name, 不加载炮台贴图
             // 瘟疫炮弹: splashDamage=25, splashDamageRadius=25, 瘟疫色
-            weapons.add(new Weapon() {{
+            weapons.add(new BlankWeapon() {{
                 rotate = true;
                 mirror = false;
                 reload = 60f;
@@ -424,7 +425,7 @@ public class Z_Units {
             // 瘟疫激光: 12 发同时散射, SapBullet 自动回血
             // PU132 原版: 匿名武器, 无炮台贴图
             // ★ v154.3: shots/shotDelay 在 shoot (ShootPattern) 字段里, 不在 Weapon 上
-            weapons.add(new Weapon() {{
+            weapons.add(new BlankWeapon() {{
                 x = 0f;
                 rotate = false;
                 mirror = false;
@@ -1077,7 +1078,7 @@ public class Z_Units {
 
             // ===== 阶段4: 头部主激光 (PU132 OppressionLaserBulletType, 完整移植7层渲染) =====
             // PU132 第4097-4108行: damage=9000, length=2150, width=140, lifetime=8*60
-            weapons.add(new Weapon() {{
+            weapons.add(new BlankWeapon() {{
                 x = 0f;
                 y = 0f;
                 shootY = 47.25f;
@@ -1323,7 +1324,7 @@ public class Z_Units {
             // ★ 使用 WormAI (继承 FlyingAI, 完全按 PU132 原版自动索敌+攻击)
             aiController = () -> new zzw.content.units.ai.WormAI();
 
-            weapons.add(new Weapon() {{
+            weapons.add(new BlankWeapon() {{
                 x = 4.25f;
                 y = -3.75f;
                 rotate = true;
@@ -1373,7 +1374,7 @@ public class Z_Units {
             //   - shots=3, shotDelay=3*60=180, reload=18*60=1080
             //   - 组间隔 = 18 - 6 = 12秒 ✓
             //   - bullet.range=300 限制索敌范围 (小激光射程)
-            weapons.add(new Weapon() {{
+            weapons.add(new BlankWeapon() {{
                 x = 0f;
                 y = 0f;
                 shootY = 8f;
@@ -1489,7 +1490,7 @@ public class Z_Units {
 
             // ===== 武器1: 头部红色激光 (PU132 LaserBulletType, 1400 伤害) =====
             // PU132 第3867-3883行: rotate=false, mirror=false, reload=4*60
-            weapons.add(new Weapon() {{
+            weapons.add(new BlankWeapon() {{
                 mirror = false;
                 rotate = false;
                 shootCone = 360f;  // 固定方向, 任意角度都能发射
@@ -3009,7 +3010,7 @@ public class Z_Units {
             range = 300f;
 
             // 武器1: 反射激光 (PU_V8 ReflectingLaserBulletType, length=500f, width=65f, reflections=5)
-            weapons.add(new Weapon() {{
+            weapons.add(new BlankWeapon() {{
                 x = 0f;
                 y = 8.25f;
                 mirror = false;
@@ -3469,7 +3470,7 @@ public class Z_Units {
             // → 在两个 Weapon 中分别 inline 同样参数的 BasicBulletType
 
             // 武器1: 加速激光 (PU_V8 AcceleratingLaserBulletType, maxLength=380f, width=27f)
-            weapons.add(new Weapon() {{
+            weapons.add(new BlankWeapon() {{
                 x = 0f;
                 y = 0f;
                 shootY = 4f;
@@ -4761,7 +4762,7 @@ public class Z_Units {
             constructor = mindustry.gen.UnitEntity::create;
             range = 200f;
 
-            weapons.add(new Weapon() {{
+            weapons.add(new BlankWeapon() {{
                 rotate = false;
                 mirror = false;
                 x = 0f;
@@ -4803,7 +4804,7 @@ public class Z_Units {
             constructor = mindustry.gen.UnitEntity::create;
             range = 220f;
 
-            weapons.add(new Weapon() {{
+            weapons.add(new BlankWeapon() {{
                 rotate = false;
                 mirror = false;
                 x = 0f;
@@ -4878,7 +4879,7 @@ public class Z_Units {
             }});
 
             // 武器2: 中央大型EMP
-            weapons.add(new Weapon() {{
+            weapons.add(new BlankWeapon() {{
                 mirror = false;
                 x = 0f;
                 y = -11.5f;

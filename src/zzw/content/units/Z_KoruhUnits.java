@@ -9,6 +9,7 @@ import mindustry.entities.bullet.MissileBulletType;
 import mindustry.entities.abilities.MoveLightningAbility;
 import mindustry.graphics.Pal;
 import mindustry.type.Weapon;
+import zzw.content.units.weapons.BlankWeapon;
 import zzw.content.type.UnityUnitType;
 import zzw.content.units.abilities.LightningBurstAbility;
 import zzw.content.units.abilities.ShootArmorAbility;
@@ -138,7 +139,7 @@ public class Z_KoruhUnits{
             armor = 6f;
             accel = 0.02f;
 
-            weapons.add(new Weapon(){{
+            weapons.add(new BlankWeapon() {{
                 top = false;
                 shootY = 1.5f;
                 reload = 70f;

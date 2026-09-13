@@ -14,6 +14,7 @@ import mindustry.graphics.Layer;
 import mindustry.type.StatusEffect;
 import mindustry.type.UnitType;
 import mindustry.type.Weapon;
+import zzw.content.units.weapons.BlankWeapon;
 import zzw.content.Z_Bullets;
 import zzw.content.graphics.UnityPal;
 import zzw.content.type.UnityUnitType;
@@ -133,7 +134,7 @@ public class Z_ScarUnits {
             legLength = 32f;
             legExtension = -4.3f;
 
-            weapons.add(new Weapon(){{
+            weapons.add(new BlankWeapon() {{
                 reload = 2.5f * 60f;
                 x = 0f;
                 y = 7.5f;
@@ -190,7 +191,7 @@ public class Z_ScarUnits {
             legExtension = -9.3f;
 
             weapons.add(
-                new Weapon(){{
+                new BlankWeapon() {{
                     x = 0f;
                     y = 12f;
                     shootY = 0f;
@@ -208,7 +209,7 @@ public class Z_ScarUnits {
                         hitEffect = Fx.massiveExplosion;
                         pierceDamageFactor = 0.2f;
                     }};
-                }}, new Weapon(){{
+                }}, new BlankWeapon() {{
                     x = 10.25f;
                     y = 2f;
                     rotate = false;
@@ -561,7 +562,7 @@ public class Z_ScarUnits {
             hitSize = 8f;
             engineOffset = 8f;
 
-            weapons.add(new Weapon(){{
+            weapons.add(new BlankWeapon() {{
                 mirror = false;
                 x = 0f;
                 y = 4f;
@@ -586,7 +587,7 @@ public class Z_ScarUnits {
 
                 shootStatusDuration = bullet.lifetime;
                 reload = 2 * 60f;
-            }}, new Weapon(){{
+            }}, new BlankWeapon() {{
                 rotate = true;
                 x = 4.2f;
                 reload = 50f;
@@ -619,7 +620,7 @@ public class Z_ScarUnits {
             hitSize = 11f;
             engineOffset = 11f;
 
-            weapons.add(new Weapon(){{
+            weapons.add(new BlankWeapon() {{
                 mirror = false;
                 x = 0f;
                 y = 7f;
@@ -679,7 +680,7 @@ public class Z_ScarUnits {
             hitSize = 11f;
             engineOffset = 14f;
 
-            weapons.add(new Weapon(){{
+            weapons.add(new BlankWeapon() {{
                 mirror = false;
                 x = 0f;
                 continuous = true;
