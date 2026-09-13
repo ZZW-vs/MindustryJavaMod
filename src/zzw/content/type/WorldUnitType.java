@@ -10,8 +10,10 @@ import arc.graphics.g2d.SpriteBatch;
 import arc.math.Angles;
 import arc.math.Mat;
 import arc.math.Mathf;
+import arc.math.geom.Geometry;
 import arc.math.geom.Point2;
 import arc.math.geom.Vec2;
+import arc.graphics.g2d.TextureRegion;
 import arc.scene.Element;
 import arc.scene.event.Touchable;
 import arc.scene.ui.layout.Table;
@@ -269,6 +271,12 @@ public class WorldUnitType extends UnityUnitType {
                             Draw.color(Pal.remove, 0.3f);
                             Fill.square(px, py, plan.block.size * Vars.tilesize / 2f);
                             Draw.color();
+                        }
+
+                        // ★ 原版方向箭头: rotate 且 drawArrow 的方块 (传送带/分拣器等),
+                        //   画在线的最后一段 (悬停单格 = 该格), 与原版 drawBottom 观感一致
+                        if (i == subLinePlans.size - 1 && plan.block.rotate && plan.block.drawArrow) {
+                            drawSubPlanArrow(plan.block, plan.x, plan.y, plan.rotation, valid);
                         }
                     }
                     Draw.reset();
@@ -569,39 +577,59 @@ public class WorldUnitType extends UnityUnitType {
         } else {
             points = Placement.normalizeLine(startX, startY, endX, endY);
         }
-        block.changePlacementPath(points, defaultRot, diagonal);
 
-        // 基准朝向 (原版规则, 在子世界空间内计算 —— 保证画出的线在平台网格上是直的)
-        float angle = Angles.angle(startX, startY, endX, endY);
-        int baseRot = (!subOverrideLineRotation && !(startX == endX && startY == endY))
-            ? ((int)((angle + 45f) / 90f)) % 4
-            : defaultRot;
+        // ★ changePlacementPath (部分方块查 world.tile) 与 blockreplace (getReplacement 查
+        //   req.tile()) 都依赖世界查询 —— 必须切到子世界执行, 否则落在主世界坐标上错乱
+        World ow = Vars.world;
+        Vars.world = w.unitWorld;
+        try {
+            block.changePlacementPath(points, defaultRot, diagonal);
 
-        Tmp.r3.set(-1, -1, 0, 0);
+            // 基准朝向 (原版规则, 在子世界空间内计算 —— 保证画出的线在平台网格上是直的)
+            float angle = Angles.angle(startX, startY, endX, endY);
+            int baseRot = (!subOverrideLineRotation && !(startX == endX && startY == endY))
+                ? ((int)((angle + 45f) / 90f)) % 4
+                : defaultRot;
 
-        for (int i = 0; i < points.size; i++) {
-            Point2 point = points.get(i);
+            Tmp.r3.set(-1, -1, 0, 0);
 
-            // 多方块计划重叠: 与前一个已入列计划的占用区重叠 → 跳过 (原版同款防重叠)
-            if (block.size > 1 && Tmp.r2.setSize(block.size * Vars.tilesize)
-                .setCenter(point.x * Vars.tilesize + block.offset, point.y * Vars.tilesize + block.offset)
-                .overlaps(Tmp.r3)) {
-                continue;
+            for (int i = 0; i < points.size; i++) {
+                Point2 point = points.get(i);
+
+                // 多方块计划重叠: 与前一个已入列计划的占用区重叠 → 跳过 (原版同款防重叠)
+                if (block.size > 1 && Tmp.r2.setSize(block.size * Vars.tilesize)
+                    .setCenter(point.x * Vars.tilesize + block.offset, point.y * Vars.tilesize + block.offset)
+                    .overlaps(Tmp.r3)) {
+                    continue;
+                }
+
+                Point2 next = i == points.size - 1 ? null : points.get(i + 1);
+                int rot = baseRot;
+                if (!subOverrideLineRotation && !block.ignoreLineRotation && next != null) {
+                    int result = Tile.relativeTo(point.x, point.y, next.x, next.y);
+                    if (result != -1) rot = result;
+                }
+
+                BuildPlan plan = new BuildPlan(point.x, point.y, rot, block, block.nextConfig());
+                plan.animScale = 1f;
+                subLinePlans.add(plan);
+
+                Tmp.r3.setSize(block.size * Vars.tilesize)
+                    .setCenter(point.x * Vars.tilesize + block.offset, point.y * Vars.tilesize + block.offset);
             }
 
-            Point2 next = i == points.size - 1 ? null : points.get(i + 1);
-            int rot = baseRot;
-            if (!subOverrideLineRotation && !block.ignoreLineRotation && next != null) {
-                int result = Tile.relativeTo(point.x, point.y, next.x, next.y);
-                if (result != -1) rot = result;
+            // ★ 原版 updateLine 的 blockreplace 设置: 交叉的传送带自动换关节等
+            //   (getReplacement 基于 plans 表 + req.tile() 查询)
+            if (Core.settings.getBool("blockreplace")) {
+                subLinePlans.each(plan -> {
+                    Block replace = plan.block.getReplacement(plan, subLinePlans);
+                    if (replace.unlockedNow()) {
+                        plan.block = replace;
+                    }
+                });
             }
-
-            BuildPlan plan = new BuildPlan(point.x, point.y, rot, block, block.nextConfig());
-            plan.animScale = 1f;
-            subLinePlans.add(plan);
-
-            Tmp.r3.setSize(block.size * Vars.tilesize)
-                .setCenter(point.x * Vars.tilesize + block.offset, point.y * Vars.tilesize + block.offset);
+        } finally {
+            Vars.world = ow;
         }
     }
 
@@ -867,6 +895,29 @@ public class WorldUnitType extends UnityUnitType {
     /** 打开建筑配置: 子世界建筑走子世界 Fragment (可视化由 drawBody 在投影内绘制) */
     private static void openSubConfig(Building b) {
         subConfig.showConfig(b);
+    }
+
+    /**
+     * 子世界预览的方向箭头 (复刻原版 InputHandler.drawArrow, 在投影上下文中绘制):
+     * "place-arrow" 贴图画在方块朝向一侧边缘, 阴影层 + 主层, 无效时红色.
+     */
+    private static void drawSubPlanArrow(Block block, int x, int y, int rotation, boolean valid) {
+        float trns = (block.size / 2) * Vars.tilesize;
+        int dx = Geometry.d4(rotation).x, dy = Geometry.d4(rotation).y;
+        float offsetx = x * Vars.tilesize + block.offset + dx * trns;
+        float offsety = y * Vars.tilesize + block.offset + dy * trns;
+
+        Draw.color(!valid ? Pal.removeBack : Pal.accentBack);
+        TextureRegion regionArrow = Core.atlas.find("place-arrow");
+
+        Draw.rect(regionArrow, offsetx, offsety - 1,
+            regionArrow.width * regionArrow.scl(), regionArrow.height * regionArrow.scl(),
+            rotation * 90 - 90);
+
+        Draw.color(!valid ? Pal.remove : Pal.accent);
+        Draw.rect(regionArrow, offsetx, offsety,
+            regionArrow.width * regionArrow.scl(), regionArrow.height * regionArrow.scl(),
+            rotation * 90 - 90);
     }
 
     // ===== 建造模式开关按钮 (点击主核心弹出) =====

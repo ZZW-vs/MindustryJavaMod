@@ -3788,6 +3788,7 @@ public class Z_Units {
             flying = true;
             health = 70f;
             speed = 3.5f;
+            accel = 0.1f;           // PU_V8: 0.1 (原版默认 0.5, 必须显式覆盖)
             drag = 0.07f;
             hitSize = 13f;
             engineOffset = 6.75f;
@@ -3817,7 +3818,8 @@ public class Z_Units {
             lowAltitude = true;
             health = 220f;
             speed = 2.5f;
-            drag = 0.07f;
+            accel = 0.09f;          // PU_V8: 0.09
+            drag = 0.08f;           // PU_V8: 0.08
             hitSize = 19.5f;
             engineOffset = 10.25f;
             engineSize = 3f;
@@ -3828,6 +3830,9 @@ public class Z_Units {
             range = 130f;
 
             weapons.add(new mindustry.type.weapons.RepairBeamWeapon("repair-beam-weapon-center-large") {{
+                x = 0f;
+                y = -3f;                // PU_V8: 挂点偏移
+                shootY = 6f;            // PU_V8: 光束从挂点前 6px 发出
                 beamWidth = 1f;
                 mirror = false;
                 repairSpeed = 1.5f;
@@ -3846,11 +3851,12 @@ public class Z_Units {
             lowAltitude = true;
             health = 670f;
             speed = 2f;
-            drag = 0.07f;
+            accel = 0.095f;         // PU_V8: 0.095
+            drag = 0.09f;           // PU_V8: 0.09
             hitSize = 34f;
             engineOffset = 15.75f;
             engineSize = 3.5f;
-            useUnitCap = false;     // v158 字段 (旧版 isCounted=false), 不计入单位上限
+            // PU_V8 未设 isCounted=false → seraphim 计入单位上限 (与 cherub/malakhim 不同)
             circleTarget = true;          // ★ NewHealerAI 用 circle() 围绕目标盘旋
             outlineColor = Color.valueOf("2e3142");
             constructor = mindustry.gen.UnitEntity::create;

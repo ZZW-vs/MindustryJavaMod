@@ -171,7 +171,10 @@ public class WorldUnitEntity extends UnitEntity {
         if (isPlayer()) {
             for (TurretBuild t : turrets) {
                 t.logicControlTime = 5f;
-                t.logicShooting = isShooting();
+                // ★ 建造模式下不再因建造点击开火 (原版语义: isPlacing 时 canShoot()=false,
+                //   玩家的点击全部视为建造意图; 否则平台上每次点击都会触发 player.shooting
+                //   → 炮台"自动攻击")。炮台仍跟随玩家瞄准转动; 非建造模式照常跟随开火
+                t.logicShooting = buildMode ? false : isShooting();
                 t.targetPos.set(aimX(), aimY());
             }
         }
@@ -467,6 +470,9 @@ public class WorldUnitEntity extends UnitEntity {
     /**
      * 子世界能否放置方块 (多方块按尺寸铺开检查边界和占用).
      * <p>子世界地板全是 metalFloor 可建, 无需地形检查; 子世界里也没有单位, 无需重叠检查。</p>
+     * <p>★ 原版 validPlace 替换语义: 占用 tile 上存在同队<b>可替换</b>建筑
+     * ({@code block.canReplace}) 时允许覆盖 —— 拖线经过旧传送带改方向/替换是
+     * 原版核心操作, 否则旧方向的带子残留, 物品在"看起来同方向"的接缝处断流。</p>
      */
     public boolean canBuildSub(Block block, int tx, int ty) {
         if (unitWorld == null || block == null) return false;
@@ -475,7 +481,8 @@ public class WorldUnitEntity extends UnitEntity {
             for (int dy = 0; dy < block.size; dy++) {
                 int x2 = tx + offset + dx, y2 = ty + offset + dy;
                 if (!valid(x2, y2)) return false;
-                if (unitWorld.tile(x2, y2).build != null) return false;
+                Building ob = unitWorld.tile(x2, y2).build;
+                if (ob != null && !(ob.team == team && block.canReplace(ob.block))) return false;
             }
         }
         return true;
@@ -515,6 +522,22 @@ public class WorldUnitEntity extends UnitEntity {
 
         if (!canBuildSub(block, tx, ty)) return false;
 
+        // ★ 原版替换语义: 收集将被覆盖的同队可替换建筑 —— 移入 ConstructBuild.prevBuild /
+        //   即时路径直接 overwrote (传送带 items 转移等, 与 constructFinish 一致)
+        Seq<Building> prev = null;
+        int offset = -(block.size - 1) / 2;
+        for (int dx = 0; dx < block.size; dx++) {
+            for (int dy = 0; dy < block.size; dy++) {
+                Tile t2 = unitWorld.tile(tx + offset + dx, ty + offset + dy);
+                if (t2 == null || t2.build == null) continue;
+                Building ob = t2.build;
+                if (ob.team == team && block.canReplace(ob.block)) {
+                    if (prev == null) prev = new Seq<>();
+                    if (!prev.contains(ob)) prev.add(ob);
+                }
+            }
+        }
+
         World ow = Vars.world;
         Vars.world = unitWorld;
         try {
@@ -524,6 +547,14 @@ public class WorldUnitEntity extends UnitEntity {
                 block.placeBegan(tile, tile.block(), this);
                 tile.setBlock(block, team, rot);
                 if (tile.build != null) {
+                    if (prev != null) {
+                        for (Building ob : prev) {
+                            buildings.remove(ob);
+                            buildingIds.remove(ob.id);
+                            if (ob instanceof TurretBuild tb) turrets.remove(tb, true);
+                        }
+                        tile.build.overwrote(prev);
+                    }
                     if (config != null) tile.build.configured(this, config);
                     registerBuilding(tile.build);
                     tile.build.updateProximity();
@@ -545,6 +576,11 @@ public class WorldUnitEntity extends UnitEntity {
             ConstructBuild cons = (ConstructBuild) tile.build;
             cons.setConstruct(Blocks.air, block);
             cons.lastConfig = config;
+            // 被覆盖的旧建筑记入 prevBuild → 完成时 constructFinish 自动 overwrote 转移内容
+            if (prev != null) {
+                if (cons.prevBuild == null) cons.prevBuild = new Seq<>();
+                cons.prevBuild.addAll(prev);
+            }
             registerBuilding(cons);
             arc.Events.fire(new BlockBuildBeginEvent(tile, team, this, false));
             block.placeBegan(tile, Blocks.air, this);

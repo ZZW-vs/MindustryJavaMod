@@ -77,6 +77,27 @@ public class FlagellaDecorationType extends UnitDecorationType{
     public void update(Unit unit, UnitDecoration deco){
         FlagellaDecoration d = (FlagellaDecoration)deco;
         float dLen = unit.deltaLen();
+
+        // ★ 回弹抽搐修复: 转身补偿 —
+        //   原版目标点链不随单位旋转更新, 转向时目标点滞留在旧方向,
+        //   摆动方向与转向一致时节点角度在限幅边界来回打 (回弹抽搐蜷缩)。
+        //   这里把整条目标点链绕单位旋转 deltaRot, 让模拟跟随转身。
+        float deltaRot = unit.rotation - d.prevUnitRot;
+        deltaRot = ((deltaRot + 540f) % 360f) - 180f; // 归一化到 -180~180
+        d.prevUnitRot = unit.rotation;
+        if (Math.abs(deltaRot) > 0.001f && d.root != null) {
+            float cos = Mathf.cosDeg(deltaRot), sin = Mathf.sinDeg(deltaRot);
+            float ox = unit.x, oy = unit.y;
+            FlagellaSegment c = d.root;
+            while (c != null) {
+                float dx = c.tx - ox, dy = c.ty - oy;
+                c.tx = ox + dx * cos - dy * sin;
+                c.ty = oy + dx * sin + dy * cos;
+                c.tr += deltaRot;
+                c = c.next;
+            }
+        }
+
         d.progress += dLen;
         Tmp.v1.trns(unit.rotation - 90f, x, y).add(unit);
 
@@ -186,6 +207,7 @@ public class FlagellaDecorationType extends UnitDecorationType{
     @Override
     public void added(Unit unit, UnitDecoration deco){
         FlagellaDecoration d = (FlagellaDecoration)deco;
+        d.prevUnitRot = unit.rotation;
 
         float ox = Angles.trnsx(unit.rotation + 180f, segmentLength),
         oy = Angles.trnsy(unit.rotation + 180f, segmentLength);
@@ -228,6 +250,7 @@ public class FlagellaDecorationType extends UnitDecorationType{
     /** 鞭毛尾巴状态实例 (每单位独立) */
     static class FlagellaDecoration extends UnitDecoration{
         float progress;
+        float prevUnitRot;
         FlagellaSegment root, end;
 
         public FlagellaDecoration(UnitDecorationType type){
