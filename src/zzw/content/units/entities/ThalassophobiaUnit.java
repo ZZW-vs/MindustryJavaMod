@@ -35,6 +35,12 @@ public class ThalassophobiaUnit extends DecorationUnitEntity implements WaterMov
     /** 水波颜色 (跟随脚下液体的地图色渐变) */
     private final transient Color waveTrailColor = Blocks.water.mapColor.cpy().mul(1.5f);
 
+    // ===== End 防作弊 (PU132 EndComp): 血量双轨 + 死亡拒绝复活 =====
+    /** 防作弊参数 (UnitType.antiCheatType) */
+    private zzw.content.units.anticheat.EndCheatVars ac;
+    /** 真实血量台账 (按防作弊上限缓慢扣减) */
+    private float trueHealth;
+
     /** 实体工厂 (UnitType.constructor 用) */
     public static ThalassophobiaUnit create() {
         return new ThalassophobiaUnit();
@@ -52,6 +58,55 @@ public class ThalassophobiaUnit extends DecorationUnitEntity implements WaterMov
         super.add();
         tleft.clear();
         tright.clear();
+        // 读取 End 防作弊参数 (thalassophobia: 8000/16000/h÷520/h÷120)
+        if (type instanceof zzw.content.type.UnityUnitType u && u.antiCheatType != null) {
+            ac = u.antiCheatType;
+        }
+        trueHealth = type.health;
+    }
+
+    /**
+     * 血量双轨伤害 (PU132 EndComp):
+     * 台账 (trueHealth) 按防作弊单次上限扣减 (慢), 显示血量由原版路径扣减 (快);
+     * 显示血量先归零 → kill → 台账未耗尽 → 拒绝死亡+复活。
+     */
+    @Override
+    public void damage(float amount) {
+        if (ac != null) {
+            trueHealth -= Math.min(amount, ac.maxDamageTaken);
+            if (trueHealth < 0f) trueHealth = 0f;
+        }
+        super.damage(amount);
+    }
+
+    @Override
+    public void heal(float amount) {
+        super.heal(amount);
+        // 治疗同步回台账
+        if (ac != null) trueHealth = Math.max(trueHealth, Math.min(health, maxHealth));
+    }
+
+    /** 死亡拒绝+复活: 台账未耗尽时播放红色蓄力特效并复活 */
+    private boolean denyDeath() {
+        if (ac != null && trueHealth > 0f) {
+            health = Math.max(health, Math.min(trueHealth, maxHealth));
+            hitTime = 1f;
+            zzw.content.units.effects.SpecialFx.endDeny.at(x, y, rotation, this);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public void destroy() {
+        if (denyDeath()) return;
+        super.destroy();
+    }
+
+    @Override
+    public void kill() {
+        if (denyDeath()) return;
+        super.kill();
     }
 
     /**

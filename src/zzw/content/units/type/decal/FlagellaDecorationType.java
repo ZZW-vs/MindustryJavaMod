@@ -78,10 +78,10 @@ public class FlagellaDecorationType extends UnitDecorationType{
     public void update(Unit unit, UnitDecoration deco){
         FlagellaDecoration d = (FlagellaDecoration)deco;
         float dLen = unit.deltaLen();
-        // ★ 平滑优化: 摆动相位同时随时间小幅推进 —
-        //   PU132 原版只随移动距离累加, 单位慢速/静止时尾巴僵住;
-        //   时间系数取小值 (1), 过大会导致尾巴甩过头顶"卷起来"
-        d.progress += dLen + Time.delta * 1f;
+        // ★ 抽搐修复: 摆动相位改为纯时间驱动 —
+        //   PU132 原版随移动距离 (dLen) 累加, 水深/加减速导致每帧相位增量波动 → 尾巴抽搐;
+        //   固定速率 (15/tick ≈ PU132 移动时的相位速率) 后全程匀速丝滑
+        d.progress += Time.delta * 15f;
         Tmp.v1.trns(unit.rotation - 90f, x, y).add(unit);
 
         FlagellaSegment c = d.root;

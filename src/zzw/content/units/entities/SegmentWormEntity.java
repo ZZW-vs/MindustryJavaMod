@@ -612,7 +612,12 @@ public class SegmentWormEntity extends UnitEntity {
      */
     @Override
     public void damage(float amount) {
-        // ★ 伤害减免
+        // ★ 普通多节虫 (arcnelidia/toxobyte/catenapede): 无 End 防作弊, 走原版伤害路径
+        if (!endCheat) {
+            super.damage(amount);
+            return;
+        }
+        // ★ 伤害减免 (End 虫: devourer/oppression)
         SegmentConfig cfg = type != null ? configs.get(type.name) : null;
         if (cfg != null && cfg.damageMultiplier != 1f) {
             amount *= cfg.damageMultiplier;
@@ -646,7 +651,7 @@ public class SegmentWormEntity extends UnitEntity {
      */
     @Override
     public void kill() {
-        if (lastHealth > 100f) {
+        if (endCheat && lastHealth > 100f) {
             // 还有血量时拒绝死亡，但不再增加大量抗性
             immunity += 100f;
             // ★ 复活表现 (PU132 EndComp): 血量回充 + 红色粒子蓄力特效
@@ -668,7 +673,7 @@ public class SegmentWormEntity extends UnitEntity {
      */
     @Override
     public void destroy() {
-        if (lastHealth > 100f) {
+        if (endCheat && lastHealth > 100f) {
             // ★ 复活表现 (PU132 EndComp): 血量回充 + 红色粒子蓄力特效
             immunity += 3500f;
             health = Math.max(health, lastHealth);
@@ -1203,11 +1208,20 @@ public class SegmentWormEntity extends UnitEntity {
         }
     }
 
+    /** ★ End 防作弊门控: 仅当 UnitType 配置了 antiCheatType 时启用 (死亡拒绝/伤害上限)。
+     * 普通 End 多节虫 = false, End 虫 (devourer/oppression) = true */
+    protected boolean endCheat = false;
+
     @Override
     public void add() {
         super.add();
         // 缓存贴图前缀
         if (type != null) texturePrefix = type.name + "-";
+        // 读取 End 防作弊配置 (PU132: 只有 @FactionDef("end") 的多节虫有 Endc 组件)
+        endCheat = type instanceof zzw.content.type.UnityUnitType u && u.antiCheatType != null;
+        if (endCheat) {
+            lastHealth = type.health;
+        }
         // ★ 防秒杀: 初始化真实血量 (PU132 EndWormUnit.setType L90)
         if (lastHealth <= 0f && type != null) {
             lastHealth = type.health;

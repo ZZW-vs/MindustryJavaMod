@@ -257,13 +257,9 @@ public class Z_Units {
             // ★ hitSize=19.75f (19.25 + 0.5, 用户要求增大 0.5)
             hitSize = 19.75f;
             armor = 5f;
-            flying = false;  // 修复: 改为陆军单位
-            // ★ 绘制层级修复: 头部必须画在整条虫的最上层
-            //   其他多节虫头部 flying=true 时 z=flyingLayer(90/115), 高于建筑阴影层 darkness(80);
-            //   本单位是陆军, 默认 groundLayer=groundUnit(60), 会被墙体阴影(80)和自己段身
-            //   (SegmentWormEntity.draw 用 flyingLayer=115 绘制段身)盖住, 看起来"头进墙里"。
-            //   提到 flyingUnit+1 (116) 让头部压住段身与一切墙体阴影。
-            groundLayer = mindustry.graphics.Layer.flyingUnit + 1f;
+            // ★ 恢复飞行单位 (用户确认): 多节单位全部是飞行虫, PU132 arcnelidia 也是飞行;
+            //   flying 后 z=flyingLayer(115), 自然高于段身(115-序号/10000)与墙体阴影层
+            flying = true;
             // PU132: engineSize=-1f (不显示引擎喷射效果)
             engineSize = -1f;
             range = 210f;
@@ -700,8 +696,12 @@ public class Z_Units {
 
         // ★ Devourer 头部 ★
         // ★ 单位名必须用 "devourer-of-eldrich-gods" 与 PU132 原版贴图文件名匹配
-        devourer = new UnitType("devourer-of-eldrich-gods") {{
-            health = 1250000f;  // PU132 原版
+        devourer = new zzw.content.type.UnityUnitType("devourer-of-eldrich-gods") {{
+            health = 1250000f;
+            // PU132: antiCheatType = (h/600, h/190, h/610, h/100, 0.6, 7m, 8m, 35, 4)
+            // (SegmentWormEntity 据此启用 End 防作弊/死亡拒绝; 无配置的普通多节虫没有复活)
+            antiCheatType = new zzw.content.units.anticheat.EndCheatVars(
+                health / 600f, health / 190f, health / 610f, health / 100f, 0.6f, 7f * 60f, 8f * 60f, 35f, 4);  // PU132 原版
             flying = true;
             speed = 5f;
             accel = 0.12f;
@@ -1035,9 +1035,12 @@ public class Z_Units {
         }};
 
         // —— 头部 Oppression ——
-        oppression = new UnitType("oppression") {{
+        oppression = new zzw.content.type.UnityUnitType("oppression") {{
             // ===== 基础属性 (PU132 UnityUnitTypes.java 第4055-4095行) =====
             health = 2500000f;  // PU132 原版
+            // PU132: antiCheatType = (8000, h/190, 10000, h/100, 0.6, 7m, 8m, 35, 3)
+            antiCheatType = new zzw.content.units.anticheat.EndCheatVars(
+                8000f, health / 190f, 10000f, health / 100f, 0.6f, 7f * 60f, 8f * 60f, 35f, 3);
             flying = true;
             speed = 4.5f;  // PU132 原版
             accel = 0.13f;
