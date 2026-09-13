@@ -79,9 +79,9 @@ public class EndGroundUnit extends LegsUnit {
     @Override
     public void update() {
         // ★ 防作弊更新 (PU132 EndComp.update L141-178, 在 super.update() 之前)
-        // 血量防回退 (防作弊)
-        if (health < trueHealth || Float.isNaN(health)) health = trueHealth;
-        trueHealth = health;
+        // ★ 血量双轨 (修正): 台账(trueHealth)只按防作弊上限独立扣减, 不再每帧回充 health —
+        //   旧逻辑 health = trueHealth 每帧把原始伤害回满, 导致 health 永远到不了 0,
+        //   死亡拒绝永远不触发 (PU132 的 health 由原版 rawDamage 扣减, 与此不同步)
         if (maxHealth < trueMaxHealth || Float.isNaN(maxHealth)) maxHealth = trueMaxHealth;
         trueMaxHealth = maxHealth;
         if (trueHealth > 0f) dead = false;
@@ -223,6 +223,13 @@ public class EndGroundUnit extends LegsUnit {
             return true;
         }
         return false;
+    }
+
+    @Override
+    public void heal(float amount) {
+        super.heal(amount);
+        // PU132 EndComp.heal: 治疗同步回台账 (health 为准, 上限钳制)
+        trueHealth = Math.max(trueHealth, Math.min(health, trueMaxHealth));
     }
 
     @Override

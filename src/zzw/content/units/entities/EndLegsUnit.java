@@ -66,8 +66,7 @@ public class EndLegsUnit extends UnitEntity {
     public void update() {
         // ★ 防作弊更新 (PU132 EndComp.update L141-178, 在 super.update() 之前)
         // 血量防回退 (防作弊)
-        if (health < trueHealth || Float.isNaN(health)) health = trueHealth;
-        trueHealth = health;
+        // ★ 血量双轨 (修正): 台账独立扣减, 不回充 health (同 EndGroundUnit)
         if (maxHealth < trueMaxHealth || Float.isNaN(maxHealth)) maxHealth = trueMaxHealth;
         trueMaxHealth = maxHealth;
         if (trueHealth > 0f) dead = false;

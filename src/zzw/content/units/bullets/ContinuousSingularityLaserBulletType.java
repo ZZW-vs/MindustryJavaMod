@@ -36,10 +36,8 @@ import zzw.content.graphics.UnityPal;
  * <br>4. 绘制: 5 层颜色 (红→黑) 嵌套光束, 每层带 oscScl 呼吸宽度与 laserInstability 抖动,
  *     根部圆球 + 根部三角翼 + 末端三角。</p>
  *
- * <p>碰撞检测说明: PU132 原版用 Utils.collideLineRawEnemyRatio (基于 tile raycast 的
- * 精确线扫描), 本移植沿用模组既有方案 (indexer.eachBlock + Geometry.raycastRect +
- * Units.nearbyEnemies, 见 EndCutterLaserBulletType), 并复刻 ratio 距离衰减公式,
- * 观感与原版一致。</p>
+ * <p>碰撞检测: PU132 Utils.collideLineRawEnemyRatio 已全量移植为
+ * {@link zzw.util.LineCollide}, 本类直接使用精确线扫描。</p>
  */
 public class ContinuousSingularityLaserBulletType extends AntiCheatBulletTypeBase {
     public float maxLength = 1000f;
@@ -143,7 +141,63 @@ public class ContinuousSingularityLaserBulletType extends AntiCheatBulletTypeBas
             }
 
             if (timer) {
-                checkCollision(b, data);
+                // ★ 碰撞 (PU132 update L104-166 逐行移植, 走 LineCollide 精确线扫描)
+                boolean p = pierceCap > 0;
+                if (p) {
+                    data.pierceScore = 0f;
+                    data.pierceOffset = 0f;
+                }
+                Tmp.v1.trns(b.rotation(), b.fdata).add(b);
+                zzw.util.LineCollide.collideLineRawEnemyRatio(b.team, b.x, b.y, Tmp.v1.x, Tmp.v1.y, collisionWidth,
+                (building, ratio, direct) -> {
+                    // 建筑: 健康 > damage/100 或吸激光方块才阻挡光束
+                    boolean h = (building.health > damage / 100f) || building.block.absorbLasers;
+                    if (direct) {
+                        if (h) {
+                            if (p) data.pierceScore += building.block.size * (building.block.absorbLasers ? 10f : 1f) * ratio;
+                            if (!p || data.pierceScore >= pierceCap) {
+                                Tmp.v2.trns(b.rotation(), maxLength * 1.5f).add(b);
+                                float dst = Intersector.distanceLinePoint(b.x, b.y, Tmp.v2.x, Tmp.v2.y, building.x, building.y);
+                                data.velocity = 0f;
+                                data.restartTime = 0f;
+                                data.velocityTime = 0f;
+                                data.pierceOffset = 1f - Mathf.clamp(data.pierceScore - pierceCap);
+                                if (fastUpdateLength) {
+                                    if (building != data.target) data.pierceOffsetSmooth = data.pierceOffset;
+                                    data.target = building;
+                                    data.targetSize = building.block.size * Vars.tilesize / 2f;
+                                }
+                                b.fdata = ((b.dst(building) - (building.block.size * Vars.tilesize / 2f)) + dst) + pierceAmount + (data.pierceOffsetSmooth * data.targetSize);
+                            }
+                        }
+                        hitBuildingAntiCheat(b, building);
+                    }
+                    return !p ? h : data.pierceScore >= pierceCap;
+                },
+                (unit, ratio) -> {
+                    // 单位: 大型单位 (hitSize > width×3 且血量 > damage) 阻挡光束
+                    boolean h = unit.hitSize > width * 3f && unit.health > damage;
+                    if (h) {
+                        if (p) data.pierceScore += (((unit.hitSize / Vars.tilesize) / 2f) + (unit.health / 4000f)) * ratio;
+                        if (!p || data.pierceScore >= pierceCap) {
+                            Tmp.v2.trns(b.rotation(), maxLength * 1.5f).add(b);
+                            float dst = Intersector.distanceLinePoint(b.x, b.y, Tmp.v2.x, Tmp.v2.y, unit.x, unit.y);
+                            data.velocity = 0f;
+                            data.restartTime = 0f;
+                            data.velocityTime = 0f;
+                            data.pierceOffset = 1f - Mathf.clamp(data.pierceScore - pierceCap);
+                            if (fastUpdateLength) {
+                                if (unit != data.target) data.pierceOffsetSmooth = data.pierceOffset;
+                                data.target = unit;
+                                data.targetSize = unit.hitSize / 2f;
+                            }
+                            b.fdata = ((b.dst(unit) - (unit.hitSize / 2f)) + dst) + pierceAmount + (data.pierceOffsetSmooth * data.targetSize);
+                        }
+                    }
+                    hitUnitAntiCheat(b, unit);
+                    return !p ? h : data.pierceScore >= pierceCap;
+                },
+                (ex, ey) -> hit(b, ex, ey));
             }
 
             // ===== 引力场: 拉扯光束两侧 gravityRange 内的敌人 =====
@@ -173,103 +227,6 @@ public class ContinuousSingularityLaserBulletType extends AntiCheatBulletTypeBas
                     u.impulse(m);
                 }
             }
-        }
-    }
-
-    /**
-     * 沿光束线段碰撞检测 (PU132 Utils.collideLineRawEnemyRatio + update lambda 移植)。
-     *
-     * <p>逐步解释:</p>
-     * <p>1. 建筑: 健康 &gt; damage/100 或吸激光方块 → 阻挡 (光束缩短到命中点 + pierceAmount,
-     *    velocity/restartTime 重置); 所有直接命中的建筑都受防作弊伤害;
-     * <br>2. 单位: hitSize &gt; width×3 且血量 &gt; damage → 阻挡, 同样缩短光束;
-     *    沿线所有敌人受防作弊伤害 (距离光束越近 ratio 越接近 1);
-     * <br>3. 命中点触发 hitEffect。</p>
-     */
-    private void checkCollision(Bullet b, VoidLaserData data) {
-        boolean p = pierceCap > 0;
-        float ex = Tmp.v1.trns(b.rotation(), b.fdata).add(b.x, b.y).x;
-        float ey = Tmp.v1.y;
-        boolean[] stopped = {false};
-
-        // ===== 建筑: 遍历光束范围内敌方建筑, raycastRect 找最近阻挡者 =====
-        Vars.indexer.eachBlock(null, b.x, b.y, b.fdata + 32f,
-            build -> build.team != b.team && build.health > 0,
-            build -> {
-                if (stopped[0]) return;
-                boolean h = (build.health > damage / 100f) || build.block.absorbLasers;
-
-                Tmp.r1.setCentered(build.x, build.y, build.block.size * Vars.tilesize);
-                Vec2 hv = arc.math.geom.Geometry.raycastRect(b.x, b.y, ex, ey, Tmp.r1);
-                if (hv == null) return;
-
-                if (h) {
-                    if (p) data.pierceScore += build.block.size * (build.block.absorbLasers ? 10f : 1f) * 1f;
-                    if (!p || data.pierceScore >= pierceCap) {
-                        Tmp.v2.trns(b.rotation(), maxLength * 1.5f).add(b);
-                        float dst = Intersector.distanceLinePoint(b.x, b.y, Tmp.v2.x, Tmp.v2.y, build.x, build.y);
-                        data.velocity = 0f;
-                        data.restartTime = 0f;
-                        data.velocityTime = 0f;
-                        data.pierceOffset = 1f - Mathf.clamp(data.pierceScore - pierceCap);
-                        if (fastUpdateLength) {
-                            if (build != data.target) data.pierceOffsetSmooth = data.pierceOffset;
-                            data.target = build;
-                            data.targetSize = build.block.size * Vars.tilesize / 2f;
-                        }
-                        b.fdata = ((b.dst(build) - (build.block.size * Vars.tilesize / 2f)) + dst) + pierceAmount + (data.pierceOffsetSmooth * data.targetSize);
-                        stopped[0] = true;
-                    }
-                }
-                hitBuildingAntiCheat(b, build);
-            });
-
-        if (stopped[0]) {
-            hitEffect.at(ex + Mathf.range(4f), ey + Mathf.range(4f), b.rotation() + 180f);
-            return;
-        }
-
-        // ===== 单位: 沿光束线段查找敌人 (距离光束越近 ratio 越大) =====
-        Tmp.v3.set((b.x + ex) / 2f, (b.y + ey) / 2f);
-        float radius = Mathf.dst(b.x, b.y, ex, ey) / 2f + 32f;
-        Seq<Unit> units = new Seq<>();
-        mindustry.entities.Units.nearbyEnemies(b.team, Tmp.v3.x, Tmp.v3.y, radius, unit -> {
-            if (!unit.isValid()) return;
-            // 仅光束走廊 (collisionWidth) 命中的单位受伤
-            float segDst = Intersector.distanceSegmentPoint(b.x, b.y, ex, ey, unit.x, unit.y);
-            if (segDst > collisionWidth + unit.hitSize / 2f) return;
-            // ratio 距离衰减 (PU132 collideLineRawEnemyRatio): 距离越近 ratio 越接近 1, 最低 0.05
-            float size = unit.hitSize / 2f;
-            float ratio = Mathf.clamp(1f - ((segDst - collisionWidth) / size), 0.05f, 1f);
-            units.add(unit);
-
-            boolean h = unit.hitSize > width * 3f && unit.health > damage;
-            if (h && !stopped[0]) {
-                if (p) data.pierceScore += (((unit.hitSize / Vars.tilesize) / 2f) + (unit.health / 4000f)) * ratio;
-                if (!p || data.pierceScore >= pierceCap) {
-                    Tmp.v2.trns(b.rotation(), maxLength * 1.5f).add(b);
-                    float dst = Intersector.distanceLinePoint(b.x, b.y, Tmp.v2.x, Tmp.v2.y, unit.x, unit.y);
-                    data.velocity = 0f;
-                    data.restartTime = 0f;
-                    data.velocityTime = 0f;
-                    data.pierceOffset = 1f - Mathf.clamp(data.pierceScore - pierceCap);
-                    if (fastUpdateLength) {
-                        if (unit != data.target) data.pierceOffsetSmooth = data.pierceOffset;
-                        data.target = unit;
-                        data.targetSize = unit.hitSize / 2f;
-                    }
-                    b.fdata = ((b.dst(unit) - (unit.hitSize / 2f)) + dst) + pierceAmount + (data.pierceOffsetSmooth * data.targetSize);
-                    stopped[0] = true;
-                }
-            }
-        });
-
-        for (Unit unit : units) {
-            hitUnitAntiCheat(b, unit);
-        }
-
-        if (stopped[0]) {
-            hitEffect.at(ex + Mathf.range(4f), ey + Mathf.range(4f), b.rotation() + 180f);
         }
     }
 

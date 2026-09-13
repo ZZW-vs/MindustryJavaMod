@@ -78,10 +78,10 @@ public class FlagellaDecorationType extends UnitDecorationType{
     public void update(Unit unit, UnitDecoration deco){
         FlagellaDecoration d = (FlagellaDecoration)deco;
         float dLen = unit.deltaLen();
-        // ★ 平滑优化: 摆动相位同时随时间推进 (Time.delta×2) —
+        // ★ 平滑优化: 摆动相位同时随时间小幅推进 —
         //   PU132 原版只随移动距离累加, 单位慢速/静止时尾巴僵住;
-        //   加入时间项后尾巴持续丝滑波动 (参考多节单位 anglePhysicsSmooth 的平滑思路)
-        d.progress += dLen + Time.delta * 2f;
+        //   时间系数取小值 (1), 过大会导致尾巴甩过头顶"卷起来"
+        d.progress += dLen + Time.delta * 1f;
         Tmp.v1.trns(unit.rotation - 90f, x, y).add(unit);
 
         FlagellaSegment c = d.root;
@@ -104,17 +104,15 @@ public class FlagellaDecorationType extends UnitDecorationType{
             c.tx = Tmp.v2.x;
             c.ty = Tmp.v2.y;
 
-            // ★ 平滑优化: 绘制用旋转向目标旋转渐近 (lerpDelta), 消除转向时的抖动跳变
-            c.sr = Mathf.lerpDelta(c.sr, c.tr, 0.2f);
-
             c = c.next;
             idx++;
         }
-        // 第二遍: 从平滑旋转 + 摆动角推算实际绘制位置 (x/y)
+        // 第二遍: 从目标旋转 + 摆动角推算实际绘制位置 (x/y)
+        // (注: 曾尝试绘制旋转 lerpDelta 平滑, 但链式滞后会使尾巴卷曲, 已回退)
         idx = 0;
         c = d.root;
         while(c != null){
-            float rot = c.sr + swayAngle(d, idx);
+            float rot = c.tr + swayAngle(d, idx);
 
             if(c.prev == null){
                 Tmp.v2.trns(rot, segmentLength).add(Tmp.v1);
@@ -242,11 +240,10 @@ public class FlagellaDecorationType extends UnitDecorationType{
         }
     }
 
-    /** 单节数据: 目标位置 (tx/ty/tr) 与绘制位置 (x/y), 双向链表; sr = 平滑后的绘制旋转 */
+    /** 单节数据: 目标位置 (tx/ty/tr) 与绘制位置 (x/y), 双向链表 */
     static class FlagellaSegment{
         float tx, ty, tr, length;
         float x, y;
-        float sr;
 
         FlagellaSegment next, prev;
     }

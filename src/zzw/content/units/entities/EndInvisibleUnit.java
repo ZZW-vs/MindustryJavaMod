@@ -46,10 +46,8 @@ public class EndInvisibleUnit extends UnitEntity {
 
     @Override
     public void update() {
-        // ★ 血量双轨同步: 显示血量 (health) 低于台账时回充到台账
-        //   (台账 = antiCheat.lastHealth, 只按防作弊上限缓慢扣减 → 拒绝死亡可复活)
-        if (health < antiCheat.lastHealth || Float.isNaN(health)) health = antiCheat.lastHealth;
-        antiCheat.lastHealth = health;
+        // ★ 血量双轨 (修正): 台账(antiCheat.lastHealth)按防作弊上限独立扣减,
+        //   不回充 health — 回充会抵消原始伤害使血量永远到不了 0, 死亡拒绝无法触发
 
         super.update();
 
@@ -132,6 +130,13 @@ public class EndInvisibleUnit extends UnitEntity {
             return true;
         }
         return false;
+    }
+
+    @Override
+    public void heal(float amount) {
+        super.heal(amount);
+        // 治疗同步回台账
+        antiCheat.lastHealth = Math.max(antiCheat.lastHealth, health);
     }
 
     @Override

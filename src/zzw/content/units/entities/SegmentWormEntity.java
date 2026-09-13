@@ -649,6 +649,10 @@ public class SegmentWormEntity extends UnitEntity {
         if (lastHealth > 100f) {
             // 还有血量时拒绝死亡，但不再增加大量抗性
             immunity += 100f;
+            // ★ 复活表现 (PU132 EndComp): 血量回充 + 红色粒子蓄力特效
+            health = Math.max(health, lastHealth);
+            hitTime = 1f;
+            zzw.content.units.effects.SpecialFx.endDeny.at(x, y, rotation, this);
             dead = false;
             return;
         }
@@ -665,7 +669,11 @@ public class SegmentWormEntity extends UnitEntity {
     @Override
     public void destroy() {
         if (lastHealth > 100f) {
+            // ★ 复活表现 (PU132 EndComp): 血量回充 + 红色粒子蓄力特效
             immunity += 3500f;
+            health = Math.max(health, lastHealth);
+            hitTime = 1f;
+            zzw.content.units.effects.SpecialFx.endDeny.at(x, y, rotation, this);
             return;
         }
         lastHealth = 0f;

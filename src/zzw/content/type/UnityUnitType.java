@@ -234,12 +234,20 @@ public class UnityUnitType extends UnitType{
      * PU132 的 trailType 工厂 (MultiTrail/TexturedTrail, 幻影/灵魂蓝色拖尾) 永远不会被调用。
      * 这里在拖尾为空时优先用 trailType 工厂创建, 再走原版绘制路径
      * (MultiTrail.draw 内部每个 TrailHold 优先用自己的颜色, 覆盖队伍色)。</p>
+     *
+     * <p>★ 关键: TexturedTrail 的丝带本体色取自 {@code Draw.getColor()} (渲染管线状态色),
+     * 传入的 color 参数只作用于 mix 混色层 —— 而 soul 丝带的 mixAlpha=0, 混色层关闭,
+     * 若不提前钉住管线色, 丝带会继承渲染序列中上一个绘制调用的残留色 (表现为黄色)。
+     * 因此绘制前先把管线色钉住为引擎色 (Monolith 蓝), 与 PU132 的 CTrail 渲染行为对齐。</p>
      */
     @Override
     public void drawTrail(Unit unit){
         if(trailLength > 0 && unit.trail == null){
             unit.trail = trailType.get(unit);
         }
+        // 钉住管线色: engineColor (单位 apply 写回的 Monolith 蓝), 为空时退回队伍色
+        Draw.color(engineColor != null ? engineColor : unit.team.color);
         super.drawTrail(unit);
+        Draw.reset();
     }
 }

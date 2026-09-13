@@ -132,7 +132,7 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
             return;
         }
 
-        if (b.fdata() <= 0f) {
+        if (!data.dashed) {
             // ===== Phase 1: 悬停跟踪 (PU132 L62-100) =====
             if (data.target != null && !data.target.isValid()) data.target = null;
             if (data.target == null && b.timer(1, 5f)) {
@@ -151,6 +151,7 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
                 b.vel().trns(b.rotation(), trueSpeed);
                 data.x = b.x();
                 data.y = b.y();
+                data.dashed = true;
                 // ★ PU132 L99: activeSound.at(b.x, b.y, Mathf.random(0.9f, 1.1f))
                 if (activeSound != null) {
                     activeSound.at(b.x(), b.y(), Mathf.random(0.9f, 1.1f));
@@ -252,7 +253,10 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
     public void removed(Bullet b) {
         super.removed(b);
         // ===== Phase 2 结束: 生成 spikes + 播放 voidFractureEffect (PU132 L141-186) =====
-        if (b.fdata() >= 1f && b.data() instanceof FractureData data) {
+        // ★ 用 dashed 标志代替 fdata>=1 (fdata 可能被外部系统改写导致 0 坐标连线)
+        // ★ 数据退化防护: 冲刺起点为 (0,0) 时跳过余晖特效, 避免画出到地图原点的黑线
+        if (b.data() instanceof FractureData data && data.dashed
+            && !(data.x == 0f && data.y == 0f)) {
             VoidFractureData d = new VoidFractureData();
             d.x = data.x;
             d.y = data.y;
@@ -329,7 +333,7 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
         Draw.z(Layer.flyingUnit + 1f);
         Draw.blend();
         Draw.color(Color.black);
-        if (b.fdata() <= 0f) {
+        if (!data.dashed) {
             // ===== Phase 1: 小三角 (PU132 L192-195) =====
             float in = Mathf.clamp(b.time() / delay);
             Drawf.tri(b.x(), b.y(), width * in, length, b.rotation());
@@ -370,6 +374,8 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
     public static class FractureData {
         public Healthc target;
         public float x, y;
+        /** ★ 是否已进入 Phase 2 冲刺 (explicit 标志, 代替 fdata>=1 判定, 防止 fdata 被其它系统改写误判) */
+        public boolean dashed;
         public IntSet collided = new IntSet();
     }
 

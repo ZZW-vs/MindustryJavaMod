@@ -31,6 +31,7 @@ import zzw.content.units.effects.UnityDrawf;
 import zzw.content.units.entities.ApocalypseUnit;
 import zzw.content.units.entities.ThalassophobiaUnit;
 import zzw.content.units.types.ApocalypseUnitType;
+import zzw.content.units.types.InvisibleUnitType;
 import zzw.content.units.types.ThalassophobiaUnitType;
 import zzw.content.units.type.decal.FlagellaDecorationType;
 import zzw.content.units.weapons.EnergyChargeWeapon;

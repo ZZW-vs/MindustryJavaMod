@@ -64,6 +64,7 @@ import zzw.content.units.effects.WormDecal;
 import zzw.content.units.entities.CopterUnitEntity;
 import zzw.content.units.entities.EndLegsUnit;
 import zzw.content.units.entities.EndGroundUnit;
+import zzw.content.units.entities.EndInvisibleUnit;
 import zzw.content.units.entities.SegmentUnitEntity;
 import zzw.content.units.entities.SegmentWormEntity;
 import zzw.content.units.entities.SlowLightningEntity;
@@ -1294,8 +1295,11 @@ public class Z_Units {
         //  - 武器: VoidPelletBulletType (黑色弹丸, 比例伤害)
         //  - 防作弊: 简化版 (无敌帧+单次上限+抗性递增)
         // ═══════════════════════════════════════════════════════════
-        enigma = new UnitType("enigma") {{
+        enigma = new zzw.content.type.UnityUnitType("enigma") {{
             health = 2000f;
+            // PU132: antiCheatType = (900, 1000, h/10, 1000, 0.2, 6m, 3m, 15, 1)
+            antiCheatType = new zzw.content.units.anticheat.EndCheatVars(
+                900f, 1000f, health / 10f, 1000f, 0.2f, 6f * 60f, 3f * 60f, 15f, 1);
             speed = 4f;
             drag = 0.4f;
             accel = 0.5f;
@@ -1333,8 +1337,11 @@ public class Z_Units {
         //  - 武器: VoidFractureBulletType (黑色碎裂弹, +ArmorDamageModule)
         //  - 防作弊: 简化版
         // ═══════════════════════════════════════════════════════════
-        voidVessel = new UnitType("void-vessel") {{
+        voidVessel = new zzw.content.type.UnityUnitType("void-vessel") {{
             health = 10000f;
+            // PU132: antiCheatType = (h/20, h/1.25, h/15, h/25, 0.2, 6m, 3m, 15, 4)
+            antiCheatType = new zzw.content.units.anticheat.EndCheatVars(
+                health / 20f, health / 1.25f, health / 15f, health / 25f, 0.2f, 6f * 60f, 3f * 60f, 15f, 4);
             speed = 3f;
             accel = 0.1f;
             drag = 0.03f;
@@ -1409,8 +1416,11 @@ public class Z_Units {
         //  - 武器: TimeStopBulletType (时间停止子弹)
         //  - 防作弊: 简化版
         // ═══════════════════════════════════════════════════════════
-        chronos = new UnitType("chronos") {{
+        chronos = new zzw.content.type.UnityUnitType("chronos") {{
             health = 17000f;
+            // PU132: antiCheatType = (h/20, h/1.25, h/15, h/25, 0.2, 6m, 3m, 15, 4)
+            antiCheatType = new zzw.content.units.anticheat.EndCheatVars(
+                health / 20f, health / 1.25f, health / 15f, health / 25f, 0.2f, 6f * 60f, 3f * 60f, 15f, 4);
             speed = 2f;
             accel = 0.1f;
             drag = 0.08f;
@@ -1452,8 +1462,11 @@ public class Z_Units {
         //  - ★ PU132 原版有隐身能力 (InvisibleUnitType), v158 简化为普通 UnitType
         //    (隐身机制依赖 Invisiblec 组件, v158 无原生支持)
         // ═══════════════════════════════════════════════════════════
-        opticaecus = new UnitType("opticaecus") {{
+        opticaecus = new zzw.content.units.types.InvisibleUnitType("opticaecus") {{
             health = 60000f;
+            // PU132: antiCheatType = (h/15, h/1.5, h/12.5, h/20, 0.2, 6m, 3m, 30, 4)
+            antiCheatType = new zzw.content.units.anticheat.EndCheatVars(
+                health / 15f, health / 1.5f, health / 12.5f, health / 20f, 0.2f, 6f * 60f, 3f * 60f, 30f, 4);
             speed = 1.8f;
             drag = 0.02f;
             hitSize = 60.5f;
@@ -1466,7 +1479,7 @@ public class Z_Units {
             rotateSpeed = 3f;
             range = 400f;
             outlineColor = Color.valueOf("1a1a2e");
-            constructor = EndLegsUnit::create;
+            constructor = EndInvisibleUnit::create;  // ★ 补隐身: PU132 Invisiblec (血量>50% 未交战时渐隐)
             aiController = () -> new zzw.content.units.ai.WormAI();
 
             // ===== 武器1: 头部红色激光 (PU132 LaserBulletType, 1400 伤害) =====
