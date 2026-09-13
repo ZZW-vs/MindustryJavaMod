@@ -19,7 +19,6 @@ public class EndInvisibleUnit extends UnitEntity {
     private float invFrame = 0f;
     private float alphaLerp = 0f;
     private float scanInterval = 0f;
-    private float lastHealth = 0f;
 
     public boolean isInvisible = false;
 
@@ -27,6 +26,10 @@ public class EndInvisibleUnit extends UnitEntity {
     public float fadeDelay = 3f * 60f;
     /** 现身保持计时器 */
     protected float revealTimer = 0f;
+
+    /** 怒气系统 (PU132 EndComp): 死亡拒绝后 4 倍速 + 加速武器装填 */
+    protected float aggression = 0f;
+    protected float aggressionTime = 0f;
 
     @Override
     public void setType(mindustry.type.UnitType type) {
@@ -38,13 +41,15 @@ public class EndInvisibleUnit extends UnitEntity {
     public void add() {
         if (added) return;
         super.add();
-        lastHealth = health;
+        antiCheat.lastHealth = health;
     }
 
     @Override
     public void update() {
-        if (health < lastHealth) health = lastHealth;
-        lastHealth = health;
+        // ★ 血量双轨同步: 显示血量 (health) 低于台账时回充到台账
+        //   (台账 = antiCheat.lastHealth, 只按防作弊上限缓慢扣减 → 拒绝死亡可复活)
+        if (health < antiCheat.lastHealth || Float.isNaN(health)) health = antiCheat.lastHealth;
+        antiCheat.lastHealth = health;
 
         super.update();
 
@@ -69,15 +74,9 @@ public class EndInvisibleUnit extends UnitEntity {
         }
 
         // 隐身: 血量高 + 不在攻击 + 没有 disabled
-        // ★ 攻击后延迟变透明 (用户要求): 开火或持续弹存在时刷新现身保持计时,
-        //   计时结束后才开始渐隐 (而不是停火下一帧就变透明)
+        // ★ 攻击后延迟变透明 (用户要求): 停火后保持现身 fadeDelay tick 再开始渐隐
+        //   (isShooting 由 AI/玩家输入驱动, 停火即 false — mount.bullet 残留不作为现身依据)
         boolean attacking = isShooting();
-        for (mindustry.entities.units.WeaponMount mount : mounts) {
-            if (mount.bullet != null) {
-                attacking = true;
-                break;
-            }
-        }
         if (attacking) {
             revealTimer = fadeDelay;
         } else {
@@ -90,43 +89,66 @@ public class EndInvisibleUnit extends UnitEntity {
             alphaLerp = Mathf.lerpDelta(alphaLerp, 0f, 0.1f);
         }
         isInvisible = alphaLerp > 0.5f;
+
+        // ★ 怒气系统 (PU132 EndComp.update): 死亡拒绝后加速全部武器装填
+        if (aggression > 0f) {
+            for (mindustry.entities.units.WeaponMount mount : mounts) {
+                mount.reload = Math.max(0f, mount.reload - (aggression * Time.delta));
+            }
+            if (aggressionTime > 0f) {
+                aggressionTime -= Time.delta;
+            } else {
+                aggression = Mathf.lerpDelta(aggression, 0f, 0.1f);
+            }
+        }
     }
 
     @Override
     public void damage(float amount) {
         if (invFrame < 15f) return;
+        // 台账按防作弊上限扣减 (慢); 显示血量按原始伤害走原版路径 (快, 含护甲/护盾/死亡触发)
         float trueDamage = antiCheat.applyAntiCheatDamage(amount);
         if (trueDamage <= 0f) return;
         disabledTime = Math.max(1.4f * 60f, trueDamage / 25f);
         invFrame = 0f;
-        super.damage(trueDamage);
+        // ★ 传入原始 amount: health 比台账先归零 → kill() → 台账 > 0 → 拒绝死亡+复活
+        super.damage(amount);
+    }
+
+    /**
+     * 死亡拒绝+复活 (PU132 EndComp.destroy/remove 完整移植):
+     * 台账 (antiCheat.lastHealth) 未耗尽时, 播放红色蓄力特效并复活。
+     */
+    private boolean denyDeath() {
+        if (antiCheat.lastHealth > 0f) {
+            // 狂暴: 4 倍速 + 持续 10 秒 (PU132 aggression=4, aggressionTime=10*60)
+            aggression = 4f;
+            aggressionTime = 10f * 60f;
+            // 复活: 血量回充到台账值
+            health = Math.max(health, antiCheat.lastHealth);
+            hitTime = 1f;
+            // 红色粒子蓄力特效 (PU132 SpecialFx.endDeny)
+            zzw.content.units.effects.SpecialFx.endDeny.at(x, y, rotation, this);
+            return true;
+        }
+        return false;
     }
 
     @Override
     public void destroy() {
-        // ★ 死亡拒绝: 原始血量(lastHealth) > 0 时不允许销毁 (PU132 EndComp 机制)
-        if (lastHealth > 0f) {
-            antiCheat.immunity += 3500f;
-            return;
-        }
+        if (denyDeath()) return;
         super.destroy();
     }
 
     @Override
     public void kill() {
-        if (lastHealth > 0f) {
-            antiCheat.immunity += 3500f;
-            return;
-        }
+        if (denyDeath()) return;
         super.kill();
     }
 
     @Override
     public void remove() {
-        if (lastHealth > 0f) {
-            antiCheat.immunity += 3500f;
-            return;
-        }
+        if (antiCheat.lastHealth > 0f && health > 0f) return;
         super.remove();
     }
 
@@ -147,30 +169,32 @@ public class EndInvisibleUnit extends UnitEntity {
     }
 
     /**
-     * 原始扣血: 同时维护 lastHealth 原始血量追踪 (PU132: lastHealth -= v; health -= v)。
+     * 台账+显示血量同时扣减 (PU132 AntiCheatBase.overrideAntiCheatDamage):
+     * lastHealth -= v; if(health > lastHealth) health = lastHealth。
+     * 用于优先级无敌帧扣血 (绕过常规伤害路径)。
      *
      * @param v 要扣除的血量
      */
     protected void subtractHealthRaw(float v) {
-        health -= v;
-        lastHealth = health;
+        antiCheat.lastHealth -= v;
+        if (health > antiCheat.lastHealth) health = antiCheat.lastHealth;
     }
 
     /**
-     * 仅扣减原始血量追踪值 (PU132 ApocalypseUnit.damage: lastHealth -= trueAmount),
-     * 血量本身由 {@link #damageMindustry(float)} 走 Mindustry 原版路径扣除。
+     * 仅扣减台账 (PU132 ApocalypseUnit.damage: lastHealth -= trueAmount),
+     * 显示血量由 {@link #damageMindustry(float)} 走 Mindustry 原版路径扣除。
      *
-     * @param v 要从原始血量追踪中扣除的值
+     * @param v 要从台账中扣除的值
      */
     protected void subtractLastHealth(float v) {
-        lastHealth -= v;
+        antiCheat.lastHealth -= v;
     }
 
     /**
      * 绕过子类防作弊覆写, 直接调用 Mindustry 原版扣血
-     * (PU132 ApocalypseUnit.damage 末尾的 superDamage(trueAmount))。
+     * (原版路径: 护甲/护盾修正 + health 扣减 + 血量≤0 触发 kill)。
      *
-     * @param amount 实际造成的伤害
+     * @param amount 原始伤害
      */
     protected void damageMindustry(float amount) {
         super.damage(amount);

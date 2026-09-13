@@ -93,9 +93,9 @@ public class ApocalypseUnit extends EndInvisibleUnit {
         max *= 1.5f;
         immunity += (float)Math.pow(Math.max(amount - max, 0f) / max, 2) * 2f;
 
-        // 原始血量追踪值与实际血量各扣一次 (PU132: lastHealth -= trueAmount; superDamage(trueAmount))
+        // 台账扣减 + 原版显示血量扣减 (原始伤害 → health 比台账先归零 → 触发拒绝死亡)
         subtractLastHealth(trueAmount);
-        damageMindustry(trueAmount);
+        damageMindustry(amount);
     }
 
     @Override

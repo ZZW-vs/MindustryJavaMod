@@ -71,6 +71,7 @@ public class TentacleAbility extends Ability {
     private transient float[] attackTimes;
     private transient float[] stabTimes;
     private transient float[] retargets;
+    private transient float[] coneBlockTimes; // 射界外卡住计时 (强制开火兜底)
     private transient Vec2[] stabStarts;     // (alx, aly) stab射线起点
     private transient Teamc[] targets;
     private transient float[] targetXs, targetYs;
@@ -306,14 +307,26 @@ public class TentacleAbility extends Ability {
         // ===== 射击 =====
         if (bullets[t] == null && bullet != null) reloadTimers[t] += Time.delta * unit.reloadMultiplier;
 
+        // 角度对准检查: 目标在射界内才开火; 若长时间卡在射界外 (≥60 tick), 强制开火兜底
+        // (防止末端快速摆动时 rotation 始终追不上 angle, 导致触手永远不攻击)
+        boolean inCone = Angles.within(end.rotation, Angles.angle(ex, ey, targetXs[t], targetYs[t]), shootCone);
+        if (isAttacking && !inCone && reloadTimers[t] >= reload) {
+            coneBlockTimes[t] += Time.delta;
+        } else {
+            coneBlockTimes[t] = 0f;
+        }
+        boolean forceFire = coneBlockTimes[t] >= 60f;
+
         if (isAttacking && bullet != null && reloadTimers[t] >= reload
-            && Angles.within(end.rotation, Angles.angle(ex, ey, targetXs[t], targetYs[t]), shootCone)) {
-            Bullet b = bullet.create(unit, unit.team, ex, ey, end.rotation);
+            && (inCone || forceFire)) {
+            float shootAngle = forceFire ? end.rotation : Angles.angle(ex, ey, targetXs[t], targetYs[t]);
+            Bullet b = bullet.create(unit, unit.team, ex, ey, shootAngle);
             if (continuous) {
                 if (bulletDuration > 0) b.lifetime = bulletDuration;
                 bullets[t] = b;
             }
             reloadTimers[t] = 0f;
+            coneBlockTimes[t] = 0f;
         }
 
         // continuous 子弹同步
@@ -341,6 +354,16 @@ public class TentacleAbility extends Ability {
                             }
                         }
                     });
+                    // 建筑伤害 (PU132 collideLineRawEnemyRatio 的 building direct 分支)
+                    mindustry.Vars.indexer.eachBlock(null, (sx + ex) / 2f, (sy + ey) / 2f,
+                        Mathf.dst(sx, sy, ex, ey) / 2f + 16f,
+                        build -> build.team != unit.team && build.isValid(),
+                        build -> {
+                            float dist = pointToLineDist(build.x, build.y, sx, sy, ex, ey);
+                            if (dist < build.block.size * 4f) {
+                                build.damage(tentacleDamage);
+                            }
+                        });
                     stabStarts[t].set(end.x, end.y);
                     stabTimes[t] = 0f;
                 }
@@ -401,6 +424,7 @@ public class TentacleAbility extends Ability {
         attackTimes = new float[count];
         stabTimes = new float[count];
         retargets = new float[count];
+        coneBlockTimes = new float[count];
         stabStarts = new Vec2[count];
         targets = new Teamc[count];
         targetXs = new float[count];

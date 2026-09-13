@@ -124,6 +124,10 @@ public class Z_EndUnits {
             lowAltitude = true;
             outlineColor = UnityPal.darkerOutline;
 
+            // PU132: antiCheatType = (h/600, h/200, h/600, h/100, 0.6, 7m, 8m, 35, 4)
+            antiCheatType = new zzw.content.units.anticheat.EndCheatVars(
+                health / 600f, health / 200f, health / 600f, health / 100f, 0.6f, 7f * 60f, 8f * 60f, 35f, 4);
+
             // PU132: rotateShooting = false (v158 无此字段, 默认行为一致)
             constructor = ApocalypseUnit::create;
 
@@ -388,6 +392,10 @@ public class Z_EndUnits {
             drag = 0.16f;
             rotateSpeed = 0.3f;
             outlineColor = UnityPal.darkerOutline;
+
+            // PU132: antiCheatType = (8000, 16000, h/520, h/120, 0.6, 7m, 8m, 35, 4)
+            antiCheatType = new zzw.content.units.anticheat.EndCheatVars(
+                8000f, 16000f, health / 520f, health / 120f, 0.6f, 7f * 60f, 8f * 60f, 35f, 4);
 
             // PU132: immuneAll = true → 免疫所有状态效果
             for(StatusEffect st : mindustry.Vars.content.statusEffects()){

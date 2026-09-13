@@ -19,24 +19,23 @@ import mindustry.gen.LegsUnit;
  * 之所以分两个类: v158 腿单位(UnitType with legCount) 必须用 LegsUnit 作为 constructor,
  * 否则 UnitType.drawLegs() 中 `unit instanceof Legsc` 为 false 导致不画腿.
  *
- * 防作弊机制 (与 EndLegsUnit 完全一致, 仅父类不同):
+ * 防作弊机制 (PU132 EndComp 完整移植, 参数来自 UnitType.antiCheatType):
  * 1. 多槽位无敌帧 (invFrames[]): 每次受伤占用一个槽位, 轮询使用
  * 2. 抗性累积 (resist): 高伤害累积抗性, 减少后续伤害
  * 3. 伤害曲线衰减 (Pow(2)): 超过 damageThreshold 的伤害按曲线衰减
- * 4. 单次伤害硬上限 (maxDamageTaken)
+ * 4. 单次伤害硬上限 (maxDamageTaken) — 只作用于真实血量台账
  * 5. 怒气系统 (aggression): 受伤后加速武器 reload
- * 6. 死亡拒绝: trueHealth > 0 时拒绝 destroy/kill/remove
+ * 6. 死亡拒绝+复活 (PU132 EndComp.destroy/remove L55-78):
+ *    显示血量 (health) 先于台账耗尽 → destroy/kill 被拒绝 →
+ *    播放红色蓄力特效 (SpecialFx.endDeny) + 狂暴 → 血量回充到台账值;
+ *    台账 (trueHealth) 耗尽后才真正死亡。
  *
- * ★ 参数按单位 health 比例计算 (PU132 voidVessel/chronos 配置 L3804/L3839):
- *   damageThreshold       = health / 20f
- *   maxDamageThreshold    = health / 1.25f
- *   maxDamageTaken        = health / 15f
- *   resistStart           = health / 25f
- *   resistScl             = 0.2f
- *   resistDuration        = 6f * 60f
- *   resistTime            = 3f * 60f
- *   invincibilityDuration = 15f
- *   invincibilityArray    = 4
+ * ★ 血量双轨制 (PU132 关键机制):
+ *   - health (显示血量): 按原始伤害 (仅护甲/护盾修正) 扣减, 先归零;
+ *   - trueHealth (真实台账): 按防作弊上限/曲线/抗性扣减, 慢得多;
+ *   - health 归零触发 kill → 台账 > 0 → 拒绝+复活 (health = trueHealth)。
+ *
+ * ★ 无 antiCheatType 配置时回退到 PU132 voidVessel/chronos 默认参数。
  */
 public class EndGroundUnit extends LegsUnit {
     private static final Interp curveType = new Interp.Pow(2);
@@ -49,6 +48,8 @@ public class EndGroundUnit extends LegsUnit {
     private int invIndex = 0;
     private float invTimer = 0f;
     private float resist, resistMax, resistTime;
+    /** 单位配置的防作弊参数集 (add() 时从 UnitType.antiCheatType 读取) */
+    private zzw.content.units.anticheat.EndCheatVars ac;
 
     /** 工厂方法 (UnitType.constructor 用) */
     public static EndGroundUnit create() {
@@ -65,7 +66,11 @@ public class EndGroundUnit extends LegsUnit {
     public void add() {
         if (added) return;
         super.add();
-        // 初始化防作弊数据 (按 PU132 voidVessel/chronos 配置: invincibilityArray=4)
+        // 读取单位配置的防作弊参数 (无配置时回退 PU132 voidVessel/chronos 默认值)
+        if (type instanceof zzw.content.type.UnityUnitType u && u.antiCheatType != null) {
+            ac = u.antiCheatType;
+        }
+        // 初始化防作弊数据
         trueHealth = type.health;
         trueMaxHealth = type.health;
         invFrames = new float[4];
@@ -124,16 +129,18 @@ public class EndGroundUnit extends LegsUnit {
 
     @Override
     public void damage(float amount) {
-        // ★ 防作弊伤害处理 (完全复刻 PU132 EndComp.damage L210-257)
-        if (invFrames[invIndex] <= 0f) {
-            // 按单位 health 比例计算参数 (PU132 voidVessel/chronos 配置)
-            float damageThreshold = trueMaxHealth / 20f;
-            float maxDamageThreshold = trueMaxHealth / 1.25f;
-            float maxDamageTaken = trueMaxHealth / 15f;
-            float resistStart = trueMaxHealth / 25f;
-            float resistScl = 0.2f;
-            float invincibilityDuration = 15f;
+        // 读取防作弊参数 (未配置时用 PU132 voidVessel/chronos 默认比例)
+        float damageThreshold = ac != null ? ac.damageThreshold : trueMaxHealth / 20f;
+        float maxDamageThreshold = ac != null ? ac.maxDamageThreshold : trueMaxHealth / 1.25f;
+        float maxDamageTaken = ac != null ? ac.maxDamageTaken : trueMaxHealth / 15f;
+        float resistStart = ac != null ? ac.resistStart : trueMaxHealth / 25f;
+        float resistScl = ac != null ? ac.resistScl : 0.2f;
+        float invincibilityDuration = ac != null ? ac.invincibilityDuration : 15f;
+        float resistTimeMax = ac != null ? ac.resistTime : 3f * 60f;
+        Interp curve = ac != null ? ac.curveType : curveType;
 
+        // ★ 防作弊伤害处理 (复刻 PU132 EndComp.damage L210-257)
+        if (invFrames[invIndex] <= 0f) {
             float nextAmount = Math.min(amount, maxDamageTaken);
 
             // 抗性累积
@@ -142,15 +149,15 @@ public class EndGroundUnit extends LegsUnit {
                 resist += a;
                 if (Float.isInfinite(resist)) resist = Float.MAX_VALUE;
                 resistMax = Math.max(resistMax, resist);
-                resistTime = 3f * 60f;  // PU132: resistTime=3*60
+                resistTime = resistTimeMax;
                 aggression += Math.min(a / (trueMaxHealth / 5f), 1.5f);
                 aggression = Math.min(aggression, 4f);
                 aggressionTime = 5f * 60f;
             }
 
-            // 伤害曲线衰减 (Pow(2))
+            // 伤害曲线衰减 (PU132 curveType, 默认 Pow(2))
             if (amount > damageThreshold) {
-                float in = 1f - curveType.apply(Mathf.clamp((amount - damageThreshold) / (maxDamageThreshold - damageThreshold)));
+                float in = 1f - curve.apply(Mathf.clamp((amount - damageThreshold) / (maxDamageThreshold - damageThreshold)));
                 nextAmount *= in;
             }
 
@@ -169,7 +176,7 @@ public class EndGroundUnit extends LegsUnit {
             return;
         }
 
-        // 自行计算伤害 (绕过原版 health 处理, 直接扣 trueHealth)
+        // 台账扣减 (按防作弊上限/曲线/抗性后的金额)
         float tmpAmount = Math.max(amount - armor, Vars.minArmorDamage * amount) / healthMultiplier;
 
         if (tmpAmount > 0) {
@@ -181,38 +188,58 @@ public class EndGroundUnit extends LegsUnit {
             }
         }
 
-        // 同步 health 让原版处理 hitTime (红光闪烁)
+        // ★ 原版显示血量并行扣减 (PU132 关键机制):
+        // 显示血量按"未经防作弊上限的原始伤害"扣减, 比台账先归零;
+        // 归零触发 kill() → 台账 > 0 → 拒绝死亡 + 红色蓄力特效 + 复活。
+        float rawAmount = Math.max(amount - armor, Vars.minArmorDamage * amount) / healthMultiplier;
+        if (rawAmount > 0) {
+            float shieldDamage = Math.min(Math.max(shield, 0), rawAmount);
+            rawAmount -= shieldDamage;
+            if (rawAmount > 0) {
+                health -= rawAmount;
+            }
+        }
         this.hitTime = 1f;
+        // 血量归零 → 触发原版死亡链 (kill → destroy → 拒绝判定)
+        if (health <= 0f && !dead) {
+            kill();
+        }
+    }
+
+    /**
+     * 死亡拒绝+复活 (PU132 EndComp.destroy/remove L55-78 完整移植):
+     * 台账 (trueHealth) 未耗尽时, 播放红色蓄力特效并复活。
+     */
+    private boolean denyDeath() {
+        if (trueHealth > 0f) {
+            // 狂暴: 4 倍速 + 持续 10 秒 (PU32 aggression=4, aggressionTime=10*60)
+            aggression = 4f;
+            aggressionTime = 10f * 60f;
+            // 复活: 血量回充到台账值 (台账 > 0)
+            health = Math.max(health, Math.min(trueHealth, trueMaxHealth));
+            hitTime = 1f;
+            // 红色粒子蓄力特效 (PU132 SpecialFx.endDeny)
+            zzw.content.units.effects.SpecialFx.endDeny.at(x, y, rotation, this);
+            return true;
+        }
+        return false;
     }
 
     @Override
     public void destroy() {
-        if (trueHealth > 0f) {
-            // 死亡拒绝: 增加怒气 (PU132 EndComp.destroy L72-78)
-            aggression = 4f;
-            aggressionTime = 10f * 60f;
-            return;
-        }
+        if (denyDeath()) return;
         super.destroy();
     }
 
     @Override
     public void kill() {
-        if (trueHealth > 0f) {
-            aggression = 4f;
-            aggressionTime = 10f * 60f;
-            return;
-        }
+        if (denyDeath()) return;
         super.kill();
     }
 
     @Override
     public void remove() {
-        if (trueHealth > 0f) {
-            aggression = 4f;
-            aggressionTime = 10f * 60f;
-            return;
-        }
+        if (trueHealth > 0f && health > 0f) return;
         super.remove();
     }
 }

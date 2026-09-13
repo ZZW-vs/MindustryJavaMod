@@ -72,6 +72,14 @@ public class UnityUnitType extends UnitType{
      */
     public int maxSouls = 0;
 
+    /**
+     * End 阵营防作弊参数集 (PU132 UnitType.antiCheatType)。
+     *
+     * <p>由 EndGroundUnit / EndInvisibleUnit 等防作弊实体在 add() 时读取;
+     * null = 无防作弊 (普通单位)。各 End 单位参数见 PU132 UnityUnitTypes。</p>
+     */
+    public zzw.content.units.anticheat.EndCheatVars antiCheatType;
+
     public UnityUnitType(String name){
         super(name);
         outlines = false;

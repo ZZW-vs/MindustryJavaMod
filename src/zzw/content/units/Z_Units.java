@@ -1532,13 +1532,17 @@ public class Z_Units {
         //  - 8腿地面单位 (legCount=8, legGroupSize=4, legLength=140)
         //  - 免疫所有状态效果
         // ═══════════════════════════════════════════════════════════
-        ravager = new UnitType("ravager") {{
+        ravager = new zzw.content.type.UnityUnitType("ravager") {{
             health = 1650000f;
             speed = 0.65f;
             drag = 0.16f;
             armor = 15f;
             hitSize = 138f;
             rotateSpeed = 1.1f;
+
+            // PU132: antiCheatType = (h/610, h/190, h/560, h/120, 0.6, 7m, 8m, 35, 4)
+            antiCheatType = new zzw.content.units.anticheat.EndCheatVars(
+                health / 610f, health / 190f, health / 560f, health / 120f, 0.6f, 7f * 60f, 8f * 60f, 35f, 4);
 
             immunities.addAll(mindustry.Vars.content.getBy(mindustry.ctype.ContentType.status));
 
@@ -2107,6 +2111,10 @@ public class Z_Units {
             armor = 35f;
             hitSize = 257f;
             rotateSpeed = 0.9f;
+
+            // PU132: antiCheatType = (6000, 12000, h/560, h/120, 0.6, 7m, 8m, 35, 4)
+            antiCheatType = new zzw.content.units.anticheat.EndCheatVars(
+                6000f, 12000f, health / 560f, health / 120f, 0.6f, 7f * 60f, 8f * 60f, 35f, 4);
 
             // ===== 腿配置 (模仿 FlameOut DespondencyUnitType + PU132 原值) =====
             // PU132: legTrns=0.3, legLength=672*(1-(0.3*0.85*0.5))=585.6, legExtension=-48, legMoveSpace=0.2, legBaseOffset=61.25

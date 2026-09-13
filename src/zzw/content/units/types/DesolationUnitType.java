@@ -18,7 +18,7 @@ import mindustry.type.UnitType;
  * 重写 drawLegs 添加阴影腿贴图 (leg-shadow + leg-base-shadow), 实现立体腿部效果
  * 参考: FlameOut-1.1.3 DespondencyUnitType.drawLegs (L204-237)
  */
-public class DesolationUnitType extends UnitType {
+public class DesolationUnitType extends zzw.content.type.UnityUnitType {
     static Vec2 legOff = new Vec2();
 
     public TextureRegion legShadowRegion, legShadowBaseRegion;

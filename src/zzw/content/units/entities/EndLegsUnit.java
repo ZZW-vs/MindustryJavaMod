@@ -160,7 +160,7 @@ public class EndLegsUnit extends UnitEntity {
             return;
         }
 
-        // 自行计算伤害 (绕过原版 health 处理, 直接扣 trueHealth)
+        // 台账扣减 (按防作弊上限/曲线/抗性后的金额)
         float tmpAmount = Math.max(amount - armor, Vars.minArmorDamage * amount) / healthMultiplier;
 
         if (tmpAmount > 0) {
@@ -172,38 +172,52 @@ public class EndLegsUnit extends UnitEntity {
             }
         }
 
-        // 同步 health 让原版处理 hitTime (红光闪烁)
+        // ★ 原版显示血量并行扣减 (PU132 关键机制): 显示血量比台账先归零
+        float rawAmount = Math.max(amount - armor, Vars.minArmorDamage * amount) / healthMultiplier;
+        if (rawAmount > 0) {
+            float shieldDamage = Math.min(Math.max(shield, 0), rawAmount);
+            rawAmount -= shieldDamage;
+            if (rawAmount > 0) {
+                health -= rawAmount;
+            }
+        }
         this.hitTime = 1f;
+        if (health <= 0f && !dead) {
+            kill();
+        }
+    }
+
+    /**
+     * 死亡拒绝+复活 (PU132 EndComp.destroy/remove 完整移植):
+     * 台账 (trueHealth) 未耗尽时, 播放红色蓄力特效并复活。
+     */
+    private boolean denyDeath() {
+        if (trueHealth > 0f) {
+            aggression = 4f;
+            aggressionTime = 10f * 60f;
+            health = Math.max(health, Math.min(trueHealth, trueMaxHealth));
+            hitTime = 1f;
+            zzw.content.units.effects.SpecialFx.endDeny.at(x, y, rotation, this);
+            return true;
+        }
+        return false;
     }
 
     @Override
     public void destroy() {
-        if (trueHealth > 0f) {
-            // 死亡拒绝: 增加怒气 (PU132 EndComp.destroy L72-78)
-            aggression = 4f;
-            aggressionTime = 10f * 60f;
-            return;
-        }
+        if (denyDeath()) return;
         super.destroy();
     }
 
     @Override
     public void kill() {
-        if (trueHealth > 0f) {
-            aggression = 4f;
-            aggressionTime = 10f * 60f;
-            return;
-        }
+        if (denyDeath()) return;
         super.kill();
     }
 
     @Override
     public void remove() {
-        if (trueHealth > 0f) {
-            aggression = 4f;
-            aggressionTime = 10f * 60f;
-            return;
-        }
+        if (trueHealth > 0f && health > 0f) return;
         super.remove();
     }
 }
