@@ -239,6 +239,15 @@ public class WorldUnitType extends UnityUnitType {
                     hoveredSubBuild.drawSelect();
                 }
 
+                // ★ 配置可视化: 电力节点范围圈/可连节点方块等 (原版由 OverlayRenderer 在
+                //   主世界上下文绘制, 子世界建筑会画到地图原点) —— 在投影 + 子世界上下文中绘制
+                Building cfgSel = subConfig.getSelected();
+                if (cfgSel != null && !cfgSel.dead && w.ownsBuilding(cfgSel)) {
+                    Draw.z(Layer.overlayUI);
+                    cfgSel.drawConfigure();
+                    Draw.reset();
+                }
+
                 // ★ 放置预览: 建造模式下在子世界网格上画原版风格 ghost (投影上下文内,
                 //   坐标即子世界坐标): 未拖拽 = 单格跟随光标; 拖拽放置 = 整条线的计划预览
                 if (buildPreviewUnit == w && (subDragMode == dragNone || subDragMode == dragPlace)) {
@@ -758,11 +767,19 @@ public class WorldUnitType extends UnityUnitType {
             invalidateHoverPanel();
         }
 
-        // ★ 点击子世界建筑: 打开原版配置 UI / 物品界面 (同原版点击方块);
+        // ★ 点击子世界建筑: 打开配置 UI / 物品界面 (同原版点击方块);
         // 放置/拆除模式下不拦截, 避免和原版操作冲突
+        boolean busy = Vars.control.input != null &&
+                       (Vars.control.input.isPlacing() || Vars.control.input.isBreaking());
+
+        // ★ 点击游戏世界空白处 → 关闭子世界配置界面 (原版 tileTapped(null) → hideConfig 行为;
+        //   子世界配置界面由本类管理, 原版输入不会关它)
+        if (subConfig.isShown() && hoveredSubBuild == null && !busy
+            && Core.input.justTouched() && !Core.scene.hasMouse()) {
+            subConfig.hideConfig();
+        }
+
         if (hoveredSubBuild != null) {
-            boolean busy = Vars.control.input != null &&
-                           (Vars.control.input.isPlacing() || Vars.control.input.isBreaking());
             if (Core.input.justTouched() && !Core.scene.hasMouse() && !busy) {
                 Building found = hoveredSubBuild;
 
@@ -790,11 +807,10 @@ public class WorldUnitType extends UnityUnitType {
                 //   随后会把它关掉), 复刻原版 tileTapped 的 onConfigureBuildTapped 流程:
                 //   电力节点 → 点范围内另一个节点 = 连接 (返回 false), 双击自身 = 汇总/清除
                 //   链接, 其余返回 true = 切换选中
-                Building selectedConfig = Vars.control.input.config.isShown()
-                                          ? Vars.control.input.config.getSelected() : null;
+                Building selectedConfig = subConfig.isShown() ? subConfig.getSelected()
+                    : (Vars.control.input.config.isShown() ? Vars.control.input.config.getSelected() : null);
                 Core.app.post(() -> {
                     if (found.dead) return;
-                    InputHandler in = Vars.control.input;
 
                     if (selectedConfig != null && selectedConfig.isValid()) {
                         // 电力节点 configure/getPotentialLinks 内部有 world.build 查询
@@ -810,16 +826,16 @@ public class WorldUnitType extends UnityUnitType {
                         }
 
                         if (switchSel) {
-                            // 切换选中 (原版: showConfig 只在 configurable 时调用)
+                            // 切换选中 (原版: 只在 configurable 时 showConfig)
                             if (found.block.configurable && found.shouldShowConfigure(Vars.player)) {
                                 found.block.configureSound.at(mx, my);
-                                in.config.showConfig(found);
+                                openSubConfig(found);
                             }
                         } else if (found != selectedConfig) {
                             // 连接成功 (原版保留配置界面方便继续连下一个) ——
                             // 本帧原版 tileTapped(null) 已把它关掉, 这里重新打开
                             if (selectedConfig.block.configurable && selectedConfig.isValid()) {
-                                in.config.showConfig(selectedConfig);
+                                openSubConfig(selectedConfig);
                             }
                         }
                         // found == selectedConfig: 双击自身 → deselect 意图, 保持关闭
@@ -829,7 +845,7 @@ public class WorldUnitType extends UnityUnitType {
                     if (found.block.configurable && found.shouldShowConfigure(Vars.player)) {
                         // 原版 tileTapped 的配置音效 (在点击的主世界位置播放)
                         found.block.configureSound.at(mx, my);
-                        in.config.showConfig(found);
+                        openSubConfig(found);
                     } else {
                         // 非配置建筑: 显示物品栏 (子世界版, 支持拿取物品)
                         subInv.showFor(found);
@@ -837,6 +853,11 @@ public class WorldUnitType extends UnityUnitType {
                 });
             }
         }
+    }
+
+    /** 打开建筑配置: 子世界建筑走子世界 Fragment (可视化由 drawBody 在投影内绘制) */
+    private static void openSubConfig(Building b) {
+        subConfig.showConfig(b);
     }
 
     // ===== 建造模式开关按钮 (点击主核心弹出) =====

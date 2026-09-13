@@ -3,6 +3,9 @@ package zzw.content;
 import arc.graphics.Blending;
 import arc.graphics.Color;
 import arc.math.geom.Vec3;
+import arc.util.Log;
+import mindustry.Vars;
+import mindustry.ctype.ContentType;
 import mindustry.content.Planets;
 import mindustry.graphics.Pal;
 import mindustry.graphics.Shaders;
@@ -48,6 +51,8 @@ public class Z_Planets{
     }
 
     public static void load(){
+        Log.info("[planet-debug] Z_Planets.load 开始 (行星注册前, sun.children=@)", Planets.sun.children.size);
+
         // megalith — monolith 母星 (起始区块 200, 可进入)
         megalith = new Planet("megalith", Planets.sun, 1f, 3){{
             // PU132: CompositeMesh + 星环 → v158 用原生六边形网格替代
@@ -60,14 +65,20 @@ public class Z_Planets{
             atmosphereRadIn = 0.04f;
             atmosphereRadOut = 0.35f;
         }};
+        Log.info("[planet-debug] megalith 已注册: 全名=@, 父星=@, accessible=@, meshLoader=@",
+            megalith.name, megalith.parent, megalith.accessible, megalith.meshLoader != null);
 
         // electrode — imber 行星 (起始区块 30, 可进入)
         electrode = new Planet("electrode", Planets.sun, 1f, 3){{
-            meshLoader = () -> new HexMesh(this, solidMesher(Pal.surge), 6, Shaders.planet);
+            meshLoader = () -> {
+                Log.info("[planet-debug] electrode HexMesh 构建 (图标/渲染时调用)");
+                return new HexMesh(this, solidMesher(Pal.surge), 6, Shaders.planet);
+            };
             accessible = true;
             atmosphereColor = Pal.surge;
             startSector = 30;
         }};
+        Log.info("[planet-debug] electrode 已注册: 全名=@, accessible=@", electrode.name, electrode.accessible);
 
         // inert — electrode 的卫星 (半径减半, 不可进入, 深灰单色外观)
         inert = new Planet("inert", electrode, 0.5f){{
@@ -76,5 +87,15 @@ public class Z_Planets{
             // PU132: ColorMesh 多面单色网格 → v158 用低细分 HexMesh 替代
             meshLoader = () -> new HexMesh(this, solidMesher(Color.valueOf("3a3a45")), 3, Shaders.planet);
         }};
+
+        Log.info("[planet-debug] inert 已注册: 全名=@, 父星=@, accessible=@",
+            inert.name, inert.parent, inert.accessible);
+        Log.info("[planet-debug] 注册完成: sun.children=@ (应含 megalith/electrode), " +
+            "electrode.children=@ (应含 inert), 全部行星数=@",
+            Planets.sun.children.size, electrode.children.size, Vars.content.planets().size);
+        // 逐一确认三个行星确实进了内容表 (找不到 = 没注册成功)
+        for(String n : new String[]{"create-megalith", "create-electrode", "create-inert"}){
+            Log.info("[planet-debug] 内容查询 @ -> @", n, Vars.content.getByName(ContentType.planet, n) != null ? "OK" : "缺失!");
+        }
     }
 }
