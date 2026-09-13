@@ -105,6 +105,22 @@ public class ScarFx {
     });
 
     /**
+     * 彩色大型命中特效 (21tick)
+     * PU132 HitFx.coloredHitLarge
+     * - 0-8tick: 白色到指定颜色渐变的圆形脉冲 (更大)
+     * - 全程: 6条射线朝弹道反方向 45° 扇形发射
+     */
+    public static final Effect coloredHitLarge = new Effect(21f, e -> {
+        Draw.color(Color.white, e.color, e.fin());
+        e.scaled(8f, s -> {
+            Lines.stroke(0.5f + s.fout());
+            Lines.circle(e.x, e.y, s.fin() * 11f);
+        });
+        Lines.stroke(0.5f + e.fout());
+        Angles.randLenVectors(e.id, 6, e.fin() * 35f, e.rotation + 180f, 45f, (x, y) -> Lines.lineAngle(e.x + x, e.y + y, Mathf.angle(x, y), e.fout() * 7f + 1f));
+    });
+
+    /**
      * 假闪电特效 (10tick, 500裁剪半径)
      * PU132 UnityFx.falseLightning
      * - 基于长度生成分段闪电效果

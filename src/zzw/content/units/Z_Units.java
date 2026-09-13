@@ -10,7 +10,7 @@ import arc.util.Time;
 import mindustry.entities.abilities.Ability;
 import mindustry.entities.abilities.UnitSpawnAbility;
 import mindustry.content.Fx;
-import mindustry.entities.StatusEffect;
+import mindustry.type.StatusEffect;
 import mindustry.entities.bullet.ArtilleryBulletType;
 import mindustry.entities.bullet.BasicBulletType;
 import mindustry.entities.bullet.BulletType;
@@ -33,6 +33,7 @@ import zzw.content.units.anticheat.ArmorDamageModule;
 import zzw.content.units.anticheat.AbilityDamageModule;
 import zzw.content.units.anticheat.ForceFieldDamageModule;
 import zzw.content.Z_Sounds;
+import zzw.content.Z_StatusEffects;
 import zzw.content.units.bullets.AcceleratingLaserBulletType;
 import zzw.content.units.bullets.AntiBulletFlakBulletType;
 import zzw.content.units.bullets.ArrowBulletType;
@@ -3034,7 +3035,7 @@ public class Z_Units {
                 shootStatus = mindustry.content.StatusEffects.slow;
                 shootStatusDuration = 80f;
                 // PU_V8: 齐射前播放充能特效 (greenLaserChargeParent 80tick)
-                firstShotDelay = zzw.content.units.effects.ChargeFx.greenLaserChargeParent.lifetime;
+                shoot.firstShotDelay = zzw.content.units.effects.ChargeFx.greenLaserChargeParent.lifetime;
                 bullet = new ReflectingLaserBulletType(500f) {{
                     lifetime = 65f;
                     shootEffect = zzw.content.units.effects.ChargeFx.greenLaserChargeParent;
@@ -3127,12 +3128,12 @@ public class Z_Units {
                 cooldownTime = 280f;
                 shootSound = Sounds.beamPlasma;
                 // PU_V8: 齐射前蓄力 (sagittariusCharge 特效 2*60 tick)
-                firstShotDelay = zzw.content.units.effects.ChargeFx.sagittariusCharge.lifetime;
+                shoot.firstShotDelay = zzw.content.units.effects.ChargeFx.sagittariusCharge.lifetime;
                 // PU_V8: 射击期间施加蓄力疲劳 (移速10%/生命60%)
                 shootStatus = sagittariusFatigue;
                 shootStatusDuration = 10f * 60f + zzw.content.units.effects.ChargeFx.sagittariusCharge.lifetime;
-                shootEffect = zzw.content.units.effects.ChargeFx.sagittariusCharge;
                 bullet = new SagittariusLaserBulletType(35f) {{
+                    shootEffect = zzw.content.units.effects.ChargeFx.sagittariusCharge;
                     lifetime = 10f * 60f;
                     collidesTeam = true;
                     healPercent = 0.4f;
@@ -3715,7 +3716,7 @@ public class Z_Units {
                     healPercent = 6f;
                     allyStatus = mindustry.content.StatusEffects.overclock;
                     allyStatusDuration = 9f * 60f;
-                    status = mindustry.content.StatusEffects.sapped;  // v158 替代 UnityStatusEffects.weaken
+                    status = Z_StatusEffects.weaken;  // PU_V8 UnityStatusEffects.weaken (伤害/生命-25%, 移速-50%)
                     statusDuration = 40f;
                     lifetime = 6f * 60f;
                 }};
@@ -3771,7 +3772,7 @@ public class Z_Units {
                     scanAccuracy = 25;
                     allyStatus = mindustry.content.StatusEffects.overclock;
                     allyStatusDuration = 9f * 60f;
-                    status = mindustry.content.StatusEffects.sapped;  // v158 替代 UnityStatusEffects.weaken
+                    status = Z_StatusEffects.weaken;  // PU_V8 UnityStatusEffects.weaken
                     statusDuration = 40f;
                     lifetime = 6f * 60f;
                 }};
@@ -3800,7 +3801,7 @@ public class Z_Units {
                 bullet = new HealingNukeBulletType() {{
                     allyStatus = mindustry.content.StatusEffects.overclock;
                     allyStatusDuration = 15f * 60f;
-                    status = mindustry.content.StatusEffects.unmoving;  // v158 替代 UnityStatusEffects.disabled
+                    status = Z_StatusEffects.disabled;  // PU_V8 UnityStatusEffects.disabled (移速/装填归零+缴械)
                     statusDuration = 120f;
                     healPercent = 20f;
                 }};

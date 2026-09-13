@@ -22,6 +22,12 @@ public class Z_StatusEffects{
      */
     public static StatusEffect blueBurn;
 
+    /** 虚弱 (PU132 UnityStatusEffects.weaken): 伤害/生命 -25%, 移速 -50% */
+    public static StatusEffect weaken;
+
+    /** 瘫痪 (PU132 UnityStatusEffects.disabled): 移速/装填归零 + 缴械 */
+    public static StatusEffect disabled;
+
     public static void load(){
         blueBurn = new StatusEffect("blue-burn"){{
             damage = 0.14f;
@@ -31,6 +37,22 @@ public class Z_StatusEffects{
             init(() -> {
                 opposite(StatusEffects.wet, StatusEffects.freezing);
             });
+        }};
+
+        // PU132 UnityStatusEffects.weaken: sedec/trigintaduo 治疗锥对敌人施加的削弱
+        // (与原版 weaken 数值不同: 原版无 healthMultiplier)
+        weaken = new StatusEffect("weaken"){{
+            damageMultiplier = 0.75f;
+            healthMultiplier = 0.75f;
+            speedMultiplier = 0.5f;
+        }};
+
+        // PU132 UnityStatusEffects.disabled: trigintaduo 治疗核弹对敌人的瘫痪
+        // (原版 unmoving 只锁移动, 这里的 disabled 额外归零装填并缴械)
+        disabled = new StatusEffect("disabled"){{
+            reloadMultiplier = 0f;
+            speedMultiplier = 0f;
+            disarm = true;
         }};
     }
 }
