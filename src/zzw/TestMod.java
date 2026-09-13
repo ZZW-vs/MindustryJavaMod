@@ -162,13 +162,9 @@ public class TestMod extends Mod{
         //   直升机(schistocerca)/EMP(discharge)/巨石(stele) 系列的生产与升级配方
         zzw.content.Z_Overwriter.load();
 
-        // ===== PU132 行星 / 区块 / 天气 / 科技树 (内容全注册后再挂载) =====
-
-        // 行星 (megalith/electrode/inert; 必须在区块预设之前)
-        Z_Planets.load();
-
-        // 区块预设 (accretion/salvaged-laboratory, msav 地图驱动)
-        Z_SectorPresets.load();
+        // ===== PU132 天气 / 科技树 =====
+        // ★ 行星系统已移除 (用户要求): PU 内容改为在原版普罗塞 (Serpulo) 世界显示/可用,
+        //   科技树节点全部挂在原版树上; Z_Planets/Z_SectorPresets 保留代码不再调用
 
         // 天气 (timeStorm/debrisStorm)
         Z_Weathers.load();

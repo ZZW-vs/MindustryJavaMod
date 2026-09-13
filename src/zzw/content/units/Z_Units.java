@@ -10,6 +10,7 @@ import arc.util.Time;
 import mindustry.entities.abilities.Ability;
 import mindustry.entities.abilities.UnitSpawnAbility;
 import mindustry.content.Fx;
+import mindustry.entities.StatusEffect;
 import mindustry.entities.bullet.ArtilleryBulletType;
 import mindustry.entities.bullet.BasicBulletType;
 import mindustry.entities.bullet.BulletType;
@@ -168,6 +169,10 @@ public class Z_Units {
         continuousSapLaser,     // theraphosidae 持续吸血激光
         sapArtilleryFrag;       // 磁轨炮子弹的 frag
 
+    // —— PU_V8 状态效果 (T6/T7 单位使用) ——
+    /** sagittarius 蓄力激光射击疲劳 (PU_V8 UnityStatusEffects.sagittariusFatigue) */
+    public static StatusEffect sagittariusFatigue;
+
     public static void load() {
         // ★ 关键: 注册自定义 Entity 到 EntityMapping.idMap, 否则 v154.3 的 UnitType.init() 会失败 ★
         // v154.3 要求每个自定义 Entity class 有唯一 classId, 必须在 idMap 占一个空 slot
@@ -190,6 +195,14 @@ public class Z_Units {
         WorldUnitEntity.registerSaveChunk();
         // ★ 注册 SlowLightningEntity (慢闪电 Entity, 实现 Drawc 接口)
         SlowLightningEntity.register();
+
+        // —— PU_V8 状态效果 (必须在单位定义之前初始化) ——
+        // UnityStatusEffects.sagittariusFatigue: 蓄力激光射击疲劳 (移速降至10%, 生命降至60%)
+        sagittariusFatigue = new StatusEffect("sagittarius-fatigue"){{
+            speedMultiplier = 0.1f;
+            healthMultiplier = 0.6f;
+            color = Color.valueOf("62ae7f");
+        }};
 
         // —— 段身 UnitType (先创建, 头部要引用它) ——
         arcnelidiaSegment = new UnitType("arcnelidia-segment") {{
@@ -3017,8 +3030,14 @@ public class Z_Units {
                 reload = 4f * 60f;
                 recoil = 0f;
                 shootSound = Sounds.shootLancer;
+                // PU_V8: 射击后自身减速 80tick
+                shootStatus = mindustry.content.StatusEffects.slow;
+                shootStatusDuration = 80f;
+                // PU_V8: 齐射前播放充能特效 (greenLaserChargeParent 80tick)
+                firstShotDelay = zzw.content.units.effects.ChargeFx.greenLaserChargeParent.lifetime;
                 bullet = new ReflectingLaserBulletType(500f) {{
                     lifetime = 65f;
+                    shootEffect = zzw.content.units.effects.ChargeFx.greenLaserChargeParent;
                     healPercent = 6f;
                     splashDamage = 70f;
                     splashDamageRadius = 30f;
@@ -3048,7 +3067,8 @@ public class Z_Units {
                 reload = 25f;
                 inaccuracy = 5f;
                 shootCone = 30f;
-                shootSound = Sounds.shootArc;
+                heatColor = mindustry.graphics.Pal.heal;    // PU_V8: 炮台热色为治疗绿
+                shootSound = Z_Sounds.energyBolt;           // PU_V8 UnitySounds.energyBolt
                 bullet = new CygnusBulletType() {{
                     speed = 6f;
                     damage = 20f;
@@ -3059,6 +3079,10 @@ public class Z_Units {
                     shootEffect = Fx.hitEmpSpark;
                     smokeEffect = Fx.shootBigSmoke2;
                     backColor = mindustry.graphics.Pal.heal;
+                    // PU_V8: 治疗绿拖尾
+                    trailLength = 15;
+                    trailWidth = 6f;
+                    trailColor = mindustry.graphics.Pal.heal;
                     status = mindustry.content.StatusEffects.electrified;
                     statusDuration = 30f;
                     lightColor = mindustry.graphics.Pal.heal;
@@ -3084,6 +3108,7 @@ public class Z_Units {
             shadowElevation = 0.23f;
             groundLayer = mindustry.graphics.Layer.legUnit;
             outlineColor = Color.valueOf("2e3142");
+            drawShields = false;            // PU_V8: 不绘制原版力场贴图 (力场由护盾能力自绘)
             constructor = mindustry.gen.LegsUnit::create;
             aiController = () -> new mindustry.ai.types.GroundAI();
             range = 400f;
@@ -3101,6 +3126,12 @@ public class Z_Units {
                 continuous = true;
                 cooldownTime = 280f;
                 shootSound = Sounds.beamPlasma;
+                // PU_V8: 齐射前蓄力 (sagittariusCharge 特效 2*60 tick)
+                firstShotDelay = zzw.content.units.effects.ChargeFx.sagittariusCharge.lifetime;
+                // PU_V8: 射击期间施加蓄力疲劳 (移速10%/生命60%)
+                shootStatus = sagittariusFatigue;
+                shootStatusDuration = 10f * 60f + zzw.content.units.effects.ChargeFx.sagittariusCharge.lifetime;
+                shootEffect = zzw.content.units.effects.ChargeFx.sagittariusCharge;
                 bullet = new SagittariusLaserBulletType(35f) {{
                     lifetime = 10f * 60f;
                     collidesTeam = true;
@@ -3128,7 +3159,7 @@ public class Z_Units {
                 rotate = true;
                 alternate = false;
                 shoot.shots = 2;
-                shootSound = Sounds.shootLancer;
+                shootSound = Z_Sounds.energyBolt;   // PU_V8 UnitySounds.energyBolt
                 bullet = new ArrowBulletType(7f, 25f) {{
                     lifetime = 60f;
                     pierce = true;
