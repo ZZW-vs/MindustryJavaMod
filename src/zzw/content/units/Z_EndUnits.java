@@ -407,14 +407,15 @@ public class Z_EndUnits {
             // (实现原版 WaterMovec 接口, UnitType.init 自动设置 naval=true/omniMovement=false/免溺水)
             constructor = ThalassophobiaUnit::create;
 
-            // ===== 鞭毛尾巴 (FlagellaDecorationType 运动学重写版) =====
-            // 4 段贴图 × 15 节 × 45.75 节长, 挂载点 (0, -172) (身体正后方)
-            // swayScl 沿用 PU132 写法 (hitSize/speed ≈ 127.6), phaseSpeed=3 → 摆动周期约 0.7 秒
-            decorations.add(new FlagellaDecorationType("create-thalassophobia-tail", 4, 15, 45.75f){{
+            // ===== 鞭毛尾巴 (多节单位同款动态: SegmentWormEntity 跟随算法移植) =====
+            // 4 段贴图 × 15 节 × 32 节长 (PU132 45.75 间距太大, 已缩小), 挂载点 (0, -172)
+            // 角度限幅/平滑/关节拉回 = 多节虫原版公式; wobble 为轻微扰动 (幅度 5°)
+            decorations.add(new FlagellaDecorationType("create-thalassophobia-tail", 4, 15, 32f){{
                 x = 0f;
                 y = -172f;
-                swayScl = hitSize / speed;
-                swayOffset = 67f;
+                angleLimit = 30f;
+                anglePhysicsSmooth = 0.5f;
+                jointStrength = 0.6f;
             }});
 
             //region thalassophobia weapons
