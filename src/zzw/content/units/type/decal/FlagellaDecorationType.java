@@ -82,6 +82,7 @@ public class FlagellaDecorationType extends UnitDecorationType{
             d.dir.set(Angles.trnsx(unit.rotation + 180f, 1f), Angles.trnsy(unit.rotation + 180f, 1f));
             d.xs = new float[segments + 1];
             d.ys = new float[segments + 1];
+            d.rot = new float[segments];
             float rx = unit.x + Angles.trnsx(unit.rotation - 90f, x, y),
             ry = unit.y + Angles.trnsy(unit.rotation - 90f, x, y);
             for(int i = 0; i <= segments; i++){
@@ -110,9 +111,12 @@ public class FlagellaDecorationType extends UnitDecorationType{
             tmpSmooth[i] = (prev + tmpAngles[i] * 2f + next) / 4f;
         }
 
-        // 4) 跟随链: 第 i 节 = 第 i-1 节 + (基准方向 + 平滑摆动角) × 节长
+        // 4) 跟随链 (一节传一节, 同多节单位): 每节旋转向目标角渐近 (slerpDelta 处理角度环绕),
+        //    根部节跟得快、末端节滞后 → 摆动沿链条向外传播, 转身时甩尾自然
         for(int i = 0; i < segments; i++){
-            float a = baseRot + tmpSmooth[i];
+            float target = baseRot + tmpSmooth[i];
+            d.rot[i] = Mathf.slerpDelta(d.rot[i], target, 0.25f);
+            float a = d.rot[i];
             d.xs[i + 1] = d.xs[i] + Angles.trnsx(a, segmentLength);
             d.ys[i + 1] = d.ys[i] + Angles.trnsy(a, segmentLength);
         }
@@ -172,12 +176,14 @@ public class FlagellaDecorationType extends UnitDecorationType{
 
     /**
      * 鞭毛尾巴状态实例 (每单位独立):
-     * progress = 摆动相位; dir = 滞后的基础朝向; xs/ys = 各节绘制位置 (含尾根共 segments+1 点)。
+     * progress = 摆动相位; dir = 滞后的基础朝向;
+     * rot = 每节持久旋转 (一节传一节的载体, 向目标角渐近产生传导延迟);
+     * xs/ys = 各节绘制位置 (含尾根共 segments+1 点)。
      */
     static class FlagellaDecoration extends UnitDecoration{
         float progress;
         final Vec2 dir = new Vec2();
-        float[] xs, ys;
+        float[] xs, ys, rot;
         boolean inited;
 
         public FlagellaDecoration(UnitDecorationType type){

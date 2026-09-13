@@ -304,8 +304,17 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
             u.damagePierce(spikesDamage);
             u.apply(status, statusDuration);
             hitEffect.at(v.x, v.y, v.angleTo(u));
-            // 记录到 spikes 序列 (用于 voidFractureEffect 绘制)
-            d.spikes.add(v.x, v.y, u.x(), u.y());
+            // ★ 拉丝修复: 尖刺终点钳制在光束点上最多 spikesRange 距离 —
+            //   大单位 hitSize 巨大时原版会把尖刺画到很远的单位中心 (dst×2 长三角),
+            //   视觉上就是"从地图边界拉丝到目标"
+            float dx = u.x() - v.x, dy = u.y() - v.y;
+            float dist = Mathf.dst(dx, dy);
+            if (dist > spikesRange) {
+                float scl = spikesRange / dist;
+                dx *= scl;
+                dy *= scl;
+            }
+            d.spikes.add(v.x, v.y, v.x + dx, v.y + dy);
         });
         // 建筑
         Vars.indexer.allBuildings(cx, cy, radius, build -> {
@@ -317,7 +326,14 @@ public class VoidFractureBulletType extends AntiCheatBulletTypeBase {
             count[0]++;
             build.damagePierce(spikesDamage);
             hitEffect.at(v.x, v.y, v.angleTo(build));
-            d.spikes.add(v.x, v.y, build.x(), build.y());
+            float dx = build.x() - v.x, dy = build.y() - v.y;
+            float dist = Mathf.dst(dx, dy);
+            if (dist > spikesRange) {
+                float scl = spikesRange / dist;
+                dx *= scl;
+                dy *= scl;
+            }
+            d.spikes.add(v.x, v.y, v.x + dx, v.y + dy);
         });
     }
 
