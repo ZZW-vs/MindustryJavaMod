@@ -29,6 +29,12 @@ public class BarrelsItemTurret extends ItemTurret {
 
     public BarrelsItemTurret(String name) {
         super(name);
+        // ★ 弹药消耗修复: PU_V8 原版在 shootBarrel()/focus 模式 shoot() 中显式调用 useAmmo(),
+        //   每根炮管每次射击消耗 1 发弹药。v132 的 bullet() 不消耗弹药, 但 v155.4 的 bullet()
+        //   在 consumeAmmoOnce == false 时会自动调用 useAmmo() —— 等价于原版行为。
+        //   之前未设置此字段 (默认 true), 导致炮管射击 (bullet()) 永不消耗弹药:
+        //   只要还剩 1 发弹药 hasAmmo() 恒为 true, 炮管无限开火 (banshee 无限攻击 bug)。
+        consumeAmmoOnce = false;
         // ★ v155.4 bullet(type, xOffset, yOffset, ...) 期望 LOCAL 局部坐标 (rotation-90 坐标系)
         // 默认 shootY = size*tilesize/2 (前向半身高偏移), 我们自定义每个炮管的前向偏移
         // 所以将默认值清零, 这样 yOffset 就是相对于炮台中心的前向距离
