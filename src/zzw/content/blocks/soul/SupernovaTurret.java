@@ -257,6 +257,19 @@ public class SupernovaTurret extends SoulLaserTurret {
         public float starHeat;
 
         /**
+         * ★ 操控修复 (v158 LaserTurret.firingMoveFract 等效):
+         * 原版 (PU132) 持续射击中转向减速至 20%, 让光束"甩尾"平滑;
+         * v158 适配时没带这个行为 → 射击时炮塔仍全速旋转, 操控感突兀。
+         * turnToTarget 在 super.updateTile() 内被调用, 无法直接覆写参数,
+         * 这里在射击期间临时压低 block.rotateSpeed 的使用值。
+         */
+        @Override
+        public void turnToTarget(float targetRot){
+            rotation = Angles.moveToward(rotation, targetRot,
+                efficiency * rotateSpeed * delta() * (bullets.any() ? 0.2f : 1f));
+        }
+
+        /**
          * PU132 updateTile 完整移植 - 严格按原版顺序
          *
          * 原版顺序:

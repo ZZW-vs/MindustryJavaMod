@@ -376,10 +376,17 @@ public class Z_AdvTurrets {
             size = 7;
             health = 8100;
             consumePower(24f);
-            rotateSpeed = 1f;
+            // ★ v158 操控手感修复: PU132 原版 rotateSpeed=1f + inherits 充能时 firingMoveFract=0.25
+            //   导致玩家操控时炮管转速极低, 鼠标刚移到别的方向炮管追不上, shootCone 内永远不满足
+            //   → 只有鼠标对准炮台当前面朝方向才充能开火 (表现为"只有面向炮管方向才响应")
+            // 提高到 6f 接近 v158 默认(5f)并让充能时仍保留一半转速(0.5), 操控明显跟手
+            rotateSpeed = 6f;
+            firingMoveFract = 0.5f;
             recoil = 4f;
             shootCone = 15f;
-            range = 250f;
+            // ★ 范围一致性修复: 显示圈 = 实际光束长度 (PU132 length=280),
+            //   之前 range=250 < length=280, 玩家看到的目标在圈内却打不到/反之
+            range = 280f;
             shootSound = Z_Sounds.supernovaShoot;
             loopSound = Z_Sounds.supernovaActive;
             loopSoundVolume = 1f;

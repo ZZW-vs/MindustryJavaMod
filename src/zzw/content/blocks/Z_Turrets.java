@@ -715,7 +715,12 @@ public class Z_Turrets {
             consumePower(1.9f);
             shootSound = Z_Sounds.gluonShoot;  // ★ 原版 UnitySounds.gluonShoot (light/gluon-shoot.ogg)
             shootType = new BasicBulletType(8f, 60f) {{
-                lifetime = 60f;
+                // ★ 射程一致性修复: PU132 原版 drag=0.03f + hitSize=9f, 移植时丢失导致
+                //   弹丸无减速直飞 8*60=480 (超出 range=200 的显示圈两倍多);
+                //   补回 drag 后实际飞行 ≈8*(1-0.97^50)/0.03 ≈ 208, 与显示圈吻合
+                drag = 0.03f;
+                hitSize = 9f;
+                lifetime = 50f;
                 width = 16f;
                 height = 16f;
                 splashDamage = 40f;
@@ -1095,7 +1100,10 @@ public class Z_Turrets {
             shootType = new LaserBulletType(450f) {{
                 lifetime = 65f;
                 width = 20f;
-                length = 430f;
+                // ★ 射程一致性修复: PU132 原版 length=430 远超 range=220 显示圈 (v132 无
+                //   rangeChange 接口, 原版显示圈就骗人); v158 以显示圈为准, 收 length=225
+                //   (惯例 range+5), 伤害/宽度不变
+                length = 225f;
                 lightningSpacing = 35f;
                 lightningLength = 5;
                 lightningDelay = 1.1f;
