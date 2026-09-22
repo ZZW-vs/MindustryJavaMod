@@ -10,8 +10,6 @@ import zzw.content.blocks.Z_Blocks;
 import zzw.content.blocks.Z_Turrets;
 import zzw.content.blocks.distribution.Z_Distribution;
 import zzw.content.Z_Items;
-import zzw.content.Z_Planets;
-import zzw.content.Z_SectorPresets;
 import zzw.content.Z_StatusEffects;
 import zzw.content.Z_TechTree;
 import zzw.content.Z_Weathers;

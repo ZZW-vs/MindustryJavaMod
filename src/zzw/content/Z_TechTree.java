@@ -216,8 +216,12 @@ public class Z_TechTree{
 
     /**
      * ★ 兜底解锁 (用户要求: PU 内容必须能在普罗塞世界直接使用):
-     * 遍历全部本模组内容, 没挂科技节点的 (墙/炮台/单位等) 统一 alwaysUnlocked —
-     * 普罗塞战役里无需研究即可建造/生产。
+     * 遍历全部本模组内容统一 alwaysUnlocked — 普罗塞战役里无需研究即可建造/生产。
+     *
+     * ★ 修复 (2026-09): 之前只解锁 techNode==null 的内容, 但经验系等自制内容
+     *   挂了科技节点 (techNode != null) 被跳过 → Serpulo 战役里未研究就锁定、
+     *   无法建造 (用户反馈: 经验墙炮台等"默认不显示、无法建造")。
+     *   现在无论是否挂科技节点, 所有 create- 前缀本模组内容一律立即解锁。
      */
     private static void unlockRemaining(){
         int[] count = {0};
@@ -226,12 +230,19 @@ public class Z_TechTree{
             if(!u.name.startsWith("create-")) return;
             // 段身等 hidden 内容保持隐藏
             if(u instanceof mindustry.type.UnitType ut && ut.hidden) return;
-            if(u.techNode == null && !u.alwaysUnlocked){
+            // ★ 全环境可见: 强制覆盖 envEnabled, 避免 PU 移植方块因环境位不
+            //   含 Env.terrestrial 而在 Serpulo(陆地块) 中被 hidden 过滤掉、只在
+            //   Erekir/太空(EasicEnvironment/space) 显示 (用户实测: 埃里克尔可见,
+            //   赛普罗缺很多方块). Serpulo/Erekir/太空任意行星均显示.
+            if(u instanceof mindustry.world.Block blk && blk.envEnabled != mindustry.world.meta.Env.any){
+                blk.envEnabled = mindustry.world.meta.Env.any;
+            }
+            if(!u.alwaysUnlocked){
                 u.alwaysUnlocked = true;
                 count[0]++;
             }
         });
-        arc.util.Log.info("[techtree] 兜底解锁 @ 个未挂科技树的 PU 内容 (普罗塞可直接建造)", count[0]);
+        arc.util.Log.info("[techtree] 兜底解锁 @ 个本模组内容 (普罗塞可直接建造)", count[0]);
     }
 
     private static void node(UnlockableContent content){

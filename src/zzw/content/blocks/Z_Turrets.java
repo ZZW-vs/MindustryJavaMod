@@ -971,10 +971,10 @@ public class Z_Turrets {
             heatColor = Pal.turretHeat;
             // v158 无 chargeTime/chargeBeginEffect 字段, 用 shoot.firstShotDelay 替代充能时间
             shoot.firstShotDelay = 80f;
-            chargeSound = Sounds.shootLancer;
+            //chargeSound = Sounds.shootLancer;
 
-            shootType = new EphemeronBulletType(7.7f, 10f) {{
-                lifetime = 70f;
+            shootType = new EphemeronBulletType(7.7f, 210f) {{
+                lifetime = 150f;
                 hitSize = 12f;
                 pierce = true;
                 collidesTiles = false;
@@ -984,13 +984,13 @@ public class Z_Turrets {
                 // v158 充能特效在 BulletType.chargeEffect 上 (原 PU_V8 block.chargeBeginEffect)
                 chargeEffect = ChargeFx.ephmeronCharge;
 
-                positive = new EphemeronPairBulletType(4f) {{
+                positive = new EphemeronPairBulletType(45f) {{
                     positive = true;
                     frontColor = Pal.lancerLaser;
                     backColor = Color.white;
                 }};
 
-                negative = new EphemeronPairBulletType(4f) {{
+                negative = new EphemeronPairBulletType(45f) {{
                     frontColor = Color.white;
                     backColor = Pal.lancerLaser;
                 }};
@@ -1401,7 +1401,7 @@ public class Z_Turrets {
             shootEffect = Fx.none;
             // v158 无 chargeTime/chargeMaxDelay/chargeEffects/chargeEffect 字段, 用 shoot.firstShotDelay 替代充能时间
             shoot.firstShotDelay = 51f;
-            chargeSound = Sounds.shootLancer;
+            //chargeSound = Sounds.shootLancer;
             shootType = new ArcBulletType(4.6f, 8.6f) {{
                 lifetime = 53f;
                 hitSize = 28f;

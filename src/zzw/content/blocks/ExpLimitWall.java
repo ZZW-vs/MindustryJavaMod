@@ -91,7 +91,7 @@ public class ExpLimitWall extends LimitWall {
      * 显示: 最大经验值, 最大等级 (主动/被动), 伤害减免曲线 (按等级)
      */
     public void addExpStats() {
-        var map = stats.toMap();
+        arc.struct.OrderedMap<mindustry.world.meta.StatCat, arc.struct.OrderedMap<Stat, arc.struct.Seq<mindustry.world.meta.StatValue>>> map = stats.toMap();
         boolean removeAbil = false;
         // 遍历 expFields, 移除旧 stat 后重新添加 (支持表格/字符串两种形式)
         for (EField<?> f : expFields) {

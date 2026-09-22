@@ -15,6 +15,7 @@ import mindustry.type.SectorPreset;
  *
  * @author PU132 原作, 移植: zzw
  */
+/*
 public class Z_SectorPresets{
     public static SectorPreset accretion, salvagedLab;
 
@@ -34,3 +35,4 @@ public class Z_SectorPresets{
         }};
     }
 }
+*/
