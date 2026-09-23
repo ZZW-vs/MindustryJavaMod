@@ -88,11 +88,22 @@ public class Z_EndUnits {
         }};
     }
 
-    public static void load(){
+    static {
         // ★ 自定义实体注册 (v155.4+ 要求, 取唯一 classId)
+        //   放到静态块中: 当 Z_Units 在 ravager 之后调用本类 loadUnits() 时会先触发本块,
+        //   确保 ApocalypseUnit/ThalassophobiaUnit 已注册后再构造对应 UnitType (init 不失败)
         ZEntityRegister.register(ApocalypseUnit.class, ApocalypseUnit::create);
         ZEntityRegister.register(ThalassophobiaUnit.class, ThalassophobiaUnit::create);
+    }
 
+    /** 不再从 load() 直接调用, 改由 Z_Units 在 ravager 之后调用, 以调整单位注册顺序 */
+    public static void load(){
+        // 单位构造已移至 Z_Units.ravager 之后 (见 Z_Units 中调用 Z_EndUnits.loadUnits())
+        // 这里只保留空实现防止 TestMod 误调, 避免重复构造
+    }
+
+    /** 构造 apocalypse / thalassophobia (在 Z_Units.ravager 之后调用以控制顺序) */
+    public static void loadUnits(){
         apocalypse();
         thalassophobia();
     }

@@ -39,10 +39,17 @@ import zzw.util.ZObjs;
 public class TestMod extends Mod{
     private static final float WELCOME_DIALOG_DELAY = 3f;
 
+    // ★ FlameOut 移植单位接入: 仅移植 5 个单位 (冷漠/冷漠哨兵/共鸣/世界树/消沉),
+    //   剧情/地图系统已禁用 (FlameOut 构造函数内强制 disableStory, 不加载 SpecialMain/SpecialContent)
+    //private final flame.FlameOut flameOut;
+
     public TestMod(){
         // 初始化 WavefrontObject 占位实例 (cube/wavefront 炮台引用)
         // 实际 .obj 文件加载在 FileTreeInitEvent 时触发
         ZObjs.init();
+
+        // ★ FlameOut 移植: 实例化接入 (只含单位, 无剧情/地图)
+        //flameOut = new flame.FlameOut();
 
         Events.on(EventType.ClientLoadEvent.class, e -> {
             Time.run(WELCOME_DIALOG_DELAY, this::showWelcomeDialog);
@@ -160,6 +167,10 @@ public class TestMod extends Mod{
         //   直升机(schistocerca)/EMP(discharge)/巨石(stele) 系列的生产与升级配方
         zzw.content.Z_Overwriter.load();
 
+        // ===== FlameOut 移植单位 (仅单位, 无剧情/地图) =====
+        // 冷漠/冷漠哨兵/共鸣/世界树/消沉 5 个单位 (自给自足, 不占物品栏方块位)
+        //flameOut.flameContent();
+
         // ===== PU132 天气 / 科技树 =====
         // ★ 行星系统已移除 (用户要求): PU 内容改为在原版普罗塞 (Serpulo) 世界显示/可用,
         //   科技树节点全部挂在原版树上; Z_Planets/Z_SectorPresets 保留代码不再调用
@@ -168,7 +179,7 @@ public class TestMod extends Mod{
         Z_Weathers.load();
 
         // ★ 科技树 (必须最后: 把全部 PU 内容挂到原版科技树, 引用所有内容类)
-        Z_TechTree.load();
+        //Z_TechTree.load();
     }
     
     /**

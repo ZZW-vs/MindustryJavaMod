@@ -1780,6 +1780,13 @@ public class Z_Units {
         }};
 
         // ═══════════════════════════════════════════════════════════
+        //  End 最终 BOSS (apocalypse 天启 + thalassophobia 深海恐惧)
+        //  ★ 用户要求放在 ravager 之后, 故在此处构造 (单位注册顺序=load() 内执行顺序)
+        //  ★ 必须紧跟 ravager, 否则 exowalker 之后构造会排在更后面
+        // ═══════════════════════════════════════════════════════════
+        zzw.content.units.Z_EndUnits.loadUnits();
+
+        // ═══════════════════════════════════════════════════════════
         //  Exowalker (PU132 exowalker, Plague 阵营地面单位)
         //  - 8腿 (完整移植 PU132 TriJointLegsComp 三节腿系统), 6000 血, 速度 0.7
         //  - 5武器: 4×plagueSmallMount (瘟疫导弹) + 1×drain-laser (吸血激光)
@@ -3946,123 +3953,61 @@ public class Z_Units {
                     // 不设置 healPercent, 避免 canHeal=true 让 AI 寻找建筑而非单位
                 }};
             }});
-        }};
 
         // ═══════════════════════════════════════════════════════════
-        //  PU_V8 海军系列 (fin, blue)
+        //  PU_V8 mantodea 直升机系列 (T1-T6, 简化为普通飞行单位, 无旋翼)
+        //  - 移除 Rotor 旋翼动画, CopterAI 等自定义组件
+        //  - 用 vanilla UnitEntity::create + FlyingAI
         // ═══════════════════════════════════════════════════════════
 
-        // ===== fin (鳍级战列舰, PU_V8 原版) =====
-        fin = new UnitType("fin") {{
-            health = 36250f;
-            speed = 0.5f;
-            drag = 0.18f;
-            hitSize = 77.5f;
-            armor = 17f;
-            accel = 0.19f;
-            rotateSpeed = 0.86f;
-            constructor = mindustry.gen.UnitWaterMove::create;
+        // ===== caelifera (T1, 机枪+导弹) =====
+        caelifera = new CopterUnitType("caelifera") {{
+            speed = 5f;
+            drag = 0.08f;
+            accel = 0.04f;
+            health = 75f;
+            engineSize = 0f;
+            flying = true;
+            hitSize = 12f;
+            range = 140f;
+            outlineColor = Color.valueOf("2e3142");
+            constructor = CopterUnitEntity::create;
 
-            trailLength = 70;
-
-            // 武器1,2: 追踪导弹发射器
-            weapons.add(new Weapon("create-fin-launcher") {{
-                x = 19f;
-                y = 14f;
-                shootY = 8f;
-                rotate = true;
-                inaccuracy = 15f;
-                reload = 7f;
-                xRand = 2.25f;
-                shootSound = Sounds.shootMissile;
-                bullet = new mindustry.entities.bullet.MissileBulletType(4.2f, 15f) {{
-                    homingPower = 0.12f;
-                    width = 8f;
-                    height = 8f;
-                    shrinkX = 0f;
-                    shrinkY = 0f;
-                    drag = -0.003f;
-                    homingRange = 80f;
-                    keepVelocity = false;
-                    splashDamageRadius = 35f;
-                    splashDamage = 30f;
-                    lifetime = 62f;
-                    trailColor = mindustry.graphics.Pal.missileYellowBack;
-                    hitEffect = mindustry.content.Fx.blastExplosion;
-                    despawnEffect = mindustry.content.Fx.blastExplosion;
-                    weaveScale = 8f;
-                    weaveMag = 2f;
-                }};
-            }}, new Weapon("create-fin-launcher") {{
-                x = 24.5f;
-                y = -39.25f;
-                shootY = 8f;
-                rotate = true;
-                inaccuracy = 15f;
-                reload = 7f;
-                xRand = 2.25f;
-                shootSound = Sounds.shootMissile;
-                bullet = new mindustry.entities.bullet.MissileBulletType(4.2f, 15f) {{
-                    homingPower = 0.12f;
-                    width = 8f;
-                    height = 8f;
-                    shrinkX = 0f;
-                    shrinkY = 0f;
-                    drag = -0.003f;
-                    homingRange = 80f;
-                    keepVelocity = false;
-                    splashDamageRadius = 35f;
-                    splashDamage = 30f;
-                    lifetime = 62f;
-                    trailColor = mindustry.graphics.Pal.missileYellowBack;
-                    hitEffect = mindustry.content.Fx.blastExplosion;
-                    despawnEffect = mindustry.content.Fx.blastExplosion;
-                    weaveScale = 8f;
-                    weaveMag = 2f;
+            weapons.add(new Weapon("create-caelifera-gun") {{
+                top = false;
+                reload = 6f;
+                x = 5.25f;
+                y = 6.5f;
+                shootY = 1.5f;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.BasicBulletType(5f, 7f) {{
+                    lifetime = 30f;
+                    shrinkY = 0.2f;
                 }};
             }});
 
-            // 武器3: 迫击炮 (MortarWeapon, 倾角动画)
-            weapons.add(new zzw.content.units.weapons.MortarWeapon("create-fin-mortar") {{
+            weapons.add(new Weapon("create-caelifera-launcher") {{
+                reload = 30f;
+                x = 4.5f;
+                y = 0.5f;
+                shootY = 2.25f;
+                mirror = true;
+                shootCone = 30f;
+                bullet = new mindustry.entities.bullet.MissileBulletType(3f, 2f) {{
+                    speed = 3f;
+                    lifetime = 45f;
+                    splashDamage = 40f;
+                    splashDamageRadius = 8f;
+                    drag = -0.01f;
+                }};
+            }});
+
+            rotors.add(new Rotor(name + "-rotor"){{
                 x = 0f;
-                y = -13.75f;
-                shootY = 39.5f;
-                mirror = false;
-                rotate = true;
-                rotateSpeed = 1f;
-                shoot.shots = 3;
-                inaccuracy = 3f;
-                velocityRnd = 0.1f;
-                reload = 60f * 2f;
-                recoil = 2f;
-                bullet = new zzw.content.units.bullets.MortarBulletType(7f, 4f) {{
-                    width = 22f;
-                    height = 22f;
-                    splashDamageRadius = 160f;
-                    splashDamage = 160f;
-                    trailWidth = 7f;
-                    trailColor = mindustry.graphics.Pal.bulletYellowBack;
-                    hitEffect = mindustry.content.Fx.massiveExplosion;
-                    lifetime = 65f;
-                    fragBullet = new mindustry.entities.bullet.ArtilleryBulletType(3f, 20f) {{
-                        hitEffect = mindustry.content.Fx.flakExplosion;
-                        knockback = 0.8f;
-                        lifetime = 80f;
-                        width = 11f;
-                        height = 11f;
-                        collidesTiles = false;
-                        splashDamageRadius = 25f * 0.75f;
-                        splashDamage = 33f;
-                    }};
-                    fragBullets = 7;
-                    fragLifeMax = 0.15f;
-                    fragLifeMin = 0.15f;
-                    despawnHit = true;
-                    collidesAir = false;
-                }};
+                y = 6f;
             }});
         }};
-
         // ===== schistocerca (T2, 双机枪+燃烧弹) =====
         // 提前定义: blue 单位通过 UnitSpawnAbility 引用 schistocerca, 必须在 blue 之前初始化
         schistocerca = new CopterUnitType("schistocerca") {{
@@ -4141,318 +4086,6 @@ public class Z_Units {
                 }});
             }
         }};
-
-        // ===== blue (蓝鲸级旗舰, PU_V8 原版) =====
-        // 主炮 + 导弹井 + 点防 + 电磁炮, 海军旗舰
-        // 注意: v158 无 rotateShooting/trailX/trailY/trailScl 字段, 已删除
-        // 注意: schistocerca 已移植 (作为简化的直升机单位, CopterUnitType)
-        blue = new UnitType("blue") {{
-            health = 42500f;
-            speed = 0.4f;
-            drag = 0.18f;
-            hitSize = 80f;
-            armor = 18f;
-            accel = 0.19f;
-            rotateSpeed = 0.78f;
-            constructor = mindustry.gen.UnitWaterMove::create;
-
-            trailLength = 70;
-
-            // 召唤 schistocerca (T2 直升机, 已移植)
-            float spawnTime = 15f * 60f;
-            abilities.add(new UnitSpawnAbility(schistocerca, spawnTime, 24.75f, -29.5f),
-                          new UnitSpawnAbility(schistocerca, spawnTime, -24.75f, -29.5f));
-
-            // 武器1: 前置主炮 (LimitedAngleWeapon, 5连发, 覆盖在 body 下)
-            // PU132: bottomWeapons.add(this) -> v158: top = false
-            // bullet = Bullets.standardThoriumBig (v132: BasicBulletType(8f, 80), 自建)
-            weapons.addAll(new LimitedAngleWeapon(name + "-front-cannon") {{
-                top = false;
-                x = 22.25f;
-                y = 30.25f;
-                shootY = 9.5f;
-                recoil = 5f;
-                shoot.shots = 5;
-                shoot.shotDelay = 3f;
-                inaccuracy = 5f;
-                shootCone = 15f;
-                rotate = true;
-                shootSound = Sounds.shootArtillery;
-                reload = 25f;
-
-                bullet = new BasicBulletType(8f, 80f) {{
-                    hitSize = 5f;
-                    width = 16f;
-                    height = 23f;
-                    shootEffect = Fx.shootBig;
-                    pierceCap = 2;
-                    pierceBuilding = true;
-                    knockback = 0.7f;
-                }};
-            }}, new LimitedAngleWeapon(name + "-front-cannon") {{
-                // 镜像 (mirror=true 默认会自动生成, 但 weapons.addAll 需显式提供两侧)
-                // 实际 v158 mirror=true 默认会创建镜像, 这里只定义一侧
-                // 但 PU132 用 addAll 显式列出, 我们保留一侧让 mirror=true 自动镜像
-                x = -22.25f;
-                y = 30.25f;
-                shootY = 9.5f;
-                recoil = 5f;
-                shoot.shots = 5;
-                shoot.shotDelay = 3f;
-                inaccuracy = 5f;
-                shootCone = 15f;
-                rotate = true;
-                shootSound = Sounds.shootArtillery;
-                reload = 25f;
-                flipSprite = true;
-                bullet = new BasicBulletType(8f, 80f) {{
-                    hitSize = 5f;
-                    width = 16f;
-                    height = 23f;
-                    shootEffect = Fx.shootBig;
-                    pierceCap = 2;
-                    pierceBuilding = true;
-                    knockback = 0.7f;
-                }};
-            }});
-
-            // 武器2: 侧边导弹井 (GuidedMissileWeapon, 12连发, 固定角度指向侧面)
-            // GuidedMissileWeapon = LimitedAngleWeapon + handleBullet 覆写 (设置 b.data = mount)
-            // defaultAngle = angleOffset = 90f (侧向), angleCone = 0 (固定不旋转)
-            weapons.addAll(new GuidedMissileWeapon(name + "-side-silo") {{
-                top = false;
-                x = 29.75f;
-                y = -13f;
-                shootY = 7f;
-                xRand = 9f;
-                defaultAngle = 90f;
-                angleOffset = 90f;
-                angleCone = 0f;       // 固定角度 (导弹井)
-                shootCone = 125f;
-                alternate = false;
-                rotate = true;
-                reload = 50f;
-                shoot.shots = 12;
-                shoot.shotDelay = 3f;
-                inaccuracy = 5f;
-                shootSound = Sounds.shootMissile;
-
-                bullet = new GuidedMissileBulletType(3f, 20f) {{
-                    homingPower = 0.09f;
-                    width = 8f;
-                    height = 8f;
-                    shrinkX = 0f;
-                    shrinkY = 0f;
-                    drag = -0.003f;
-                    keepVelocity = false;
-                    splashDamageRadius = 40f;
-                    splashDamage = 45f;
-                    lifetime = 65f;
-                    trailColor = Pal.missileYellowBack;
-                    hitEffect = Fx.blastExplosion;
-                    despawnEffect = Fx.blastExplosion;
-                }};
-            }}, new GuidedMissileWeapon(name + "-side-silo") {{
-                top = false;
-                x = -29.75f;
-                y = -13f;
-                shootY = 7f;
-                xRand = 9f;
-                defaultAngle = -90f;
-                angleOffset = -90f;
-                angleCone = 0f;
-                shootCone = 125f;
-                alternate = false;
-                rotate = true;
-                reload = 50f;
-                shoot.shots = 12;
-                shoot.shotDelay = 3f;
-                inaccuracy = 5f;
-                shootSound = Sounds.shootMissile;
-                flipSprite = true;
-                bullet = new GuidedMissileBulletType(3f, 20f) {{
-                    homingPower = 0.09f;
-                    width = 8f;
-                    height = 8f;
-                    shrinkX = 0f;
-                    shrinkY = 0f;
-                    drag = -0.003f;
-                    keepVelocity = false;
-                    splashDamageRadius = 40f;
-                    splashDamage = 45f;
-                    lifetime = 65f;
-                    trailColor = Pal.missileYellowBack;
-                    hitEffect = Fx.blastExplosion;
-                    despawnEffect = Fx.blastExplosion;
-                }};
-            }});
-
-            // 武器3: 共享 fin 发射器 (LimitedAngleWeapon, basicMissile)
-            // bullet = UnityBullets.basicMissile (PU132: MissileBulletType(4.2f, 15), 自建)
-            weapons.add(new LimitedAngleWeapon(fin.name + "-launcher") {{
-                x = 0f;
-                y = 21f;
-                shootY = 8f;
-                rotate = true;
-                mirror = false;
-                inaccuracy = 15f;
-                reload = 7f;
-                xRand = 2.25f;
-                shootSound = Sounds.shootMissile;
-                angleCone = 135f;
-                bullet = new MissileBulletType(4.2f, 15f) {{
-                    homingPower = 0.12f;
-                    width = 8f;
-                    height = 8f;
-                    shrinkX = 0f;
-                    shrinkY = 0f;
-                    drag = -0.003f;
-                    homingRange = 80f;
-                    keepVelocity = false;
-                    splashDamageRadius = 35f;
-                    splashDamage = 30f;
-                    lifetime = 62f;
-                    trailColor = Pal.missileYellowBack;
-                    hitEffect = Fx.blastExplosion;
-                    despawnEffect = Fx.blastExplosion;
-                    weaveScale = 8f;
-                    weaveMag = 2f;
-                }};
-            }});
-
-            // 武器4: 点防多管武器 (PointDefenceMultiBarrelWeapon, 反导, 自动目标)
-            weapons.add(new PointDefenceMultiBarrelWeapon(name + "-flak-turret") {{
-                x = 26.5f;
-                y = 15f;
-                shootY = 15.75f;
-                barrels = 2;
-                barrelOffset = 5.25f;
-                barrelSpacing = 6.5f;
-                barrelRecoil = 4f;
-                rotate = true;
-                mirrorBarrels = true;
-                alternate = false;
-                reload = 6f;
-                recoil = 0.5f;
-                shootCone = 7f;
-                shadow = 30f;
-                targetInterval = 20f;
-                autoTarget = true;
-                controllable = false;
-                bullet = new AntiBulletFlakBulletType(8f, 6f) {{
-                    lifetime = 45f;
-                    splashDamage = 12f;
-                    splashDamageRadius = 60f;
-                    bulletRadius = 60f;
-                    bulletDamage = 18f;
-                    width = 8f;
-                    height = 12f;
-                    collidesGround = false;
-                    status = mindustry.content.StatusEffects.blasted;
-                    statusDuration = 60f;
-                }};
-            }});
-
-            // 武器5: 磁轨炮 (SlowRailBulletType, 穿透, frag=standardDense 自建)
-            // PU132: backColor = trailColor = Pal.bulletYellowBack, frontColor = Pal.bulletYellow
-            // fragCone = 20f -> v158: fragRandomSpread = 20f
-            // scaleVelocity = true -> 删除 (v158 无此字段)
-            // trailEffect = TrailFx.coloredArrowTrail -> 用 Fx.smoke 替代 (默认)
-            weapons.add(new Weapon(name + "-railgun") {{
-                x = 0f;
-                y = 0f;
-                shootY = 38.5f;
-                mirror = false;
-                rotate = true;
-                rotateSpeed = 0.7f;
-                shadow = 46f;
-                reload = 60f * 2.5f;
-                shootSound = Sounds.shootForeshadow;
-
-                bullet = new SlowRailBulletType(70f, 2100f) {{
-                    lifetime = 10f;
-                    width = 20f;
-                    height = 38f;
-                    splashDamage = 50f;
-                    splashDamageRadius = 30f;
-                    pierceDamageFactor = 0.15f;
-                    pierceCap = -1;
-                    fragBullet = new BasicBulletType(3.5f, 18f) {{
-                        width = 9f;
-                        height = 12f;
-                        reloadMultiplier = 0.6f;
-                        ammoMultiplier = 4;
-                        lifetime = 60f;
-                    }};
-                    fragBullets = 2;
-                    fragRandomSpread = 20f;
-                    fragLifeMin = 0.4f;
-                    fragLifeMax = 0.7f;
-                    trailSpacing = 40f;
-                    backColor = Pal.bulletYellowBack;
-                    trailColor = Pal.bulletYellowBack;
-                    frontColor = Pal.bulletYellow;
-                    collisionWidth = 12f;
-                }};
-            }});
-        }};
-
-        // ═══════════════════════════════════════════════════════════
-        //  PU_V8 mantodea 直升机系列 (T1-T6, 简化为普通飞行单位, 无旋翼)
-        //  - 移除 Rotor 旋翼动画, CopterAI 等自定义组件
-        //  - 用 vanilla UnitEntity::create + FlyingAI
-        // ═══════════════════════════════════════════════════════════
-
-        // ===== caelifera (T1, 机枪+导弹) =====
-        caelifera = new CopterUnitType("caelifera") {{
-            speed = 5f;
-            drag = 0.08f;
-            accel = 0.04f;
-            health = 75f;
-            engineSize = 0f;
-            flying = true;
-            hitSize = 12f;
-            range = 140f;
-            outlineColor = Color.valueOf("2e3142");
-            constructor = CopterUnitEntity::create;
-
-            weapons.add(new Weapon("create-caelifera-gun") {{
-                top = false;
-                reload = 6f;
-                x = 5.25f;
-                y = 6.5f;
-                shootY = 1.5f;
-                mirror = true;
-                shootCone = 30f;
-                bullet = new mindustry.entities.bullet.BasicBulletType(5f, 7f) {{
-                    lifetime = 30f;
-                    shrinkY = 0.2f;
-                }};
-            }});
-
-            weapons.add(new Weapon("create-caelifera-launcher") {{
-                reload = 30f;
-                x = 4.5f;
-                y = 0.5f;
-                shootY = 2.25f;
-                mirror = true;
-                shootCone = 30f;
-                bullet = new mindustry.entities.bullet.MissileBulletType(3f, 2f) {{
-                    speed = 3f;
-                    lifetime = 45f;
-                    splashDamage = 40f;
-                    splashDamageRadius = 8f;
-                    drag = -0.01f;
-                }};
-            }});
-
-            rotors.add(new Rotor(name + "-rotor"){{
-                x = 0f;
-                y = 6f;
-            }});
-        }};
-
-        // ===== schistocerca (T2, 双机枪+燃烧弹) =====
         // ===== anthophila (T3, 机枪+闪电) =====
         anthophila = new CopterUnitType("anthophila") {{
             speed = 4f;
@@ -4790,6 +4423,376 @@ public class Z_Units {
                 speed = 29f;
                 shadeSpeed = 5f;
                 bladeFade = 0.8f;
+            }});
+        }};
+        }};
+
+        // ═══════════════════════════════════════════════════════════
+        //  PU_V8 海军系列 (fin, blue)
+        // ═══════════════════════════════════════════════════════════
+
+        // ===== fin (鳍级战列舰, PU_V8 原版) =====
+        fin = new UnitType("fin") {{
+            health = 36250f;
+            speed = 0.5f;
+            drag = 0.18f;
+            hitSize = 77.5f;
+            armor = 17f;
+            accel = 0.19f;
+            rotateSpeed = 0.86f;
+            constructor = mindustry.gen.UnitWaterMove::create;
+
+            trailLength = 70;
+
+            // 武器1,2: 追踪导弹发射器
+            weapons.add(new Weapon("create-fin-launcher") {{
+                x = 19f;
+                y = 14f;
+                shootY = 8f;
+                rotate = true;
+                inaccuracy = 15f;
+                reload = 7f;
+                xRand = 2.25f;
+                shootSound = Sounds.shootMissile;
+                bullet = new mindustry.entities.bullet.MissileBulletType(4.2f, 15f) {{
+                    homingPower = 0.12f;
+                    width = 8f;
+                    height = 8f;
+                    shrinkX = 0f;
+                    shrinkY = 0f;
+                    drag = -0.003f;
+                    homingRange = 80f;
+                    keepVelocity = false;
+                    splashDamageRadius = 35f;
+                    splashDamage = 30f;
+                    lifetime = 62f;
+                    trailColor = mindustry.graphics.Pal.missileYellowBack;
+                    hitEffect = mindustry.content.Fx.blastExplosion;
+                    despawnEffect = mindustry.content.Fx.blastExplosion;
+                    weaveScale = 8f;
+                    weaveMag = 2f;
+                }};
+            }}, new Weapon("create-fin-launcher") {{
+                x = 24.5f;
+                y = -39.25f;
+                shootY = 8f;
+                rotate = true;
+                inaccuracy = 15f;
+                reload = 7f;
+                xRand = 2.25f;
+                shootSound = Sounds.shootMissile;
+                bullet = new mindustry.entities.bullet.MissileBulletType(4.2f, 15f) {{
+                    homingPower = 0.12f;
+                    width = 8f;
+                    height = 8f;
+                    shrinkX = 0f;
+                    shrinkY = 0f;
+                    drag = -0.003f;
+                    homingRange = 80f;
+                    keepVelocity = false;
+                    splashDamageRadius = 35f;
+                    splashDamage = 30f;
+                    lifetime = 62f;
+                    trailColor = mindustry.graphics.Pal.missileYellowBack;
+                    hitEffect = mindustry.content.Fx.blastExplosion;
+                    despawnEffect = mindustry.content.Fx.blastExplosion;
+                    weaveScale = 8f;
+                    weaveMag = 2f;
+                }};
+            }});
+
+            // 武器3: 迫击炮 (MortarWeapon, 倾角动画)
+            weapons.add(new zzw.content.units.weapons.MortarWeapon("create-fin-mortar") {{
+                x = 0f;
+                y = -13.75f;
+                shootY = 39.5f;
+                mirror = false;
+                rotate = true;
+                rotateSpeed = 1f;
+                shoot.shots = 3;
+                inaccuracy = 3f;
+                velocityRnd = 0.1f;
+                reload = 60f * 2f;
+                recoil = 2f;
+                bullet = new zzw.content.units.bullets.MortarBulletType(7f, 4f) {{
+                    width = 22f;
+                    height = 22f;
+                    splashDamageRadius = 160f;
+                    splashDamage = 160f;
+                    trailWidth = 7f;
+                    trailColor = mindustry.graphics.Pal.bulletYellowBack;
+                    hitEffect = mindustry.content.Fx.massiveExplosion;
+                    lifetime = 65f;
+                    fragBullet = new mindustry.entities.bullet.ArtilleryBulletType(3f, 20f) {{
+                        hitEffect = mindustry.content.Fx.flakExplosion;
+                        knockback = 0.8f;
+                        lifetime = 80f;
+                        width = 11f;
+                        height = 11f;
+                        collidesTiles = false;
+                        splashDamageRadius = 25f * 0.75f;
+                        splashDamage = 33f;
+                    }};
+                    fragBullets = 7;
+                    fragLifeMax = 0.15f;
+                    fragLifeMin = 0.15f;
+                    despawnHit = true;
+                    collidesAir = false;
+                }};
+            }});
+        }};
+        // ===== blue (蓝鲸级旗舰, PU_V8 原版) =====
+        // 主炮 + 导弹井 + 点防 + 电磁炮, 海军旗舰
+        // 注意: v158 无 rotateShooting/trailX/trailY/trailScl 字段, 已删除
+        // 注意: schistocerca 已移植 (作为简化的直升机单位, CopterUnitType)
+        blue = new UnitType("blue") {{
+            health = 42500f;
+            speed = 0.4f;
+            drag = 0.18f;
+            hitSize = 80f;
+            armor = 18f;
+            accel = 0.19f;
+            rotateSpeed = 0.78f;
+            constructor = mindustry.gen.UnitWaterMove::create;
+
+            trailLength = 70;
+
+            // 召唤 schistocerca (T2 直升机, 已移植)
+            float spawnTime = 15f * 60f;
+            abilities.add(new UnitSpawnAbility(schistocerca, spawnTime, 24.75f, -29.5f),
+                          new UnitSpawnAbility(schistocerca, spawnTime, -24.75f, -29.5f));
+
+            // 武器1: 前置主炮 (LimitedAngleWeapon, 5连发, 覆盖在 body 下)
+            // PU132: bottomWeapons.add(this) -> v158: top = false
+            // bullet = Bullets.standardThoriumBig (v132: BasicBulletType(8f, 80), 自建)
+            weapons.addAll(new LimitedAngleWeapon(name + "-front-cannon") {{
+                top = false;
+                x = 22.25f;
+                y = 30.25f;
+                shootY = 9.5f;
+                recoil = 5f;
+                shoot.shots = 5;
+                shoot.shotDelay = 3f;
+                inaccuracy = 5f;
+                shootCone = 15f;
+                rotate = true;
+                shootSound = Sounds.shootArtillery;
+                reload = 25f;
+
+                bullet = new BasicBulletType(8f, 80f) {{
+                    hitSize = 5f;
+                    width = 16f;
+                    height = 23f;
+                    shootEffect = Fx.shootBig;
+                    pierceCap = 2;
+                    pierceBuilding = true;
+                    knockback = 0.7f;
+                }};
+            }}, new LimitedAngleWeapon(name + "-front-cannon") {{
+                // 镜像 (mirror=true 默认会自动生成, 但 weapons.addAll 需显式提供两侧)
+                // 实际 v158 mirror=true 默认会创建镜像, 这里只定义一侧
+                // 但 PU132 用 addAll 显式列出, 我们保留一侧让 mirror=true 自动镜像
+                x = -22.25f;
+                y = 30.25f;
+                shootY = 9.5f;
+                recoil = 5f;
+                shoot.shots = 5;
+                shoot.shotDelay = 3f;
+                inaccuracy = 5f;
+                shootCone = 15f;
+                rotate = true;
+                shootSound = Sounds.shootArtillery;
+                reload = 25f;
+                flipSprite = true;
+                bullet = new BasicBulletType(8f, 80f) {{
+                    hitSize = 5f;
+                    width = 16f;
+                    height = 23f;
+                    shootEffect = Fx.shootBig;
+                    pierceCap = 2;
+                    pierceBuilding = true;
+                    knockback = 0.7f;
+                }};
+            }});
+
+            // 武器2: 侧边导弹井 (GuidedMissileWeapon, 12连发, 固定角度指向侧面)
+            // GuidedMissileWeapon = LimitedAngleWeapon + handleBullet 覆写 (设置 b.data = mount)
+            // defaultAngle = angleOffset = 90f (侧向), angleCone = 0 (固定不旋转)
+            weapons.addAll(new GuidedMissileWeapon(name + "-side-silo") {{
+                top = false;
+                x = 29.75f;
+                y = -13f;
+                shootY = 7f;
+                xRand = 9f;
+                defaultAngle = 90f;
+                angleOffset = 90f;
+                angleCone = 0f;       // 固定角度 (导弹井)
+                shootCone = 125f;
+                alternate = false;
+                rotate = true;
+                reload = 50f;
+                shoot.shots = 12;
+                shoot.shotDelay = 3f;
+                inaccuracy = 5f;
+                shootSound = Sounds.shootMissile;
+
+                bullet = new GuidedMissileBulletType(3f, 20f) {{
+                    homingPower = 0.09f;
+                    width = 8f;
+                    height = 8f;
+                    shrinkX = 0f;
+                    shrinkY = 0f;
+                    drag = -0.003f;
+                    keepVelocity = false;
+                    splashDamageRadius = 40f;
+                    splashDamage = 45f;
+                    lifetime = 65f;
+                    trailColor = Pal.missileYellowBack;
+                    hitEffect = Fx.blastExplosion;
+                    despawnEffect = Fx.blastExplosion;
+                }};
+            }}, new GuidedMissileWeapon(name + "-side-silo") {{
+                top = false;
+                x = -29.75f;
+                y = -13f;
+                shootY = 7f;
+                xRand = 9f;
+                defaultAngle = -90f;
+                angleOffset = -90f;
+                angleCone = 0f;
+                shootCone = 125f;
+                alternate = false;
+                rotate = true;
+                reload = 50f;
+                shoot.shots = 12;
+                shoot.shotDelay = 3f;
+                inaccuracy = 5f;
+                shootSound = Sounds.shootMissile;
+                flipSprite = true;
+                bullet = new GuidedMissileBulletType(3f, 20f) {{
+                    homingPower = 0.09f;
+                    width = 8f;
+                    height = 8f;
+                    shrinkX = 0f;
+                    shrinkY = 0f;
+                    drag = -0.003f;
+                    keepVelocity = false;
+                    splashDamageRadius = 40f;
+                    splashDamage = 45f;
+                    lifetime = 65f;
+                    trailColor = Pal.missileYellowBack;
+                    hitEffect = Fx.blastExplosion;
+                    despawnEffect = Fx.blastExplosion;
+                }};
+            }});
+
+            // 武器3: 共享 fin 发射器 (LimitedAngleWeapon, basicMissile)
+            // bullet = UnityBullets.basicMissile (PU132: MissileBulletType(4.2f, 15), 自建)
+            weapons.add(new LimitedAngleWeapon(fin.name + "-launcher") {{
+                x = 0f;
+                y = 21f;
+                shootY = 8f;
+                rotate = true;
+                mirror = false;
+                inaccuracy = 15f;
+                reload = 7f;
+                xRand = 2.25f;
+                shootSound = Sounds.shootMissile;
+                angleCone = 135f;
+                bullet = new MissileBulletType(4.2f, 15f) {{
+                    homingPower = 0.12f;
+                    width = 8f;
+                    height = 8f;
+                    shrinkX = 0f;
+                    shrinkY = 0f;
+                    drag = -0.003f;
+                    homingRange = 80f;
+                    keepVelocity = false;
+                    splashDamageRadius = 35f;
+                    splashDamage = 30f;
+                    lifetime = 62f;
+                    trailColor = Pal.missileYellowBack;
+                    hitEffect = Fx.blastExplosion;
+                    despawnEffect = Fx.blastExplosion;
+                    weaveScale = 8f;
+                    weaveMag = 2f;
+                }};
+            }});
+
+            // 武器4: 点防多管武器 (PointDefenceMultiBarrelWeapon, 反导, 自动目标)
+            weapons.add(new PointDefenceMultiBarrelWeapon(name + "-flak-turret") {{
+                x = 26.5f;
+                y = 15f;
+                shootY = 15.75f;
+                barrels = 2;
+                barrelOffset = 5.25f;
+                barrelSpacing = 6.5f;
+                barrelRecoil = 4f;
+                rotate = true;
+                mirrorBarrels = true;
+                alternate = false;
+                reload = 6f;
+                recoil = 0.5f;
+                shootCone = 7f;
+                shadow = 30f;
+                targetInterval = 20f;
+                autoTarget = true;
+                controllable = false;
+                bullet = new AntiBulletFlakBulletType(8f, 6f) {{
+                    lifetime = 45f;
+                    splashDamage = 12f;
+                    splashDamageRadius = 60f;
+                    bulletRadius = 60f;
+                    bulletDamage = 18f;
+                    width = 8f;
+                    height = 12f;
+                    collidesGround = false;
+                    status = mindustry.content.StatusEffects.blasted;
+                    statusDuration = 60f;
+                }};
+            }});
+
+            // 武器5: 磁轨炮 (SlowRailBulletType, 穿透, frag=standardDense 自建)
+            // PU132: backColor = trailColor = Pal.bulletYellowBack, frontColor = Pal.bulletYellow
+            // fragCone = 20f -> v158: fragRandomSpread = 20f
+            // scaleVelocity = true -> 删除 (v158 无此字段)
+            // trailEffect = TrailFx.coloredArrowTrail -> 用 Fx.smoke 替代 (默认)
+            weapons.add(new Weapon(name + "-railgun") {{
+                x = 0f;
+                y = 0f;
+                shootY = 38.5f;
+                mirror = false;
+                rotate = true;
+                rotateSpeed = 0.7f;
+                shadow = 46f;
+                reload = 60f * 2.5f;
+                shootSound = Sounds.shootForeshadow;
+
+                bullet = new SlowRailBulletType(70f, 2100f) {{
+                    lifetime = 10f;
+                    width = 20f;
+                    height = 38f;
+                    splashDamage = 50f;
+                    splashDamageRadius = 30f;
+                    pierceDamageFactor = 0.15f;
+                    pierceCap = -1;
+                    fragBullet = new BasicBulletType(3.5f, 18f) {{
+                        width = 9f;
+                        height = 12f;
+                        reloadMultiplier = 0.6f;
+                        ammoMultiplier = 4;
+                        lifetime = 60f;
+                    }};
+                    fragBullets = 2;
+                    fragRandomSpread = 20f;
+                    fragLifeMin = 0.4f;
+                    fragLifeMax = 0.7f;
+                    trailSpacing = 40f;
+                    backColor = Pal.bulletYellowBack;
+                    trailColor = Pal.bulletYellowBack;
+                    frontColor = Pal.bulletYellow;
+                    collisionWidth = 12f;
+                }};
             }});
         }};
 
