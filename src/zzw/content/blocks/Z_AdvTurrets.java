@@ -475,12 +475,22 @@ public class Z_AdvTurrets {
             reload = 240f;
             consumePower(260f);
             consumeCoolant(0.01f);
-            coolantMultiplier = 1.1f;
+            // ★ 冷却强化改为固定百分比 (原版公式因水/冷冻液热容不同会显示成奇怪的数值):
+            //   水 110%, 冷冻液 120%
+            coolantMultiplier = 1f;
+            coolantBoost.put(mindustry.content.Liquids.water, 0.10f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.20f);
+
+            // ★ 开火蓄力特效: 给蓄力留出前摇, 播放 Lancer 同款充能光环
+            shoot.firstShotDelay = 60f;
+            moveWhileCharging = false;
+            chargeSound = Sounds.chargeLancer;
             shootSound = Sounds.shootLancer;  // ★ v155.4 替代 UnitySounds.cubeBlast (无 shootBig)
             shootType = new PointBlastLaserBulletType(900f) {{
                 length = 320f;
                 lifetime = 17f;
                 pierce = true;
+                chargeEffect = new mindustry.entities.effect.MultiEffect(Fx.lancerLaserCharge, Fx.lancerLaserChargeBegin);
                 width = 32f;  // 激光加粗 (原12f → 32f)
                 auraDamage = 8000f;
                 damageRadius = 120f;

@@ -21,6 +21,10 @@ public class MortarBulletType extends BasicBulletType {
         super(speed, damage, "shell");
         collides = false;
         collidesTiles = false;
+        // PU132: scaleVelocity = true → v159 改名为 scaleLife
+        // 作用: 子弹寿命按"炮口到瞄准点距离 / 射程"缩放, 保证落点在瞄准点
+        // 同时也是 MortarWeapon.handleBullet 里 fdata = 1f - lifeScl 的取值依据
+        scaleLife = true;
         shrinkX = 0f;
         shrinkY = 0f;
         trailLength = 15;

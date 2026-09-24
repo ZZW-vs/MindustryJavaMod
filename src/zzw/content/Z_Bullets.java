@@ -553,8 +553,8 @@ public class Z_Bullets {
 
         public EphemeronPairBulletType(float damage) {
             super(0.001f, damage);
-            // ★ 分裂放射小球存在时间: 360f → 720f → 1500f (用户要求再久一点)
-            lifetime = 1500f;
+            // ★ 分裂放射小球存在时间: 360f → 720f → 1500f → 3000f (用户要求再久一点)
+            lifetime = 3000f;
             hitEffect = Fx.hitLancer;
             despawnEffect = Fx.none;
             hitSize = 8f;

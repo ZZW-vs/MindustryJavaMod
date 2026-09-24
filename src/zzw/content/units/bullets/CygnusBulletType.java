@@ -58,18 +58,12 @@ public class CygnusBulletType extends EmpBulletType {
             Drawf.tri(b.x + Angles.trnsx(r, size - 2f), b.y + Angles.trnsy(r, size - 2f),
                     size, (size * 1.5f) + Mathf.sin(Time.time, 15f, size / 2f), r);
         }
-        // 简化版旋转光环 (替代 UnityDrawf.shiningCircle)
+        // ★ 按 PU132 原版还原: 两层 shiningCircle 光环 (外层 backColor 7 尖刺 + 内层白色 7 尖刺)
+        //   之前用 Fill.circle 手搓的"圆点环"与原来的尖刺光环差别很大, 所以看起来奇怪
+        zzw.content.units.effects.UnityDrawf.shiningCircle(
+                b.id, Time.time, b.x, b.y, size, 7, 30f, 17f, 12f, 180f);
         Draw.color(Color.white);
-        for (int i = 0; i < 7; i++) {
-            float ang = (Time.time * 30f + i * (360f / 7f)) % 360f;
-            float r = size + Mathf.sin(Time.time + i, 17f, 4f);
-            Fill.circle(b.x + Angles.trnsx(ang, r), b.y + Angles.trnsy(ang, r), 1.5f);
-        }
-        Draw.color(Color.white);
-        for (int i = 0; i < 7; i++) {
-            float ang = (Time.time * 23f + i * (360f / 7f) + 180f) % 360f;
-            float r = size * 0.65f + Mathf.sin(Time.time + i, 11f, 3f);
-            Fill.circle(b.x + Angles.trnsx(ang, r), b.y + Angles.trnsy(ang, r), 1f);
-        }
+        zzw.content.units.effects.UnityDrawf.shiningCircle(
+                b.id, Time.time, b.x, b.y, size * 0.65f, 7, 30f, 23f, 11f, 180f);
     }
 }

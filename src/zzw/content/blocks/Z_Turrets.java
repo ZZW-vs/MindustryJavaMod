@@ -1,9 +1,11 @@
 package zzw.content.blocks;
 
 import arc.graphics.Color;
+import arc.math.Angles;
 import arc.math.Mathf;
 import mindustry.content.Fx;
 import mindustry.content.Items;
+import mindustry.entities.Effect;
 import mindustry.entities.bullet.BasicBulletType;
 import mindustry.entities.bullet.BulletType;
 import mindustry.entities.bullet.FlakBulletType;
@@ -506,6 +508,7 @@ public class Z_Turrets {
                 length = 560f;
                 // PU132: strokes ×2.2 + spaceMag=70 (TODO: v158 原生类无 strokes/spaceMag 字段)
                 lightStroke = 90f;
+                width = 12f;  // ★ 激光加粗 (v158 默认 9f): 光束粗细 = width × baseStroke
                 fromBlockChance = 0.5f;
                 fromBlockDamage = 76f;
                 fromLaserChance = 0.8f;
@@ -960,7 +963,7 @@ public class Z_Turrets {
             requirements(Category.turret, ItemStack.with(Items.silicon, 290, Z_Items.luminum, 430, Items.titanium, 190, Items.thorium, 120, Z_Items.lightAlloy, 25));
             size = 8;
             health = 9800;
-            range = 320f;
+            range = 260f;   // ★ 用户要求缩短射程 (原 320f)
             reload = 70f;
             coolantMultiplier = 1.9f;
             consumePower(26f);
@@ -972,6 +975,27 @@ public class Z_Turrets {
             // v158 无 chargeTime/chargeBeginEffect 字段, 用 shoot.firstShotDelay 替代充能时间
             shoot.firstShotDelay = 80f;
             //chargeSound = Sounds.shootLancer;
+
+            // ★ 自定义建造实体: 让充能光球跟随炮塔转动
+            //   原版 TurretBuild.shoot() 生成 chargeEffect 时调用 at(x, y, rotation) (不带 data),
+            //   特效因此得不到父实体, 充能期间炮塔转动但光球留在原地。
+            //   这里临时把 chargeEffect 置为 Fx.none 屏蔽父类的生成, 再由本方法带 this(炮塔) 重新生成。
+            buildType = () -> new PowerTurretBuild(){
+                @Override
+                protected void shoot(BulletType type){
+                    Effect charge = type.chargeEffect;
+                    type.chargeEffect = Fx.none;
+                    super.shoot(type);
+                    type.chargeEffect = charge;
+
+                    if(charge != null && charge != Fx.none && shoot.firstShotDelay > 0f){
+                        charge.at(
+                            x + Angles.trnsx(rotation - 90f, shootX, shootY),
+                            y + Angles.trnsy(rotation - 90f, shootX, shootY),
+                            rotation, this);
+                    }
+                }
+            };
 
             shootType = new EphemeronBulletType(7.7f, 210f) {{
                 lifetime = 150f;

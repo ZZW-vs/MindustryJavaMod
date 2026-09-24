@@ -560,6 +560,7 @@ public class Z_ScarUnits {
             drag = 0.019f;
             accel = 0.028f;
             hitSize = 8f;
+            armor = 1f;  // ★ 按用户设定 (原缺失)
             engineOffset = 8f;
 
             weapons.add(new BlankWeapon() {{
@@ -618,6 +619,7 @@ public class Z_ScarUnits {
             drag = 0.019f;
             accel = 0.028f;
             hitSize = 11f;
+            armor = 2f;  // ★ 按用户设定 (原缺失)
             engineOffset = 11f;
 
             weapons.add(new BlankWeapon() {{
@@ -678,6 +680,7 @@ public class Z_ScarUnits {
             drag = 0.019f;
             accel = 0.028f;
             hitSize = 11f;
+            armor = 3f;  // ★ 按用户设定 (原缺失)
             engineOffset = 14f;
 
             weapons.add(new BlankWeapon() {{

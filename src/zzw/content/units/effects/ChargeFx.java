@@ -359,13 +359,18 @@ public class ChargeFx{
     /**
      * Ephmeron 充能 (80f): 双层 (lancerLaser + white) 闪光圆环,
      * 尖刺高度 3f/2.5f×fin 渐长。
+     *
+     * <p>★ 必须设置 {@code followParent(true).rotWithParent(true)}:
+     * 炮塔在充能期间仍会朝目标旋转, 若不跟随父实体, 光球会滞留在生成点原地不动。
+     * 跟随依赖 {@code at(x, y, rotation, data)} 传入炮塔建筑作为 data
+     * (见 Z_Turrets 中 ephemeron 的 buildType 覆写), 由 v159 的 ChildComp 按父实体旋转重投影位置。</p>
      */
     ephmeronCharge = new Effect(80f, e -> {
         color(Pal.lancerLaser);
         UnityDrawf.shiningCircle(e.id, Time.time, e.x, e.y, e.fin() * 9.5f, 6, 25f, 20f, 3f * e.fin());
         color(Color.white);
         UnityDrawf.shiningCircle(e.id, Time.time, e.x, e.y, e.fin() * 7.5f, 6, 25f, 20f, 2.5f * e.fin());
-    }),
+    }).followParent(true).rotWithParent(true),
 
     /**
      * Tendence 充能 (40f) —— 带内部状态的特效。

@@ -24,8 +24,8 @@ public class SlowRailBulletType extends BasicBulletType {
         super(speed, damage);
         collides = collidesTiles = reflectable = false;
         pierce = pierceBuilding = true;
-        // 用 vanilla 默认 trail, 后续可被外部覆盖
-        trailEffect = mindustry.content.Fx.smoke;
+        // PU_V8 原版: trailEffect = TrailFx.coloredRailgunTrail
+        trailEffect = zzw.content.units.effects.TrailFx.coloredRailgunTrail;
     }
 
     @Override

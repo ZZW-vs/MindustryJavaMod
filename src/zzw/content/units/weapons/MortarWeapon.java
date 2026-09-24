@@ -9,6 +9,7 @@ import arc.math.Mathf;
 import arc.util.Tmp;
 import mindustry.entities.Mover;
 import mindustry.entities.units.WeaponMount;
+import mindustry.gen.Bullet;
 import mindustry.gen.Unit;
 import mindustry.type.Weapon;
 
@@ -126,6 +127,28 @@ public class MortarWeapon extends Weapon {
         this.shootY = this.shootY - incline + barrelOffset;
         super.bullet(unit, mount, xOffset, yOffset, angleOffset, mover);
         this.shootY = originalShootY;
+    }
+
+    /**
+     * 覆写 handleBullet (移植自 PU132 MortarWeapon.bullet 的 fdata 赋值)
+     * <p>
+     * PU132 在 {@code bullet(...)} 里写了 {@code b.fdata = 1f - lifescl;}，
+     * lifescl 是按"炮口到瞄准点的距离 / 子弹射程"算出的生命倍率。
+     * <p>
+     * MortarBulletType.draw() 里用 fdata 控制抛物线视觉膨胀幅度：
+     * fdata = 0 (满射程) → f = lerp(0,1,0.125) = 0.125，正常抛物线；
+     * fdata 越大 (近距离射击) → 膨胀幅度越大，模拟高倾角近距吊射。
+     * <p>
+     * 若不设置 fdata (默认 0)，任何距离下 f 恒为 0.125，炮弹视觉就"怪"了。
+     */
+    @Override
+    protected void handleBullet(Unit unit, WeaponMount mount, Bullet bullet){
+        super.handleBullet(unit, mount, bullet);
+        // 注意: 参数名为 bullet，会遮蔽字段 this.bullet，故必须显式写 this.bullet
+        float lifeScl = this.bullet.scaleLife
+            ? Mathf.clamp(Mathf.dst(bullet.x, bullet.y, mount.aimX, mount.aimY) / this.bullet.range)
+            : 1f;
+        bullet.fdata = 1f - lifeScl;
     }
 
     /** 迫击炮武器挂载点 (含倾角动画状态) */

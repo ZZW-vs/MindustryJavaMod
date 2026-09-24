@@ -1,5 +1,6 @@
 package zzw.content.blocks.turrets;
 
+import arc.Core;
 import arc.func.Cons;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
@@ -8,14 +9,19 @@ import arc.graphics.g2d.Lines;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
 import arc.math.geom.Vec3;
+import arc.struct.ObjectFloatMap;
 import arc.struct.Seq;
+import arc.util.Strings;
 import arc.util.Time;
 import mindustry.entities.Units;
 import mindustry.gen.Teamc;
 import mindustry.gen.Unit;
+import mindustry.type.Liquid;
+import mindustry.ui.Styles;
 import mindustry.world.blocks.defense.turrets.PowerTurret;
 import mindustry.world.draw.DrawTurret;
 import mindustry.world.meta.Stat;
+import mindustry.world.meta.StatUnit;
 import zzw.util.WavefrontObject;
 
 /**
@@ -52,6 +58,17 @@ public class ObjPowerTurret extends PowerTurret {
     public float beamWidth = 5f;       // 光束宽度
     public Color beamColor = Color.valueOf("4a7a9e");  // 光束颜色 - 暗蓝色
 
+    /**
+     * 自定义冷却强化表: 液体 → 额外装填速度比例 (0.1 表示 +10%)。
+     *
+     * <p>原版公式为 {@code 1 + 消耗量 × coolantMultiplier × 液体热容},
+     * 由于水和冷冻液热容量不同 (0.4 / 0.9), 同一个 multiplier 会算出两个"奇怪"的百分比。
+     * 在表里直接给目标百分比即可, 同时覆盖实际冷却效果与详情面板显示。</p>
+     *
+     * <p>表为空时走原版逻辑。</p>
+     */
+    public ObjectFloatMap<Liquid> coolantBoost = new ObjectFloatMap<>();
+
     @Override
     public void load() {
         super.load();
@@ -64,6 +81,32 @@ public class ObjPowerTurret extends PowerTurret {
     @Override
     public void setStats() {
         super.setStats();
+
+        // 自定义冷却强化显示: 直接展示固定百分比 (110% / 120% ...)
+        if (coolant != null && !coolantBoost.isEmpty()) {
+            stats.replace(Stat.booster, table -> {
+                table.row();
+                table.table(c -> {
+                    for (Liquid liquid : mindustry.Vars.content.liquids()) {
+                        float boost = coolantBoost.get(liquid, -1f);
+                        if (boost < 0f) continue;
+
+                        c.table(Styles.grayPanel, b -> {
+                            b.image(liquid.uiIcon).size(40).pad(10f).left();
+                            b.table(info -> {
+                                info.add(liquid.localizedName).left().row();
+                                info.add(Strings.autoFixed(coolant.amount * 60f, 2) + StatUnit.perSecond.localized())
+                                        .left().color(Color.lightGray);
+                            });
+                            b.add(Core.bundle.format("bullet.reload", Strings.autoFixed((1f + boost) * 100f, 2)))
+                                    .pad(10f).right().grow().padRight(15f);
+                        }).growX().pad(5).row();
+                    }
+                }).growX().colspan(table.getColumns());
+                table.row();
+            });
+        }
+
         // 光束攻击面板信息
         stats.add(Stat.abilities, "[accent]持续光束攻击[]");
         stats.add(Stat.abilities, "[lightgray]光束上限: [accent]" + maxBeams + " 条");
@@ -88,6 +131,32 @@ public class ObjPowerTurret extends PowerTurret {
             // 受击时额外抖动
             float hitShake = distortionTime * 0.15f;
             return baseShake + chargeShake + hitShake;
+        }
+
+        /**
+         * 覆写冷却推进: 使用 {@link ObjPowerTurret#coolantBoost} 里的固定百分比。
+         *
+         * <p>原版实现是 {@code reloadCounter += 消耗量 × 热容 × coolantMultiplier},
+         * 换成 {@code edelta() × boost} 后, 装填速度正好是 {@code 1 + boost}
+         * (edelta 已经包含基础每帧推进量), 例如 boost=0.1 → 110%。</p>
+         */
+        @Override
+        protected void updateCooling() {
+            if (coolantBoost.isEmpty()) {
+                super.updateCooling();
+                return;
+            }
+
+            if (coolant == null || coolant.efficiency(this) <= 0f || efficiency <= 0f) return;
+
+            float boost = coolantBoost.get(liquids.current(), 0f);
+            float amount = coolant.amount * coolant.efficiency(this);
+            coolant.update(this);
+            reloadCounter += edelta() * boost;
+
+            if (Mathf.chance(0.06 * amount)) {
+                coolEffect.at(x + Mathf.range(size * mindustry.Vars.tilesize / 2f), y + Mathf.range(size * mindustry.Vars.tilesize / 2f));
+            }
         }
 
         @Override

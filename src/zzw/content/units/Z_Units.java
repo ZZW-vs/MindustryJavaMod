@@ -2809,7 +2809,7 @@ public class Z_Units {
         // ===== citadel (T6 Mech, 磁轨炮+火焰喷射) =====
         citadel = new UnitType("citadel") {{
             health = 60000f;
-            armor = 16f;
+            armor = 20f;  // ★ 按用户设定: 16f → 20f
             speed = 0.3f;
             hitSize = 49f;
             rotateSpeed = 1.5f;
@@ -2830,14 +2830,15 @@ public class Z_Units {
                 x = 31.5f;
                 y = -6.25f;
                 shootY = 30.25f;
-                reload = 90f;
+                reload = 60f;   // ★ 射速加快 (原 90f)
                 recoil = 7f;
                 shake = 3f;
                 ejectEffect = mindustry.content.Fx.casing4;
                 shootSound = mindustry.gen.Sounds.shootForeshadow;
 
-                bullet = new SlowRailBulletType(25f, 250f) {{
-                    lifetime = 13f;
+                // ★ 子弹速度翻倍 (25f → 50f), 同时把寿命减半以保持原有射程
+                bullet = new SlowRailBulletType(50f, 250f) {{
+                    lifetime = 7f;
                     trailSpacing = 25f;
                     splashDamage = 95f;
                     splashDamageRadius = 50f;
@@ -2856,7 +2857,7 @@ public class Z_Units {
                 x = 17.75f;
                 y = 11.25f;
                 shootY = 5.5f;
-                reload = 5f;
+                reload = 4f;    // ★ 射速加快 (原 5f)
                 recoil = 0.5f;
                 shootSound = mindustry.gen.Sounds.shootFlame;
                 angleCone = 80f;
@@ -2867,7 +2868,7 @@ public class Z_Units {
                 x = 14f;
                 y = -9f;
                 shootY = 5.5f;
-                reload = 4f;
+                reload = 3f;    // ★ 射速加快 (原 4f)
                 recoil = 0.5f;
                 shootSound = mindustry.gen.Sounds.shootFlame;
                 angleCone = 80f;
@@ -2881,7 +2882,7 @@ public class Z_Units {
         // PU_V8 原版: UnityUnitTypes.java 第1129-1248行
         empire = new UnitType("empire") {{
             health = 140000f;
-            armor = 20f;
+            armor = 22f;  // ★ 按用户设定: 20f → 22f
             speed = 0.2f;
             hitSize = 49f;
             rotateSpeed = 1.25f;
@@ -3047,7 +3048,8 @@ public class Z_Units {
                 shootStatusDuration = 80f;
                 // PU_V8: 齐射前播放充能特效 (greenLaserChargeParent 80tick)
                 shoot.firstShotDelay = zzw.content.units.effects.ChargeFx.greenLaserChargeParent.lifetime;
-                bullet = new ReflectingLaserBulletType(500f) {{
+                // ★ 大激光伤害提高 (原 500f → 800f)
+                bullet = new ReflectingLaserBulletType(800f) {{
                     lifetime = 65f;
                     shootEffect = zzw.content.units.effects.ChargeFx.greenLaserChargeParent;
                     healPercent = 6f;
@@ -3143,7 +3145,8 @@ public class Z_Units {
                 // PU_V8: 射击期间施加蓄力疲劳 (移速10%/生命60%)
                 shootStatus = sagittariusFatigue;
                 shootStatusDuration = 10f * 60f + zzw.content.units.effects.ChargeFx.sagittariusCharge.lifetime;
-                bullet = new SagittariusLaserBulletType(35f) {{
+                // ★ 大激光加强 (原 35f → 50f)
+                bullet = new SagittariusLaserBulletType(50f) {{
                     shootEffect = zzw.content.units.effects.ChargeFx.sagittariusCharge;
                     lifetime = 10f * 60f;
                     collidesTeam = true;
@@ -3195,7 +3198,7 @@ public class Z_Units {
         // PU_V8 原版: UnityUnitTypes.java 第1415-1508行
         araneidae = new UnitType("araneidae") {{
             health = 52000f;
-            armor = 13f;
+            armor = 15f;  // ★ 按用户设定: 13f → 15f
             speed = 0.42f;
             hitSize = 35.5f;
             rotateSpeed = 1.3f;
@@ -3330,7 +3333,7 @@ public class Z_Units {
         // PU_V8 原版: UnityUnitTypes.java 第1510-1635行
         theraphosidae = new UnitType("theraphosidae") {{
             health = 125000f;
-            armor = 16f;
+            armor = 17f;  // ★ 按用户设定: 16f → 17f
             speed = 0.4f;
             drag = 0.12f;
             hitSize = 49f;
@@ -3372,7 +3375,7 @@ public class Z_Units {
                 xRand = 2.25f;
                 shoot.shots = 2;
                 shootSound = Sounds.shootMissile;
-                bullet = new MissileBulletType(3.7f, 15f) {{
+                bullet = new MissileBulletType(3.7f, 30f) {{   // ★ 伤害加强 (原 15f)
                     width = 10f;
                     height = 12f;
                     shrinkY = 0f;
@@ -3496,7 +3499,7 @@ public class Z_Units {
         // PU_V8 原版: UnityUnitTypes.java 第1637-1710行
         mantle = new UnitType("mantle") {{
             health = 54000f;
-            armor = 17f;
+            armor = 15f;  // ★ 按用户设定: 17f → 15f
             speed = 0.45f;
             accel = 0.04f;
             drag = 0.04f;
@@ -3583,7 +3586,7 @@ public class Z_Units {
         // PU_V8 原版: UnityUnitTypes.java 第1712-1805行
         aphelion = new UnitType("aphelion") {{
             health = 130000f;
-            armor = 16f;
+            armor = 17f;  // ★ 按用户设定: 16f → 17f
             speed = 0.44f;
             accel = 0.04f;
             drag = 0.03f;
@@ -3844,6 +3847,7 @@ public class Z_Units {
             accel = 0.1f;           // PU_V8: 0.1 (原版默认 0.5, 必须显式覆盖)
             drag = 0.07f;
             hitSize = 13f;
+            armor = 8f;  // ★ 按用户设定 (原缺失)
             engineOffset = 6.75f;
             engineSize = 1.75f;
             useUnitCap = false;     // v158 字段 (旧版 isCounted=false), 不计入单位上限
@@ -3874,6 +3878,7 @@ public class Z_Units {
             accel = 0.09f;          // PU_V8: 0.09
             drag = 0.08f;           // PU_V8: 0.08
             hitSize = 19.5f;
+            armor = 12f;  // ★ 按用户设定 (原缺失)
             engineOffset = 10.25f;
             engineSize = 3f;
             useUnitCap = false;     // v158 字段 (旧版 isCounted=false), 不计入单位上限
@@ -3907,6 +3912,7 @@ public class Z_Units {
             accel = 0.095f;         // PU_V8: 0.095
             drag = 0.09f;           // PU_V8: 0.09
             hitSize = 34f;
+            armor = 16f;  // ★ 按用户设定 (原缺失)
             engineOffset = 15.75f;
             engineSize = 3.5f;
             // PU_V8 未设 isCounted=false → seraphim 计入单位上限 (与 cherub/malakhim 不同)
@@ -3969,6 +3975,7 @@ public class Z_Units {
             engineSize = 0f;
             flying = true;
             hitSize = 12f;
+            armor = 1f;  // ★ 按用户设定 (原缺失)
             range = 140f;
             outlineColor = Color.valueOf("2e3142");
             constructor = CopterUnitEntity::create;
@@ -4018,6 +4025,7 @@ public class Z_Units {
             engineSize = 0f;
             flying = true;
             hitSize = 13f;
+            armor = 2f;  // ★ 按用户设定 (原缺失)
             range = 165f;
             rotateSpeed = 4.6f;
             outlineColor = Color.valueOf("2e3142");
@@ -4095,6 +4103,7 @@ public class Z_Units {
             engineSize = 0f;
             flying = true;
             hitSize = 15f;
+            armor = 3f;  // ★ 按用户设定 (原缺失)
             range = 165f;
             rotateSpeed = 3.8f;
             outlineColor = Color.valueOf("2e3142");
@@ -4161,6 +4170,7 @@ public class Z_Units {
             engineSize = 0f;
             flying = true;
             hitSize = 30f;
+            armor = 4f;  // ★ 按用户设定 (原缺失)
             range = 165f;
             lowAltitude = true;
             rotateSpeed = 3.5f;
@@ -4240,6 +4250,7 @@ public class Z_Units {
             engineSize = 0f;
             flying = true;
             hitSize = 45f;
+            armor = 5f;  // ★ 按用户设定 (原缺失)
             range = 300f;
             rotateSpeed = 2.7f;
             lowAltitude = true;
@@ -4348,6 +4359,7 @@ public class Z_Units {
             engineSize = 0f;
             flying = true;
             hitSize = 45f;
+            armor = 6f;  // ★ 按用户设定 (原缺失)
             lowAltitude = true;
             rotateSpeed = 2.3f;
             outlineColor = Color.valueOf("2e3142");
@@ -4355,7 +4367,8 @@ public class Z_Units {
             // 使用 Mathf.random(最小值, 最大值) 生成随机伤害
             // 基础伤害在 40f 到 60f 之间随机
 
-            BulletType mantodeaFlak = new FlakBulletType(15f, 100f) {{
+            // ★ 伤害统一改为 150 (原 100f)
+            BulletType mantodeaFlak = new FlakBulletType(15f, 150f) {{
                 lifetime = 20f;
                 collidesGround = true;
                 lightning = 4;
@@ -4375,7 +4388,7 @@ public class Z_Units {
                 recoil = 2.5f;
                 shootY = 10f;
                 shootSound = Sounds.shoot;
-                shoot.shots = 5;
+                shoot.shots = 20;   // ★ 每次连发 20 发 (原 5)
                 shoot.shotDelay = 2f;
                 reload = 20f;
                 bullet = mantodeaFlak;
@@ -4391,7 +4404,7 @@ public class Z_Units {
                 recoil = 2.5f;
                 shootY = 10f;
                 shootSound = Sounds.shoot;
-                shoot.shots = 5;
+                shoot.shots = 20;   // ★ 每次连发 20 发 (原 5)
                 shoot.shotDelay = 2f;
                 reload = 20f;
                 bullet = mantodeaFlak;
@@ -4755,8 +4768,9 @@ public class Z_Units {
             // 武器5: 磁轨炮 (SlowRailBulletType, 穿透, frag=standardDense 自建)
             // PU132: backColor = trailColor = Pal.bulletYellowBack, frontColor = Pal.bulletYellow
             // fragCone = 20f -> v158: fragRandomSpread = 20f
-            // scaleVelocity = true -> 删除 (v158 无此字段)
-            // trailEffect = TrailFx.coloredArrowTrail -> 用 Fx.smoke 替代 (默认)
+            // trailEffect = TrailFx.coloredArrowTrail (原版, 沿轨迹散布箭头形粒子)
+            // shootSound: PU132 用 Sounds.railgun, v159 core 已无该音效, 沿用 shootForeshadow
+            // 注: PU132 原版此武器没有 chargeEffect / firstShotDelay, 即原版并无蓄力特效
             weapons.add(new Weapon(name + "-railgun") {{
                 x = 0f;
                 y = 0f;
@@ -4788,6 +4802,7 @@ public class Z_Units {
                     fragLifeMin = 0.4f;
                     fragLifeMax = 0.7f;
                     trailSpacing = 40f;
+                    trailEffect = zzw.content.units.effects.TrailFx.coloredArrowTrail;
                     backColor = Pal.bulletYellowBack;
                     trailColor = Pal.bulletYellowBack;
                     frontColor = Pal.bulletYellow;
@@ -4812,6 +4827,7 @@ public class Z_Units {
             accel = 0.09f;
             drag = 0.02f;
             hitSize = 11.5f;
+            armor = 2f;  // ★ 按用户设定 (EMP 系列每级 +2, 原缺失)
             engineOffset = 7.25f;
             outlineColor = Color.valueOf("2e3142");
             constructor = mindustry.gen.UnitEntity::create;
@@ -4854,6 +4870,7 @@ public class Z_Units {
             accel = 0.1f;
             drag = 0.06f;
             hitSize = 16.5f;
+            armor = 4f;  // ★ 按用户设定 (EMP 系列每级 +2, 原缺失)
             engineOffset = 8.25f;
             outlineColor = Color.valueOf("2e3142");
             constructor = mindustry.gen.UnitEntity::create;
@@ -4899,6 +4916,7 @@ public class Z_Units {
             accel = 0.1f;
             drag = 0.07f;
             hitSize = 24.5f;
+            armor = 6f;  // ★ 按用户设定 (EMP 系列每级 +2, 原缺失)
             engineOffset = 3.75f;
             outlineColor = Color.valueOf("2e3142");
             constructor = mindustry.gen.UnitEntity::create;
@@ -4977,6 +4995,7 @@ public class Z_Units {
             accel = 0.09f;
             drag = 0.07f;
             hitSize = 41.5f;
+            armor = 8f;  // ★ 按用户设定 (EMP 系列每级 +2, 原缺失)
             engineOffset = 24.25f;
             outlineColor = Color.valueOf("2e3142");
             constructor = mindustry.gen.UnitEntity::create;
@@ -5088,6 +5107,7 @@ public class Z_Units {
             accel = 0.06f;
             drag = 0.07f;
             hitSize = 57.5f;
+            armor = 10f;  // ★ 按用户设定 (EMP 系列每级 +2, 原缺失)
             engineOffset = 33.75f;
             engineSize = 3.5f;
             outlineColor = Color.valueOf("2e3142");
