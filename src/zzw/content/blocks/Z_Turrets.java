@@ -963,7 +963,7 @@ public class Z_Turrets {
             requirements(Category.turret, ItemStack.with(Items.silicon, 290, Z_Items.luminum, 430, Items.titanium, 190, Items.thorium, 120, Z_Items.lightAlloy, 25));
             size = 8;
             health = 9800;
-            range = 384f;   // ★ 48 格 (48 × 8px); 配合下方 scaleLife=true, 子弹在瞄准点即消散
+            range = 440f;   // ★ 55 格 (55 × 8px); 配合下方 scaleLife=true, 子弹在瞄准点即消散
             reload = 70f;
             coolantMultiplier = 1.9f;
             consumePower(26f);

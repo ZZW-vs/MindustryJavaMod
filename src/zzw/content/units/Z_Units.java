@@ -4367,9 +4367,9 @@ public class Z_Units {
             // 使用 Mathf.random(最小值, 最大值) 生成随机伤害
             // 基础伤害在 40f 到 60f 之间随机
 
-            // ★ 伤害改为 60 每发 (原 150f)
-            BulletType mantodeaFlak = new FlakBulletType(15f, 60f) {{
-                lifetime = 20f;
+            // ★ 伤害 60 每发, 子弹速度放慢 (15f → 10f), 寿命 20f → 30f 保持落点距离
+            BulletType mantodeaFlak = new FlakBulletType(10f, 60f) {{
+                lifetime = 30f;
                 collidesGround = true;
                 lightning = 4;
                 lightningLength = 5;
@@ -4388,9 +4388,9 @@ public class Z_Units {
                 recoil = 2.5f;
                 shootY = 10f;
                 shootSound = Sounds.shoot;
-                shoot.shots = 20;   // ★ 每次连发 20 发 (原 5)
-                shoot.shotDelay = 2f;
-                reload = 40f;   // ★ 射速改慢 (原 20f)
+                shoot.shots = 6;   // ★ 每轮 6 发子弹 (原 20)
+                shoot.shotDelay = 1f;   // ★ 间隔缩短, 弹幕更密
+                reload = 11.5f;   // ★ 每轮总 DPS ≈ 3800 (2 门炮)
                 bullet = mantodeaFlak;
             }});
 
@@ -4404,9 +4404,9 @@ public class Z_Units {
                 recoil = 2.5f;
                 shootY = 10f;
                 shootSound = Sounds.shoot;
-                shoot.shots = 20;   // ★ 每次连发 20 发 (原 5)
-                shoot.shotDelay = 2f;
-                reload = 40f;   // ★ 射速改慢 (原 20f)
+                shoot.shots = 6;   // ★ 每轮 6 发子弹 (原 20)
+                shoot.shotDelay = 1f;   // ★ 间隔缩短, 弹幕更密
+                reload = 11.5f;   // ★ 每轮总 DPS ≈ 3800 (2 门炮)
                 bullet = mantodeaFlak;
             }});
 
