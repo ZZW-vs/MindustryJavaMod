@@ -54,6 +54,65 @@ public class ChargeFx{
     public static Effect
 
     /**
+     * the-cube 蓄力 (120f, advance 浅蓝色 a3e3ff) —— 大幅放大版充能光环。
+     *
+     * <p>相比原版 Lancer 充能 (38/60f、半径 20px), 本特效:</p>
+     * <ul>
+     *   <li>持续时间拉长到 120f (2 秒), 与炮台 {@code shoot.firstShotDelay = 120f} 对齐,
+     *       充能结束的瞬间正好开火, 不会出现"特效放完还要等一会"的空档;</li>
+     *   <li>外扩圆环半径最大 ~130px (原版约 20px), 中心能量球渐大到 30px;</li>
+     *   <li>30 条辐射电弧线 + 白色核心 + 大范围光照。</li>
+     * </ul>
+     */
+    cubeCharge = new Effect(120f, e -> {
+        Color c = Color.valueOf("a3e3ff");   // UnityPal.advance
+        float fin = e.fin();
+
+        // 1) 外层光环绕中心向外扩散
+        color(c);
+        stroke(1f + fin * 3f);
+        Lines.circle(e.x, e.y, 10f + e.fout() * 120f);
+
+        // 2) 中心渐大的能量球
+        Fill.circle(e.x, e.y, fin * 30f);
+
+        // 3) 30 条向外辐射的电弧线 (长度随 fout 收缩, 形成"吸入"感)
+        randLenVectors(e.id, 30, 80f * e.fout(), e.rotation, 120f, (x, y) -> {
+            lineAngle(e.x + x, e.y + y, Mathf.angle(x, y), e.fslope() * 6f + 1.5f);
+        });
+
+        // 4) 白色核心 + 光照
+        color();
+        Fill.circle(e.x, e.y, fin * 15f);
+        Drawf.light(e.x, e.y, fin * 55f, c, 0.8f);
+    }),
+
+    /**
+     * bt-laser-turret 蓄力 (60f, lancerLaser 蓝) —— 原版 Lancer 充能的略放大版。
+     *
+     * <p>颜色与炮台激光 (Pal.lancerLaser) 一致; 持续时间 60f 与
+     * {@code shoot.firstShotDelay = 60f} 对齐, 特效结束即开火。</p>
+     */
+    btLaserCharge = new Effect(60f, e -> {
+        float fin = e.fin();
+
+        // 1) 收缩光环
+        color(Pal.lancerLaser);
+        stroke(1f + fin * 2.5f);
+        Lines.circle(e.x, e.y, 4f + e.fout() * 60f);
+
+        // 2) 16 条向外辐射的电弧线 (略大于原版 14 条 × 21px)
+        randLenVectors(e.id, 16, 1f + 26f * e.fout(), e.rotation, 120f, (x, y) -> {
+            lineAngle(e.x + x, e.y + y, Mathf.angle(x, y), e.fslope() * 4f + 1.2f);
+        });
+
+        // 3) 渐大的中心球 + 白芯
+        Fill.circle(e.x, e.y, fin * 12f);
+        color();
+        Fill.circle(e.x, e.y, fin * 6f);
+    }),
+
+    /**
      * 小型绿色激光充能 (40f): 治疗色圆环从 50 半径收缩到 0。
      */
     greenLaserChargeSmallParent = new ParentEffect(40f, 100f, e -> {

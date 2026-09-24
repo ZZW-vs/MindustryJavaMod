@@ -4367,8 +4367,8 @@ public class Z_Units {
             // 使用 Mathf.random(最小值, 最大值) 生成随机伤害
             // 基础伤害在 40f 到 60f 之间随机
 
-            // ★ 伤害统一改为 150 (原 100f)
-            BulletType mantodeaFlak = new FlakBulletType(15f, 150f) {{
+            // ★ 伤害改为 60 每发 (原 150f)
+            BulletType mantodeaFlak = new FlakBulletType(15f, 60f) {{
                 lifetime = 20f;
                 collidesGround = true;
                 lightning = 4;
@@ -4390,7 +4390,7 @@ public class Z_Units {
                 shootSound = Sounds.shoot;
                 shoot.shots = 20;   // ★ 每次连发 20 发 (原 5)
                 shoot.shotDelay = 2f;
-                reload = 20f;
+                reload = 40f;   // ★ 射速改慢 (原 20f)
                 bullet = mantodeaFlak;
             }});
 
@@ -4406,7 +4406,7 @@ public class Z_Units {
                 shootSound = Sounds.shoot;
                 shoot.shots = 20;   // ★ 每次连发 20 发 (原 5)
                 shoot.shotDelay = 2f;
-                reload = 20f;
+                reload = 40f;   // ★ 射速改慢 (原 20f)
                 bullet = mantodeaFlak;
             }});
 

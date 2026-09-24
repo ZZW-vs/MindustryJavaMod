@@ -963,7 +963,7 @@ public class Z_Turrets {
             requirements(Category.turret, ItemStack.with(Items.silicon, 290, Z_Items.luminum, 430, Items.titanium, 190, Items.thorium, 120, Z_Items.lightAlloy, 25));
             size = 8;
             health = 9800;
-            range = 260f;   // ★ 用户要求缩短射程 (原 320f)
+            range = 256f;   // ★ 32 格 (32 × 8px); 配合下方 scaleLife=true, 子弹在瞄准点即消散
             reload = 70f;
             coolantMultiplier = 1.9f;
             consumePower(26f);
@@ -1002,6 +1002,10 @@ public class Z_Turrets {
                 hitSize = 12f;
                 pierce = true;
                 collidesTiles = false;
+                // ★ PU132 原版此弹设了 scaleVelocity = true (v159 改名为 scaleLife):
+                //   子弹寿命按"炮口到瞄准点距离 / 射程"缩放, 落点正好在瞄准点,
+                //   不会按 speed × lifetime 一路飞出射程圈 (攻击距离 = 速度 × 存在时间)。
+                scaleLife = true;
                 shootEffect = Fx.lightningShoot;
                 hitEffect = Fx.hitLancer;
                 despawnEffect = smokeEffect = Fx.none;

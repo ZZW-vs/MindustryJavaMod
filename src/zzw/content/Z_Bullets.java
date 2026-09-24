@@ -553,8 +553,8 @@ public class Z_Bullets {
 
         public EphemeronPairBulletType(float damage) {
             super(0.001f, damage);
-            // ★ 分裂放射小球存在时间: 360f → 720f → 1500f → 3000f (用户要求再久一点)
-            lifetime = 3000f;
+            // ★ 分裂放射小球存在时间: 与 PU132 原版一致 (360f = 6 秒, 对撞后消失, 实测约 2~3 秒)
+            lifetime = 360f;
             hitEffect = Fx.hitLancer;
             despawnEffect = Fx.none;
             hitSize = 8f;
@@ -627,6 +627,7 @@ public class Z_Bullets {
             for (int i = 0; i < pairs; i++) {
                 Tmp.v1.rnd(Mathf.range(maxRadius)).add(b);
                 float randomSign = Mathf.random(180f);
+                float randomB = Mathf.random(0.2f, 1.4f);
                 float angleRandom = Mathf.range(360f);
                 float rangeRandom = Mathf.range(40f, 70f);
                 Tmp.v2.trns(angleRandom, rangeRandom);
@@ -635,6 +636,12 @@ public class Z_Bullets {
                 Bullet neg = negative.create(b, Tmp.v1.x + Tmp.v2.x, Tmp.v1.y + Tmp.v2.y, angleRandom + randomSign + 180f);
                 pos.data = neg;
                 neg.data = pos;
+                // ★ 关键: 给这对小球一个相反方向的小初速, 让它们先分开再被吸回对撞。
+                //   若不加这一步, 正负两球生成在同一坐标会立刻判定重叠而双双移除,
+                //   表现为"分裂小球一闪就没" (PU132 原版 ephemEronLaser 也做了这步)。
+                Tmp.v2.trns(angleRandom + randomSign, randomB);
+                pos.vel.add(Tmp.v2);
+                neg.vel.add(Tmp.v2.rotate(180f));
             }
         }
     }

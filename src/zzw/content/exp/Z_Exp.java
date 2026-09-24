@@ -533,7 +533,7 @@ public class Z_Exp {
             coolantMultiplier = 2f;
             range = 160f;
 
-            shoot.firstShotDelay = 100f;  // 充能时间
+            shoot.firstShotDelay = 60f;  // 充能时间 (与 btLaserCharge 的 60f 对齐, 特效结束即开火)
             // ★ 开火蓄力特效 (原版 Lancer 同款做法):
             //   chargeEffect 挂在 shootType 上, Turret.shoot() 在 firstShotDelay > 0 时自动播放
             //   moveWhileCharging = false 让炮台在充能期间锁定朝向, 避免充能特效与炮管错位
@@ -553,8 +553,8 @@ public class Z_Exp {
 
             shootType = new ExpLaserBulletType(240f, 150f){{
                 colors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser.cpy().a(0.4f), mindustry.graphics.Pal.lancerLaser, UnityPal.exp};
-                // ★ 充能特效: vanilla Lancer 的 光环 + 白芯 组合
-                chargeEffect = new mindustry.entities.effect.MultiEffect(mindustry.content.Fx.lancerLaserCharge, mindustry.content.Fx.lancerLaserChargeBegin);
+                // ★ 充能特效: 自定义略放大版 Lancer 光环, 颜色与激光一致 (Pal.lancerLaser)
+                chargeEffect = zzw.content.units.effects.ChargeFx.btLaserCharge;
                 hitEffect = mindustry.content.Fx.hitLaserBlast;
                 hitSize = 8;
                 lifetime = 22f;

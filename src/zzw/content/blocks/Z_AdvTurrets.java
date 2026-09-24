@@ -37,6 +37,7 @@ import zzw.content.units.bullets.EndCutterLaserBulletType;
 import zzw.content.units.bullets.PointBlastLaserBulletType;
 import zzw.content.units.bullets.WavefrontLaserBulletType;
 import zzw.content.units.effects.ChargeEffect;
+import zzw.content.units.effects.ChargeFx;
 import zzw.util.ZObjs;
 
 /**
@@ -481,8 +482,8 @@ public class Z_AdvTurrets {
             coolantBoost.put(mindustry.content.Liquids.water, 0.10f);
             coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.20f);
 
-            // ★ 开火蓄力特效: 给蓄力留出前摇, 播放 Lancer 同款充能光环
-            shoot.firstShotDelay = 60f;
+            // ★ 开火蓄力特效: 给蓄力留出前摇, 播放自定义大幅充能光环 (浅蓝 a3e3ff)
+            shoot.firstShotDelay = 120f;   // ★ 充能时间加长 (原 60f), 与 cubeCharge 的 120f 对齐
             moveWhileCharging = false;
             chargeSound = Sounds.chargeLancer;
             shootSound = Sounds.shootLancer;  // ★ v155.4 替代 UnitySounds.cubeBlast (无 shootBig)
@@ -490,7 +491,8 @@ public class Z_AdvTurrets {
                 length = 320f;
                 lifetime = 17f;
                 pierce = true;
-                chargeEffect = new mindustry.entities.effect.MultiEffect(Fx.lancerLaserCharge, Fx.lancerLaserChargeBegin);
+                // ★ 蓄力特效放大并加长: cubeCharge (120f, 外圈半径 ~130px)
+                chargeEffect = ChargeFx.cubeCharge;
                 width = 32f;  // 激光加粗 (原12f → 32f)
                 auraDamage = 8000f;
                 damageRadius = 120f;
