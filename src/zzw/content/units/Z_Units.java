@@ -4389,8 +4389,8 @@ public class Z_Units {
                 shootY = 10f;
                 shootSound = Sounds.shoot;
                 shoot.shots = 6;   // ★ 每轮 6 发子弹 (原 20)
-                shoot.shotDelay = 1f;   // ★ 间隔缩短, 弹幕更密
-                reload = 11.5f;   // ★ 每轮总 DPS ≈ 3800 (2 门炮)
+                shoot.shotDelay = 3f;   // ★ 单发间隔加大 (原 1f)
+                reload = 13.5f;   // ★ 每轮总 DPS ≈ 3800 (显示值; 2 门炮, 含溅射 15)
                 bullet = mantodeaFlak;
             }});
 
@@ -4405,8 +4405,8 @@ public class Z_Units {
                 shootY = 10f;
                 shootSound = Sounds.shoot;
                 shoot.shots = 6;   // ★ 每轮 6 发子弹 (原 20)
-                shoot.shotDelay = 1f;   // ★ 间隔缩短, 弹幕更密
-                reload = 11.5f;   // ★ 每轮总 DPS ≈ 3800 (2 门炮)
+                shoot.shotDelay = 3f;   // ★ 单发间隔加大 (原 1f)
+                reload = 13.5f;   // ★ 每轮总 DPS ≈ 3800 (显示值; 2 门炮, 含溅射 15)
                 bullet = mantodeaFlak;
             }});
 

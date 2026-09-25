@@ -88,26 +88,26 @@ public class ChargeFx{
     }),
 
     /**
-     * bt-laser-turret 蓄力 (60f, lancerLaser 蓝) —— 原版 Lancer 充能的略放大版。
+     * bt-laser-turret 蓄力 (60f) —— 与该炮台激光同色系, 蓝 + 绿双色。
      *
-     * <p>颜色偏绿 (a5ef7d); 持续时间 60f 与
-     * {@code shoot.firstShotDelay = 60f} 对齐, 特效结束即开火。</p>
+     * <p>对应激光的三段颜色 {Pal.lancerLaser, Pal.lancerLaser, UnityPal.exp}:
+     * 外层光环/电弧线用蓝 (Pal.lancerLaser), 中心能量球用绿 (UnityPal.exp)。
+     * 持续时间 60f 与 {@code shoot.firstShotDelay = 60f} 对齐, 特效结束即开火。</p>
      */
     btLaserCharge = new Effect(60f, e -> {
         float fin = e.fin();
-        Color c = Color.valueOf("a5ef7d");   // 偏绿 (介于 lancerLaser 蓝与 UnityPal.exp 绿之间)
 
-        // 1) 收缩光环
-        color(c);
+        // 1) 蓝色外层: 收缩光环 + 12 条向外辐射的电弧线
+        color(Pal.lancerLaser);
         stroke(1f + fin * 2.2f);
         Lines.circle(e.x, e.y, 3f + e.fout() * 42f);
 
-        // 2) 12 条向外辐射的电弧线 (比上一版略小)
         randLenVectors(e.id, 12, 1f + 18f * e.fout(), e.rotation, 120f, (x, y) -> {
             lineAngle(e.x + x, e.y + y, Mathf.angle(x, y), e.fslope() * 3.5f + 1f);
         });
 
-        // 3) 渐大的中心球 + 白芯
+        // 2) 绿色内层: 渐大的能量球 + 白芯
+        color(UnityPal.exp);
         Fill.circle(e.x, e.y, fin * 8f);
         color();
         Fill.circle(e.x, e.y, fin * 4f);
