@@ -1,15 +1,22 @@
 package zzw.content.blocks.soul;
 
+import arc.Core;
 import arc.audio.Sound;
+import arc.graphics.Color;
 import arc.math.Angles;
 import arc.math.Mathf;
 import arc.math.geom.Vec2;
+import arc.util.Strings;
 import arc.util.Time;
 import mindustry.content.Fx;
 import mindustry.entities.Effect;
 import mindustry.entities.bullet.BulletType;
 import mindustry.gen.Bullet;
 import mindustry.gen.Sounds;
+import mindustry.type.Liquid;
+import mindustry.ui.Styles;
+import mindustry.world.meta.Stat;
+import mindustry.world.meta.StatUnit;
 
 import static mindustry.Vars.tilesize;
 
@@ -54,6 +61,9 @@ public class SoulBurstPowerTurret extends SoulTurretPowerTurret {
     /** 副弹幕发射音量 */
     public float subShootSoundVolume = 1f;
 
+    /** 液体冷却强化表 */
+    public arc.struct.ObjectFloatMap<mindustry.type.Liquid> coolantBoost = new arc.struct.ObjectFloatMap<>();
+    
     // ★ v158 兼容字段 (PU_V8 v7 PowerTurret 自带, v158 不存在, 在本类自定义)
     /** 主弹幕连发间隔 (tick) - PU_V8 v7 PowerTurret.burstSpacing */
     public float burstSpacing = 0f;
@@ -72,6 +82,36 @@ public class SoulBurstPowerTurret extends SoulTurretPowerTurret {
 
     public SoulBurstPowerTurret(String name) {
         super(name);
+    }
+
+    @Override
+    public void setStats() {
+        super.setStats();
+
+        // ★ 强化配方: 直接展示固定百分比 (水 130%, 冷冻液 200%), 覆盖原版按热容计算的奇怪数值
+        if (coolant != null && !coolantBoost.isEmpty()) {
+            stats.replace(Stat.booster, table -> {
+                table.row();
+                table.table(c -> {
+                    for (Liquid liquid : mindustry.Vars.content.liquids()) {
+                        float boost = coolantBoost.get(liquid, -1f);
+                        if (boost < 0f) continue;
+
+                        c.table(Styles.grayPanel, b -> {
+                            b.image(liquid.uiIcon).size(40).pad(10f).left();
+                            b.table(info -> {
+                                info.add(liquid.localizedName).left().row();
+                                info.add(Strings.autoFixed(coolant.amount * 60f, 2) + StatUnit.perSecond.localized())
+                                        .left().color(Color.lightGray);
+                            });
+                            b.add(Core.bundle.format("bullet.reload", Strings.autoFixed((1f + boost) * 100f, 2)))
+                                    .pad(10f).right().grow().padRight(15f);
+                        }).growX().pad(5).row();
+                    }
+                }).growX().colspan(table.getColumns());
+                table.row();
+            });
+        }
     }
 
     public class SoulBurstPowerTurretBuild extends SoulTurretPowerTurretBuild {
@@ -106,6 +146,8 @@ public class SoulBurstPowerTurret extends SoulTurretPowerTurret {
                     // v158 中 recoil 是 Block 级距离字段, Build 级进度字段是 curRecoil
                     curRecoil = 1f;
                     heat = 1f;
+                    // ★ 修正装填累积: 蓄力结束时装填值刚好充满, 此时才重置 (开火)
+                    reloadCounter %= reload;
 
                     // ★ 主弹幕: shoot.shots 发, 间隔 burstSpacing * 2f * i
                     // (PU_V8 原版是 burstSpacing * 2f 没有乘 i, v158 改为 *i 实现连发递增延迟)
@@ -132,6 +174,49 @@ public class SoulBurstPowerTurret extends SoulTurretPowerTurret {
                 });
             } else {
                 super.shoot(type);
+            }
+        }
+
+        /**
+         * ★ 强化配方: 用固定百分比表推进装填 (水 130%, 冷冻液 200%), 与面板显示一致。
+         */
+        @Override
+        protected void updateCooling() {
+            if (coolantBoost.isEmpty()) {
+                super.updateCooling();
+                return;
+            }
+
+            if (coolant == null || coolant.efficiency(this) <= 0f || efficiency <= 0f) return;
+
+            float boost = coolantBoost.get(liquids.current(), 0f);
+            float amount = coolant.amount * coolant.efficiency(this);
+            coolant.update(this);
+            reloadCounter += edelta() * boost;
+
+            if (Mathf.chance(0.06 * amount)) {
+                coolEffect.at(x + Mathf.range(size * tilesize / 2f), y + Mathf.range(size * tilesize / 2f));
+            }
+        }
+
+        /**
+         * ★ 修正装填/蓄力时序 (修复"蓄力时装填值不会增加、未满就开火")。
+         *
+         * <p>原实现只在装填满后由父类 {@code updateShooting()} 调用 {@link #shoot} 开始蓄力,
+         * 于是蓄力期间 {@code reloadCounter} 从 0 重新累积, 开火时装填值远未满。
+         * 现改为: 当装填剩余时间 ≤ {@link #chargeTime} 时提前进入蓄力阶段,
+         * 蓄力期间 {@code reloadCounter} 继续由父类 {@code handleReload()} 累加,
+         * 蓄力结束时装填值刚好充满 → 开火, 做到"蓄力时累加装填值、装填值满了才开火"。</p>
+         */
+        @Override
+        protected void updateShooting() {
+            if (chargeTime <= 0f) {
+                super.updateShooting();
+                return;
+            }
+            if (!charging && shootWarmup >= minWarmup
+                && reloadCounter >= Mathf.clamp(reload - chargeTime, 0f, reload)) {
+                shoot(peekAmmo());
             }
         }
 

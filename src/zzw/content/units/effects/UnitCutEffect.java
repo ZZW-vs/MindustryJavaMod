@@ -113,8 +113,8 @@ public class UnitCutEffect {
             d.startY = unit.y;
             // PU132: l.vel.trns(rot + 180f + (i * 180f), unit.hitSize / 60f)
             d.vel.trns(rot + 180f + (i * 180f), unit.hitSize / 60f);
-            // 实际持续 40 + hitSize/20, 保存到 CutData 用于判断爆炸时机
-            d.lifetime = 40f + (unit.hitSize / 20f) + Mathf.range(2f, 5f);
+            // 实际持续 60 + hitSize/15, 保存到 CutData 用于判断爆炸时机 (延长停留时间)
+            d.lifetime = 60f + (unit.hitSize / 15f) + Mathf.range(3f, 6f);
 
             d.hitSize = unit.hitSize;
             d.drag = Math.min(unit.drag, 0.07f);
@@ -126,6 +126,9 @@ public class UnitCutEffect {
 
         // PU132: UnityFx.tenmeikiriCut.at(unit.x + tmpPoint.x, unit.y + tmpPoint.y, rot + 90f, unit.hitSize * 1.5f)
         cutFlashEffect.at(unit.x + tmpPoint.x, unit.y + tmpPoint.y, rot + 90f, unit.hitSize * 1.5f);
+        
+        // ★ 添加金属熔化效果
+        cutScarEffect.at(unit.x, unit.y, 0f, unit.hitSize);
     }
 
     /**
@@ -153,6 +156,80 @@ public class UnitCutEffect {
     });
 
     /**
+     * 切割疤痕特效 - FO风格金属熔化效果
+     */
+    public static final Effect cutScarEffect = new Effect(60f, 600f, e -> {
+        if (!(e.data instanceof CutData)) return;
+        CutData d = (CutData) e.data;
+        
+        // FO风格熔化金属颜色 (鞍棕色 → 橙红色 → 金色 → 白色)
+        Color meltColor1 = Color.valueOf("#8B4513"); // 鞍棕色 (基础)
+        Color meltColor2 = Color.valueOf("#FF4500"); // 橙红色 (熔化)
+        Color meltColor3 = Color.valueOf("#FFD700"); // 金色 (高温)
+        Color meltColor4 = Color.white; // 白色 (炽热)
+        
+        float time = e.time / e.lifetime;
+        float size = d.hitSize * 1.2f; // 增加疤痕尺寸
+        
+        // ★ 增强FO风格效果: 多层渲染
+        Draw.blend(Blending.additive);
+        
+        // 1. 熔化核心区域 - 增强高温效果
+        float coreSize = size * 0.4f * (1f + Mathf.sin(time * 8f) * 0.3f);
+        Draw.color(meltColor1, meltColor2, time);
+        Fill.circle(e.x, e.y, coreSize);
+        
+        // 2. 高温中心 - 白色炽热点
+        Draw.color(meltColor3, meltColor4, Mathf.sin(time * Mathf.PI));
+        Fill.circle(e.x, e.y, coreSize * 0.3f);
+        
+        // 3. 熔化飞溅效果 - 增加数量和强度
+        for (int i = 0; i < 12; i++) {
+            float angle = (360f / 12f) * i + time * 60f;
+            float dist = size * (0.6f + Mathf.random(0.4f));
+            Vec2 pos = Tmp.v1.trns(angle, dist).add(e.x, e.y);
+            float meltSize = size * 0.15f * (1f - time);
+            
+            // 随机选择熔化颜色
+            Draw.color(meltColor2, meltColor3, Mathf.random());
+            Fill.circle(pos.x, pos.y, meltSize * (1f + Mathf.sin(time * 12f + i) * 0.4f));
+        }
+        
+        // 4. 熔化流痕 - 增加数量和长度
+        for (int i = 0; i < 6; i++) {
+            float angle = d.cutRotation + 60f + i * 60f;
+            float dist = size * time * 1.2f; // 增加流痕长度
+            Vec2 end = Tmp.v1.trns(angle, dist).add(e.x, e.y);
+            
+            // 渐变流痕颜色
+            Draw.color(meltColor1, meltColor2, 1f - time);
+            Lines.stroke(3f * (1f - time));
+            Lines.line(e.x, e.y, end.x, end.y);
+            
+            // 流痕末端飞溅
+            if (time > 0.7f) {
+                Vec2 splash = Tmp.v1.trns(angle + 90f, 5f).add(end);
+                Draw.color(meltColor3, meltColor4, (time - 0.7f) * 3.33f);
+                Fill.circle(splash.x, splash.y, 2f * (1f - time));
+            }
+        }
+        
+        // 5. 火花效果 - 模拟熔化产生的火花
+        for (int i = 0; i < 16; i++) {
+            float angle = Mathf.random(360f);
+            float dist = Mathf.random(size * 0.3f, size * 0.8f);
+            Vec2 sparkPos = Tmp.v1.trns(angle, dist).add(e.x, e.y);
+            float sparkSize = Mathf.random(1f, 3f) * (1f - time);
+            
+            Draw.color(meltColor3, meltColor4, Mathf.random());
+            Fill.circle(sparkPos.x, sparkPos.y, sparkSize);
+        }
+        
+        Draw.blend();
+        Draw.color();
+    });
+
+    /**
      * 切割实体效果 (使用 FrameBuffer + erase blending 实现真正的切割)
      *
      * PU132 原版 draw():
@@ -175,7 +252,7 @@ public class UnitCutEffect {
      * ★ 不使用 Draw.stencil(): Mindustry GL 上下文无 stencil buffer, stencil 操作无效
      * ★ 不使用摄像机偏移: 直接将单位绘制到视觉位置 (startX + offset.x), 效果相同
      */
-    public static final Effect cutEffectEntity = new Effect(80f, 400f, e -> {
+    public static final Effect cutEffectEntity = new Effect(120f, 400f, e -> {
         if (!(e.data instanceof CutData)) return;
         CutData d = (CutData) e.data;
 
@@ -194,15 +271,14 @@ public class UnitCutEffect {
             Fx.fallSmoke.at(tmpPoint2.x, tmpPoint2.y);
         }
 
-        // 末期爆炸 (PU132 update(): time >= lifetime 时触发)
+        // 末期爆炸 (PU132 update(): time >= lifetime 时触发) - 降低爆炸威力
         if (!d.exploded && e.time >= d.lifetime - 1f) {
             d.exploded = true;
             float ex = d.startX + d.cutDirection.x + d.offset.x;
             float ey = d.startY + d.cutDirection.y + d.offset.y;
-            Effect.shake(d.hitSize / 3f, d.hitSize / 3f, ex, ey);
-            Fx.dynamicExplosion.at(ex, ey, d.hitSize / 8f);
-            Effect.scorch(ex, ey, (int) (d.hitSize / 5));
-            Fx.explosion.at(ex, ey);
+            Effect.shake(d.hitSize / 6f, d.hitSize / 6f, ex, ey); // 减少震动
+            Fx.dynamicExplosion.at(ex, ey, d.hitSize / 12f); // 减小爆炸尺寸
+            // 移除 scorch 效果，减少爆炸强度
             if (d.type != null) d.type.deathSound.at(ex, ey);
         }
 
@@ -227,9 +303,38 @@ public class UnitCutEffect {
             buffer.begin(Color.clear);
             Draw.proj(Core.camera);
 
-            // 1. 绘制单位贴图 (normal blending)
+            // 1. 绘制单位贴图 (normal blending) - 添加FO风格熔化色彩
             Draw.blend();
-            Draw.rect(d.region, ux, uy, d.unitRotation + d.rotationOffset - 90f);
+            
+            // 为碎片添加FO风格熔化色彩效果
+            if (d.type != null) {
+                // FO风格金属熔化颜色 (鞍棕色 → 橙红色 → 金色渐变)
+                Color baseColor = Color.valueOf("#8B4513"); // 基础鞍棕色
+                Color meltColor = Color.valueOf("#FF4500"); // 熔化橙红色
+                Color hotColor = Color.valueOf("#FFD700"); // 高温金色
+                
+                // 根据时间渐变熔化效果
+                float time = e.time / e.lifetime;
+                Color finalColor = baseColor.lerp(meltColor, time).lerp(hotColor, Mathf.sin(time * Mathf.PI) * 0.5f);
+                
+                // 添加闪烁效果模拟熔化的高温
+                float flicker = 1f + Mathf.sin(Time.time * 15f) * 0.1f;
+                finalColor.mul(flicker);
+                
+                // 应用熔化色彩
+                Draw.color(finalColor);
+                Draw.rect(d.region, ux, uy, d.unitRotation + d.rotationOffset - 90f);
+                Draw.color(); // 重置颜色
+            } else {
+                // 默认熔化效果
+                Color meltColor = Color.valueOf("#8B4513");
+                float time = e.time / e.lifetime;
+                meltColor.lerp(Color.valueOf("#FF4500"), time);
+                Draw.color(meltColor);
+                Draw.rect(d.region, ux, uy, d.unitRotation + d.rotationOffset - 90f);
+                Draw.color();
+            }
+            
             Draw.flush();
 
             // 2. 擦除切割线一侧 (erase blending: GL_ZERO, GL_ONE_MINUS_SRC_ALPHA)

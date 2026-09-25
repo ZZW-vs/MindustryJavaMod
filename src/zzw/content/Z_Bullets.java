@@ -884,28 +884,79 @@ public class Z_Bullets {
         @Override
         public void draw(Bullet b) {
             float interp = b.fin(Interp.exp10Out);
-            for (int i = 0; i < colors.length; i++) {
-                Draw.color(colors[i]);
-                if (i != 0) {
-                    // 旋转尖刺三角形光球 (替代 UnityDrawf.shiningCircle)
-                    // 中心实心圆
-                    Fill.circle(b.x + Mathf.range(0.5f), b.y + Mathf.range(0.5f), interp * size * scales[i]);
-                    // 旋转尖刺三角形 (按 spikeDuration 周期闪烁)
-                    int spikeCount = 6;
-                    float baseAngle = Time.time * 1.5f - i * 30f;
-                    float radius0 = interp * size * scales[i];
-                    float spikeLen = radius0 * 1.4f;
-                    for (int s = 0; s < spikeCount; s++) {
-                        float ang = baseAngle + s * (360f / spikeCount);
-                        Tmp.v1.trns(ang, spikeLen).add(b);
-                        Tmp.v2.trns(ang + 30f, radius0 * 0.5f).add(b);
-                        Tmp.v3.trns(ang - 30f, radius0 * 0.5f).add(b);
-                        Fill.tri(Tmp.v1.x, Tmp.v1.y, Tmp.v2.x, Tmp.v2.y, Tmp.v3.x, Tmp.v3.y);
-                    }
-                } else {
-                    Fill.circle(b.x + Mathf.range(0.5f), b.y + Mathf.range(0.5f), interp * size * scales[i]);
-                }
+            
+            // 黑洞整体尺寸（大幅缩小）
+            float actualRadius = radius * 0.3f;
+            
+            // 1. 中心黑色圆形（完全黑色的小圆形）
+            Draw.color(Color.black);
+            float coreRadius = interp * size * scales[0] * 0.5f; // 更小的核心
+            Fill.circle(b.x, b.y, coreRadius);
+            
+            // 2. 细金色光圈快速旋转（原版风格）
+            Draw.blend(arc.graphics.Blending.additive);
+            Draw.color(Color.valueOf("FFD700")); // 金色
+            for (int i = 0; i < 4; i++) {
+                float rotationSpeed = Time.time * (4f + i * 0.5f); // 快速旋转
+                float angle = rotationSpeed + i * 90f;
+                float ringRadius = coreRadius * (2f + i * 0.5f);
+                
+                // 绘制细金色光圈
+                Lines.stroke(1f + i * 0.3f);
+                Lines.circle(b.x, b.y, ringRadius);
             }
+            
+            // 3. 灰色半透明圆形粒子系统
+            // 在黑洞影响范围内随机生成灰色半透明圆形
+            for (int i = 0; i < 15; i++) {
+                float angle = Mathf.random(360f);
+                // 从黑洞外圈到外围范围内生成
+                float dist = Mathf.random(actualRadius * 0.8f, actualRadius * 1.8f);
+                float x = b.x + Mathf.cosDeg(angle) * dist;
+                float y = b.y + Mathf.sinDeg(angle) * dist;
+                
+                // 灰色偏透明，大小不一但不能太大
+                float particleSize = Mathf.random(2f, 6f);
+                Color particleColor = Color.valueOf("80808080"); // 灰色半透明
+                Draw.color(particleColor);
+                Fill.circle(x, y, particleSize);
+            }
+            
+            // 4. 粒子向黑洞中心飞行的动画
+            Draw.color(Color.valueOf("A0A0A080")); // 灰色偏透明
+            for (int i = 0; i < 12; i++) {
+                float angle = Mathf.random(360f);
+                float dist = Mathf.random(actualRadius * 0.5f, actualRadius * 1.5f);
+                float x = b.x + Mathf.cosDeg(angle) * dist;
+                float y = b.y + Mathf.sinDeg(angle) * dist;
+                float particleSize = Mathf.random(1.5f, 4f);
+                
+                // 计算向中心移动的目标位置
+                float speed = (1f - dist / (actualRadius * 1.5f)) * 0.15f; // 越近越快
+                float targetDist = Mathf.clamp(dist - speed * actualRadius, coreRadius, dist);
+                float targetX = b.x + Mathf.cosDeg(angle) * targetDist;
+                float targetY = b.y + Mathf.sinDeg(angle) * targetDist;
+                
+                // 绘制粒子轨迹
+                Lines.stroke(particleSize);
+                Lines.line(x, y, targetX, targetY);
+                
+                // 绘制移动中的粒子
+                Fill.circle(targetX, targetY, particleSize * 0.8f);
+            }
+            
+            // 5. 额外的环境效果（微弱的引力场可视化）
+            Draw.color(Color.valueOf("40404040")); // 很淡的灰色
+            for (int i = 0; i < 6; i++) {
+                float angle = Time.time * 0.5f + i * (360f / 6);
+                float fieldRadius = actualRadius * (1.2f + Mathf.sin(Time.time + i) * 0.2f);
+                float x = b.x + Mathf.cosDeg(angle) * fieldRadius;
+                float y = b.y + Mathf.sinDeg(angle) * fieldRadius;
+                
+                Fill.circle(x, y, 3f);
+            }
+            
+            Draw.blend();
             Draw.color();
         }
     }

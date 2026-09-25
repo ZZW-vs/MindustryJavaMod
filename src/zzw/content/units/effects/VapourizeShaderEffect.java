@@ -175,7 +175,7 @@ public class VapourizeShaderEffect extends Effect{
                 blend();
 
                 // 步骤 2: 护盾动画开启时, 重绘目标到帧缓冲并套用汽化着色器
-                if(Vars.renderer.animateShields){
+                if(Vars.renderer.animateShields && UnityShaders.bufferAlt != null){
                     Draw.draw(z() + 0.001f, () -> {
                         float in = Mathf.clamp(fin() * 2f);
 
@@ -194,7 +194,7 @@ public class VapourizeShaderEffect extends Effect{
                         buffer.blit(UnityShaders.vapourizeShader);
                     });
                 }
-            }else if(Vars.renderer.animateShields && data instanceof Building[] drwA && datab != null){
+            }else if(Vars.renderer.animateShields && UnityShaders.bufferAlt != null && data instanceof Building[] drwA && datab != null){
                 // 步骤 3: 批量建筑汽化 —— 逐个视锥剔除后重绘进帧缓冲
                 Draw.draw(Layer.block + 0.001f, () -> {
                     float in = fin();

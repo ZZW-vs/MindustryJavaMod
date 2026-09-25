@@ -495,5 +495,57 @@ public class ChargeFx{
             state.data = trails;
             return state;
         }
-    }.followParent(true);
+    }.followParent(true),
+
+    /**
+     * orb 蓄力光球 (71f) —— surge/白双层收缩圆点 (PU132 UnityFx.orbChargeBegin)。
+     *
+     * <p>★ 设置 {@code followParent(true).rotWithParent(true)}: orb 在充能期间仍会朝目标转动,
+     * 若不跟随父实体, 光球会滞留在生成点原地不动。跟随依赖
+     * {@code at(x, y, rotation, data)} 传入炮塔建筑作为 data
+     * (见 Z_Turrets 中 orb 的 buildType 覆写)。</p>
+     */
+    orbCharge = new Effect(71f, e -> {
+        color(Pal.surge);
+        circle(e.x, e.y, e.fin() * 3f);
+        color();
+        circle(e.x, e.y, e.fin() * 2f);
+    }).followParent(true).rotWithParent(true),
+
+    /**
+     * current 蓄力光球 (260f) —— surge/白双层缓慢生长圆点, 跟随炮台转动/移动
+     * (PU132 UnityFx.currentChargeBegin)。
+     */
+    currentCharge = new Effect(260f, e -> {
+        color(Pal.surge);
+        circle(e.x, e.y, e.fin() * 7f);
+        color();
+        circle(e.x, e.y, e.fin() * 3f);
+    }).followParent(true).rotWithParent(true),
+
+    /**
+     * electrobomb 蓄力 (60f) —— 金色发光充能环, 颜色与子弹一致 ({@link Pal#surge})。
+     *
+     * <p>时间轴: 外层光环从中心外扩, 14 条电弧线向外辐射 (长度随 fout 收缩形成"吸入"感),
+     * 中心金色能量球渐大并带白芯与光照。持续时间与 {@code shoot.firstShotDelay = 60f} 对齐。</p>
+     */
+    electrobombCharge = new Effect(60f, e -> {
+        float fin = e.fin();
+
+        // 1) 金色外层光环 (外扩)
+        color(Pal.surge);
+        stroke(1f + fin * 3f);
+        Lines.circle(e.x, e.y, 6f + e.fout() * 48f);
+
+        // 2) 14 条向外辐射的金色电弧线
+        randLenVectors(e.id, 14, 1f + 22f * e.fout(), e.rotation, 120f, (x, y) -> {
+            lineAngle(e.x + x, e.y + y, Mathf.angle(x, y), e.fslope() * 4f + 1.2f);
+        });
+
+        // 3) 中心金色能量球 + 白芯 + 光照
+        Fill.circle(e.x, e.y, fin * 12f);
+        color();
+        Fill.circle(e.x, e.y, fin * 6f);
+        Drawf.light(e.x, e.y, fin * 45f, Pal.surge, 0.8f);
+    });
 }

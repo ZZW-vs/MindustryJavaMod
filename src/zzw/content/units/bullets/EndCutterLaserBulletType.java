@@ -69,6 +69,28 @@ public class EndCutterLaserBulletType extends AntiCheatBulletTypeBase {
         });
     });
 
+    /**
+     * ★ 分割割痕特效 (FlameOut 风格: 沿切割面双向高亮割痕 + 火花)。
+     *
+     * <p>在 {@link zzw.content.units.effects.UnitCutEffect#createCut} 触发处额外播放,
+     * 让"一刀切两半"的瞬间有明确的视觉反馈, 提升原版激光分割单位的观感。</p>
+     */
+    public Effect cutScarEffect = new Effect(24f, e -> {
+        // 双向割痕 (垂直于激光方向)
+        Draw.color(Color.valueOf("f53036"), Color.white, e.fout());
+        Lines.stroke(2.5f * e.fout());
+        for (int s : Mathf.signs) {
+            Lines.lineAngleCenter(e.x, e.y, e.rotation + 90f * s, e.fin() * 80f);
+        }
+        // 割痕周围火花
+        randLenVectors(e.id, 8, 70f * e.fin(), e.rotation + 90f, 60f, (x, y) -> {
+            Draw.color(Color.valueOf("ff786e"), Color.white, e.fout());
+            Lines.stroke(1.8f * e.fout());
+            Lines.lineAngleCenter(e.x + x, e.y + y, Mathf.angle(x, y), e.fslope() * 10f);
+        });
+        Draw.reset();
+    });
+
     // 激光数据 (PU132 LaserData)
     private static class LaserData {
         float velocity = 0f;
@@ -76,6 +98,8 @@ public class EndCutterLaserBulletType extends AntiCheatBulletTypeBase {
         float restartTime = 0f;
         float lightningTime = 0f;
         float lastLength = 0f;
+        /** 已被切割过的单位 id (防止同一单位被重复触发切割动画) */
+        arc.struct.IntSet cutUnits = new arc.struct.IntSet();
     }
 
     public EndCutterLaserBulletType(float damage) {
@@ -118,7 +142,12 @@ public class EndCutterLaserBulletType extends AntiCheatBulletTypeBase {
             Lines.lineAngle(b.x, b.y, b.rotation(), b.fdata);
         }
 
+        // ★ FlameOut 风格 z 分层: 每层用 1/10000 步长微调 z 值,
+        //   保证"外圈→核心"多色叠层稳定排序 (对应 FlameOut 分段渲染的 z 层级递减思路,
+        //   激光此处改为递增, 使最亮的核心色始终压在最上层)
+        float baseZ = Draw.z();
         for (int i = 0; i < colors.length; i++) {
+            Draw.z(baseZ + (i + 1f) / 10000f);
             float f = ((float) (colors.length - i) / colors.length);
             float w = f * (width + Mathf.absin(Time.time + (i * 1.4f), 1.1f, width / 4)) * fade;
 
@@ -137,6 +166,7 @@ public class EndCutterLaserBulletType extends AntiCheatBulletTypeBase {
                 }
             }
         }
+        Draw.z(baseZ);
         Tmp.v2.trns(b.rotation(), b.fdata + tipHeight).add(b);
         // ★ v158 Drawf.light 无 Team 参数版本: light(x1, y1, x2, y2, stroke, color, alpha)
         Drawf.light(b.x, b.y, Tmp.v2.x, Tmp.v2.y, width * 2f, colors[0], 0.5f);
@@ -274,9 +304,21 @@ public class EndCutterLaserBulletType extends AntiCheatBulletTypeBase {
                 // ★ 修复: unit.damage() → kill() → remove() 后 isValid() 返回 false, 但 dead=true 或 health<=0 仍可判断
                 // ★ 修复: 移除 createCut 中的 isValid() 检查, 改用 unit.type != null
                 if ((u.dead || u.health <= 0f) && u.hitSize >= 30f) {
+                    // ★ 去重: 同一单位只触发一次切割 (避免重复创建切割动画导致画面混乱)
+                    LaserData data = (b.data instanceof LaserData ld) ? ld : null;
+                    if (data != null) {
+                        if (data.cutUnits.contains(u.id)) continue;
+                        data.cutUnits.add(u.id);
+                    }
                     // 激光延伸方向 (用于切割方向计算)
                     Tmp.v2.trns(b.rotation(), maxLength * 1.5f).add(b);
                     UnitCutEffect.createCut(u, b.x, b.y, Tmp.v2.x, Tmp.v2.y);
+                    // ★ 额外割痕特效: 强化"分割单位"瞬间的视觉反馈
+                    UnitCutEffect.cutScarEffect.at(u.x, u.y, 0f, u.hitSize);
+                    // ★ 增强分割效果：添加更多视觉特效
+                    for (int i = 0; i < 3; i++) {
+                        mindustry.content.Fx.blastExplosion.at(u.x + Mathf.range(20f), u.y + Mathf.range(20f));
+                    }
                     // ★ 延迟 remove, 让切割特效有时间渲染 unit
                     // PU_V8 用 AntiCheat.annihilateEntity(unit, true) 仅移除 groups 但不调用 unit.remove()
                     // 此处标记 dead 并用 Time.run 延迟 remove (特效持续时间内保持可绘制)

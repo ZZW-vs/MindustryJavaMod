@@ -1,10 +1,13 @@
 package zzw.content.blocks.turrets;
 
+import arc.Core;
 import arc.graphics.Blending;
+import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Angles;
 import arc.math.Mathf;
+import arc.util.Strings;
 import arc.util.Time;
 import arc.util.io.Reads;
 import arc.util.io.Writes;
@@ -12,8 +15,12 @@ import mindustry.entities.Effect;
 import mindustry.entities.bullet.BulletType;
 import mindustry.gen.Bullet;
 import mindustry.gen.Building;
+import mindustry.type.Liquid;
+import mindustry.ui.Styles;
 import mindustry.world.blocks.defense.turrets.PowerTurret;
 import mindustry.world.draw.DrawTurret;
+import mindustry.world.meta.Stat;
+import mindustry.world.meta.StatUnit;
 import zzw.content.units.effects.ChargeEffect;
 
 /**
@@ -46,6 +53,8 @@ public class EndLaserTurret extends PowerTurret {
     public float resistScl = 0.25f;
     public TextureRegion[] lightRegions;
     public TextureRegion baseOutline;
+    /** 液体冷却强化表 */
+    public arc.struct.ObjectFloatMap<mindustry.type.Liquid> coolantBoost = new arc.struct.ObjectFloatMap<>();
 
     // 自定义充能参数 (v155.4 PowerTurret 无这些字段)
     public float shootLength = 8f;
@@ -112,6 +121,36 @@ public class EndLaserTurret extends PowerTurret {
         }
         // 加载底座叠加层 (tenmeikiri-base-outline)
         baseOutline = arc.Core.atlas.find(name + "-base-outline");
+    }
+
+    @Override
+    public void setStats() {
+        super.setStats();
+
+        // ★ 强化配方: 直接展示固定百分比 (冷冻液 220%), 覆盖原版按热容计算的奇怪数值
+        if (coolant != null && !coolantBoost.isEmpty()) {
+            stats.replace(Stat.booster, table -> {
+                table.row();
+                table.table(c -> {
+                    for (Liquid liquid : mindustry.Vars.content.liquids()) {
+                        float boost = coolantBoost.get(liquid, -1f);
+                        if (boost < 0f) continue;
+
+                        c.table(Styles.grayPanel, b -> {
+                            b.image(liquid.uiIcon).size(40).pad(10f).left();
+                            b.table(info -> {
+                                info.add(liquid.localizedName).left().row();
+                                info.add(Strings.autoFixed(coolant.amount * 60f, 2) + StatUnit.perSecond.localized())
+                                        .left().color(Color.lightGray);
+                            });
+                            b.add(Core.bundle.format("bullet.reload", Strings.autoFixed((1f + boost) * 100f, 2)))
+                                    .pad(10f).right().grow().padRight(15f);
+                        }).growX().pad(5).row();
+                    }
+                }).growX().colspan(table.getColumns());
+                table.row();
+            });
+        }
     }
 
     public class EndLaserTurretBuild extends PowerTurretBuild {
@@ -255,7 +294,23 @@ public class EndLaserTurret extends PowerTurret {
         @Override
         protected void updateCooling() {
             // 激光激活期间不进行冷却 (避免 reload 期间激光中断)
-            if (bullet == null) super.updateCooling();
+            if (bullet != null) return;
+
+            // ★ 强化配方: 用固定百分比表推进装填 (boost=1.20 → 220%), 与面板显示一致
+            if (!coolantBoost.isEmpty()) {
+                if (coolant == null || coolant.efficiency(this) <= 0f || efficiency <= 0f) return;
+
+                float boost = coolantBoost.get(liquids.current(), 0f);
+                float amount = coolant.amount * coolant.efficiency(this);
+                coolant.update(this);
+                reloadCounter += edelta() * boost;
+
+                if (Mathf.chance(0.06 * amount)) {
+                    coolEffect.at(x + Mathf.range(size * mindustry.Vars.tilesize / 2f), y + Mathf.range(size * mindustry.Vars.tilesize / 2f));
+                }
+                return;
+            }
+            super.updateCooling();
         }
 
         @Override

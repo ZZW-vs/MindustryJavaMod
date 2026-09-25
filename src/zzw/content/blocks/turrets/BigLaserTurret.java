@@ -4,17 +4,16 @@ import arc.graphics.Blending;
 import arc.graphics.g2d.Draw;
 import arc.math.Interp;
 import arc.util.Tmp;
-import mindustry.world.blocks.defense.turrets.LaserTurret;
 import mindustry.world.blocks.defense.turrets.Turret;
 import mindustry.world.draw.DrawTurret;
 
 /**
  * 大型激光炮台 (PU_V8 BigLaserTurret 移植版)
- * 继承 LaserTurret, 自定义过热贴图渲染 (加法混合 + 自定义颜色曲线)
+ * 继承 {@link BoostLaserTurret} (支持 coolantBoost 固定百分比效率加成), 自定义过热贴图渲染 (加法混合 + 自定义颜色曲线)
  * 简化: 用 Interp.pow5In 替代 PU_V8 Utils.pow6In (v158 无 Utils 类)
  * 参考: PU_V8 main/src/unity/world/blocks/defense/turrets/BigLaserTurret.java
  */
-public class BigLaserTurret extends LaserTurret {
+public class BigLaserTurret extends BoostLaserTurret {
 
     public BigLaserTurret(String name) {
         super(name);

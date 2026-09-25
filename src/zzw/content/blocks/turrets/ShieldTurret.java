@@ -32,6 +32,10 @@ public class ShieldTurret extends PowerTurret {
                 bulletY = y + arc.math.Angles.trnsy(rotation - 90, shootX + xOffset, shootY + yOffset),
                 shootAngle = rotation + angleOffset;
             handleBullet(type.create(this, team, bulletX, bulletY, shootAngle, spdScl, 1f), xOffset, yOffset, shootAngle - rotation);
+
+            // ★ 父类 TurretBuild.bullet() 里才会播放开火音效, 但本方法覆写后未调用 super,
+            //   导致 shootSound 从未播放 (只剩 chargeSound 在充能阶段响)。这里在实际发射时补播。
+            shootSound.at(bulletX, bulletY, Mathf.random(soundPitchMin, soundPitchMax), shootSoundVolume);
         }
 
         @Override

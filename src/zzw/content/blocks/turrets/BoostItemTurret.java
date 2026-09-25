@@ -83,6 +83,11 @@ public class BoostItemTurret extends ItemTurret {
             if (coolant == null || coolant.efficiency(this) <= 0f || efficiency <= 0f) return;
 
             float boost = coolantBoost.get(liquids.current(), 0f);
+            if (boost <= 0f) {
+                super.updateCooling();
+                return;
+            }
+
             float amount = coolant.amount * coolant.efficiency(this);
             coolant.update(this);
             reloadCounter += edelta() * boost;

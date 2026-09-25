@@ -60,17 +60,29 @@ public class WavefrontTurret extends PowerTurret {
         @Override
         public void updateTile() {
             super.updateTile();
-            if (isShooting() && canConsume()) {  // v155.4: consValid() → canConsume()
-                gap = Math.min(0.5f, gap + (0.005f * Time.delta));
-                // PU_V8: angle += (reload / reloadTime) * objectRotationSpeed;
-                // v155.4: reloadTime → reload (Block 字段); reload (Build 计数器) → reloadCounter
-                angle += (reloadCounter / reload) * objectRotationSpeed;
-                animTime = Mathf.approach(animTime, 40f, Time.delta);
+            
+            // 检查是否正在蓄力
+            boolean isCharging = isShooting() && canConsume() && reloadCounter < reload;
+            
+            if (isCharging || waitTime > 0f) {  // 蓄力或激光发射期间，炮台不能转动
+                angle = Mathf.slerp(angle, Mathf.round(angle / 90f) * 90f, 0.1f);  // 保持角度不变
             } else {
                 angle = Mathf.slerp(angle, Mathf.round(angle / 90f) * 90f, 0.1f);
                 if (resetAvailable()) {
                     gap = Math.max(0f, gap - (0.005f * Time.delta));
                 }
+            }
+
+            if (isShooting() && canConsume()) {  // v155.4: consValid() → canConsume()
+                gap = Math.min(0.5f, gap + (0.005f * Time.delta));
+                // PU_V8: angle += (reload / reloadTime) * objectRotationSpeed;
+                // v155.4: reloadTime → reload (Block 字段); reload (Build 计数器) → reloadCounter
+                // 只有在非蓄力且非激光发射时才旋转
+                if (!isCharging && waitTime <= 0f) {
+                    angle += (reloadCounter / reload) * objectRotationSpeed;
+                }
+                animTime = Mathf.approach(animTime, 40f, Time.delta);
+            } else {
                 animTime = Mathf.approach(animTime, 0f, Time.delta);
             }
 
@@ -81,7 +93,9 @@ public class WavefrontTurret extends PowerTurret {
 
         @Override
         public boolean shouldTurn() {
-            return super.shouldTurn() && waitTime <= 0f;
+            // 检查是否正在蓄力
+            boolean isCharging = isShooting() && canConsume() && reloadCounter < reload;
+            return super.shouldTurn() && waitTime <= 0f && !isCharging;
         }
 
         @Override

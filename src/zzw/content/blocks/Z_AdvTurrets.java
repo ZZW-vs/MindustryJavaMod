@@ -1,12 +1,15 @@
 package zzw.content.blocks;
 
+import arc.graphics.Blending;
 import arc.graphics.Color;
 import arc.math.Angles;
 import arc.math.Mathf;
 import arc.util.Time;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
+import arc.graphics.g2d.Lines;
 import mindustry.content.Fx;
+import mindustry.entities.Effect;
 import mindustry.entities.Lightning;
 import mindustry.content.Items;
 import mindustry.entities.bullet.BasicBulletType;
@@ -36,7 +39,6 @@ import zzw.content.blocks.turrets.ObjPowerTurret;
 import zzw.content.blocks.turrets.PrismTurret;
 import zzw.content.blocks.turrets.WavefrontTurret;
 import zzw.content.units.bullets.EndCutterLaserBulletType;
-import zzw.content.units.bullets.ArcnelidiaCutterLaserBulletType;
 import zzw.content.units.bullets.PointBlastLaserBulletType;
 import zzw.content.units.bullets.WavefrontLaserBulletType;
 import zzw.content.units.effects.ChargeEffect;
@@ -83,6 +85,37 @@ public class Z_AdvTurrets {
     // ===== 3D 模型炮台 (伪 3D, WavefrontObject) =====
     public static ObjPowerTurret cube;
     public static WavefrontTurret wavefront;
+
+    /**
+     * wavefront 蓄力闪电特效 (内联实现, 避免改动 ChargeFx.java 与其他 agent 冲突)。
+     *
+     * <p>蓄力期间在炮口周围缠绕数道闪电弧, 并随进度收束到中心, 蓄力完成瞬间闪白。</p>
+     */
+    static final Effect wavefrontChargeLightning = new Effect(120f, 300f, e -> {
+        Draw.blend(Blending.additive);
+        for(int i = 0; i < 4; i++){
+            float base = e.rotation + i * 90f + e.time * 4f;
+            float len = (1f - e.fout()) * 46f;
+            Draw.color(Color.valueOf("a3e3ff"), Color.white, e.fin());
+            Lines.stroke(2f * e.fout());
+            float px = e.x, py = e.y;
+            for(int s = 0; s < 4; s++){
+                float a = base + Mathf.range(35f);
+                float nx = e.x + Mathf.cosDeg(a) * (len * (s + 1) / 4f);
+                float ny = e.y + Mathf.sinDeg(a) * (len * (s + 1) / 4f);
+                Lines.line(px, py, nx, ny);
+                px = nx;
+                py = ny;
+            }
+        }
+        Draw.color(Color.white, Color.valueOf("a3e3ff"), e.fin());
+        // ★ 增大光球尺寸，从蓄力开始就显示
+        // 使用e.fin()而不是e.fout()，让光球从蓄力开始就显示
+        float ballSize = 20f * e.fin();  // 从蓄力开始就显示，逐渐增大
+        Fill.circle(e.x, e.y, ballSize);
+        Draw.blend();
+        Draw.color();
+    });
 
 
     /**
@@ -290,6 +323,7 @@ public class Z_AdvTurrets {
             // ★ 副弹幕: 激光 (PU_V8 BurstPowerTurret.subShootType)
             subShootType = new LaserBulletType(288f) {{  // PU_V8 原版 damage=288f
                 length = 180f;
+                width = 24f;  // ★ 激光加粗 (原 15f → 24f)
                 sideAngle = 45f;
                 inaccuracy = 8f;
                 colors = new Color[]{Pal.lancerLaser.cpy().a(0.4f), Pal.lancerLaser, Color.white};
@@ -391,8 +425,8 @@ public class Z_AdvTurrets {
             // ★ v158 操控手感修复: PU132 原版 rotateSpeed=1f + inherits 充能时 firingMoveFract=0.25
             //   导致玩家操控时炮管转速极低, 鼠标刚移到别的方向炮管追不上, shootCone 内永远不满足
             //   → 只有鼠标对准炮台当前面朝方向才充能开火 (表现为"只有面向炮管方向才响应")
-            // 提高到 6f 接近 v158 默认(5f)并让充能时仍保留一半转速(0.5), 操控明显跟手
-            rotateSpeed = 3f;  // 转动速度上限调小
+            // 降低到 1.5f 让炮台转动更缓慢，提供更好的瞄准体验
+            rotateSpeed = 1.5f;  // 转动速度上限调小
             firingMoveFract = 0.5f;
             recoil = 4f;
             shootCone = 15f;
@@ -531,7 +565,14 @@ public class Z_AdvTurrets {
             consumePower(260f);
             coolantMultiplier = 0.9f;
             shootSound = Sounds.shootLancer;  // ★ v155.4 替代 UnitySounds.cubeBlast (无 shootBig)
-            shootType = new WavefrontLaserBulletType(2400f);
+            // ★ 蓄力闪电特效: 开火前摇 90f, 蓄力期间锁定炮管不转动
+            shoot.firstShotDelay = 90f;
+            moveWhileCharging = false;
+            chargeSound = Sounds.chargeLancer;
+            shootType = new WavefrontLaserBulletType(2400f) {{
+                maxLength = 700f;                          // ★ 激光加长 (450 → 700)
+                chargeEffect = wavefrontChargeLightning;   // ★ 蓄力闪电特效 (内联)
+            }};
         }};
     }
 
@@ -564,7 +605,7 @@ public class Z_AdvTurrets {
             shootSound = Z_Sounds.tenmeikiriShoot;
             shake = 4f;
             rotateSpeed = 1.5f;  // 转动速度上限调小
-            shootType = new ArcnelidiaCutterLaserBulletType(12000f) {{
+            shootType = new EndCutterLaserBulletType(12000f) {{
                 maxLength = 1200f;
                 lifetime = 3f * 60f;
                 width = 30f;
@@ -577,14 +618,6 @@ public class Z_AdvTurrets {
                 lightningLength = 15;
                 // 防作弊参数 (PU132 tenmeikiri 原版值)
                 ratioDamage = 1f / 40f;
-                
-                // ★ 基于FlameOut arcnelidia技术的分割配置
-                segmentCount = 8;           // 分割段数
-                segmentOffset = 22.7f;      // 段间距
-                angleLimit = 30f;           // 角度限制
-                anglePhysicsSmooth = 0.1f;  // 角度平滑度
-                jointStrength = 0.6f;       // 关节强度
-                segmentCast = 6;            // 传播段数
             }};
             // ★ 强化配方: 冷冻液 220% 伤害 123456
             coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.cryofluid, 1f));

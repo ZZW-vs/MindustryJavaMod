@@ -434,8 +434,9 @@ public class Z_Exp {
 
             // branchLaser 子弹: 激光 + 3 发 frag (branchLaserFrag)
             // PU_V8: ExpLaserBulletType(140, 20) + fragBullet=branchLaserFrag + fragBullets=3
-            // ★ 用户调整: 伤害 150 → 120
-            shootType = new ExpLaserBulletType(120f, 20f){{
+            // ★ 用户调整: 伤害 20 → 120 (注意 ExpLaserBulletType 参数为 (length, damage),
+            //   长度保持 150f 不变, 仅提升第二参数 damage)
+            shootType = new ExpLaserBulletType(150f, 120f){{
                 colors = new Color[]{
                         Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.5f).a(0.4f),
                         Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.5f),
@@ -552,8 +553,9 @@ public class Z_Exp {
             heatColor = mindustry.graphics.Pal.redderDust;
             toColor = UnityPal.exp;
 
-            // ★ 用户调整: 伤害 240 → 560
-            shootType = new ExpLaserBulletType(560f, 150f){{
+            // ★ 用户调整: 伤害 150 → 560 (注意 ExpLaserBulletType 参数为 (length, damage),
+            //   长度保持原设定的 240f 不变, 仅提升第二参数 damage)
+            shootType = new ExpLaserBulletType(240f, 560f){{
                 colors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser.cpy().a(0.4f), mindustry.graphics.Pal.lancerLaser, UnityPal.exp};
                 // ★ 充能特效: 自定义略放大版 Lancer 光环, 颜色与激光一致 (Pal.lancerLaser)
                 chargeEffect = zzw.content.units.effects.ChargeFx.btLaserCharge;

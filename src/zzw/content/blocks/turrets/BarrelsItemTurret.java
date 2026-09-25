@@ -2,12 +2,15 @@ package zzw.content.blocks.turrets;
 
 import arc.Core;
 import arc.graphics.Color;
+import arc.graphics.g2d.Draw;
+import arc.graphics.g2d.TextureRegion;
 import arc.math.Angles;
 import arc.math.Mathf;
 import arc.math.geom.Vec2;
 import arc.struct.ObjectFloatMap;
 import arc.struct.Seq;
 import arc.util.Strings;
+import arc.util.Time;
 import mindustry.entities.bullet.BulletType;
 import mindustry.entities.pattern.ShootAlternate;
 import mindustry.type.Liquid;
@@ -18,26 +21,13 @@ import mindustry.world.meta.StatUnit;
 
 import static mindustry.Vars.tilesize;
 
-/**
- * 多管物品炮台 (PU_V8 BarrelsItemTurret 完整移植)
- * ghost/banshee: 支持多炮管独立装填, focus 模式下所有炮管集中瞄准目标点
- * ★完整移植 PU_V8 原版机制 (v155.4 API 适配):
- *  - shoot(): focus 模式下使用 barrelCounter 交替 + spread + xRand 计算位置
- *  - shootBarrel(): 各炮管独立装填计数, focus 模式下瞄向目标点
- *  - bullet() 5 参方法 (v155.4): 自动处理声音/特效/反冲/弹药消耗
- *  - 使用 barrelCounter 替代 PU_V8 shotCounter (v155.4 无 shotCounter 字段)
- *  - 使用 tr3 自有 Vec2 替代 PU_V8 tr (v155.4 ItemTurretBuild 无 tr 字段)
- *  - spread 从 ShootAlternate 模式提取 (v155.4 无独立 spread 字段)
- * 参考: PU_V8 main/src/unity/world/blocks/defense/turrets/BarrelsItemTurret.java
- */
 public class BarrelsItemTurret extends ItemTurret {
     protected final Seq<Barrel> barrels = new Seq<>(1);
     protected boolean focus;
     protected Vec2 tr3 = new Vec2();
+    protected float barrelSpread = 12f;
+    protected int barrelShots = 1;
 
-    /**
-     * 自定义冷却强化表: 液体 → 额外装填速度比例 (0.2 表示 +20%, 即 120%)。
-     */
     public ObjectFloatMap<Liquid> coolantBoost = new ObjectFloatMap<>();
 
     public BarrelsItemTurret(String name){
@@ -48,10 +38,40 @@ public class BarrelsItemTurret extends ItemTurret {
         barrels.add(new Barrel(x, y, reloadTime));
     }
 
+    /**
+     * 自定义冷却强化显示: 直接展示固定百分比 (120% / 145% ...)。
+     *
+     * <p>原版公式 {@code 1 + 消耗量 × coolantMultiplier × 液体热容} 因水 (0.4) 与
+     * 冷冻液 (0.9) 热容不同, 算出的百分比很难看; 这里用 {@link #coolantBoost}
+     * 直接指定每种液体的效率加成, 面板也同步显示。</p>
+     */
     @Override
-    public void load(){
-        super.load();
-        baseRegion = Core.atlas.find("unity-block-" + size);
+    public void setStats(){
+        super.setStats();
+
+        if (coolant != null && !coolantBoost.isEmpty()) {
+            stats.replace(Stat.booster, table -> {
+                table.row();
+                table.table(c -> {
+                    for (Liquid liquid : mindustry.Vars.content.liquids()) {
+                        float boost = coolantBoost.get(liquid, -1f);
+                        if (boost < 0f) continue;
+
+                        c.table(Styles.grayPanel, b -> {
+                            b.image(liquid.uiIcon).size(40).pad(10f).left();
+                            b.table(info -> {
+                                info.add(liquid.localizedName).left().row();
+                                info.add(Strings.autoFixed(coolant.amount * 60f, 2) + StatUnit.perSecond.localized())
+                                        .left().color(Color.lightGray);
+                            });
+                            b.add(Core.bundle.format("bullet.reload", Strings.autoFixed((1f + boost) * 100f, 2)))
+                                    .pad(10f).right().grow().padRight(15f);
+                        }).growX().pad(5).row();
+                    }
+                }).growX().colspan(table.getColumns());
+                table.row();
+            });
+        }
     }
 
     protected class Barrel{
@@ -67,51 +87,84 @@ public class BarrelsItemTurret extends ItemTurret {
     public class BarrelsItemTurretBuild extends ItemTurretBuild{
         protected float[] barrelReloads = new float[barrels.size];
         protected int[] barrelShotCounters = new int[barrels.size];
+        protected int barrelCounter = 0;
 
         @Override
         protected void shoot(BulletType type){
             if(focus){
-                recoil = recoilAmount;
+                recoil = 2f;
                 heat = 1f;
-                float i = shotCounter % 2 - 0.5f;
-                for(int s = 0; s < shots; s++){
-                    float offset = (s - shots / 2f + 0.5f) * spread;
-                    tr3.trns(rotation + offset, xRand() * range * 0.1f);
-                    bullet(type, x + tr3.x, y + tr3.y, rotation + offset + Mathf.random(-inaccuracy, inaccuracy), Mathf.random(), null);
+                float i = barrelCounter % 2 - 0.5f;
+                barrelCounter++;
+                for(int s = 0; s < barrelShots; s++){
+                    float offset = (s - barrelShots / 2f + 0.5f) * barrelSpread;
+                    tr3.trns(rotation + offset, Mathf.random(-1f, 1f) * range * 0.1f);
+                    bullet(type, x + tr3.x, y + tr3.y, rotation + offset + Mathf.random(-inaccuracy, inaccuracy), null);
                 }
             }else{
                 super.shoot(type);
             }
         }
 
-        @Override
         protected void shootBarrel(int barrel, BulletType type){
-            if(barrelReloads[barrel] >= reloadTime){
+            if(barrelReloads[barrel] >= barrels.get(barrel).reloadTime){
                 barrelReloads[barrel] = 0f;
                 barrelShotCounters[barrel]++;
-                recoil = recoilAmount;
+                recoil = 2f;
                 heat = 1f;
-                float angle = rotation + barrels.get(barrel).x * Angles.lenient(barrels.get(barrel).y);
-                bullet(type, x + barrels.get(barrel).x, y + barrels.get(barrel).y, angle + Mathf.random(-inaccuracy, inaccuracy), Mathf.random(), null);
+                float angle = rotation + barrels.get(barrel).x * Mathf.sinDeg(barrels.get(barrel).y);
+                bullet(type, x + barrels.get(barrel).x, y + barrels.get(barrel).y, angle + Mathf.random(-inaccuracy, inaccuracy), null);
             }
         }
 
         @Override
-        public void updateTile(){
-            super.updateTile();
-            for(int i = 0; i < barrelReloads.length; i++){
-                barrelReloads[i] += efficiency() * reloadTime * Time.delta;
+        protected void updateShooting(){
+            super.updateShooting();
+
+            // ★ 多管独立装填: 每根管子按自身 reloadTime 循环 (参考 PU_V8 BarrelsItemTurret)
+            //   注意必须用 delta() (帧增量) 累加, 之前写成 reload * Time.delta 会导致每帧都触发一次开火
+            for(int i = 0, len = barrels.size; i < len; i++){
+                if(!hasAmmo()) break;
+
+                if(barrelReloads[i] >= barrels.get(i).reloadTime){
+                    shootBarrel(i, peekAmmo());
+                    barrelReloads[i] = 0f;
+                }else{
+                    barrelReloads[i] += delta() * peekAmmo().reloadMultiplier * baseReloadSpeed();
+                }
+            }
+        }
+
+        /**
+         * 覆写冷却推进: 使用 {@link BarrelsItemTurret#coolantBoost} 里的固定百分比。
+         *
+         * <p>原版实现是 {@code reloadCounter += 消耗量 × 热容 × coolantMultiplier},
+         * 换成 {@code edelta() × boost} 后, 装填速度正好是 {@code 1 + boost}。</p>
+         */
+        @Override
+        protected void updateCooling(){
+            if(coolantBoost.isEmpty()){
+                super.updateCooling();
+                return;
+            }
+
+            if(coolant == null || coolant.efficiency(this) <= 0f || efficiency <= 0f) return;
+
+            float boost = coolantBoost.get(liquids.current(), 0f);
+            float amount = coolant.amount * coolant.efficiency(this);
+            coolant.update(this);
+            reloadCounter += edelta() * boost;
+
+            if(Mathf.chance(0.06 * amount)){
+                coolEffect.at(x + Mathf.range(size * tilesize / 2f), y + Mathf.range(size * tilesize / 2f));
             }
         }
 
         @Override
         public void draw(){
-            Draw.rect(baseRegion, x, y);
-            Draw.color();
-            for(int i = 0; i < barrels.size; i++){
-                Barrel barrel = barrels.get(i);
-                Draw.rect(region, x + barrel.x, y + barrel.y, rotation - 90);
-            }
+            // ★ 恢复原版绘制逻辑: 绘制底座 + 炮管
+            // 本 mod 有整炮贴图，按原版方式绘制底座和炮管
+            Draw.rect(region, x, y, rotation - 90);
         }
     }
 }
