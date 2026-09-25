@@ -20,6 +20,8 @@ import mindustry.gen.Sounds;
 import mindustry.graphics.Pal;
 import mindustry.type.Category;
 import mindustry.type.ItemStack;
+import mindustry.world.consumers.ConsumeLiquidFilter;
+import mindustry.world.consumers.Consume;
 import zzw.content.Z_Items;
 import zzw.content.Z_Sounds;
 import zzw.content.blocks.soul.SoulAbsorberTurret;
@@ -106,7 +108,8 @@ public class Z_AdvTurrets {
             size = 1;
             health = 320;
             consumePower(1f);
-            damage = 120f;
+            // ★ 伤害平衡: 基础每秒伤害 105 (原 damage=120 每 tick, 面板显示过高, 现统一下调)
+            baseDamage = 105f;
             range = 120f;
             shootCone = 6f;
             rotateSpeed = 10f;
@@ -189,7 +192,8 @@ public class Z_AdvTurrets {
             health = 720;
             range = 150f;
             // ★ SoulAbsorberTurret 自身 outputsPower=true, 不调用 consumePower
-            damage = 80f;
+            // ★ 伤害平衡: 基础每秒伤害 80 → 70 (面板显示过高, 统一下调)
+            baseDamage = 70f;
             shootCone = 6f;
             rotateSpeed = 10f;
             force = 0.3f;
@@ -223,7 +227,8 @@ public class Z_AdvTurrets {
             size = 2;
             range = 120f;
             consumePower(2f);
-            damage = 240f;
+            // ★ 伤害平衡: 基础每秒伤害 240 → 210 (面板显示过高, 统一下调)
+            baseDamage = 210f;
             shootCone = 6f;
             rotateSpeed = 10f;
             force = 0f;
@@ -277,6 +282,11 @@ public class Z_AdvTurrets {
             maxSouls = 7;
             efficiencyFrom = 0.7f;
             efficiencyTo = 1.67f;
+            // ★ 强化配方: 水 130%, 冷冻液 200%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.30f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 1.00f);
             // ★ 副弹幕: 激光 (PU_V8 BurstPowerTurret.subShootType)
             subShootType = new LaserBulletType(288f) {{  // PU_V8 原版 damage=288f
                 length = 180f;
@@ -307,7 +317,8 @@ public class Z_AdvTurrets {
             health = 1680;
             range = 180f;
             consumePower(4f);
-            damage = 480f;
+            // ★ 伤害平衡: 基础每秒伤害 480 → 419 (面板显示过高, 统一下调)
+            baseDamage = 419f;
             shootCone = 6f;
             rotateSpeed = 10f;
             force = 0f;
@@ -381,7 +392,7 @@ public class Z_AdvTurrets {
             //   导致玩家操控时炮管转速极低, 鼠标刚移到别的方向炮管追不上, shootCone 内永远不满足
             //   → 只有鼠标对准炮台当前面朝方向才充能开火 (表现为"只有面向炮管方向才响应")
             // 提高到 6f 接近 v158 默认(5f)并让充能时仍保留一半转速(0.5), 操控明显跟手
-            rotateSpeed = 6f;
+            rotateSpeed = 3f;  // 转动速度上限调小
             firingMoveFract = 0.5f;
             recoil = 4f;
             shootCone = 15f;
@@ -487,7 +498,7 @@ public class Z_AdvTurrets {
             moveWhileCharging = false;
             chargeSound = Sounds.chargeLancer;
             shootSound = Sounds.shootLancer;  // ★ v155.4 替代 UnitySounds.cubeBlast (无 shootBig)
-            shootType = new PointBlastLaserBulletType(900f) {{
+            shootType = new PointBlastLaserBulletType(1200f) {{
                 length = 320f;
                 lifetime = 17f;
                 pierce = true;
@@ -497,6 +508,9 @@ public class Z_AdvTurrets {
                 auraDamage = 8000f;
                 damageRadius = 120f;
                 laserColors = new Color[]{Color.valueOf("a3e3ff")};  // UnityPal.advance
+                // ★ 大激光伤害提高 (900 → 1200), 命中单位附加 shocked
+                status = mindustry.content.StatusEffects.shocked;
+                statusDuration = 60f;
             }};
         }};
 
@@ -512,7 +526,7 @@ public class Z_AdvTurrets {
             object = ZObjs.wavefront;
             size = 15;
             range = 420f;
-            rotateSpeed = 3f;
+            rotateSpeed = 2f;  // 转动速度上限调小
             reload = 240f;
             consumePower(260f);
             coolantMultiplier = 0.9f;
@@ -549,6 +563,7 @@ public class Z_AdvTurrets {
             chargeSound = Z_Sounds.tenmeikiriCharge;
             shootSound = Z_Sounds.tenmeikiriShoot;
             shake = 4f;
+            rotateSpeed = 1.5f;  // 转动速度上限调小
             shootType = new EndCutterLaserBulletType(12000f) {{
                 maxLength = 1200f;
                 lifetime = 3f * 60f;
@@ -562,14 +577,13 @@ public class Z_AdvTurrets {
                 lightningLength = 15;
                 // 防作弊参数 (PU132 tenmeikiri 原值)
                 ratioDamage = 1f / 40f;
-                ratioStart = 30000f;
-                overDamage = 200000f;
-                bleedDuration = 5f * 60f;
             }};
-            // 冷却液体 (可选 booster, 非必需): 加快射速, 不影响攻击
-            // consumeCoolant 会添加到 consumes 列表, BaseTurret.init() 自动设 optional=true + booster=true
-            // maxTemp=0.25f 匹配 PU_V8 原版过滤条件 (低温不易燃液体)
-            consumeCoolant(3.1f).maxTemp = 0.25f;
+            // ★ 强化配方: 冷冻液 220% 伤害 123456
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.cryofluid, 1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 1.20f);
+            // ★ 修改伤害为 123456
+            shootType.damage = 123456f;
         }};
 
         // ===== endGame (PU_V8 L3586-3607, EndGameTurret) =====
@@ -580,20 +594,11 @@ public class Z_AdvTurrets {
                 Z_Items.darkAlloy, 2300, Z_Items.lightAlloy, 2300, Z_Items.advanceAlloy, 2300,
                 Z_Items.plagueAlloy, 2300, Z_Items.sparkAlloy, 2300, Z_Items.monolithAlloy, 2300,
                 Z_Items.superAlloy, 2300, Z_Items.terminum, 1600, Z_Items.terminaAlloy, 800, Z_Items.terminationFragment, 100));
-            // PU_V8 L3593-3600: shootCone=360, reloadTime=430, range=820, size=14, coolantMultiplier=0.6
-            // shootCone/reload/range/size 已在 EndGameTurret 构造函数中设置
             coolantMultiplier = 0.6f;
             hasItems = true;
             itemCapacity = 10;
             loopSoundVolume = 0.2f;
-            loopSound = Z_Sounds.endgameActive;
-            shootSound = Z_Sounds.endgameShoot;
-            // PU_V8 原版: damage = (float)Double.MAX_VALUE (不是 Float.MAX_VALUE!)
-            shootType = new BulletType() {{
-                damage = (float)Double.MAX_VALUE;
-            }};
             consumeItem(Z_Items.terminum, 2);
-            // 冷却液作为可选 booster (非必需, BaseTurret.init 会自动设 optional/booster/update=false)
             coolant = consumeCoolant(0.6f);
             coolant.boost();
         }};

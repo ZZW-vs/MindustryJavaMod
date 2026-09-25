@@ -31,8 +31,8 @@ import zzw.util.WavefrontObject;
  * - 使用 WavefrontObject (.obj 文件) 渲染伪 3D 立方体
  * - 受击时产生形变效果 (distortionTime)
  * - 旋转动画随 reload 进度变化
- * - 持续光束攻击: 自动锁定范围内目标，最多同时连接12条光束
- *   光束持续连接目标直到目标死亡或离开范围，每条伤害480，频率为激光的1.8倍
+ * - 持续光束攻击: 自动锁定范围内目标，最多同时连接5条光束
+ *   光束持续连接目标直到目标死亡或离开范围，每0.5秒造成20伤害
  *
  * v155.4 适配:
  * - reloadTime → reload (Block 字段)
@@ -51,11 +51,12 @@ public class ObjPowerTurret extends PowerTurret {
     public TextureRegion baseRegion;
     public float width = 2f, height = 7f;
 
-    // 光束攻击参数
-    public int maxBeams = 12;           // 最多同时连接的光束数量
-    public float beamDamage = 450f;    // 每次光束攻击的伤害
-    public float beamRange = 800f;     // 光束攻击范围
-    public float beamWidth = 5f;       // 光束宽度
+    // 光束攻击参数 (★ 按用户设定调整)
+    public int maxBeams = 5;            // 最多同时连接的光束数量
+    public float beamDamage = 20f;      // 每次光束攻击的伤害
+    public float beamRange = 640f;      // 光束攻击范围 (80 格)
+    public float beamInterval = 30f;    // 光束伤害间隔 (30 帧 = 0.5 秒)
+    public float beamWidth = 5f;        // 光束宽度
     public Color beamColor = Color.valueOf("4a7a9e");  // 光束颜色 - 暗蓝色
 
     /**
@@ -112,7 +113,7 @@ public class ObjPowerTurret extends PowerTurret {
         stats.add(Stat.abilities, "[lightgray]光束上限: [accent]" + maxBeams + " 条");
         stats.add(Stat.abilities, "[lightgray]光束伤害: [accent]" + (int)beamDamage);
         stats.add(Stat.abilities, "[lightgray]光束范围: [accent]" + (int)beamRange);
-        stats.add(Stat.abilities, "[lightgray]攻击频率: [accent]" + String.format("%.1f", 60f * 5.4f / reload) + " 次/秒");
+        stats.add(Stat.abilities, "[lightgray]攻击频率: [accent]" + String.format("%.1f", 60f / beamInterval) + " 次/秒");
     }
 
     public class ObjPowerTurretBuild extends PowerTurretBuild {
@@ -172,8 +173,8 @@ public class ObjPowerTurret extends PowerTurret {
 
             // 光束攻击逻辑 - 持续连接模式
             if (efficiency > 0) {
-                // 光束伤害频率: 激光攻击速度的1.8倍 (reload / 5.4)
-                float beamReload = reload / 5.4f;
+                // 光束伤害频率: 固定间隔 (0.5 秒)
+                float beamReload = beamInterval;
                 beamTimer += Time.delta;
 
                 // 1. 清理无效目标（死亡或离开范围）
@@ -256,25 +257,25 @@ public class ObjPowerTurret extends PowerTurret {
                 float tx = t.getX();
                 float ty = t.getY();
 
-                // 光束外层（半透明光晕）
-                Draw.color(beamColor.cpy().a(0.3f));
+                // 光束外层（半透明光晕）★ 透明度加大
+                Draw.color(beamColor.cpy().a(0.18f));
                 Lines.stroke(beamWidth * 2f);
                 Lines.line(x, y, tx, ty);
 
                 // 光束中层
-                Draw.color(beamColor.cpy().a(0.6f));
+                Draw.color(beamColor.cpy().a(0.38f));
                 Lines.stroke(beamWidth * 1.2f);
                 Lines.line(x, y, tx, ty);
 
                 // 光束核心（白色高亮）
-                Draw.color(Color.white.cpy().a(0.9f));
+                Draw.color(Color.white.cpy().a(0.6f));
                 Lines.stroke(beamWidth * 0.5f);
                 Lines.line(x, y, tx, ty);
 
                 // 击中点光晕
-                Draw.color(beamColor.cpy().a(0.5f));
+                Draw.color(beamColor.cpy().a(0.3f));
                 Fill.circle(tx, ty, beamWidth * 1.5f);
-                Draw.color(Color.white.cpy().a(0.7f));
+                Draw.color(Color.white.cpy().a(0.45f));
                 Fill.circle(tx, ty, beamWidth * 0.5f);
             }
 

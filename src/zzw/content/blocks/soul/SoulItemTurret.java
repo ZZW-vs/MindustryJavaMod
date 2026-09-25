@@ -54,13 +54,12 @@ public class SoulItemTurret extends ItemTurret implements ISoulTurret {
     public void setStats() {
         super.setStats();
         stats.add(Stat.abilities, (table) -> {
-            table.row().table(bt -> {
+            table.table(bt -> {
                 bt.left().defaults().padRight(3).left();
-                bt.row();
+                // ★ 修复: 灵魂信息与最大数量放在同一行, 避免"可选灵魂"后面看起来是空白
                 bt.add(requireSoul ? "@soul.require" : "@soul.optional");
                 if (maxSouls > 0) {
-                    bt.row();
-                    bt.add("[lightgray]最大灵魂: [accent]" + maxSouls);
+                    bt.add(arc.Core.bundle.format("soul.max", maxSouls)).padLeft(6);
                 }
             });
         });

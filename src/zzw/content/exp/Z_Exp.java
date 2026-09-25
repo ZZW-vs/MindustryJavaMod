@@ -434,7 +434,8 @@ public class Z_Exp {
 
             // branchLaser 子弹: 激光 + 3 发 frag (branchLaserFrag)
             // PU_V8: ExpLaserBulletType(140, 20) + fragBullet=branchLaserFrag + fragBullets=3
-            shootType = new ExpLaserBulletType(150f, 20f){{
+            // ★ 用户调整: 伤害 150 → 120
+            shootType = new ExpLaserBulletType(120f, 20f){{
                 colors = new Color[]{
                         Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.5f).a(0.4f),
                         Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.5f),
@@ -551,7 +552,8 @@ public class Z_Exp {
             heatColor = mindustry.graphics.Pal.redderDust;
             toColor = UnityPal.exp;
 
-            shootType = new ExpLaserBulletType(240f, 150f){{
+            // ★ 用户调整: 伤害 240 → 560
+            shootType = new ExpLaserBulletType(560f, 150f){{
                 colors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser.cpy().a(0.4f), mindustry.graphics.Pal.lancerLaser, UnityPal.exp};
                 // ★ 充能特效: 自定义略放大版 Lancer 光环, 颜色与激光一致 (Pal.lancerLaser)
                 chargeEffect = zzw.content.units.effects.ChargeFx.btLaserCharge;
@@ -581,10 +583,12 @@ public class Z_Exp {
             // shootSmallBlaze/shootPyraBlaze: 火焰色粒子向射击方向喷射 (PU_V8 自定义)
             // ★ v158 简化: 用 BulletType 替代 ExpBulletType, 用自定义 Effect 替代 ShootFx
             ammo(
-                mindustry.content.Items.scrap, new mindustry.entities.bullet.LiquidBulletType(mindustry.content.Liquids.slag) {{
+                mindustry.content.Items.scrap, new SlagFanBulletType(mindustry.content.Liquids.slag) {{
                     // ★ PU_V8 Bullets.slagShot 等效 (来自 PU特供v132版): damage=4.0f, drag=0.01f
                     damage = 4.0f;
                     drag = 0.01f;
+                    // ★ 用户需求: 废料弹一次发射 3 发扇形分叉 (左右各偏 12°)
+                    fanSpread = 12f;
                 }},
                 mindustry.content.Items.coal, new mindustry.entities.bullet.BulletType(3.35f, 32f) {{
                     ammoMultiplier = 3;
@@ -647,5 +651,40 @@ public class Z_Exp {
                 new EList<>(v -> ((mindustry.entities.pattern.ShootSpread)shoot).spread = v, new Float[]{0f, 0f, 5f, 10f, 15f, 7f, 14f, 8f, 10f, 6f, 9f}, null)
             };
         }};
+    }
+
+    /**
+     * 废料专属分叉液弹 (PU 原版 inferno 废料弹视觉)。
+     * <p>
+     * 原版 inferno 使用废料作弹药时, 一次会喷出 3 发呈扇形分叉的渣液弹;
+     * v158 的 {@link mindustry.entities.bullet.LiquidBulletType} 每次只发射 1 发,
+     * 因此这里在子弹初始化时额外朝左右各偏 {@link #fanSpread} 度补射两发副弹。
+     * <p>
+     * {@link #spawning} 为重入标记: 生成副弹时置为 true, 让副弹的 init() 直接返回,
+     * 避免副弹再次分叉造成无限递归。
+     */
+    static class SlagFanBulletType extends mindustry.entities.bullet.LiquidBulletType {
+        /** 扇形半角 (度): 主弹左右各偏该角度生成一发副弹 */
+        public float fanSpread = 12f;
+        /** 重入标记: 生成副弹期间为 true, 阻止副弹继续分叉 */
+        boolean spawning = false;
+
+        public SlagFanBulletType(mindustry.type.Liquid liquid) {
+            super(liquid);
+        }
+
+        @Override
+        public void init(mindustry.gen.Bullet b) {
+            super.init(b);
+            // 副弹不再分叉
+            if (spawning) return;
+
+            spawning = true;
+            // Mathf.signs = {-1, 1}: 左右各生成一发副弹
+            for (int s : arc.math.Mathf.signs) {
+                create(b, b.x, b.y, b.rotation() + fanSpread * s);
+            }
+            spawning = false;
+        }
     }
 }

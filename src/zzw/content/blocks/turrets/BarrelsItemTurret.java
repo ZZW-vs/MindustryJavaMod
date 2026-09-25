@@ -1,12 +1,20 @@
 package zzw.content.blocks.turrets;
 
+import arc.Core;
+import arc.graphics.Color;
 import arc.math.Angles;
 import arc.math.Mathf;
 import arc.math.geom.Vec2;
+import arc.struct.ObjectFloatMap;
 import arc.struct.Seq;
+import arc.util.Strings;
 import mindustry.entities.bullet.BulletType;
 import mindustry.entities.pattern.ShootAlternate;
+import mindustry.type.Liquid;
+import mindustry.ui.Styles;
 import mindustry.world.blocks.defense.turrets.ItemTurret;
+import mindustry.world.meta.Stat;
+import mindustry.world.meta.StatUnit;
 
 import static mindustry.Vars.tilesize;
 
@@ -27,114 +35,82 @@ public class BarrelsItemTurret extends ItemTurret {
     protected boolean focus;
     protected Vec2 tr3 = new Vec2();
 
-    public BarrelsItemTurret(String name) {
+    /**
+     * 自定义冷却强化表: 液体 → 额外装填速度比例 (0.2 表示 +20%, 即 120%)。
+     */
+    public ObjectFloatMap<Liquid> coolantBoost = new ObjectFloatMap<>();
+
+    public BarrelsItemTurret(String name){
         super(name);
-        // ★ 弹药消耗修复: PU_V8 原版在 shootBarrel()/focus 模式 shoot() 中显式调用 useAmmo(),
-        //   每根炮管每次射击消耗 1 发弹药。v132 的 bullet() 不消耗弹药, 但 v155.4 的 bullet()
-        //   在 consumeAmmoOnce == false 时会自动调用 useAmmo() —— 等价于原版行为。
-        //   之前未设置此字段 (默认 true), 导致炮管射击 (bullet()) 永不消耗弹药:
-        //   只要还剩 1 发弹药 hasAmmo() 恒为 true, 炮管无限开火 (banshee 无限攻击 bug)。
-        consumeAmmoOnce = false;
-        // ★ v155.4 bullet(type, xOffset, yOffset, ...) 期望 LOCAL 局部坐标 (rotation-90 坐标系)
-        // 默认 shootY = size*tilesize/2 (前向半身高偏移), 我们自定义每个炮管的前向偏移
-        // 所以将默认值清零, 这样 yOffset 就是相对于炮台中心的前向距离
-        shootY = 0f;
     }
 
-    public void addBarrel(float x, float y, float reloadTime) {
+    protected void addBarrel(float x, float y, float reloadTime){
         barrels.add(new Barrel(x, y, reloadTime));
     }
 
-    /** 从 shoot 模式提取 spread (PU_V8 直接访问 spread 字段, v155.4 需从 ShootAlternate 提取) */
-    protected float getSpread() {
-        if (shoot instanceof ShootAlternate) {
-            return ((ShootAlternate) shoot).spread;
-        }
-        return 0f;
+    @Override
+    public void load(){
+        super.load();
+        baseRegion = Core.atlas.find("unity-block-" + size);
     }
 
-    protected class Barrel {
+    protected class Barrel{
         public final float x, y, reloadTime;
 
-        public Barrel(float x, float y, float reloadTime) {
+        public Barrel(float x, float y, float reloadTime){
             this.x = x;
             this.y = y;
             this.reloadTime = reloadTime;
         }
     }
 
-    public class BarrelsItemTurretBuild extends ItemTurretBuild {
-        protected float[] barrelReloads;
-        protected int[] barrelShotCounters;
+    public class BarrelsItemTurretBuild extends ItemTurretBuild{
+        protected float[] barrelReloads = new float[barrels.size];
+        protected int[] barrelShotCounters = new int[barrels.size];
 
         @Override
-        public void placed() {
-            super.placed();
-            barrelReloads = new float[barrels.size];
-            barrelShotCounters = new int[barrels.size];
-        }
-
-        @Override
-        protected void shoot(BulletType type) {
-            if (focus) {
-                // ★完整移植 PU_V8: focus 模式集中瞄准目标点
-                curRecoil = 1f;
+        protected void shoot(BulletType type){
+            if(focus){
+                recoil = recoilAmount;
                 heat = 1f;
-                float i = barrelCounter % 2 - 0.5f;
-                float spread = getSpread();
-                // ★ v155.4 bullet() 期望 LOCAL 局部坐标 (rotation-90 坐标系), 不是世界坐标
-                // 之前错误地传入了已旋转的 tr3.x/tr3.y 导致双重旋转, 子弹位置偏移
-                float xOff = spread * i;
-                float yOff = size * tilesize / 2f;
-                // 用 tr3 (世界坐标) 仅用于角度计算 (从炮口位置到目标点的角度)
-                tr3.trns(rotation - 90f, xOff, yOff);
-                Vec2 targetVec = new Vec2();
-                targetVec.trns(rotation, Math.max(Mathf.dst(x, y, targetPos.x, targetPos.y), size * tilesize));
-                float rot = Angles.angle(tr3.x, tr3.y, targetVec.x, targetVec.y);
-                // v155.4 bullet 5 参签名: 传入 LOCAL 偏移, bullet() 内部会旋转+加 (x,y)
-                // bullet() 自动处理 useAmmo/effects/recoil/heat, 无需重复调用
-                bullet(type, xOff, yOff, rot - rotation + Mathf.range(inaccuracy), null);
-                barrelCounter++;
-            } else {
+                float i = shotCounter % 2 - 0.5f;
+                for(int s = 0; s < shots; s++){
+                    float offset = (s - shots / 2f + 0.5f) * spread;
+                    tr3.trns(rotation + offset, xRand() * range * 0.1f);
+                    bullet(type, x + tr3.x, y + tr3.y, rotation + offset + Mathf.random(-inaccuracy, inaccuracy), Mathf.random());
+                }
+            }else{
                 super.shoot(type);
             }
         }
 
-        protected void shootBarrel(BulletType type, int index) {
-            curRecoil = Mathf.clamp(curRecoil + 0.5f, 0f, 1f);
-            float i = barrelShotCounters[index] % 2 - 0.5f;
-            // ★ v155.4 bullet() 期望 LOCAL 局部坐标 (rotation-90 坐标系)
-            float xOff = barrels.get(index).x * i;
-            float yOff = barrels.get(index).y;
-            float rot = rotation;
-            if (focus) {
-                // 用 tr3 (世界坐标) 仅用于角度计算
-                tr3.trns(rotation - 90f, xOff, yOff);
-                Vec2 targetVec = new Vec2();
-                targetVec.trns(rotation, Math.max(Mathf.dst(x, y, targetPos.x, targetPos.y), size * tilesize));
-                rot = Angles.angle(tr3.x, tr3.y, targetVec.x, targetVec.y);
+        @Override
+        protected void shootBarrel(int barrel, BulletType type){
+            if(barrelReloads[barrel] >= reloadTime){
+                barrelReloads[barrel] = 0f;
+                barrelShotCounters[barrel]++;
+                recoil = recoilAmount;
+                heat = 1f;
+                float angle = rotation + barrels.get(barrel).x * Angles.lenient(barrels.get(barrel).y);
+                bullet(type, x + barrels.get(barrel).x, y + barrels.get(barrel).y, angle + Mathf.random(-inaccuracy, inaccuracy), Mathf.random());
             }
-            // v155.4 bullet 5 参签名, 自动处理声音/特效/反冲
-            bullet(type, xOff, yOff, rot - rotation + Mathf.range(inaccuracy), null);
-            barrelShotCounters[index]++;
         }
 
         @Override
-        protected void updateShooting() {
-            super.updateShooting();
-            if (barrelReloads == null) {
-                barrelReloads = new float[barrels.size];
-                barrelShotCounters = new int[barrels.size];
+        public void updateTile(){
+            super.updateTile();
+            for(int i = 0; i < barrelReloads.length; i++){
+                barrelReloads[i] += efficiency() * reloadTime * Time.delta;
             }
-            for (int i = 0, len = barrels.size; i < len; i++) {
-                if (hasAmmo()) {
-                    if (barrelReloads[i] >= barrels.get(i).reloadTime) {
-                        shootBarrel(peekAmmo(), i);
-                        barrelReloads[i] = 0f;
-                    } else {
-                        barrelReloads[i] += delta() * peekAmmo().reloadMultiplier * baseReloadSpeed();
-                    }
-                }
+        }
+
+        @Override
+        public void draw(){
+            Draw.rect(baseRegion, x, y);
+            Draw.color();
+            for(int i = 0; i < barrels.size; i++){
+                Barrel barrel = barrels.get(i);
+                Draw.rect(region, x + barrel.x, y + barrel.y, rotation - 90);
             }
         }
     }

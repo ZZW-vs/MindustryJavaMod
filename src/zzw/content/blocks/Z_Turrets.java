@@ -3,6 +3,7 @@ package zzw.content.blocks;
 import arc.graphics.Color;
 import arc.math.Angles;
 import arc.math.Mathf;
+import arc.graphics.g2d.Draw;
 import mindustry.content.Fx;
 import mindustry.content.Items;
 import mindustry.entities.Effect;
@@ -12,6 +13,7 @@ import mindustry.entities.bullet.FlakBulletType;
 import mindustry.entities.bullet.LaserBulletType;
 import mindustry.entities.bullet.ArtilleryBulletType;
 import mindustry.entities.bullet.ContinuousLaserBulletType;
+import zzw.content.Z_Bullets.SingularityBulletType;
 import mindustry.entities.pattern.ShootAlternate;
 import mindustry.entities.pattern.ShootSpread;
 import mindustry.gen.Sounds;
@@ -22,6 +24,8 @@ import mindustry.world.blocks.defense.turrets.ItemTurret;
 import mindustry.world.blocks.defense.turrets.PowerTurret;
 import mindustry.world.blocks.defense.turrets.LaserTurret;
 import mindustry.world.consumers.ConsumeLiquidFilter;
+import mindustry.Vars;
+import arc.struct.ObjectFloatMap;
 import zzw.content.Z_Bullets.ArcBulletType;
 import zzw.content.Z_Bullets.BeamBulletType;
 import zzw.content.Z_Bullets.DecayBasicBulletType;
@@ -46,6 +50,7 @@ import zzw.content.units.effects.ShootEffect;
 import zzw.content.units.bullets.ChangeTeamLaserBulletType;
 import zzw.content.blocks.turrets.AbsorberTurret;
 import zzw.content.blocks.turrets.BarrelsItemTurret;
+import zzw.content.blocks.turrets.BoostItemTurret;
 import zzw.content.blocks.turrets.BigLaserTurret;
 import zzw.content.blocks.turrets.OrbTurret;
 import zzw.content.blocks.turrets.RampupPowerTurret;
@@ -144,7 +149,7 @@ public class Z_Turrets {
         //   - standardHomingLarge: damage*1.23, speed*1.1, width*1.12, height*1.12, homingPower=0.09, reloadMult=1.3
         //   - standardIncendiaryLarge: damage*1.4, speed*1.1, width*1.12, height*1.12
         //   - standardThoriumLarge: damage*1.4, speed*1.1, width*1.12, height*1.12
-        apparition = new ItemTurret("apparition") {{
+        apparition = new BoostItemTurret("apparition") {{
             requirements(Category.turret, ItemStack.with(Items.copper, 350, Items.graphite, 380, Items.silicon, 360, Items.plastanium, 200, Items.thorium, 220, Z_Items.umbrium, 370, Items.surgeAlloy, 290));
             size = 5;
             health = 3975;
@@ -157,8 +162,14 @@ public class Z_Turrets {
             shootSound = Sounds.shootSpectre;  // v155.4 无 Sounds.shootBig, 用 shootSpectre 替代
             recoil = 3f;
             rotateSpeed = 4.5f;
+            // ★ 预先强化配方: 水 60/秒 → 120%, 冷冻液 60/秒 → 145%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.20f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
             // ★ Large 子弹 (基于 v155.4 Spectre 内联 standardDenseBig 等的属性 + PU_V8 Large 倍率)
-            ammo(Items.graphite, new BasicBulletType(7.5f * 1.1f, 50f * 1.4f) {{
+            // ★ 用户调整: 每种子弹伤害 +10
+            ammo(Items.graphite, new BasicBulletType(7.5f * 1.1f, 50f * 1.4f + 10f) {{
                 // standardDenseLarge (graphite)
                 lifetime = 40f;
                 width = 15f * 1.12f;
@@ -171,7 +182,7 @@ public class Z_Turrets {
                 hitEffect = despawnEffect = Fx.hitBulletColor;
                 hitColor = backColor = trailColor = Pal.graphiteAmmoBack;
                 frontColor = Pal.graphiteAmmoFront;
-            }}, Items.silicon, new BasicBulletType(7.5f * 1.1f, 50f * 1.23f) {{
+            }}, Items.silicon, new BasicBulletType(7.5f * 1.1f, 50f * 1.23f + 10f) {{
                 // standardHomingLarge (silicon, 追踪型)
                 lifetime = 40f;
                 width = 15f * 1.12f;
@@ -185,7 +196,7 @@ public class Z_Turrets {
                 hitEffect = despawnEffect = Fx.hitBulletColor;
                 hitColor = backColor = trailColor = Pal.graphiteAmmoBack;
                 frontColor = Pal.graphiteAmmoFront;
-            }}, Items.pyratite, new BasicBulletType(7f * 1.1f, 70f * 1.4f) {{
+            }}, Items.pyratite, new BasicBulletType(7f * 1.1f, 70f * 1.4f + 10f) {{
                 // standardIncendiaryLarge (pyratite, 燃烧型)
                 lifetime = 40f;
                 width = 16f * 1.12f;
@@ -203,7 +214,7 @@ public class Z_Turrets {
                 ammoMultiplier = 3;
                 splashDamage = 20f;
                 splashDamageRadius = 25f;
-            }}, Items.thorium, new BasicBulletType(8f * 1.1f, 80f * 1.4f) {{
+            }}, Items.thorium, new BasicBulletType(8f * 1.1f, 80f * 1.4f + 10f) {{
                 // standardThoriumLarge (thorium, 穿透型)
                 lifetime = 40f;
                 width = 16f * 1.12f;
@@ -238,8 +249,14 @@ public class Z_Turrets {
             recoil = 5.5f;
             rotateSpeed = 3.5f;
             addBarrel(8f, 18.75f, 6f);
+            // ★ 预先强化配方: 水 60/秒 → 120%, 冷冻液 60/秒 → 145%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.20f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
             // ★ Heavy 子弹 (基于 v155.4 Spectre 内联 standardDenseBig 等的属性 + PU_V8 Heavy 倍率)
-            ammo(Items.graphite, new BasicBulletType(7.5f * 1.3f, 50f * 1.7f) {{
+            // ★ 用户调整: 每种子弹伤害 +20
+            ammo(Items.graphite, new BasicBulletType(7.5f * 1.3f, 50f * 1.7f + 20f) {{
                 // standardDenseHeavy (graphite)
                 lifetime = 40f;
                 width = 15f * 1.32f;
@@ -252,7 +269,7 @@ public class Z_Turrets {
                 hitEffect = despawnEffect = Fx.hitBulletColor;
                 hitColor = backColor = trailColor = Pal.graphiteAmmoBack;
                 frontColor = Pal.graphiteAmmoFront;
-            }}, Items.silicon, new BasicBulletType(7.5f * 1.3f, 50f * 1.4f) {{
+            }}, Items.silicon, new BasicBulletType(7.5f * 1.3f, 50f * 1.4f + 20f) {{
                 // standardHomingHeavy (silicon, 追踪型)
                 lifetime = 40f;
                 width = 15f * 1.19f;
@@ -266,7 +283,7 @@ public class Z_Turrets {
                 hitEffect = despawnEffect = Fx.hitBulletColor;
                 hitColor = backColor = trailColor = Pal.graphiteAmmoBack;
                 frontColor = Pal.graphiteAmmoFront;
-            }}, Items.pyratite, new BasicBulletType(7f * 1.3f, 70f * 1.7f) {{
+            }}, Items.pyratite, new BasicBulletType(7f * 1.3f, 70f * 1.7f + 20f) {{
                 // standardIncendiaryHeavy (pyratite, 燃烧型)
                 lifetime = 40f;
                 width = 16f * 1.32f;
@@ -284,7 +301,7 @@ public class Z_Turrets {
                 ammoMultiplier = 3;
                 splashDamage = 20f;
                 splashDamageRadius = 25f;
-            }}, Items.thorium, new BasicBulletType(8f * 1.3f, 80f * 1.7f) {{
+            }}, Items.thorium, new BasicBulletType(8f * 1.3f, 80f * 1.7f + 20f) {{
                 // standardThoriumHeavy (thorium, 穿透型)
                 lifetime = 40f;
                 width = 16f * 1.32f;
@@ -318,12 +335,18 @@ public class Z_Turrets {
             shoot = new ShootAlternate(37f);
             shootSound = Sounds.shootSpectre;  // v155.4 无 Sounds.shootBig, 用 shootSpectre 替代 (同为大型炮弹音效)
             recoil = 5.5f;
-            rotateSpeed = 3.5f;
+            rotateSpeed = 3.0f;  // ★ 用户调整: 转动速度上限稍微改小 (3.5 → 3.0, 幅度很小)
             focus = true;
             addBarrel(23.5f, 36.5f, 9f);
             addBarrel(8.5f, 24.5f, 6f);
+            // ★ 预先强化配方: 水 60/秒 → 120%, 冷冻液 60/秒 → 145%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.20f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
             // ★ Massive 子弹 (基于 v155.4 Spectre 内联 standardDenseBig 等的属性 + PU_V8 Massive 倍率)
-            ammo(Items.graphite, new BasicBulletType(7.5f * 1.3f, 50f * 1.8f) {{
+            // ★ 用户调整: 每种子弹伤害 +40
+            ammo(Items.graphite, new BasicBulletType(7.5f * 1.3f, 50f * 1.8f + 40f) {{
                 // standardDenseMassive (graphite)
                 lifetime = 40f * 1.1f;
                 width = 15f * 1.34f;
@@ -336,7 +359,7 @@ public class Z_Turrets {
                 hitEffect = despawnEffect = Fx.hitBulletColor;
                 hitColor = backColor = trailColor = Pal.graphiteAmmoBack;
                 frontColor = Pal.graphiteAmmoFront;
-            }}, Items.silicon, new BasicBulletType(7.5f * 1.3f, 50f * 1.6f) {{
+            }}, Items.silicon, new BasicBulletType(7.5f * 1.3f, 50f * 1.6f + 40f) {{
                 // standardHomingMassive (silicon, 追踪型)
                 lifetime = 40f * 1.1f;
                 width = 15f * 1.21f;
@@ -350,7 +373,7 @@ public class Z_Turrets {
                 hitEffect = despawnEffect = Fx.hitBulletColor;
                 hitColor = backColor = trailColor = Pal.graphiteAmmoBack;
                 frontColor = Pal.graphiteAmmoFront;
-            }}, Items.pyratite, new BasicBulletType(7f * 1.3f, 70f * 1.8f) {{
+            }}, Items.pyratite, new BasicBulletType(7f * 1.3f, 70f * 1.8f + 40f) {{
                 // standardIncendiaryMassive (pyratite, 燃烧型)
                 lifetime = 40f * 1.1f;
                 width = 16f * 1.34f;
@@ -368,7 +391,7 @@ public class Z_Turrets {
                 ammoMultiplier = 3;
                 splashDamage = 20f;
                 splashDamageRadius = 25f;
-            }}, Items.thorium, new BasicBulletType(8f * 1.3f, 80f * 1.8f) {{
+            }}, Items.thorium, new BasicBulletType(8f * 1.3f, 80f * 1.8f + 40f) {{
                 // standardThoriumMassive (thorium, 穿透型)
                 lifetime = 40f * 1.1f;
                 width = 16f * 1.34f;
@@ -406,6 +429,7 @@ public class Z_Turrets {
             requirements(Category.turret, ItemStack.with(Items.copper, 450, Items.lead, 350, Items.graphite, 390, Items.silicon, 360, Items.titanium, 250, Z_Items.umbrium, 370, Items.surgeAlloy, 360));
             shootType = new SparkingContinuousLaserBulletType(95f) {{
                 length = 230f;
+                width = 8f;  // ★ 激光粗细分级: fallout 最细 (默认 9f → 8f)
                 fromBlockChance = 0.12f;
                 fromBlockDamage = 23f;
                 fromLaserAmount = 0;
@@ -413,7 +437,11 @@ public class Z_Turrets {
                 fromBlockLen = 2;
                 fromBlockLenRand = 5;
             }};
-            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability < 0.1f, 0.58f)).boost().update(false);
+            // ★ 预先强化配方: 仅冷冻液 120/秒 → 145%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.cryofluid, 2.1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
+            consume(new ConsumeLiquidFilter(liquid -> liquid == mindustry.content.Liquids.cryofluid, 0.58f)).boost().update(false);
         }};
 
         // ===== catastrophe (PU_V8 L483-505, BigLaserTurret + SparkingContinuousLaserBulletType) =====
@@ -436,8 +464,14 @@ public class Z_Turrets {
             loopSound = Sounds.beamPlasma;
             loopSoundVolume = 2.2f;
             requirements(Category.turret, ItemStack.with(Items.copper, 1250, Items.lead, 1320, Items.graphite, 1100, Items.titanium, 1340, Items.surgeAlloy, 1240, Items.silicon, 1350, Items.thorium, 770, Z_Items.darkAlloy, 370));
+            // ★ 预先强化配方: 冷冻液 120/秒 → 145%, 水 120/秒 → 125%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 2.1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.25f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
             shootType = new SparkingContinuousLaserBulletType(240f) {{
                 length = 340f;
+                width = 10f;  // ★ 激光粗细分级: catastrophe (比 fallout 粗一级)
                 // TODO PU132: strokes = 默认值 ×1.4 (光束四层粗细) — v158 原生
                 // ContinuousLaserBulletType 无 strokes 字段, 需给 Sparking 类加 draw 支持后启用
                 incendSpread = 7f;
@@ -466,8 +500,14 @@ public class Z_Turrets {
             loopSound = Sounds.beamPlasma;
             loopSoundVolume = 2.6f;
             requirements(Category.turret, ItemStack.with(Items.copper, 2800, Items.lead, 2970, Items.graphite, 2475, Items.titanium, 3100, Items.surgeAlloy, 2790, Items.silicon, 3025, Items.thorium, 1750, Z_Items.darkAlloy, 1250));
+            // ★ 预先强化配方: 冷冻液 120/秒 → 145%, 水 120/秒 → 125%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 2.1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.25f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
             shootType = new SparkingContinuousLaserBulletType(580f) {{
                 length = 450f;
+                width = 11f;  // ★ 激光粗细分级: calamity (比 catastrophe 粗一级)
                 // PU132: strokes ×1.7 + spaceMag=70 (TODO: v158 原生类无 strokes/spaceMag 字段)
                 lightStroke = 70f;
                 fromBlockChance = 0.5f;
@@ -481,7 +521,11 @@ public class Z_Turrets {
                 incendSpread = 9f;
                 incendAmount = 2;
             }};
-            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.3f && liquid.flammability < 0.1f, 2.1f)).boost().update(false);
+            // ★ 预先强化配方: 冷冻液 120/秒 → 145%, 水 120/秒 → 125%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 2.1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.25f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
         }};
 
         // ===== extinction (PU_V8 L531-554, BigLaserTurret + SparkingContinuousLaserBulletType) =====
@@ -504,11 +548,16 @@ public class Z_Turrets {
             shootSound = Z_Sounds.extinctionShoot;  // ★ 原版 UnitySounds.extinctionShoot (dark/extinction-shoot.ogg)
             loopSound = Z_Sounds.beamIntenseHighpitchTone;  // ★ 原版 UnitySounds.beamIntenseHighpitchTone (dark/beam-intense-highpitch-tone.ogg)
             loopSoundVolume = 2f;
+            // ★ 预先强化配方: 冷冻液 120/秒 → 145%, 水 120/秒 → 125%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 2.1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.25f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
             shootType = new SparkingContinuousLaserBulletType(770f) {{
                 length = 560f;
                 // PU132: strokes ×2.2 + spaceMag=70 (TODO: v158 原生类无 strokes/spaceMag 字段)
                 lightStroke = 90f;
-                width = 12f;  // ★ 激光加粗 (v158 默认 9f): 光束粗细 = width × baseStroke
+                width = 12f;  // ★ 激光粗细分级: extinction 最粗 (v158 默认 9f)
                 fromBlockChance = 0.5f;
                 fromBlockDamage = 76f;
                 fromLaserChance = 0.8f;
@@ -547,7 +596,6 @@ public class Z_Turrets {
                 // TODO PU132: strokes = {0.92, 0.6, 0.28} 三明治细光束 (v158 原生类无 strokes 字段)
                 lightColor = hitColor = Pal.lancerLaser;
             }};
-            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability < 0.1f, 0.2f)).boost().update(false);
         }};
 
         // ===== graviton (重力子激光炮, PU132 L611-631) =====
@@ -572,7 +620,6 @@ public class Z_Turrets {
                 strokes = new float[]{2.4f, 1.8f};
                 width = 9f;
             }};
-            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability < 0.1f, 0.25f)).boost().update(false);
         }};
 
         // ===== electron (T1 电力炮, PU132 L632-662) =====
@@ -589,15 +636,24 @@ public class Z_Turrets {
             heatColor = Pal.turretHeat;
             shootEffect = ShootEffect.blueTriangleShoot;
             shootSound = Sounds.shootArc;  // ★ v158 无 Sounds.pew, 用 shootArc (电弧炮音效) 替代
-            shootType = new BasicBulletType(9f, 34f) {{
+            // ★ 预先强化配方: 冷冻液 120/秒 → 145%, 水 120/秒 → 125%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 2.1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.25f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
+            shootType = new BasicBulletType(9f, 65f) {{
                 lifetime = 22f;
-                width = 12f;
-                height = 19f;
+                // ★ 用户调整: 子弹加大 (12×19 → 17×26), 伤害 34 → 65
+                width = 17f;
+                height = 26f;
                 shrinkX = 0f;
                 shrinkY = 0f;
                 backColor = lightColor = hitColor = Pal.lancerLaser;
                 frontColor = Color.white;
                 hitEffect = HitEffect.electronHit;
+                // ★ 用户调整: 命中施加 create-weaken 状态 2 秒
+                status = Z_StatusEffects.weaken;
+                statusDuration = 2f * 60f;
             }
 
             // PU132: 飞行中每 2~3.5tick 撒蓝三角拖尾
@@ -711,13 +767,18 @@ public class Z_Turrets {
             reload = 90f;
             coolantMultiplier = 3f;
             shootCone = 30f;
-            range = 200f;
+            range = 480f;  // 统一改为60格显示  // 统一改为50格显示
             heatColor = Pal.turretHeat;
             rotateSpeed = 4.3f;
             recoil = 2f;
             consumePower(1.9f);
             shootSound = Z_Sounds.gluonShoot;  // ★ 原版 UnitySounds.gluonShoot (light/gluon-shoot.ogg)
-            shootType = new BasicBulletType(8f, 60f) {{
+            // ★ 预先强化配方: 冷冻液 120/秒 → 145%, 水 120/秒 → 125%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 2.1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.25f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
+            shootType = new BasicBulletType(8f, 100f) {{
                 // ★ 射程一致性修复: PU132 原版 drag=0.03f + hitSize=9f, 移植时丢失导致
                 //   弹丸无减速直飞 8*60=480 (超出 range=200 的显示圈两倍多);
                 //   补回 drag 后实际飞行 ≈8*(1-0.97^50)/0.03 ≈ 208, 与显示圈吻合
@@ -726,8 +787,14 @@ public class Z_Turrets {
                 lifetime = 50f;
                 width = 16f;
                 height = 16f;
-                splashDamage = 40f;
-                splashDamageRadius = 50f;
+                // ★ 用户调整: 伤害 60 → 100, 命中/消散时小范围爆炸并释放几条小闪电
+                splashDamage = 60f;
+                splashDamageRadius = 60f;
+                lightning = 3;
+                lightningDamage = 25f;
+                lightningLength = 8;
+                lightningLengthRand = 5;
+                lightningColor = Pal.lancerLaser;
                 shrinkX = 0f;
                 shrinkY = 0f;
                 backColor = lightColor = hitColor = Pal.lancerLaser;
@@ -749,11 +816,11 @@ public class Z_Turrets {
             heatColor = Pal.turretHeat;
             // v158 无 chargeTime/chargeEffect/chargeBeginEffect 字段, 用 shoot.firstShotDelay 替代充能时间
             shoot.firstShotDelay = 38f;
-            chargeSound = Sounds.shootLancer;
+            // ★ 用户调整: 原版无蓄力音效, 删除 chargeSound (仅保留发射音)
             // ★ 修复: shootSound 之前未设置, 导致充能音结束后子弹静默发射
             shootSound = Z_Sounds.wbosonShoot;
             consumePower(8.6f);
-            shootType = new DecayBasicBulletType(8.5f, 24f) {{
+            shootType = new DecayBasicBulletType(8.5f, 80f) {{
                 drag = 0.026f;
                 lifetime = 48f;
                 hittable = absorbable = collides = false;
@@ -766,7 +833,7 @@ public class Z_Turrets {
                 decayEffect = ParticleFx.wBosonEffectLong;
                 height = 13f;
                 width = 12f;
-                decayBullet = new BasicBulletType(4.8f, 24f) {{
+                decayBullet = new BasicBulletType(4.8f, 30f) {{
                     drag = 0.04f;
                     lifetime = 18f;
                     pierce = true;
@@ -816,6 +883,11 @@ public class Z_Turrets {
             shoot.shots = 2;
             ((ShootAlternate)shoot).spread = 14f;
             inaccuracy = 2.3f;
+            // ★ 预先强化配方: 冷冻液 120/秒 → 145%, 水 120/秒 → 125%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 2.1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.25f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
 
             lightning = true;
             lightningThreshold = 12f;
@@ -827,7 +899,7 @@ public class Z_Turrets {
             barBaseY = -10.75f;
             barLength = 20f;
 
-            shootType = new VelocityLaserBoltBulletType(9.5f, 56f) {{
+            shootType = new VelocityLaserBoltBulletType(9.5f, 60f) {{
                 splashDamage = 8f;
                 splashDamageRadius = 16f;
                 drag = 0.005f;
@@ -856,6 +928,11 @@ public class Z_Turrets {
             recoil = 1.5f;
             consumePower(10.4f);
             shootSound = Z_Sounds.higgsBosonShoot;  // ★ 原版 UnitySounds.higgsBosonShoot (light/higgs-boson-shoot.ogg)
+            // ★ 预先强化配方: 冷冻液 120/秒 → 145%, 水 120/秒 → 125%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 2.1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.25f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
             shootType = new RoundLaserBulletType(85f) {{
                 length = 270f;
                 width = 5.8f;
@@ -871,6 +948,7 @@ public class Z_Turrets {
         //  - 能量球飞向目标位置, 接近敌人(20f内)或到达寿命终点时移除
         //  - despawned() 创建黑洞子弹 (SingularityBulletType)
         //  - 黑洞: 吸引范围内敌方单位 + 摧毁建筑 + 多层旋转尖刺光球渲染
+        //  - 添加着色器扭曲效果，参考FlameOut BlackHoleAttack
         singularity = new PowerTurret("singularity") {{
             requirements(Category.turret, ItemStack.with(Items.silicon, 290, Z_Items.luminum, 430, Items.titanium, 190, Items.thorium, 120, Z_Items.lightAlloy, 20));
             size = 7;
@@ -881,10 +959,15 @@ public class Z_Turrets {
             range = 310f;
             heatColor = Pal.turretHeat;
             rotateSpeed = 3.3f;
+            // ★ 预先强化配方: 冷冻液 120/秒 → 145%, 水 120/秒 → 125%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 2.1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.25f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
             recoil = 6f;
             consumePower(39.3f);
             shootSound = Z_Sounds.singularityShoot;
-            shootType = new BasicBulletType(6.6f, 7f) {
+            shootType = new BasicBulletType(500f, 7f) {  // 伤害改为500
                 {
                     lifetime = 110f;
                     drag = 0.018f;
@@ -912,9 +995,13 @@ public class Z_Turrets {
                 public void despawned(mindustry.gen.Bullet b) {
                     super.despawned(b);
                     // 创建黑洞子弹 (原版: singularityBlackHole.create(b, b.x, b.y, 0f))
-                    SingularityBulletType blackHole = new SingularityBulletType(26f);
+                    SingularityBulletType blackHole = new SingularityBulletType(500f);  // 使用500伤害
                     blackHole.lifetime = 3.5f * 60f;
                     blackHole.hitSize = 19f;
+                    blackHole.radius = 230f;  // 黑洞影响范围
+                    blackHole.tileDamage = 150f;  // 建筑伤害
+                    blackHole.force = 8f;  // 吸引力
+                    blackHole.scaledForce = 5f;  // 飞行单位额外吸引力
                     blackHole.create(b, b.x, b.y, 0f);
                 }
 
@@ -924,6 +1011,17 @@ public class Z_Turrets {
                     arc.graphics.g2d.Fill.circle(b.x, b.y, 7f + b.fout() * 1.5f);
                     arc.graphics.g2d.Draw.color(Color.white);
                     arc.graphics.g2d.Fill.circle(b.x, b.y, 5.5f + b.fout());
+                    
+                    // 应用黑洞着色器扭曲效果
+                    if (Vars.state.isPaused() || Vars.state.isEditor()) return;
+                    
+                    // 简化的着色器效果：在黑洞周围添加扭曲视觉效果
+                    arc.graphics.g2d.Draw.color(Pal.lancerLaser, 0.3f);
+                    for (int i = 0; i < 3; i++) {
+                        float radius = 15f + i * 10f + Time.time * 20f;
+                        Draw.arc(b.x, b.y, radius, 0, 360);
+                    }
+                    Draw.color();
                 }
             };
         }};
@@ -944,9 +1042,14 @@ public class Z_Turrets {
             recoil = 8f;
             shootY = size * tilesize / 2f - 8f;
             shootSound = Z_Sounds.muonShoot;  // ★ 原版 UnitySounds.muonShoot (light/muon-shoot.ogg)
+            // ★ 预先强化配方: 冷冻液 120/秒 → 145%, 水 120/秒 → 125%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 2.1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.25f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
             rotateSpeed = 1.9f;
             heatColor = Pal.turretHeat;
-            shootType = new RoundLaserBulletType(200f) {{
+            shootType = new RoundLaserBulletType(400f) {{
                 length = 330f;
                 width = 3.8f;
                 hitSize = 13f;
@@ -975,6 +1078,11 @@ public class Z_Turrets {
             // v158 无 chargeTime/chargeBeginEffect 字段, 用 shoot.firstShotDelay 替代充能时间
             shoot.firstShotDelay = 80f;
             //chargeSound = Sounds.shootLancer;
+            // ★ 预先强化配方: 冷冻液 120/秒 → 145%, 水 120/秒 → 125%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 2.1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.25f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
 
             // ★ 自定义建造实体: 让充能光球跟随炮塔转动
             //   原版 TurretBuild.shoot() 生成 chargeEffect 时调用 at(x, y, rotation) (不带 data),
@@ -1016,11 +1124,13 @@ public class Z_Turrets {
                     positive = true;
                     frontColor = Pal.lancerLaser;
                     backColor = Color.white;
+                    lifetime = 90f + Mathf.random(120f);  // 1.5~3秒随机存在时间
                 }};
 
                 negative = new EphemeronPairBulletType(45f) {{
                     frontColor = Color.white;
                     backColor = Pal.lancerLaser;
+                    lifetime = 90f + Mathf.random(120f);  // 1.5~3秒随机存在时间
                 }};
             }};
         }};
@@ -1042,9 +1152,14 @@ public class Z_Turrets {
             inaccuracy = 12f;
             // v158 无 chargeTime/chargeEffects/chargeMaxDelay/chargeEffect/chargeBeginEffect 字段, 用 shoot.firstShotDelay 替代充能时间
             shoot.firstShotDelay = 65f;
-            chargeSound = Sounds.shootLancer;
+            //chargeSound = Sounds.shootLancer;  // 移除蓄力音效，原版PU没有
             consumePower(4.2069f);
             targetAir = false;
+            // ★ 预先强化配方: 冷冻液 120/秒 → 145%, 水 120/秒 → 125%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 2.1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.25f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
             shootType = new BulletType() {
                 {
                     lifetime = 240;
@@ -1108,7 +1223,11 @@ public class Z_Turrets {
                 color = Pal.surge;
             }};
             shootSound = Sounds.shootLancer;  // ★ 原版 Sounds.thruster, v158 无此音效
-            consume(new ConsumeLiquidFilter(liquid -> liquid.temperature <= 0.5f && liquid.flammability <= 0.1f, 0.4f)).boost().update(false);
+            // ★ 预先强化配方: 冷冻液 120/秒 → 145%, 水 120/秒 → 125%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 2.1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.25f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
         }};
 
         // ===== current (PU_V8 L1204-1222, PowerTurret + LaserBulletType) =====
@@ -1125,6 +1244,11 @@ public class Z_Turrets {
             // v158 无 chargeTime/chargeEffects/chargeMaxDelay 字段, 用 shoot.firstShotDelay 替代充能时间
             shoot.firstShotDelay = 60f;
             consumePower(6.8f);
+            // ★ 预先强化配方: 冷冻液 120/秒 → 145%, 水 120/秒 → 125%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 2.1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.25f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
             shootType = new LaserBulletType(450f) {{
                 lifetime = 65f;
                 width = 20f;
@@ -1196,7 +1320,7 @@ public class Z_Turrets {
             requirements(Category.turret, ItemStack.with(Items.titanium, 360, Items.thorium, 630, Items.silicon, 240, Z_Items.sparkAlloy, 420));
             health = 3650;
             size = 5;
-            range = 400f;
+            range = 480f;  // 统一改为60格显示
             minRange = 60f;
             reload = 320f;
             coolantMultiplier = 2f;
@@ -1207,6 +1331,11 @@ public class Z_Turrets {
             smokeEffect = Fx.none;
             consumePowerCond(10f, b -> ((mindustry.world.blocks.defense.turrets.Turret.TurretBuild)b).isActive());
             shootSound = Sounds.shootLaser;  // ★ 原版 Sounds.laser, v158 无 laser 用 shootLaser 替代
+            // ★ 预先强化配方: 冷冻液 120/秒 → 145%, 水 120/秒 → 125%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 2.1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.25f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
             ammo(Z_Items.sparkAlloy, new BasicBulletType(7f, 100f, "large-bomb") {{  // ★ sprite=large-bomb
                 width = height = 30f;
                 backColor = Pal.surge;
@@ -1256,6 +1385,11 @@ public class Z_Turrets {
             inaccuracy = 0;
             consumePower(6.4f);
             targetAir = false;
+            // ★ 预先强化配方: 冷冻液 120/秒 → 145%, 水 120/秒 → 125%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 2.1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.25f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
             shootType = new ShieldBulletType(8f) {{
                 drag = 0.03f;
                 shootEffect = Fx.none;
@@ -1465,6 +1599,11 @@ public class Z_Turrets {
             shootDuration = 320f;
             firingMoveFract = 0.12f;
             shootY = size * tilesize / 2f - recoil;
+            // ★ 预先强化配方: 冷冻液 120/秒 → 145%, 水 120/秒 → 125%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 2.1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.25f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
             shootType = new AcceleratingLaserBulletType(390f) {{
                 colors = new Color[]{Color.valueOf("59a7ff55"), Color.valueOf("59a7ffaa"), Color.valueOf("a3e3ff"), Color.white};
                 width = 29.2f;
@@ -1505,6 +1644,11 @@ public class Z_Turrets {
             loopSoundVolume = 2f;
             heatColor = Color.valueOf("3a4a7a");
             rotateSpeed = 2f;
+            // ★ 预先强化配方: 冷冻液 120/秒 → 145%, 水 120/秒 → 125%
+            coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 2.1f));
+            coolant.boost();
+            coolantBoost.put(mindustry.content.Liquids.water, 0.25f);
+            coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
             shootType = new ChangeTeamLaserBulletType(60f) {{
                 length = 300f;
                 lifetime = 18f;

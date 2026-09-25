@@ -31,7 +31,13 @@ public class SoulTractorBeamTurret extends TractorBeamTurret implements ISoulTur
     public float efficiencyFrom = 0.7f;
     public float efficiencyTo = 1.5f;
 
-    /** 基础伤害 (会按灵魂比例缩放) */
+    /**
+     * 基础每秒伤害 (会按灵魂比例缩放)。
+     * <p>
+     * ★ 单位说明: 该值代表"每秒"伤害 (整数, 便于玩家阅读), 例如 105 表示 105/秒。
+     * 父类 TractorBeamTurret 的 damage 字段是"每 tick"伤害, 面板显示为 damage * 60。
+     * 因此在 init() 中会把 damage 换算为 baseDamage / 60, 使面板直接显示 baseDamage 每秒值。
+     */
     public float baseDamage = 0f;
 
     /** 激光透明度回调 (基于 power.status 和 soulf), 为 null 时激光使用全不透明 */
@@ -60,7 +66,10 @@ public class SoulTractorBeamTurret extends TractorBeamTurret implements ISoulTur
     @Override
     public void init() {
         super.init();
-        if (baseDamage == 0f) baseDamage = damage;
+        // 未显式指定每秒伤害时, 由每 tick 的 damage 反推每秒值 (damage * 60)
+        if (baseDamage == 0f) baseDamage = damage * 60f;
+        // 把每 tick 伤害换算为 每秒伤害 / 60, 使父类面板 (damage * 60) 直接显示 baseDamage 每秒值
+        damage = baseDamage / 60f;
     }
 
     @Override
@@ -88,13 +97,12 @@ public class SoulTractorBeamTurret extends TractorBeamTurret implements ISoulTur
     public void setStats() {
         super.setStats();
         stats.add(Stat.abilities, (table) -> {
-            table.row().table(bt -> {
+            table.table(bt -> {
                 bt.left().defaults().padRight(3).left();
-                bt.row();
+                // ★ 修复: 灵魂信息与最大数量放在同一行, 避免"可选灵魂"后面看起来是空白
                 bt.add(requireSoul ? "@soul.require" : "@soul.optional");
                 if (maxSouls > 0) {
-                    bt.row();
-                    bt.add("[lightgray]最大灵魂: [accent]" + maxSouls);
+                    bt.add(Core.bundle.format("soul.max", maxSouls)).padLeft(6);
                 }
             });
         });
@@ -138,7 +146,7 @@ public class SoulTractorBeamTurret extends TractorBeamTurret implements ISoulTur
 
         /** 根据灵魂更新伤害 (复刻 PU_V8 progression.linear) */
         public void updateSoulDamage() {
-            damage = baseDamage * soulEfficiency();
+            damage = (baseDamage / 60f) * soulEfficiency();
         }
 
         /** 激光透明度 (PU_V8 laserAlpha), 回调未设置时返回 1f */
@@ -156,7 +164,7 @@ public class SoulTractorBeamTurret extends TractorBeamTurret implements ISoulTur
         public void updateTile() {
             // 灵魂影响伤害 (在 super.updateTile 之前更新 damage 字段)
             if (baseDamage > 0f) {
-                damage = baseDamage * soulEfficiency();
+                damage = (baseDamage / 60f) * soulEfficiency();
             }
             // 调用父类 updateTile 处理目标查找、激光渲染、伤害施加
             super.updateTile();

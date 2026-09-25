@@ -36,12 +36,15 @@ public class SoulHeatRayTurret extends SoulTractorBeamTurret {
     public void setStats() {
         super.setStats();
         // 与 PU_V8 HeatRayTurret.setStats 一致
-        stats.add(Stat.damage, baseDamage / 60f, StatUnit.perSecond);
+        // ★ 伤害行由父类 TractorBeamTurret 显示 (damage * 60 = baseDamage 每秒), 不再重复添加
         stats.add(Stat.targetsAir, targetAir);
         stats.add(Stat.targetsGround, targetGround);
-        // 显示 status 信息 (PU_V8 TODO: display status)
+        // ★ 修复: 状态行改为与"灵魂"面板一致的嵌套表格结构 (对齐), 并使用已翻译的 bundle key
         if (status != StatusEffects.none) {
-            stats.add(Stat.abilities, t -> t.add("[lightgray]Status: [accent]" + status.localizedName));
+            stats.add(Stat.abilities, t -> t.table(bt -> {
+                bt.left().defaults().padRight(3).left();
+                bt.add(arc.Core.bundle.format("soul.status", status.localizedName));
+            }));
         }
     }
 
