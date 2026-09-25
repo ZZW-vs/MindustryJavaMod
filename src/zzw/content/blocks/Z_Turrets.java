@@ -439,9 +439,8 @@ public class Z_Turrets {
             }};
             // ★ 预先强化配方: 仅冷冻液 120/秒 → 145%
             coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.cryofluid, 2.1f));
-            coolant.boost();
             coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
-            consume(new ConsumeLiquidFilter(liquid -> liquid == mindustry.content.Liquids.cryofluid, 0.58f)).boost().update(false);
+            consume(new ConsumeLiquidFilter(liquid -> liquid == mindustry.content.Liquids.cryofluid, 0.58f)).update(false);
         }};
 
         // ===== catastrophe (PU_V8 L483-505, BigLaserTurret + SparkingContinuousLaserBulletType) =====
@@ -466,7 +465,6 @@ public class Z_Turrets {
             requirements(Category.turret, ItemStack.with(Items.copper, 1250, Items.lead, 1320, Items.graphite, 1100, Items.titanium, 1340, Items.surgeAlloy, 1240, Items.silicon, 1350, Items.thorium, 770, Z_Items.darkAlloy, 370));
             // ★ 预先强化配方: 冷冻液 120/秒 → 145%, 水 120/秒 → 125%
             coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 2.1f));
-            coolant.boost();
             coolantBoost.put(mindustry.content.Liquids.water, 0.25f);
             coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);
             shootType = new SparkingContinuousLaserBulletType(240f) {{

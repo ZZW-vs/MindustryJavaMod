@@ -36,6 +36,7 @@ import zzw.content.blocks.turrets.ObjPowerTurret;
 import zzw.content.blocks.turrets.PrismTurret;
 import zzw.content.blocks.turrets.WavefrontTurret;
 import zzw.content.units.bullets.EndCutterLaserBulletType;
+import zzw.content.units.bullets.ArcnelidiaCutterLaserBulletType;
 import zzw.content.units.bullets.PointBlastLaserBulletType;
 import zzw.content.units.bullets.WavefrontLaserBulletType;
 import zzw.content.units.effects.ChargeEffect;
@@ -284,7 +285,6 @@ public class Z_AdvTurrets {
             efficiencyTo = 1.67f;
             // ★ 强化配方: 水 130%, 冷冻液 200%
             coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 1f));
-            coolant.boost();
             coolantBoost.put(mindustry.content.Liquids.water, 0.30f);
             coolantBoost.put(mindustry.content.Liquids.cryofluid, 1.00f);
             // ★ 副弹幕: 激光 (PU_V8 BurstPowerTurret.subShootType)
@@ -564,7 +564,7 @@ public class Z_AdvTurrets {
             shootSound = Z_Sounds.tenmeikiriShoot;
             shake = 4f;
             rotateSpeed = 1.5f;  // 转动速度上限调小
-            shootType = new EndCutterLaserBulletType(12000f) {{
+            shootType = new ArcnelidiaCutterLaserBulletType(12000f) {{
                 maxLength = 1200f;
                 lifetime = 3f * 60f;
                 width = 30f;
@@ -575,12 +575,19 @@ public class Z_AdvTurrets {
                 lightningColor = Color.valueOf("f53036");  // scarColor
                 lightningDamage = 150f;
                 lightningLength = 15;
-                // 防作弊参数 (PU132 tenmeikiri 原值)
+                // 防作弊参数 (PU132 tenmeikiri 原版值)
                 ratioDamage = 1f / 40f;
+                
+                // ★ 基于FlameOut arcnelidia技术的分割配置
+                segmentCount = 8;           // 分割段数
+                segmentOffset = 22.7f;      // 段间距
+                angleLimit = 30f;           // 角度限制
+                anglePhysicsSmooth = 0.1f;  // 角度平滑度
+                jointStrength = 0.6f;       // 关节强度
+                segmentCast = 6;            // 传播段数
             }};
             // ★ 强化配方: 冷冻液 220% 伤害 123456
             coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.cryofluid, 1f));
-            coolant.boost();
             coolantBoost.put(mindustry.content.Liquids.cryofluid, 1.20f);
             // ★ 修改伤害为 123456
             shootType.damage = 123456f;

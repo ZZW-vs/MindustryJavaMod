@@ -77,7 +77,7 @@ public class BarrelsItemTurret extends ItemTurret {
                 for(int s = 0; s < shots; s++){
                     float offset = (s - shots / 2f + 0.5f) * spread;
                     tr3.trns(rotation + offset, xRand() * range * 0.1f);
-                    bullet(type, x + tr3.x, y + tr3.y, rotation + offset + Mathf.random(-inaccuracy, inaccuracy), Mathf.random());
+                    bullet(type, x + tr3.x, y + tr3.y, rotation + offset + Mathf.random(-inaccuracy, inaccuracy), Mathf.random(), null);
                 }
             }else{
                 super.shoot(type);
@@ -92,7 +92,7 @@ public class BarrelsItemTurret extends ItemTurret {
                 recoil = recoilAmount;
                 heat = 1f;
                 float angle = rotation + barrels.get(barrel).x * Angles.lenient(barrels.get(barrel).y);
-                bullet(type, x + barrels.get(barrel).x, y + barrels.get(barrel).y, angle + Mathf.random(-inaccuracy, inaccuracy), Mathf.random());
+                bullet(type, x + barrels.get(barrel).x, y + barrels.get(barrel).y, angle + Mathf.random(-inaccuracy, inaccuracy), Mathf.random(), null);
             }
         }
 
