@@ -11,14 +11,13 @@ import arc.math.geom.Vec2;
 import arc.struct.Seq;
 import arc.util.Time;
 import arc.util.Tmp;
+import mindustry.Vars;
 import mindustry.content.Fx;
 import mindustry.entities.Lightning;
 import mindustry.entities.Units;
 import mindustry.entities.bullet.BulletType;
 import mindustry.entities.units.UnitController;
-import mindustry.game.Team;
 import mindustry.gen.Building;
-import mindustry.gen.Groups;
 import mindustry.gen.Posc;
 import mindustry.gen.Unit;
 import mindustry.graphics.Drawf;
@@ -38,10 +37,15 @@ import zzw.content.units.effects.SpecialFx;
  *   <li><b>通电</b>: 灯环常亮, 并且会向四周释放慢速闪电 (仅有观赏/压制效果, 无法攻击);</li>
  *   <li><b>通电 + 有弹药</b>: 每只眼睛各自锁定一个敌人并射出秒杀光束,
  *       光束持续连接目标; 每 2 条光束消耗 1 个弹药;</li>
- *   <li>光束命中后先解除目标 AI, 1 秒后将其湮灭并播放汽化特效,
+ *   <li>光束命中后先解除目标 AI, 0.5 秒后将其湮灭并播放汽化特效,
  *       湮灭后眼睛才会转去锁定下一个目标;</li>
  *   <li>每只眼睛可以打不同的目标 —— 分配时按目标列表轮转,
  *       避免所有眼睛都盯着同一个单位。</li>
+ *   <li><b>限伤</b>: 单次受到的伤害最多只结算 {@link #damageCap} 点,
+ *       无论来袭伤害多高都不会被一击秒杀 (见 {@code handleDamage});</li>
+ *   <li><b>稳定性</b>: 击杀目标时不再使用 NaN 坐标等破坏性手法,
+ *       全部走引擎自带的幂等死亡流程; 同时跳过玩家单位, 避免顶掉
+ *       Player 控制器导致玩家卡死。</li>
  * </ul>
  *
  * <p>★ v155/v159 适配要点:</p>
@@ -50,8 +54,10 @@ import zzw.content.units.effects.SpecialFx;
  *       {@code TurretBuild.peekAmmo()} 返回 null, 会在
  *       {@code ammoReloadMultiplier()} 处抛 NPE。
  *       本炮台不使用普通子弹, 因此填一个伤害为 0 的占位子弹;</li>
- *   <li>移除 PU132 的 AntiCheat 采样湮灭系统, 改用直接击杀 + 汽化特效;</li>
- *   <li>移除 PU132 的反子弹拦截 (updateAntiBullets) 与减伤 (resist) —— 与既定秒杀系统一致。</li>
+ *   <li>移除 PU132 的 AntiCheat 采样湮灭系统, 改用"先特效后击杀"+
+ *       分层降级击杀 ({@code kill → destroy → remove});</li>
+ *   <li>移除 PU132 的反子弹拦截 (updateAntiBullets) 与减伤 (resist),
+ *       改为直接的 {@code handleDamage} 单次伤害上限。</li>
  * </ul>
  */
 public class EndGameTurret extends PowerTurret {
@@ -68,10 +74,19 @@ public class EndGameTurret extends PowerTurret {
 
     /** 眼睛数量: 内环 8 只 + 外环 8 只。 */
     public static final int eyeCount = 16;
-    /** 每只眼睛锁定后, 从"命中"到"湮灭"的延迟 (帧)。 */
-    public static final float annihilateDelay = 60f;
+    /** 每只眼睛锁定后, 从"命中"到"湮灭"的延迟 (帧)。0.5 秒 = 30 帧。 */
+    public static final float annihilateDelay = 30f;
     /** 眼睛光束的发射间隔 (帧)。 */
     public static final float eyeShotInterval = 14f;
+
+    /**
+     * 单次受到伤害的上限。
+     *
+     * <p>无论来袭伤害多高 (核弹/秒杀光束/反作弊穿透弹等), 本炮台
+     * 单帧最多只吃 {@code damageCap} 点伤害, 保证不会被一击秒杀,
+     * 也给玩家留出反应与修复时间。</p>
+     */
+    public static final float damageCap = 10000f;
 
     // ===== 贴图 =====
     public TextureRegion baseRegion, baseLightsRegion, bottomLightsRegion, eyeMainRegion;
@@ -82,7 +97,7 @@ public class EndGameTurret extends PowerTurret {
     public EndGameTurret(String name) {
         super(name);
 
-        health = 68000;
+        health = 136000;
         consumePower(320f);
         reload = 430f;
         range = 820f;
@@ -191,6 +206,14 @@ public class EndGameTurret extends PowerTurret {
         /** 每只眼睛的湮灭倒计时 (帧)。 */
         protected float[] annihilateTimers = new float[eyeCount];
 
+        {
+            // 在构造阶段就把 eyeVecs 填满 —— 保证任何时刻 draw() 都不会
+            // 读到 null 元素 (绘制早于 add() 的极端情况也不会崩)。
+            for (int i = 0; i < eyeCount; i++) {
+                eyeVecs[i] = new Vec2();
+            }
+        }
+
         /** 眼睛位置平滑偏移 (让光点微微游走)。 */
         protected Vec2 eyeOffset = new Vec2();
         protected Vec2 eyeTargetOffset = new Vec2();
@@ -213,14 +236,80 @@ public class EndGameTurret extends PowerTurret {
         /** 三层环的当前角度。 */
         protected float[] ringProgress = {0f, 0f, 0f};
 
+        /**
+         * 索敌结果缓存 —— 复用同一个 {@link Seq}, 避免每轮询都新建对象
+         * 产生垃圾 (手机端内存友好)。每轮先 {@code clear()} 再填充。
+         */
+        protected final Seq<Unit> foundCache = new Seq<>();
+
         @Override
         public void add() {
             for (int i = 0; i < eyeCount; i++) {
-                eyeVecs[i] = new Vec2();
+                // eyeVecs 已在构造块里初始化, 这里不重复 new (避免垃圾)
                 targets[i] = null;
                 annihilateTimers[i] = 0f;
             }
             super.add();
+        }
+
+        /**
+         * ★ 限伤: 单次受到的伤害被截断到 {@link EndGameTurret#damageCap}。
+         *
+         * <p>{@code Building.damage(float)} 内部会把伤害交给本方法做最终修正,
+         * 再用返回值扣血 ({@code health -= handleDamage(damage)}),
+         * 所以在这里做钳制是唯一且最可靠的入口 —— 无论伤害来自子弹、
+         * 爆炸、逻辑方块还是其它模组, 都会被限制, 不会出现一击秒杀。</p>
+         *
+         * @param amount 引擎计算后的原始伤害 (已按 blockHealth 规则缩放)
+         * @return 实际结算的伤害, 最大不超过 {@link EndGameTurret#damageCap}
+         */
+        @Override
+        public float handleDamage(float amount) {
+            // 负数/NaN 直接视为 0, 避免异常数值污染血量
+            if (Float.isNaN(amount) || amount <= 0f) {
+                return 0f;
+            }
+            return Math.min(amount, damageCap);
+        }
+
+        /**
+         * 建筑被移除 (拆除/被摧毁) 时, 把所有仍被眼睛锁定的单位 AI 还原,
+         * 否则这些单位会因为没有控制器而永久僵在原地。
+         *
+         * <p>这是手机端/联机下的稳定性关键: 建筑生命周期结束时
+         * {@code updateTile()} 不再执行, 必须在这里补做清理。</p>
+         */
+        @Override
+        public void onRemoved() {
+            releaseAllTargets();
+            super.onRemoved();
+        }
+
+        /**
+         * 断开所有眼睛的目标连接, 并还原被替换掉的单位 AI。
+         *
+         * <p>幂等: 可重复调用, 已还原过的单位不会被重复处理。</p>
+         */
+        protected void releaseAllTargets() {
+            for (int i = 0; i < eyeCount; i++) {
+                Posc t = targets[i];
+                targets[i] = null;
+                annihilateTimers[i] = 0f;
+
+                // 把之前被替换掉的原始控制器还原回去。
+                // 注意: 绝不能传 null 给 controller(), 设置器内部会立即调用
+                // controller.unit(this), 传 null 必然抛 NPE。
+                if (t instanceof Unit u && u.controller() instanceof NullAI na) {
+                    if (na.previous != null) {
+                        try {
+                            u.controller(na.previous);
+                        } catch (Throwable ignored) {
+                            // 单位可能已进入死亡流程, 还原失败不影响游戏
+                        }
+                    }
+                    u.vel.setZero();
+                }
+            }
         }
 
         @Override
@@ -275,21 +364,7 @@ public class EndGameTurret extends PowerTurret {
                 }
             } else {
                 // 失去电力或弹药 → 断开所有光束并恢复单位AI
-                for (int i = 0; i < eyeCount; i++) {
-                    Posc t = targets[i];
-                    targets[i] = null;
-                    annihilateTimers[i] = 0f;
-                    
-                    // 恢复单位AI: 把之前被替换掉的原始控制器还原回去。
-                    // 注意: 绝不能传 null 给 controller(), 设置器内部会立即调用
-                    // controller.unit(this), 传 null 必然抛 NPE。
-                    if (t instanceof Unit u && u.controller() instanceof NullAI na) {
-                        if (na.previous != null) {
-                            u.controller(na.previous);
-                        }
-                        u.vel.setZero(); // 重置速度
-                    }
-                }
+                releaseAllTargets();
             }
 
             updateAnnihilation();
@@ -354,9 +429,13 @@ public class EndGameTurret extends PowerTurret {
          * 使每只眼睛尽可能打不同的敌人。</p>
          */
         protected void refreshTargets() {
-            Seq<Unit> found = new Seq<>();
-            Units.nearbyEnemies(team, x - range(), y - range(), range() * 2f, range() * 2f, u -> {
-                if (u.isValid() && !u.dead() && Mathf.within(x, y, u.x, u.y, range())) {
+            // 复用缓存 Seq, 避免每 15 帧新建集合产生垃圾
+            Seq<Unit> found = foundCache;
+            found.clear();
+
+            float r = range();
+            Units.nearbyEnemies(team, x - r, y - r, r * 2f, r * 2f, u -> {
+                if (u.isValid() && !u.dead() && Mathf.within(x, y, u.x, u.y, r)) {
                     found.add(u);
                 }
             });
@@ -365,7 +444,10 @@ public class EndGameTurret extends PowerTurret {
                 return;
             }
 
-            found.sort((a, b) -> Float.compare(a.dst2(this), b.dst2(this)));
+            final float cx = x, cy = y;
+            found.sort((a, b) -> Float.compare(
+                Mathf.dst2(a.x, a.y, cx, cy),
+                Mathf.dst2(b.x, b.y, cx, cy)));
 
             int n = found.size;
             int slot = 0;
@@ -398,7 +480,7 @@ public class EndGameTurret extends PowerTurret {
             Z_Sounds.endgameSmallShoot.at(x, y, Mathf.random(0.95f, 1.05f), 0.6f);
         }
 
-        /** 更新每只眼睛的湮灭流程: 先解除 AI, 1 秒后湮灭。 */
+        /** 更新每只眼睛的湮灭流程: 先解除 AI, 0.5 秒后湮灭。 */
         protected void updateAnnihilation() {
             for (int i = 0; i < eyeCount; i++) {
                 Posc t = targets[i];
@@ -414,99 +496,182 @@ public class EndGameTurret extends PowerTurret {
                 }
 
                 // 步骤 1: 解除目标 AI (使其无法移动/攻击)
-                // 保存原控制器, 以便断电/断弹时恢复
-                if (t instanceof Unit u && !(u.controller() instanceof NullAI)) {
+                // 保存原控制器, 以便断电/断弹时恢复。
+                // ★ 跳过玩家操控的单位: 直接顶掉 Player 控制器会让玩家
+                //   在单位死亡时收不到 removed() 回调, 出现卡死/无法复活,
+                //   因此对玩家单位只做击杀、不做定身。
+                // ★ 跳过联机客户端: 客户端改控制器会造成实体不同步。
+                if (t instanceof Unit u && !Vars.net.client()
+                    && !u.isPlayer() && !(u.controller() instanceof NullAI)) {
                     u.controller(new NullAI(u.controller()));
                     u.vel.setZero();
                 }
 
-                // 步骤 2: 1 秒后湮灭
+                // 步骤 2: 0.5 秒后湮灭
                 annihilateTimers[i] += Time.delta;
                 if (annihilateTimers[i] >= annihilateDelay) {
                     annihilate(t);
+                    // 无论客户端还是服务器都要断开光束, 否则会残留一条指向
+                    // 已消失目标的连线。
                     targets[i] = null;
                     annihilateTimers[i] = 0f;
                 }
             }
         }
 
-        /** 湮灭目标: 播放汽化特效并直接秒杀。 */
+        /**
+         * 湮灭目标: 播放汽化特效并直接秒杀。
+         *
+         * <p>★ 关键顺序: <b>必须先播放特效, 再执行击杀</b>。
+         * 汽化特效要靠目标的实时坐标/朝向去绘制轮廓, 而击杀流程会把
+         * 单位从世界里移除。旧实现把击杀放在前面并且还会把坐标写成
+         * {@code NaN}, 于是特效被创建在 NaN 坐标上 —— 完全不可见。
+         * 这就是"湮灭特效消失"的根因。</p>
+         *
+         * @param t 已被眼睛锁定并倒计时结束的目标 (单位或建筑)
+         */
         protected void annihilate(Posc t) {
+            if (t == null) {
+                return;
+            }
+
+            // 联机客户端不做权威结算: kill()/destroy()/remove() 在客户端执行会
+            // 造成"本地提前移除"的实体不同步, 击杀统一由服务器下发。
+            if (Vars.net.client()) {
+                return;
+            }
+
+            // 先把坐标固定下来, 之后无论目标发生什么都能拿到有效值
+            float tx = t.getX(), ty = t.getY();
+
             if (t instanceof Unit u) {
+                float rot = angleTo(u);
+                // 步骤 1: 先放特效 (此时坐标一定有效)
+                SpecialFx.endgameVapourize.at(tx, ty, rot, new Object[]{this, u});
+                // 步骤 2: 再击杀
                 annihilateUnit(u);
-                SpecialFx.endgameVapourize.at(u.x, u.y, angleTo(u), new Object[]{this, u});
             } else if (t instanceof Building b) {
-                // 建筑秒杀：直接摧毁
-                b.health = -Float.MAX_VALUE; // 确保秒杀
-                SpecialFx.endgameVapourize.at(b.x, b.y, b.angleTo(this), new Object[]{this, b});
-                b.remove();
+                float rot = b.angleTo(this);
+                // 步骤 1: 先放特效
+                SpecialFx.endgameVapourize.at(tx, ty, rot, new Object[]{this, b});
+                // 步骤 2: 走引擎的标准摧毁流程 (掉落/音效/事件齐全),
+                //         比"把血量写成 -Float.MAX_VALUE"稳定得多。
+                try {
+                    b.kill();
+                } catch (Throwable ignored) {
+                }
             }
         }
 
         /**
-         * ★ 多重秒杀机制: 绕过所有可能的反作弊方式
-         * 至少有一条攻击路径会生效，确保任何单位都能被杀死
-         * 参考FlameOut模组的annihilate方法和EmpathyDamage系统
+         * ★ 湮灭单位 —— 五层降级击杀, 保证任何单位都能被消灭, 同时保持稳定。
+         *
+         * <p>与旧实现的关键区别:</p>
+         * <ul>
+         *   <li><b>不再把坐标写成 {@code NaN}</b>。旧实现用 NaN 让"引用失效",
+         *       但这会连带把汽化特效也画到 NaN 上 (特效消失), 而且 NaN 会顺着
+         *       弹道/索敌/统计等系统扩散, 是典型的不稳定源;</li>
+         *   <li><b>不再手工拆解实体</b>。旧实现直接 {@code Groups.unit.remove(u)}
+         *       外加反复 {@code remove()}, 绕过了引擎的下标维护; 现在统一交给
+         *       {@code kill() → destroy() → remove()} 这三个自带幂等守卫的引擎
+         *       方法, 队伍单位计数不会被重复扣减;</li>
+         *   <li><b>不做 {@code Float.MAX_VALUE} 这种极端伤害</b>, 避免触发伤害
+         *       反弹、数值溢出等副作用; 压血 + 走死亡流程已经足够;</li>
+         *   <li><b>层层兜底</b>: 每一层都只在前一层没把单位清掉时才执行,
+         *       所以对普通原版单位来说只有第一层会生效, 开销与副作用都最小。</li>
+         * </ul>
+         *
+         * @param u 要湮灭的单位
          */
         void annihilateUnit(Unit u) {
-            if (u == null || u.isAdded() == false) return;
-
-            // ===== 机制1: 常规伤害 + remove =====
-            try {
-                u.damage(Float.MAX_VALUE);
-            } catch (Throwable ignored) {}
-
-            // ===== 机制2: 直接设置 health=0, dead=true =====
-            try {
-                u.health = 0f;
-                u.dead = true;
-                u.maxHealth = 1f;
-            } catch (Throwable ignored) {}
-
-            // ===== 机制3: 反射清除反作弊私有字段 =====
-            // 清除 SegmentWormEntity 的 lastHealth/invTime/immunity/rogueDamageResist
-            // 清除 EmpathyUnit 的 trueHealth/trueMaxHealth/invFrames/parryTime
-            try {
-                java.lang.reflect.Field f = findField(u.getClass(), "lastHealth");
-                if (f != null) { f.setFloat(u, 0f); }
-                f = findField(u.getClass(), "trueHealth");
-                if (f != null) { f.setFloat(u, 0f); }
-                f = findField(u.getClass(), "trueMaxHealth");
-                if (f != null) { f.setFloat(u, 1f); }
-                f = findField(u.getClass(), "invTime");
-                if (f != null) { f.setFloat(u, 100f); }
-                f = findField(u.getClass(), "immunity");
-                if (f != null) { f.setFloat(u, 0f); }
-                f = findField(u.getClass(), "rogueDamageResist");
-                if (f != null) { f.setFloat(u, 0f); }
-                f = findField(u.getClass(), "parryTime");
-                if (f != null) { f.setFloat(u, 0f); }
-                f = findField(u.getClass(), "damageTaken");
-                if (f != null) { f.setFloat(u, 0f); }
-            } catch (Throwable ignored) {}
-
-            // ===== 机制4: 反复调用kill()绕过死亡拒绝 =====
-            for (int i = 0; i < 5; i++) {
-                try {
-                    u.kill();
-                } catch (Throwable ignored) {}
+            if (u == null) {
+                return;
             }
 
-            // ===== 机制5: 从Groups中移除 + NaN销毁 (参考FlameOut annihilate) =====
-            try {
-                u.health = 0f;
-                u.dead = true;
-                Groups.unit.remove(u);
-                // 设置NaN让任何引用该单位的代码失效
-                u.x = Float.NaN;
-                u.y = Float.NaN;
-                u.rotation = Float.NaN;
-            } catch (Throwable ignored) {}
+            // ===== 第 1 层: 清除各类"防秒杀"保护字段 =====
+            clearProtectionFields(u);
 
-            // ===== 机制6: 最终remove =====
+            // ===== 第 2 层: 直接把血量压到 0 =====
             try {
-                u.remove();
-            } catch (Throwable ignored) {}
+                if (u.health > 0f) {
+                    u.health = 0f;
+                }
+            } catch (Throwable ignored) {
+            }
+
+            // ===== 第 3 层: 引擎标准死亡流程 kill → killed → destroy → remove =====
+            try {
+                if (!u.dead) {
+                    u.kill();
+                }
+            } catch (Throwable ignored) {
+            }
+
+            // ===== 第 4 层: 强制销毁 =====
+            // 飞行且会留下残骸的单位被击杀后是先"坠机"而不是立刻消失的,
+            // 这里强制走完 destroy(), 让湮灭真正瞬时发生, 同时补齐死亡特效、
+            // UnitDestroyEvent 事件与 abilities 的死亡回调。
+            if (u.isAdded()) {
+                try {
+                    u.destroy();
+                } catch (Throwable ignored) {
+                }
+            }
+
+            // ===== 第 5 层: 最终兜底, 直接移除 =====
+            // 只有 killable() == false 这类"拒绝死亡"的单位才会走到这里。
+            // remove() 内部有 added 守卫, 重复调用是安全的。
+            if (u.isAdded()) {
+                try {
+                    u.remove();
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+
+        /**
+         * 反射清除各类单位用来"防秒杀"的私有字段。
+         *
+         * <p>这些字段来自 PU132 / FlameOut 等模组体系:</p>
+         * <ul>
+         *   <li>{@code lastHealth} —— 每帧把血量钳回历史最低值, 使治疗/压血无效;</li>
+         *   <li>{@code trueHealth / trueMaxHealth} —— 用另一套血量接管结算;</li>
+         *   <li>{@code parryTime / invFrames} —— 招架/无敌帧;</li>
+         *   <li>{@code immunity / rogueDamageResist / damageTaken} —— 减伤与免疫计数。</li>
+         * </ul>
+         *
+         * <p>字段不存在时会静默跳过, 所以对原版单位完全无副作用。</p>
+         *
+         * @param u 目标单位
+         */
+        protected void clearProtectionFields(Unit u) {
+            Class<?> clazz = u.getClass();
+            setUnitField(u, clazz, "lastHealth", 0f);
+            setUnitField(u, clazz, "trueHealth", 0f);
+            setUnitField(u, clazz, "immunity", 0f);
+            setUnitField(u, clazz, "rogueDamageResist", 0f);
+            setUnitField(u, clazz, "parryTime", 0f);
+            setUnitField(u, clazz, "damageTaken", 0f);
+            setUnitField(u, clazz, "invFrames", 0f);
+            // trueMaxHealth 压到 1 而不是 0: 保持 health/maxHealth 比例可计算,
+            // 避免其它系统除零产生 NaN。
+            setUnitField(u, clazz, "trueMaxHealth", 1f);
+        }
+
+        /**
+         * 把单位身上指定名字的 float 字段设为给定值。
+         *
+         * <p>找不到字段、字段类型不符或不可写 (Android 上偶发) 时静默跳过,
+         * 绝不让反射异常打断击杀流程。</p>
+         */
+        protected void setUnitField(Unit u, Class<?> clazz, String name, float value) {
+            try {
+                java.lang.reflect.Field f = findField(clazz, name);
+                if (f != null && f.getType() == float.class) {
+                    f.setFloat(u, value);
+                }
+            } catch (Throwable ignored) {
+            }
         }
 
         /** 递归查找字段(包括父类) */
