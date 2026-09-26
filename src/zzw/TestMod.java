@@ -18,6 +18,7 @@ import zzw.content.Z_Liquids;
 import zzw.content.Z_Mine;
 import zzw.content.Z_Sounds;
 import zzw.content.exp.Z_Exp;
+import zzw.content.graphics.BlackHoleShader;
 import zzw.content.mechanics.Z_Mechanics;
 import zzw.content.mechanics.torque.Z_Torque;
 import zzw.content.units.Z_Units;
@@ -168,6 +169,9 @@ public class TestMod extends Mod{
 
         // 天气 (timeStorm/debrisStorm)
         Z_Weathers.load();
+
+        // ★ 加载黑洞着色器 (必须在所有内容加载之后, 确保纹理已加载)
+        BlackHoleShader.load();
 
         // ★ 科技树 (必须最后: 把全部 PU 内容挂到原版科技树, 引用所有内容类)
         //Z_TechTree.load();

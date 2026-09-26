@@ -3,6 +3,7 @@ package zzw.content;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
+import arc.graphics.g2d.TextureRegion;
 import arc.graphics.g2d.Lines;
 import arc.math.Angles;
 import arc.math.Interp;
@@ -882,85 +883,119 @@ public class Z_Bullets {
         }
 
         @Override
-        public void draw(Bullet b) {
-            float interp = b.fin(Interp.exp10Out);
-            
-            // 黑洞整体尺寸（大幅缩小）
-            float actualRadius = radius * 0.2f; // 进一步缩小整体尺寸
-            
-            // 1. 中心黑色圆形（完全黑色的小圆形）- 确保在任何情况下都可见
-            Draw.color(Color.black);
-            float baseCoreRadius = size * scales[0] * 0.8f; // 基础尺寸
-            float coreRadius = interp * baseCoreRadius;
-            if (coreRadius < 12f) coreRadius = 12f; // 确保最小12像素
-            Fill.circle(b.x, b.y, coreRadius);
-            
-            // 2. 细金色光圈快速旋转（原版风格）- 缩小金色圈
-            Draw.blend(arc.graphics.Blending.additive);
-            Draw.color(Color.valueOf("FFD700")); // 金色
-            for (int i = 0; i < 4; i++) {
-                float rotationSpeed = Time.time * (4f + i * 0.5f); // 快速旋转
-                float angle = rotationSpeed + i * 90f;
-                float ringRadius = coreRadius * (1.5f + i * 0.3f); // 减小金色圈的相对大小
-                
-                // 绘制细金色光圈
-                Lines.stroke(0.8f + i * 0.2f); // 也稍微减小线条粗细
-                Lines.circle(b.x, b.y, ringRadius);
-            }
-            
-            // 3. 灰色半透明圆形粒子系统
-            // 在黑洞影响范围内随机生成灰色半透明圆形
-            for (int i = 0; i < 15; i++) {
-                float angle = Mathf.random(360f);
-                // 从黑洞外圈到外围范围内生成，调整范围以匹配缩小的黑洞
-                float dist = Mathf.random(actualRadius * 1.2f, actualRadius * 2.5f);
-                float x = b.x + Mathf.cosDeg(angle) * dist;
-                float y = b.y + Mathf.sinDeg(angle) * dist;
-                
-                // 灰色偏透明，大小不一但不能太大
-                float particleSize = Mathf.random(1.5f, 4f); // 稍微减小粒子大小
-                Color particleColor = Color.valueOf("80808080"); // 灰色半透明
-                Draw.color(particleColor);
-                Fill.circle(x, y, particleSize);
-            }
-            
-            // 4. 粒子向黑洞中心飞行的动画
-            Draw.color(Color.valueOf("A0A0A080")); // 灰色偏透明
-            for (int i = 0; i < 12; i++) {
-                float angle = Mathf.random(360f);
-                float dist = Mathf.random(actualRadius * 0.8f, actualRadius * 2.0f); // 调整范围
-                float x = b.x + Mathf.cosDeg(angle) * dist;
-                float y = b.y + Mathf.sinDeg(angle) * dist;
-                float particleSize = Mathf.random(1f, 3f); // 减小粒子大小
-                
-                // 计算向中心移动的目标位置
-                float speed = (1f - dist / (actualRadius * 1.5f)) * 0.15f; // 越近越快
-                float targetDist = Mathf.clamp(dist - speed * actualRadius, coreRadius, dist);
-                float targetX = b.x + Mathf.cosDeg(angle) * targetDist;
-                float targetY = b.y + Mathf.sinDeg(angle) * targetDist;
-                
-                // 绘制粒子轨迹
-                Lines.stroke(particleSize);
-                Lines.line(x, y, targetX, targetY);
-                
-                // 绘制移动中的粒子
-                Fill.circle(targetX, targetY, particleSize * 0.8f);
-            }
-            
-            // 5. 额外的环境效果（微弱的引力场可视化）
-            Draw.color(Color.valueOf("40404040")); // 很淡的灰色
-            for (int i = 0; i < 6; i++) {
-                float angle = Time.time * 0.5f + i * (360f / 6);
-                float fieldRadius = actualRadius * (1.5f + Mathf.sin(Time.time + i) * 0.3f); // 调整范围
-                float x = b.x + Mathf.cosDeg(angle) * fieldRadius;
-                float y = b.y + Mathf.sinDeg(angle) * fieldRadius;
-                
-                Fill.circle(x, y, 2f); // 减小环境效果点的大小
-            }
-            
-            Draw.blend();
-            Draw.color();
+    public void draw(Bullet b){
+        float life = b.fin();
+
+        // 生命周期：前 20% 长大，稳定，最后 25% 缩小到消失
+        float scaleCurve;
+        if(life < 0.2f){
+            scaleCurve = life / 0.2f;
+        } else if(life > 0.75f){
+            scaleCurve = (1f - life) / 0.25f;
+        } else {
+            scaleCurve = 1f;
         }
+        scaleCurve = Mathf.clamp(scaleCurve, 0f, 1f);
+        scaleCurve = (float)Math.sin(scaleCurve * Mathf.PI * 0.5f);
+        scaleCurve = Mathf.lerp(0.55f, 1.0f, scaleCurve);   // 保证最小 55% 可见度
+
+        if(scaleCurve < 0.02f) return;
+
+        float fade  = scaleCurve;
+        float pulse = 0.85f + 0.15f * Mathf.sin(Time.time * 6f);
+
+        // 核心参数
+        float coreR      = (16f + 12f * life) * scaleCurve;   // 事件视界半径
+        float photonR    = coreR * 1.10f;                     // 光子环
+        float diskInner  = coreR * 1.5f;                      // 吸积盘内缘
+        float diskOuter  = coreR * 4.2f;                      // 吸积盘外缘
+        float lensR1     = coreR * 2.2f;                      // 引力透镜弧 1
+        float lensR2     = coreR * 3.4f;                      // 引力透镜弧 2
+
+        // ============================================================
+        // 1. 引力透镜背景光晕（最底层，冷色，大范围渐隐）
+        // ============================================================
+        Draw.blend(arc.graphics.Blending.additive);
+
+        for(int i = 0; i < 3; i++){
+            float rr = diskOuter * (1.0f + i * 0.35f);
+            float a  = (0.12f - i * 0.03f) * fade;
+            Draw.color(Pal.lancerLaser, a);
+            Fill.circle(b.x, b.y, rr);
+        }
+
+        Draw.color(Color.valueOf("7ab8ff"), 0.35f * fade * pulse);
+        Lines.stroke(1.6f);
+        Lines.arc(b.x, b.y, lensR1, 0.45f, 0f);
+        Lines.arc(b.x, b.y, lensR1, 0.45f, 180f);
+        Draw.color(Color.valueOf("a8d4ff"), 0.25f * fade);
+        Lines.stroke(1.2f);
+        Lines.arc(b.x, b.y, lensR2, 0.32f, 0f);
+        Lines.arc(b.x, b.y, lensR2, 0.32f, 180f);
+
+        // ============================================================
+        // 2. 水平吸积盘（暖色，橙色为主，两侧各一条弧）
+        // ============================================================
+        Draw.color(Color.valueOf("ff7030"), 0.55f * fade * pulse);
+        Lines.stroke(4.0f);
+        Lines.arc(b.x, b.y, diskOuter * 0.85f, 0.28f, 0f);
+        Lines.arc(b.x, b.y, diskOuter * 0.85f, 0.28f, 180f);
+
+        Draw.color(Color.valueOf("ffb050"), 0.75f * fade);
+        Lines.stroke(3.0f);
+        Lines.arc(b.x, b.y, diskInner * 1.6f, 0.32f, 6f);
+        Lines.arc(b.x, b.y, diskInner * 1.6f, 0.32f, 186f);
+
+        Draw.color(Color.valueOf("ffe090"), 0.9f * fade * pulse);
+        Lines.stroke(2.0f);
+        Lines.arc(b.x, b.y, diskInner * 1.15f, 0.38f, 12f);
+        Lines.arc(b.x, b.y, diskInner * 1.15f, 0.38f, 192f);
+
+        // ============================================================
+        // 3. 光子环（紧贴事件视界的纯白细线）
+        // ============================================================
+        Draw.color(Color.white, 1.0f * fade);
+        Lines.stroke(1.4f);
+        Lines.circle(b.x, b.y, photonR);
+
+        // ============================================================
+        // 5. 内向汇聚粒子
+        // ============================================================
+        int particles = 14;
+        for(int i = 0; i < particles; i++){
+            float seed = i * 1.37f;
+            float t = (Time.time * 0.4f + seed) % 1f;
+            float r = Mathf.lerp(diskOuter * 1.1f, coreR * 1.3f, t);
+
+            float baseAng = seed * 137.5f;
+            float driftAng = (1f - t) * 60f * (i % 2 == 0 ? 1f : -1f);
+            float ang = baseAng + driftAng;
+
+            float px = b.x + Mathf.cosDeg(ang) * r;
+            float py = b.y + Mathf.sinDeg(ang) * r * 0.55f;
+
+            float a = Mathf.sin(t * Mathf.PI) * 0.85f * fade;
+            float size = Mathf.lerp(2.2f, 0.7f, t);
+            Draw.color(Color.valueOf("FFE8A0"), a);
+            Fill.circle(px, py, size);
+        }
+
+        // ============================================================
+        // 6. 事件视界（纯黑多边形圆，完全不透明）
+        // ============================================================
+        Draw.blend(arc.graphics.Blending.normal);
+        Draw.color(0f, 0f, 0f, 1f);
+        Fill.poly(b.x, b.y, 48, coreR, 0f);
+
+        // 视界外圈描边
+        Draw.color(0.25f, 0.4f, 0.7f, 0.9f * fade);
+        Lines.stroke(1.0f);
+        Lines.circle(b.x, b.y, coreR + 0.6f);
+
+        Draw.blend();
+        Draw.color();
+        Draw.reset();
+    }
     }
 
     /** GluonOrbData - 黑洞单位列表管理 (PU_V8 移植) */
