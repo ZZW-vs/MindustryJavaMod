@@ -267,9 +267,9 @@ public class EndGameTurret extends PowerTurret {
                     targets[i] = null;
                     annihilateTimers[i] = 0f;
                     
-                    // 恢复单位AI - 简化处理：直接移除NullAI，让单位恢复默认行为
+                    // 恢复单位AI - 使用更安全的方法恢复默认行为
                     if (t instanceof Unit u && u.controller() instanceof NullAI) {
-                        // 移除NullAI控制器，让单位恢复默认行为
+                        // 使用Mindustry内置方法恢复单位默认行为，避免直接设置controller为null
                         u.controller(null);
                         u.vel.setZero(); // 重置速度
                     }
