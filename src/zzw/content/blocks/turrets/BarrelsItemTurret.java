@@ -1,170 +1,141 @@
 package zzw.content.blocks.turrets;
 
-import arc.Core;
-import arc.graphics.Color;
-import arc.graphics.g2d.Draw;
-import arc.graphics.g2d.TextureRegion;
 import arc.math.Angles;
 import arc.math.Mathf;
 import arc.math.geom.Vec2;
-import arc.struct.ObjectFloatMap;
 import arc.struct.Seq;
-import arc.util.Strings;
-import arc.util.Time;
 import mindustry.entities.bullet.BulletType;
 import mindustry.entities.pattern.ShootAlternate;
-import mindustry.type.Liquid;
-import mindustry.ui.Styles;
 import mindustry.world.blocks.defense.turrets.ItemTurret;
-import mindustry.world.meta.Stat;
-import mindustry.world.meta.StatUnit;
 
 import static mindustry.Vars.tilesize;
 
+/**
+ * 多管物品炮台 (PU_V8 BarrelsItemTurret 完整移植)
+ * ghost/banshee: 支持多炮管独立装填, focus 模式下所有炮管集中瞄准目标点
+ * ★完整移植 PU_V8 原版机制 (v155.4 API 适配):
+ *  - shoot(): focus 模式下使用 barrelCounter 交替 + spread + xRand 计算位置
+ *  - shootBarrel(): 各炮管独立装填计数, focus 模式下瞄向目标点
+ *  - bullet() 5 参方法 (v155.4): 自动处理声音/特效/反冲/弹药消耗
+ *  - 使用 barrelCounter 替代 PU_V8 shotCounter (v155.4 无 shotCounter 字段)
+ *  - 使用 tr3 自有 Vec2 替代 PU_V8 tr (v155.4 ItemTurretBuild 无 tr 字段)
+ *  - spread 从 ShootAlternate 模式提取 (v155.4 无独立 spread 字段)
+ * 参考: PU_V8 main/src/unity/world/blocks/defense/turrets/BarrelsItemTurret.java
+ */
 public class BarrelsItemTurret extends ItemTurret {
     protected final Seq<Barrel> barrels = new Seq<>(1);
     protected boolean focus;
     protected Vec2 tr3 = new Vec2();
-    protected float barrelSpread = 12f;
-    protected int barrelShots = 1;
 
-    public ObjectFloatMap<Liquid> coolantBoost = new ObjectFloatMap<>();
-
-    public BarrelsItemTurret(String name){
+    public BarrelsItemTurret(String name) {
         super(name);
+        // ★ 弹药消耗修复: PU_V8 原版在 shootBarrel()/focus 模式 shoot() 中显式调用 useAmmo(),
+        //   每根炮管每次射击消耗 1 发弹药。v132 的 bullet() 不消耗弹药, 但 v155.4 的 bullet()
+        //   在 consumeAmmoOnce == false 时会自动调用 useAmmo() —— 等价于原版行为。
+        //   之前未设置此字段 (默认 true), 导致炮管射击 (bullet()) 永不消耗弹药:
+        //   只要还剩 1 发弹药 hasAmmo() 恒为 true, 炮管无限开火 (banshee 无限攻击 bug)。
+        consumeAmmoOnce = false;
+        // ★ v155.4 bullet(type, xOffset, yOffset, ...) 期望 LOCAL 局部坐标 (rotation-90 坐标系)
+        // 默认 shootY = size*tilesize/2 (前向半身高偏移), 我们自定义每个炮管的前向偏移
+        // 所以将默认值清零, 这样 yOffset 就是相对于炮台中心的前向距离
+        shootY = 0f;
     }
 
-    protected void addBarrel(float x, float y, float reloadTime){
+    public void addBarrel(float x, float y, float reloadTime) {
         barrels.add(new Barrel(x, y, reloadTime));
     }
 
-    /**
-     * 自定义冷却强化显示: 直接展示固定百分比 (120% / 145% ...)。
-     *
-     * <p>原版公式 {@code 1 + 消耗量 × coolantMultiplier × 液体热容} 因水 (0.4) 与
-     * 冷冻液 (0.9) 热容不同, 算出的百分比很难看; 这里用 {@link #coolantBoost}
-     * 直接指定每种液体的效率加成, 面板也同步显示。</p>
-     */
-    @Override
-    public void setStats(){
-        super.setStats();
-
-        if (coolant != null && !coolantBoost.isEmpty()) {
-            stats.replace(Stat.booster, table -> {
-                table.row();
-                table.table(c -> {
-                    for (Liquid liquid : mindustry.Vars.content.liquids()) {
-                        float boost = coolantBoost.get(liquid, -1f);
-                        if (boost < 0f) continue;
-
-                        c.table(Styles.grayPanel, b -> {
-                            b.image(liquid.uiIcon).size(40).pad(10f).left();
-                            b.table(info -> {
-                                info.add(liquid.localizedName).left().row();
-                                info.add(Strings.autoFixed(coolant.amount * 60f, 2) + StatUnit.perSecond.localized())
-                                        .left().color(Color.lightGray);
-                            });
-                            b.add(Core.bundle.format("bullet.reload", Strings.autoFixed((1f + boost) * 100f, 2)))
-                                    .pad(10f).right().grow().padRight(15f);
-                        }).growX().pad(5).row();
-                    }
-                }).growX().colspan(table.getColumns());
-                table.row();
-            });
+    /** 从 shoot 模式提取 spread (PU_V8 直接访问 spread 字段, v155.4 需从 ShootAlternate 提取) */
+    protected float getSpread() {
+        if (shoot instanceof ShootAlternate) {
+            return ((ShootAlternate) shoot).spread;
         }
+        return 0f;
     }
 
-    protected class Barrel{
+    protected class Barrel {
         public final float x, y, reloadTime;
 
-        public Barrel(float x, float y, float reloadTime){
+        public Barrel(float x, float y, float reloadTime) {
             this.x = x;
             this.y = y;
             this.reloadTime = reloadTime;
         }
     }
 
-    public class BarrelsItemTurretBuild extends ItemTurretBuild{
-        protected float[] barrelReloads = new float[barrels.size];
-        protected int[] barrelShotCounters = new int[barrels.size];
-        protected int barrelCounter = 0;
+    public class BarrelsItemTurretBuild extends ItemTurretBuild {
+        protected float[] barrelReloads;
+        protected int[] barrelShotCounters;
 
         @Override
-        protected void shoot(BulletType type){
-            if(focus){
-                recoil = 2f;
+        public void placed() {
+            super.placed();
+            barrelReloads = new float[barrels.size];
+            barrelShotCounters = new int[barrels.size];
+        }
+
+        @Override
+        protected void shoot(BulletType type) {
+            if (focus) {
+                // ★完整移植 PU_V8: focus 模式集中瞄准目标点
+                curRecoil = 1f;
                 heat = 1f;
                 float i = barrelCounter % 2 - 0.5f;
+                float spread = getSpread();
+                // ★ v155.4 bullet() 期望 LOCAL 局部坐标 (rotation-90 坐标系), 不是世界坐标
+                // 之前错误地传入了已旋转的 tr3.x/tr3.y 导致双重旋转, 子弹位置偏移
+                float xOff = spread * i;
+                float yOff = size * tilesize / 2f;
+                // 用 tr3 (世界坐标) 仅用于角度计算 (从炮口位置到目标点的角度)
+                tr3.trns(rotation - 90f, xOff, yOff);
+                Vec2 targetVec = new Vec2();
+                targetVec.trns(rotation, Math.max(Mathf.dst(x, y, targetPos.x, targetPos.y), size * tilesize));
+                float rot = Angles.angle(tr3.x, tr3.y, targetVec.x, targetVec.y);
+                // v155.4 bullet 5 参签名: 传入 LOCAL 偏移, bullet() 内部会旋转+加 (x,y)
+                // bullet() 自动处理 useAmmo/effects/recoil/heat, 无需重复调用
+                bullet(type, xOff, yOff, rot - rotation + Mathf.range(inaccuracy), null);
                 barrelCounter++;
-                for(int s = 0; s < barrelShots; s++){
-                    float offset = (s - barrelShots / 2f + 0.5f) * barrelSpread;
-                    tr3.trns(rotation + offset, Mathf.random(-1f, 1f) * range * 0.1f);
-                    bullet(type, x + tr3.x, y + tr3.y, rotation + offset + Mathf.random(-inaccuracy, inaccuracy), null);
-                }
-            }else{
+            } else {
                 super.shoot(type);
             }
         }
 
-        protected void shootBarrel(int barrel, BulletType type){
-            if(barrelReloads[barrel] >= barrels.get(barrel).reloadTime){
-                barrelReloads[barrel] = 0f;
-                barrelShotCounters[barrel]++;
-                recoil = 2f;
-                heat = 1f;
-                float angle = rotation + barrels.get(barrel).x * Mathf.sinDeg(barrels.get(barrel).y);
-                bullet(type, x + barrels.get(barrel).x, y + barrels.get(barrel).y, angle + Mathf.random(-inaccuracy, inaccuracy), null);
+        protected void shootBarrel(BulletType type, int index) {
+            curRecoil = Mathf.clamp(curRecoil + 0.5f, 0f, 1f);
+            float i = barrelShotCounters[index] % 2 - 0.5f;
+            // ★ v155.4 bullet() 期望 LOCAL 局部坐标 (rotation-90 坐标系)
+            float xOff = barrels.get(index).x * i;
+            float yOff = barrels.get(index).y;
+            float rot = rotation;
+            if (focus) {
+                // 用 tr3 (世界坐标) 仅用于角度计算
+                tr3.trns(rotation - 90f, xOff, yOff);
+                Vec2 targetVec = new Vec2();
+                targetVec.trns(rotation, Math.max(Mathf.dst(x, y, targetPos.x, targetPos.y), size * tilesize));
+                rot = Angles.angle(tr3.x, tr3.y, targetVec.x, targetVec.y);
             }
+            // v155.4 bullet 5 参签名, 自动处理声音/特效/反冲
+            bullet(type, xOff, yOff, rot - rotation + Mathf.range(inaccuracy), null);
+            barrelShotCounters[index]++;
         }
 
         @Override
-        protected void updateShooting(){
+        protected void updateShooting() {
             super.updateShooting();
-
-            // ★ 多管独立装填: 每根管子按自身 reloadTime 循环 (参考 PU_V8 BarrelsItemTurret)
-            //   注意必须用 delta() (帧增量) 累加, 之前写成 reload * Time.delta 会导致每帧都触发一次开火
-            for(int i = 0, len = barrels.size; i < len; i++){
-                if(!hasAmmo()) break;
-
-                if(barrelReloads[i] >= barrels.get(i).reloadTime){
-                    shootBarrel(i, peekAmmo());
-                    barrelReloads[i] = 0f;
-                }else{
-                    barrelReloads[i] += delta() * peekAmmo().reloadMultiplier * baseReloadSpeed();
+            if (barrelReloads == null) {
+                barrelReloads = new float[barrels.size];
+                barrelShotCounters = new int[barrels.size];
+            }
+            for (int i = 0, len = barrels.size; i < len; i++) {
+                if (hasAmmo()) {
+                    if (barrelReloads[i] >= barrels.get(i).reloadTime) {
+                        shootBarrel(peekAmmo(), i);
+                        barrelReloads[i] = 0f;
+                    } else {
+                        barrelReloads[i] += delta() * peekAmmo().reloadMultiplier * baseReloadSpeed();
+                    }
                 }
             }
-        }
-
-        /**
-         * 覆写冷却推进: 使用 {@link BarrelsItemTurret#coolantBoost} 里的固定百分比。
-         *
-         * <p>原版实现是 {@code reloadCounter += 消耗量 × 热容 × coolantMultiplier},
-         * 换成 {@code edelta() × boost} 后, 装填速度正好是 {@code 1 + boost}。</p>
-         */
-        @Override
-        protected void updateCooling(){
-            if(coolantBoost.isEmpty()){
-                super.updateCooling();
-                return;
-            }
-
-            if(coolant == null || coolant.efficiency(this) <= 0f || efficiency <= 0f) return;
-
-            float boost = coolantBoost.get(liquids.current(), 0f);
-            float amount = coolant.amount * coolant.efficiency(this);
-            coolant.update(this);
-            reloadCounter += edelta() * boost;
-
-            if(Mathf.chance(0.06 * amount)){
-                coolEffect.at(x + Mathf.range(size * tilesize / 2f), y + Mathf.range(size * tilesize / 2f));
-            }
-        }
-
-        @Override
-        public void draw(){
-            // ★ 恢复原版绘制逻辑: 绘制底座 + 炮管
-            // 本 mod 有整炮贴图，按原版方式绘制底座和炮管
-            Draw.rect(region, x, y, rotation - 90);
         }
     }
 }

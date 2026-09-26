@@ -886,23 +886,25 @@ public class Z_Bullets {
             float interp = b.fin(Interp.exp10Out);
             
             // 黑洞整体尺寸（大幅缩小）
-            float actualRadius = radius * 0.3f;
+            float actualRadius = radius * 0.2f; // 进一步缩小整体尺寸
             
-            // 1. 中心黑色圆形（完全黑色的小圆形）
+            // 1. 中心黑色圆形（完全黑色的小圆形）- 确保在任何情况下都可见
             Draw.color(Color.black);
-            float coreRadius = interp * size * scales[0] * 0.5f; // 更小的核心
+            float baseCoreRadius = size * scales[0] * 0.8f; // 基础尺寸
+            float coreRadius = interp * baseCoreRadius;
+            if (coreRadius < 12f) coreRadius = 12f; // 确保最小12像素
             Fill.circle(b.x, b.y, coreRadius);
             
-            // 2. 细金色光圈快速旋转（原版风格）
+            // 2. 细金色光圈快速旋转（原版风格）- 缩小金色圈
             Draw.blend(arc.graphics.Blending.additive);
             Draw.color(Color.valueOf("FFD700")); // 金色
             for (int i = 0; i < 4; i++) {
                 float rotationSpeed = Time.time * (4f + i * 0.5f); // 快速旋转
                 float angle = rotationSpeed + i * 90f;
-                float ringRadius = coreRadius * (2f + i * 0.5f);
+                float ringRadius = coreRadius * (1.5f + i * 0.3f); // 减小金色圈的相对大小
                 
                 // 绘制细金色光圈
-                Lines.stroke(1f + i * 0.3f);
+                Lines.stroke(0.8f + i * 0.2f); // 也稍微减小线条粗细
                 Lines.circle(b.x, b.y, ringRadius);
             }
             
@@ -910,13 +912,13 @@ public class Z_Bullets {
             // 在黑洞影响范围内随机生成灰色半透明圆形
             for (int i = 0; i < 15; i++) {
                 float angle = Mathf.random(360f);
-                // 从黑洞外圈到外围范围内生成
-                float dist = Mathf.random(actualRadius * 0.8f, actualRadius * 1.8f);
+                // 从黑洞外圈到外围范围内生成，调整范围以匹配缩小的黑洞
+                float dist = Mathf.random(actualRadius * 1.2f, actualRadius * 2.5f);
                 float x = b.x + Mathf.cosDeg(angle) * dist;
                 float y = b.y + Mathf.sinDeg(angle) * dist;
                 
                 // 灰色偏透明，大小不一但不能太大
-                float particleSize = Mathf.random(2f, 6f);
+                float particleSize = Mathf.random(1.5f, 4f); // 稍微减小粒子大小
                 Color particleColor = Color.valueOf("80808080"); // 灰色半透明
                 Draw.color(particleColor);
                 Fill.circle(x, y, particleSize);
@@ -926,10 +928,10 @@ public class Z_Bullets {
             Draw.color(Color.valueOf("A0A0A080")); // 灰色偏透明
             for (int i = 0; i < 12; i++) {
                 float angle = Mathf.random(360f);
-                float dist = Mathf.random(actualRadius * 0.5f, actualRadius * 1.5f);
+                float dist = Mathf.random(actualRadius * 0.8f, actualRadius * 2.0f); // 调整范围
                 float x = b.x + Mathf.cosDeg(angle) * dist;
                 float y = b.y + Mathf.sinDeg(angle) * dist;
-                float particleSize = Mathf.random(1.5f, 4f);
+                float particleSize = Mathf.random(1f, 3f); // 减小粒子大小
                 
                 // 计算向中心移动的目标位置
                 float speed = (1f - dist / (actualRadius * 1.5f)) * 0.15f; // 越近越快
@@ -949,11 +951,11 @@ public class Z_Bullets {
             Draw.color(Color.valueOf("40404040")); // 很淡的灰色
             for (int i = 0; i < 6; i++) {
                 float angle = Time.time * 0.5f + i * (360f / 6);
-                float fieldRadius = actualRadius * (1.2f + Mathf.sin(Time.time + i) * 0.2f);
+                float fieldRadius = actualRadius * (1.5f + Mathf.sin(Time.time + i) * 0.3f); // 调整范围
                 float x = b.x + Mathf.cosDeg(angle) * fieldRadius;
                 float y = b.y + Mathf.sinDeg(angle) * fieldRadius;
                 
-                Fill.circle(x, y, 3f);
+                Fill.circle(x, y, 2f); // 减小环境效果点的大小
             }
             
             Draw.blend();
