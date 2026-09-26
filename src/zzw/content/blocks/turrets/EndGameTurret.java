@@ -18,6 +18,7 @@ import mindustry.entities.bullet.BulletType;
 import mindustry.entities.units.UnitController;
 import mindustry.game.Team;
 import mindustry.gen.Building;
+import mindustry.gen.Groups;
 import mindustry.gen.Posc;
 import mindustry.gen.Unit;
 import mindustry.graphics.Drawf;
@@ -150,9 +151,21 @@ public class EndGameTurret extends PowerTurret {
      * <p>注意: 不能直接调用 {@code unit.controller(null)},
      * 因为 {@code Unit.controller(UnitController)} 内部会执行
      * {@code controller.unit()} 而抛 NPE, 这里用一个空实现代替。</p>
+     *
+     * <p>同时保存被替换掉的原始控制器 ({@link #previous}),
+     * 以便炮台断电/断弹时能把 AI 还原回去。</p>
      */
     public static class NullAI implements UnitController {
         protected Unit unit;
+        /** 被本控制器替换掉的原始 AI 控制器, 用于事后恢复。 */
+        public final UnitController previous;
+
+        /**
+         * @param previous 目标单位原本的控制器 (可为 null, 此时放弃恢复)
+         */
+        public NullAI(UnitController previous) {
+            this.previous = previous;
+        }
 
         @Override
         public void unit(Unit unit) {
@@ -267,10 +280,13 @@ public class EndGameTurret extends PowerTurret {
                     targets[i] = null;
                     annihilateTimers[i] = 0f;
                     
-                    // 恢复单位AI - 使用更安全的方法恢复默认行为
-                    if (t instanceof Unit u && u.controller() instanceof NullAI) {
-                        // 使用Mindustry内置方法恢复单位默认行为，避免直接设置controller为null
-                        u.controller(null);
+                    // 恢复单位AI: 把之前被替换掉的原始控制器还原回去。
+                    // 注意: 绝不能传 null 给 controller(), 设置器内部会立即调用
+                    // controller.unit(this), 传 null 必然抛 NPE。
+                    if (t instanceof Unit u && u.controller() instanceof NullAI na) {
+                        if (na.previous != null) {
+                            u.controller(na.previous);
+                        }
                         u.vel.setZero(); // 重置速度
                     }
                 }
@@ -398,8 +414,9 @@ public class EndGameTurret extends PowerTurret {
                 }
 
                 // 步骤 1: 解除目标 AI (使其无法移动/攻击)
+                // 保存原控制器, 以便断电/断弹时恢复
                 if (t instanceof Unit u && !(u.controller() instanceof NullAI)) {
-                    u.controller(new NullAI());
+                    u.controller(new NullAI(u.controller()));
                     u.vel.setZero();
                 }
 
@@ -416,25 +433,94 @@ public class EndGameTurret extends PowerTurret {
         /** 湮灭目标: 播放汽化特效并直接秒杀。 */
         protected void annihilate(Posc t) {
             if (t instanceof Unit u) {
-                // ★ 真正的秒杀机制：直接设置生命值为负数，确保秒杀一切单位
-                float originalHealth = u.health;
-                u.health = -Float.MAX_VALUE; // 确保秒杀
-                
+                annihilateUnit(u);
                 SpecialFx.endgameVapourize.at(u.x, u.y, angleTo(u), new Object[]{this, u});
-                
-                // 额外的秒杀效果：确保目标被彻底摧毁
-                if (u.health > 0) {
-                    u.health = -Float.MAX_VALUE; // 再次确保秒杀
-                }
-                
-                // 移除单位
-                u.remove();
             } else if (t instanceof Building b) {
                 // 建筑秒杀：直接摧毁
                 b.health = -Float.MAX_VALUE; // 确保秒杀
                 SpecialFx.endgameVapourize.at(b.x, b.y, b.angleTo(this), new Object[]{this, b});
                 b.remove();
             }
+        }
+
+        /**
+         * ★ 多重秒杀机制: 绕过所有可能的反作弊方式
+         * 至少有一条攻击路径会生效，确保任何单位都能被杀死
+         * 参考FlameOut模组的annihilate方法和EmpathyDamage系统
+         */
+        void annihilateUnit(Unit u) {
+            if (u == null || u.isAdded() == false) return;
+
+            // ===== 机制1: 常规伤害 + remove =====
+            try {
+                u.damage(Float.MAX_VALUE);
+            } catch (Throwable ignored) {}
+
+            // ===== 机制2: 直接设置 health=0, dead=true =====
+            try {
+                u.health = 0f;
+                u.dead = true;
+                u.maxHealth = 1f;
+            } catch (Throwable ignored) {}
+
+            // ===== 机制3: 反射清除反作弊私有字段 =====
+            // 清除 SegmentWormEntity 的 lastHealth/invTime/immunity/rogueDamageResist
+            // 清除 EmpathyUnit 的 trueHealth/trueMaxHealth/invFrames/parryTime
+            try {
+                java.lang.reflect.Field f = findField(u.getClass(), "lastHealth");
+                if (f != null) { f.setFloat(u, 0f); }
+                f = findField(u.getClass(), "trueHealth");
+                if (f != null) { f.setFloat(u, 0f); }
+                f = findField(u.getClass(), "trueMaxHealth");
+                if (f != null) { f.setFloat(u, 1f); }
+                f = findField(u.getClass(), "invTime");
+                if (f != null) { f.setFloat(u, 100f); }
+                f = findField(u.getClass(), "immunity");
+                if (f != null) { f.setFloat(u, 0f); }
+                f = findField(u.getClass(), "rogueDamageResist");
+                if (f != null) { f.setFloat(u, 0f); }
+                f = findField(u.getClass(), "parryTime");
+                if (f != null) { f.setFloat(u, 0f); }
+                f = findField(u.getClass(), "damageTaken");
+                if (f != null) { f.setFloat(u, 0f); }
+            } catch (Throwable ignored) {}
+
+            // ===== 机制4: 反复调用kill()绕过死亡拒绝 =====
+            for (int i = 0; i < 5; i++) {
+                try {
+                    u.kill();
+                } catch (Throwable ignored) {}
+            }
+
+            // ===== 机制5: 从Groups中移除 + NaN销毁 (参考FlameOut annihilate) =====
+            try {
+                u.health = 0f;
+                u.dead = true;
+                Groups.unit.remove(u);
+                // 设置NaN让任何引用该单位的代码失效
+                u.x = Float.NaN;
+                u.y = Float.NaN;
+                u.rotation = Float.NaN;
+            } catch (Throwable ignored) {}
+
+            // ===== 机制6: 最终remove =====
+            try {
+                u.remove();
+            } catch (Throwable ignored) {}
+        }
+
+        /** 递归查找字段(包括父类) */
+        java.lang.reflect.Field findField(Class<?> clazz, String name) {
+            while (clazz != null) {
+                try {
+                    java.lang.reflect.Field f = clazz.getDeclaredField(name);
+                    f.setAccessible(true);
+                    return f;
+                } catch (NoSuchFieldException e) {
+                    clazz = clazz.getSuperclass();
+                }
+            }
+            return null;
         }
 
         // ================= 渲染 =================
