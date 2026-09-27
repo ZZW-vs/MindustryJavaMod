@@ -46,6 +46,47 @@ public class WavefrontObject{
     public boolean odd = false;
     /** 模型边界球半径 (模型空间, 未缩放), 用于阴影大小计算 */
     public float boundRadius = 1f;
+    
+    // ★ 坐标系诊断变量
+    public float minX, maxX, minY, maxY, minZ, maxZ;
+    
+    // ★ Y-up → Z-up 转换方案：0=不转, 1=A, 2=B, 3=C, 4=D
+    public int yUpConversion = 2;   // 默认方案 B
+    /** 是否启用坐标转换 */
+    public boolean enableYUpConversion = true;
+    /** 全局转换模式（优先级高于单个模型的yUpConversion） */
+    public static int globalYUpMode = 2;
+    
+    /** 每个模型独立的额外旋转偏移（度），叠加在调用方传入的 rX/rY/rZ 之上 */
+    public float extraRotX = 0f;
+    public float extraRotY = 0f;
+    public float extraRotZ = 0f;
+    
+    /** 临时诊断：是否跳过纹理渲染，用纯白替代 */
+    public boolean debugNoTexture = false;
+    
+    /** 金属度（0=非金属，1=全金属），控制高光强度 */
+    public float metalness = 0.3f;
+    
+    /** 是否启用真光照（false 时回退到旧的假 shading） */
+    public boolean useRealLighting = true;
+    
+    /** 是否在加载时把模型 Z 贴地（minZ 移到 0）
+     *  默认 false（模型保持原始 Z 居中）
+     *  只有"薄片型"模型（飞轮、水车、齿轮等）需要 true
+     */
+    public boolean groundAtLoad = false;
+    
+    /** 真透视相机。null 时 fallback 到旧的假透视 */
+    public rbmk.gfx.Cam cam = null;
+    
+    // ★ zOffset 防御补丁
+    /** 同一帧内的实例序号，用于自动分配 zOffset */
+    private static int drawSeq = 0;
+    /** 上一帧的帧号，用来判断是否是新的一帧 */
+    private static long lastFrameId = -1L;
+    /** 当前实例的有效 zOffset（自动分配或手动设置） */
+    private float effectiveZOffset = 0f;
 
     public ShadingType shadingType = ShadingType.normalAngle;
     public Color lightColor = Color.white;
@@ -98,6 +139,9 @@ public class WavefrontObject{
     protected float[] sortZVals;
     protected Integer[] sortIndices;
     protected Face[] sortedFaces;
+    /** int[] 归并排序缓存，避免 Integer 装箱开销 */
+    protected int[] sortIdxInt;
+    protected int[] sortTmpInt;
 
     public void load(Fi file, @Nullable Fi material){
         if(material != null){
@@ -344,15 +388,224 @@ public class WavefrontObject{
                 if(r > maxR) maxR = r;
             }
             boundRadius = Math.max(maxR, 0.1f);
+            
+            // 保存用于诊断
+            this.minX = minX; this.maxX = maxX;
+            this.minY = minY; this.maxY = maxY;
+            this.minZ = minZ; this.maxZ = maxZ;
+            
+            // ★ Y-up → Z-up 坐标转换
+            if(enableYUpConversion && globalYUpMode > 0){
+                convertYUpToZUp(globalYUpMode);
+                // 转换后需要重新计算 boundRadius 和 min/max
+                recomputeBounds();
+            }
+            
+            // ★ 模型级额外旋转（加载时一次性应用到顶点）
+            applyExtraRotations();
+            recomputeBounds();
+            
+            // ★ 模型几何中心居中（X/Y 居中，Z 保持贴地）
+            recenterModel();
+            // ★ Z轴贴地修正（避免旋转后沉入地下）
+            if(groundAtLoad){
+                groundModel();
+            }
         }
 
         Log.info("[Create] WavefrontObject loaded: " + drawnVertices.size + " verts, " + faces.size + " faces, boundRadius=" + boundRadius);
+        
+        // ★ 坐标系诊断：打印顶点范围
+        if(!vertices.isEmpty()){
+            Log.info("[Diag] " + textureName
+                + " X=[" + minX + "," + maxX + "]"
+                + " Y=[" + minY + "," + maxY + "]"
+                + " Z=[" + minZ + "," + maxZ + "]");
+        }
 
         // ★ 手机端崩溃修复: 不再构建 GPU Mesh
         //   drawGpuMesh 渲染路径已弃用 (全项目无调用者, GPU Shader 手机端兼容性问题已回退 CPU 路径),
         //   但 buildGpuMesh 仍会为每个模型分配 顶点数组(~8MB/模型 堆) + Mesh GPU 原生缓冲(~8MB/模型),
         //   4 个角色模型合计浪费 ~58MB, 在 512MB 内存的手机上直接 OOM 崩溃
-        // buildGpuMesh();
+        // ★ 自动初始化真透视相机
+    if(cam == null){
+        float r = boundRadius * defaultScl * size;
+        cam = new rbmk.gfx.Cam(Math.max(r * 1.2f, 4f));
+    }
+    
+    // buildGpuMesh();
+    }
+    
+    /** Y-up → Z-up 坐标转换 */
+    private void convertYUpToZUp(int mode){
+        // 4 种方案 (oldX, oldY, oldZ) -> (newX, newY, newZ)
+        // A: newX=ox, newY=oz,  newZ=oy     （直接交换 Y/Z）
+        // B: newX=ox, newY=-oz, newZ=oy     （交换 Y/Z 并翻转 Y，Blender 默认）
+        // C: newX=ox, newY=oz,  newZ=-oy    （交换 Y/Z 并翻转 Z）
+        // D: newX=ox, newY=-oz, newZ=-oy    （交换并双翻转）
+        for(int i = 0; i < vertices.size; i++){
+            Vec3 v = vertices.get(i);
+            float ox = v.x, oy = v.y, oz = v.z;
+            switch(mode){
+                case 1 -> { v.x = ox; v.y =  oz; v.z =  oy; }
+                case 2 -> { v.x = ox; v.y = -oz; v.z =  oy; }
+                case 3 -> { v.x = ox; v.y =  oz; v.z = -oy; }
+                case 4 -> { v.x = ox; v.y = -oz; v.z = -oy; }
+            }
+        }
+        // 法线用同样的规则
+        for(int i = 0; i < normals.size; i++){
+            Vec3 n = normals.get(i);
+            float ox = n.x, oy = n.y, oz = n.z;
+            switch(mode){
+                case 1 -> { n.x = ox; n.y =  oz; n.z =  oy; }
+                case 2 -> { n.x = ox; n.y = -oz; n.z =  oy; }
+                case 3 -> { n.x = ox; n.y =  oz; n.z = -oy; }
+                case 4 -> { n.x = ox; n.y = -oz; n.z = -oy; }
+            }
+        }
+        // drawnVertices 和 drawnNormals 是 final 字段，改内部 Vec3
+        for(int i = 0; i < drawnVertices.size; i++){
+            Vec3 v = drawnVertices.get(i).source;
+            Vec3 v0 = vertices.get(i);
+            v.set(v0.x, v0.y, v0.z);
+        }
+        for(int i = 0; i < drawnNormals.size; i++){
+            Vec3 n = drawnNormals.get(i);
+            Vec3 n0 = normals.get(i);
+            n.set(n0.x, n0.y, n0.z);
+        }
+    }
+    
+    /** 重新计算边界球和坐标范围 */
+    private void recomputeBounds(){
+        if(vertices.isEmpty()) return;
+        
+        // 重新计算 min/max
+        float minX = Float.MAX_VALUE, maxX = Float.MIN_VALUE;
+        float minY = Float.MAX_VALUE, maxY = Float.MIN_VALUE;
+        float minZ = Float.MAX_VALUE, maxZ = Float.MIN_VALUE;
+        
+        for(Vec3 v : vertices){
+            minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x);
+            minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y);
+            minZ = Math.min(minZ, v.z); maxZ = Math.max(maxZ, v.z);
+        }
+        this.minX = minX; this.maxX = maxX;
+        this.minY = minY; this.maxY = maxY;
+        this.minZ = minZ; this.maxZ = maxZ;
+        
+        // 重新计算 boundRadius
+        float cx = (minX + maxX) * 0.5f, cy = (minY + maxY) * 0.5f, cz = (minZ + maxZ) * 0.5f;
+        float maxR = 0f;
+        for(Vec3 v : vertices){
+            float dx = v.x - cx, dy = v.y - cy, dz = v.z - cz;
+            float r = (float)Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if(r > maxR) maxR = r;
+        }
+        boundRadius = Math.max(maxR, 0.1f);
+        
+    }
+
+    /** 模型几何中心居中（X/Y 居中，Z 保持贴地） */
+    private void recenterModel(){
+        if(vertices.isEmpty()) return;
+
+        // 只居中 X 和 Y（竖直旋转轴是 Z，Z 保持贴地不动）
+        float minX = Float.MAX_VALUE, maxX = -Float.MAX_VALUE;
+        float minY = Float.MAX_VALUE, maxY = -Float.MAX_VALUE;
+        for(Vec3 v : vertices){
+            minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x);
+            minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y);
+        }
+
+        float cx = (minX + maxX) * 0.5f;
+        float cy = (minY + maxY) * 0.5f;
+
+        for(Vec3 v : vertices){
+            v.x -= cx;
+            v.y -= cy;
+        }
+
+        // 同步 drawnVertices
+        for(int i = 0; i < drawnVertices.size; i++){
+            Vec3 v = drawnVertices.get(i).source;
+            Vec3 v0 = vertices.get(i);
+            v.set(v0.x, v0.y, v0.z);
+        }
+
+        // 法线是方向量，不需要平移
+
+        // 重新计算 boundRadius 和 min/max
+        recomputeBounds();
+
+        Log.info("[Recenter] @ cx=@ cy=@", textureName, cx, cy);
+    }
+
+    /** 模型Z轴贴地修正（避免旋转后沉入地下） */
+    private void groundModel(){
+        if(vertices.isEmpty()) return;
+        float minZ = Float.MAX_VALUE;
+        for(Vec3 v : vertices) minZ = Math.min(minZ, v.z);
+        if(Math.abs(minZ) < 1e-6f) return;   // 已经贴地
+
+        for(Vec3 v : vertices) v.z -= minZ;
+        for(int i = 0; i < drawnVertices.size; i++){
+            Vec3 v = drawnVertices.get(i).source;
+            Vec3 v0 = vertices.get(i);
+            v.set(v0.x, v0.y, v0.z);
+        }
+        recomputeBounds();
+        Log.info("[Ground] @ minZ was @", textureName, minZ);
+    }
+
+    /** 把 extraRotX/Y/Z 一次性应用到顶点上（加载时） */
+    private void applyExtraRotations(){
+        if(extraRotX == 0f && extraRotY == 0f && extraRotZ == 0f) return;
+
+        float cx = Mathf.cosDeg(extraRotX), sx = -Mathf.sinDeg(extraRotX);
+        float cy = Mathf.cosDeg(extraRotY), sy = -Mathf.sinDeg(extraRotY);
+        float cz = Mathf.cosDeg(extraRotZ), sz = -Mathf.sinDeg(extraRotZ);
+
+        // 组合矩阵 Rz * Ry * Rx（和 draw() 里同一个公式）
+        float m00 = 1, m01 = 0, m02 = 0;
+        float m10 = 0, m11 = cx, m12 = -sx;
+        float m20 = 0, m21 = sx, m22 = cx;
+
+        float n00 = cy*m00 + sy*m20,   n01 = cy*m01 + sy*m21,   n02 = cy*m02 + sy*m22;
+        float n10 = m10,               n11 = m11,               n12 = m12;
+        float n20 = -sy*m00 + cy*m20,  n21 = -sy*m01 + cy*m21,  n22 = -sy*m02 + cy*m22;
+
+        float p00 = cz*n00 - sz*n10,   p01 = cz*n01 - sz*n11,   p02 = cz*n02 - sz*n12;
+        float p10 = sz*n00 + cz*n10,   p11 = sz*n01 + cz*n11,   p12 = sz*n02 + cz*n12;
+        float p20 = n20,               p21 = n21,               p22 = n22;
+
+        for(Vec3 v : vertices){
+            float ox = v.x, oy = v.y, oz = v.z;
+            v.x = p00*ox + p01*oy + p02*oz;
+            v.y = p10*ox + p11*oy + p12*oz;
+            v.z = p20*ox + p21*oy + p22*oz;
+        }
+        // 法线也要旋转
+        for(Vec3 n : normals){
+            float ox = n.x, oy = n.y, oz = n.z;
+            n.x = p00*ox + p01*oy + p02*oz;
+            n.y = p10*ox + p11*oy + p12*oz;
+            n.z = p20*ox + p21*oy + p22*oz;
+        }
+        // 同步 drawnVertices / drawnNormals
+        for(int i = 0; i < drawnVertices.size; i++){
+            Vec3 v = drawnVertices.get(i).source;
+            Vec3 v0 = vertices.get(i);
+            v.set(v0.x, v0.y, v0.z);
+        }
+        for(int i = 0; i < drawnNormals.size; i++){
+            Vec3 n = drawnNormals.get(i);
+            Vec3 n0 = normals.get(i);
+            n.set(n0.x, n0.y, n0.z);
+        }
+        Log.info("[ExtraRot] @ applied rX=@ rY=@ rZ=@",
+            textureName, extraRotX, extraRotY, extraRotZ);
     }
 
     /** ★ 从 mod 文件树加载独立 Texture (非 atlas 贴图, 用于 MMD 等多贴图模型) */
@@ -387,29 +640,79 @@ public class WavefrontObject{
     }
 
     public void draw(float x, float y, float rX, float rY, float rZ, Cons<Vec3> cons){
+        // ★ zOffset 防御补丁：每帧重置实例序号，保证同一帧内不同实例有唯一 zOffset
+        long frameId = Core.graphics != null ? Core.graphics.getFrameId() : 0L;
+        if(frameId != lastFrameId){
+            lastFrameId = frameId;
+            drawSeq = 0;
+        }
+        
+        // ★ 调用方没设 zOffset 时，自动分配一个微小偏移，避免排序歧义
+        //   范围：0 ~ 0.0001，小于单个模型的内部 z 精度，不会跨层
+        this.effectiveZOffset = (zOffset != 0f) ? zOffset : (drawSeq * 0.00001f);
+        drawSeq++;
+        
         float oz = Draw.z();
+        
+        // 预计算旋转矩阵 (Rz * Ry * Rx)，避免每个顶点重复算三角函数
+        // ★ arc 的 Vec3.rotate(axis, θ) 实际执行的是标准旋转的逆（矩阵转置），
+        //   为了让手写矩阵与链式调用等价，sin 全部取反（cos 不变）
+        float cx = Mathf.cosDeg(rX), sx = -Mathf.sinDeg(rX);
+        float cy = Mathf.cosDeg(rY), sy = -Mathf.sinDeg(rY);
+        float cz = Mathf.cosDeg(rZ), sz = -Mathf.sinDeg(rZ);
+        // Rx
+        float m00 = 1,  m01 = 0,  m02 = 0;
+        float m10 = 0,  m11 = cx, m12 = -sx;
+        float m20 = 0,  m21 = sx, m22 = cx;
+        // Ry * Rx
+        float n00 = cy*m00 + sy*m20,        n01 = cy*m01 + sy*m21,        n02 = cy*m02 + sy*m22;
+        float n10 = m10,                    n11 = m11,                    n12 = m12;
+        float n20 = -sy*m00 + cy*m20,       n21 = -sy*m01 + cy*m21,       n22 = -sy*m02 + cy*m22;
+        // Rz * (Ry * Rx)
+        float p00 = cz*n00 - sz*n10,  p01 = cz*n01 - sz*n11,  p02 = cz*n02 - sz*n12;
+        float p10 = sz*n00 + cz*n10,  p11 = sz*n01 + cz*n11,  p12 = sz*n02 + cz*n12;
+        float p20 = n20,              p21 = n21,              p22 = n22;
+        float scl = defaultScl * size;
+        
         for(int i = 0; i < drawnVertices.size; i++){
+            Vec3 src = vertices.get(i);
+            float vx = src.x, vy = src.y, vz = src.z;
+            // 旋转 + 缩放
+            float X = (p00*vx + p01*vy + p02*vz) * scl;
+            float Y = (p10*vx + p11*vy + p12*vz) * scl;
+            float Z = (p20*vx + p21*vy + p22*vz) * scl;
+            // 平移到屏幕位置
             Vec3 v = drawnVertices.get(i).source;
-            v.set(vertices.get(i));
+            if(cam != null){
+                // ★ 不要直接用 cam.sy(Y, Z)，它带了 cy 常数偏移。
+                //   用缩放系数 s = D/(D-Z) 直接投影，语义是"相对方块中心的偏移"。
+                float s = cam.D / (cam.D - Z);
+                v.set(x + X * s, y + Y * s, Z);
+            }else{
+                // fallback：旧的假透视
+                float depth = Math.max(0.01f, (perspectiveDistance + Z) / perspectiveDistance);
+                v.set(x + X * depth, y + Y * depth, Z);
+            }
+
             if(cons != null) cons.get(v);
-            v.scl(defaultScl * size).rotate(Vec3.X, rX).rotate(Vec3.Y, rY).rotate(Vec3.Z, rZ);
-            // ★ 透视投影: depth < 1 远离(缩小), depth > 1 靠近(放大)
-            //   perspectiveDistance=2000 确保大模型旋转后 v.z 不超出范围
-            //   最小值 0.01f 防止极端情况 depth=0 导致顶点坍缩到原点
-            float depth = Math.max(0.01f, (perspectiveDistance + v.z) / perspectiveDistance);
-            v.scl(depth);
-            
-            v.add(x, y, 0f);
+
+            // 法线也用同一矩阵旋转（注意：法线不缩放、不平移）
             if(i <= drawnNormals.size - 1){
-                drawnNormals.get(i).set(normals.get(i)).rotate(Vec3.X, rX).rotate(Vec3.Y, rY).rotate(Vec3.Z, rZ);
+                Vec3 nsrc = normals.get(i);
+                float nx = nsrc.x, ny = nsrc.y, nz = nsrc.z;
+                drawnNormals.get(i).set(
+                    p00*nx + p01*ny + p02*nz,
+                    p10*nx + p11*ny + p12*nz,
+                    p20*nx + p21*ny + p22*nz
+                );
             }
         }
 
-        // ★ 高面数模型(>50000面): 用 drawBatched 批量渲染
+        // ★ 所有singleZLayer模型都用 drawBatched 批量渲染
         //   Draw.draw(z, runnable) 包裹整个模型, 只创建 1 个 DrawRequest (非78580个)
         //   runnable 在 flush 阶段执行 (flushing=true), Draw.vert 走 super.draw 直接渲染
         //   不用 GPU Mesh (GPU Shader 兼容性问题导致 MMD 无法显示, 回退到 CPU 路径)
-        if(singleZLayer && faces.size > 50000){
+        if(singleZLayer){
             drawBatched();
             Draw.z(oz);
             return;
@@ -422,11 +725,11 @@ public class WavefrontObject{
         if(singleZLayer){
             int n = faces.size;
             // ★ 手机端崩溃修复: 排序数组缓存复用 (避免每帧分配)
-            if(sortIndices == null || sortIndices.length != n){
+            if(sortIdxInt == null || sortIdxInt.length != n){
+                sortIdxInt = new int[n];
+                sortTmpInt = new int[n];
                 sortZVals = new float[n];
-                sortIndices = new Integer[n];
-                for(int i = 0; i < n; i++) sortIndices[i] = i;
-                sortedFaces = new Face[n];
+                for(int i = 0; i < n; i++) sortIdxInt[i] = i;
             }
             float[] zVals = sortZVals;
             for(int i = 0; i < n; i++){
@@ -437,8 +740,15 @@ public class WavefrontObject{
                 //   (不能用混合比较规则, 否则违反传递性 → TimSort 抛 IllegalArgumentException)
                 zVals[i] = z / f.verts.length + i * 1e-6f;
             }
-            Arrays.sort(sortIndices, (a, b) -> Float.compare(zVals[a], zVals[b]));
-            for(int i = 0; i < n; i++) sortedFaces[i] = faces.get(sortIndices[i]);
+            // 归并排序前先重置索引顺序（因为上次排序已经打乱）
+            for(int i = 0; i < n; i++) sortIdxInt[i] = i;
+            mergeSortInt(sortIdxInt, sortTmpInt, zVals, 0, n);
+            
+            // 构建排序后的面数组
+            if(sortedFaces == null || sortedFaces.length != n){
+                sortedFaces = new Face[n];
+            }
+            for(int i = 0; i < n; i++) sortedFaces[i] = faces.get(sortIdxInt[i]);
             drawOrder = sortedFaces;
         }else{
             drawOrder = faces.toArray(Face.class);
@@ -453,9 +763,15 @@ public class WavefrontObject{
                 indexerA++;
             }
             indexerZ /= indexerA;
-            float z = (indexerZ * zScale) + drawLayer + zOffset;
+            float z = (indexerZ * zScale) + drawLayer + effectiveZOffset;
             Draw.z(z);
 
+            // TODO [已知问题 2026-09-27]: 斜视时部分面变透明
+            //   现象：从正上方看正常，相机斜视 45° 以上时某些面像是被剔除，
+            //         能透过模型看到背景
+            //   可能原因：cullBackfaces 剔除过严，或 singleZLayer 排序在斜视时错位
+            //   影响：视觉瑕疵，不影响游戏性
+            //   优先级：低（等光照升级 1.3 完成后再排查）
             if(cullBackfaces && hasNormal){
                 if(Math.abs(face.normal[0].angle(Vec3.Z)) >= 90f) continue;
             }
@@ -491,14 +807,14 @@ public class WavefrontObject{
         int n = faces.size;
 
         // ★ 手机端崩溃修复: 排序数组缓存复用, 只在面数变化时重新分配
-        //   Integer 装箱对象(0..n-1)首次填充后一直复用, 后续帧零分配
-        if(batchOrder == null || batchOrder.length != n){
-            batchZVals = new float[n];
-            batchOrder = new Integer[n];
-            for(int i = 0; i < n; i++) batchOrder[i] = i;
+        //   int 原始类型首次填充后一直复用, 后续帧零分配
+        if(sortIdxInt == null || sortIdxInt.length != n){
+            sortIdxInt = new int[n];
+            sortTmpInt = new int[n];
+            sortZVals = new float[n];
+            for(int i = 0; i < n; i++) sortIdxInt[i] = i;
         }
-        float[] zVals = batchZVals;
-        Integer[] order = batchOrder;
+        float[] zVals = sortZVals;
 
         // 1. 计算每个面的 z 值 (加索引微偏移保证唯一性)
         for(int i = 0; i < n; i++){
@@ -509,31 +825,32 @@ public class WavefrontObject{
         }
 
         // 2. 全局排序 (所有面按 z 排序, 远的先画)
-        Arrays.sort(order, (a, b) -> Float.compare(zVals[a], zVals[b]));
+        for(int i = 0; i < n; i++) sortIdxInt[i] = i;
+        mergeSortInt(sortIdxInt, sortTmpInt, zVals, 0, n);
 
-        // 3. 用 Draw.draw 包裹整个模型渲染
-        //    Draw.draw 创建 1 个 DrawRequest, runnable 在 flush 阶段执行
-        //    runnable 内部 Draw.vert 走 super.draw (直接渲染, 不创建 DrawRequest)
-        float modelZ = (zVals[order[0]] * zScale) + drawLayer + zOffset;
-        Draw.draw(modelZ, () -> {
-            for(int idx : order){
-                Face f = faces.get(idx);
+        // ★ 立即提交：不做延迟，避免共享数据被下一个实例覆写
+    //   代价：每个 face 会创建 1 个 DrawRequest（性能略降但正确）
+    float modelZ = (zVals[sortIdxInt[0]] * zScale) + drawLayer + effectiveZOffset;
+    float oz = Draw.z();
+    Draw.z(modelZ);
+    for(int i = 0; i < n; i++){
+        int idx = sortIdxInt[i];
+        Face f = faces.get(idx);
 
-                // 着色
-                switch(shadingType){
-                    case zMedian -> zMedianDraw(f);
-                    case zDistance -> zDistanceDraw(f);
-                    case normalAngle -> normalAngleDraw(f);
-                    case topLight -> topLightDraw(f);
-                    default -> Draw.color(lightColor);
-                }
-                float color = Draw.getColor().toFloatBits();
-                float mColor = Draw.getMixColor().toFloatBits();
+        switch(shadingType){
+            case zMedian -> zMedianDraw(f);
+            case zDistance -> zDistanceDraw(f);
+            case normalAngle -> normalAngleDraw(f);
+            case topLight -> topLightDraw(f);
+            default -> Draw.color(lightColor);
+        }
+        float color = Draw.getColor().toFloatBits();
+        float mColor = Draw.getMixColor().toFloatBits();
 
-                updateFace(f, color, mColor);
-                f.draw();
-            }
-        });
+        updateFace(f, color, mColor);
+        f.draw();    // ★ 立即提交，不再延迟
+    }
+    Draw.z(oz);
     }
 
     // ===== GPU Mesh 渲染方法 =====
@@ -771,25 +1088,53 @@ public class WavefrontObject{
         }
         Vec3 tmp = Tmp.v31.setZero();
         indexerA = 0;
-        for(Vec3 n : face.normal){
-            tmp.add(n);
-            indexerA++;
-        }
+        for(Vec3 n : face.normal){ tmp.add(n); indexerA++; }
         tmp.scl(1f / indexerA);
 
-        boolean matB = face.mat != null && face.mat.hasColor;
-        if(matB){
-            Tmp.c3.rgba8888(face.mat.diffuseCol);
-            Tmp.c2.set(Tmp.c3.r * 0.3f, Tmp.c3.g * 0.3f, Tmp.c3.b * 0.3f, 1f);
-            Tmp.c4.rgba8888(face.mat.emitCol);
-            Tmp.c2.r = Mathf.lerp(Tmp.c2.r, Tmp.c3.r, Tmp.c4.r);
-            Tmp.c2.g = Mathf.lerp(Tmp.c2.g, Tmp.c3.g, Tmp.c4.g);
-            Tmp.c2.b = Mathf.lerp(Tmp.c2.b, Tmp.c3.b, Tmp.c4.b);
+        float nx = tmp.x, ny = tmp.y, nz = tmp.z;
+        float len = (float)Math.sqrt(nx*nx + ny*ny + nz*nz);
+        if(len < 1e-6f){ Draw.color(lightColor); return; }
+        nx /= len; ny /= len; nz /= len;
+
+        if(!useRealLighting){
+            // 回退到旧 normalAngle
+            boolean matB = face.mat != null && face.mat.hasColor;
+            if(matB){
+                Tmp.c3.rgba8888(face.mat.diffuseCol);
+                Tmp.c2.set(Tmp.c3.r * 0.3f, Tmp.c3.g * 0.3f, Tmp.c3.b * 0.3f, 1f);
+                Tmp.c4.rgba8888(face.mat.emitCol);
+                Tmp.c2.r = Mathf.lerp(Tmp.c2.r, Tmp.c3.r, Tmp.c4.r);
+                Tmp.c2.g = Mathf.lerp(Tmp.c2.g, Tmp.c3.g, Tmp.c4.g);
+                Tmp.c2.b = Mathf.lerp(Tmp.c2.b, Tmp.c3.b, Tmp.c4.b);
+            }
+            float angle = (Math.abs((float)Math.acos(Mathf.clamp(nz, -1f, 1f))) / (45f * Mathf.degRad)) / shadingSmoothness;
+            Tmp.c1.set(matB ? Tmp.c3 : lightColor).lerp(matB ? Tmp.c2 : shadeColor, Mathf.clamp(angle, 0f, maxShade));
+            Draw.color(Tmp.c1);
+            return;
         }
 
-        float angle = (Math.abs(tmp.angleRad(Vec3.Z)) / (45f * Mathf.degRad)) / shadingSmoothness;
-        Tmp.c1.set(matB ? Tmp.c3 : lightColor).lerp(matB ? Tmp.c2 : shadeColor, Mathf.clamp(angle, 0f, maxShade));
-        Draw.color(Tmp.c1);
+        // 真光照（和 topLight 相同的公式）
+        float diff = rbmk.gfx.Light.diffuse(nx, ny, nz);
+        float sp = rbmk.gfx.Light.spec(nx, ny, nz, metalness);
+
+        float baseR = lightColor.r, baseG = lightColor.g, baseB = lightColor.b;
+        if(face.mat != null && face.mat.hasColor){
+            Tmp.c3.rgba8888(face.mat.diffuseCol);
+            baseR = Tmp.c3.r; baseG = Tmp.c3.g; baseB = Tmp.c3.b;
+        }
+
+        float lum = Mathf.clamp((diff - 0.5f) / 0.54f, 0f, 1f);
+        float shadeAmt = (1f - lum) * maxShade;
+
+        float r = Mathf.lerp(baseR, shadeColor.r, shadeAmt) + sp;
+        float g = Mathf.lerp(baseG, shadeColor.g, shadeAmt) + sp;
+        float b = Mathf.lerp(baseB, shadeColor.b, shadeAmt) + sp;
+
+        Draw.color(
+            Mathf.clamp(r, 0f, 1f),
+            Mathf.clamp(g, 0f, 1f),
+            Mathf.clamp(b, 0f, 1f),
+            1f);
     }
 
     /** ★ 顶光着色: 模拟从上方(Y轴正方向)照射的环境光 */
@@ -798,6 +1143,7 @@ public class WavefrontObject{
             Draw.color(lightColor);
             return;
         }
+        // 归一化面法线
         Vec3 tmp = Tmp.v31.setZero();
         indexerA = 0;
         for(Vec3 n : face.normal){
@@ -806,19 +1152,53 @@ public class WavefrontObject{
         }
         tmp.scl(1f / indexerA);
 
-        boolean matB = face.mat != null && face.mat.hasColor;
-        if(matB){
-            Tmp.c3.rgba8888(face.mat.diffuseCol);
-            Tmp.c2.set(Tmp.c3.r * 0.3f, Tmp.c3.g * 0.3f, Tmp.c3.b * 0.3f, 1f);
-            Tmp.c4.rgba8888(face.mat.emitCol);
-            Tmp.c2.r = Mathf.lerp(Tmp.c2.r, Tmp.c3.r, Tmp.c4.r);
-            Tmp.c2.g = Mathf.lerp(Tmp.c2.g, Tmp.c3.g, Tmp.c4.g);
-            Tmp.c2.b = Mathf.lerp(Tmp.c2.b, Tmp.c3.b, Tmp.c4.b);
+        float nx = tmp.x, ny = tmp.y, nz = tmp.z;
+        float len = (float)Math.sqrt(nx*nx + ny*ny + nz*nz);
+        if(len < 1e-6f){ Draw.color(lightColor); return; }
+        nx /= len; ny /= len; nz /= len;
+
+        if(!useRealLighting){
+            // 回退到旧的 topLight
+            float shade = Mathf.clamp((1f - ny) * 0.5f, 0f, maxShade);
+            boolean matB = face.mat != null && face.mat.hasColor;
+            if(matB){
+                Tmp.c3.rgba8888(face.mat.diffuseCol);
+                Tmp.c2.set(Tmp.c3.r * 0.3f, Tmp.c3.g * 0.3f, Tmp.c3.b * 0.3f, 1f);
+                Tmp.c4.rgba8888(face.mat.emitCol);
+                Tmp.c2.r = Mathf.lerp(Tmp.c2.r, Tmp.c3.r, Tmp.c4.r);
+                Tmp.c2.g = Mathf.lerp(Tmp.c2.g, Tmp.c3.g, Tmp.c4.g);
+                Tmp.c2.b = Mathf.lerp(Tmp.c2.b, Tmp.c3.b, Tmp.c4.b);
+            }
+            Tmp.c1.set(matB ? Tmp.c3 : lightColor).lerp(matB ? Tmp.c2 : shadeColor, shade);
+            Draw.color(Tmp.c1);
+            return;
         }
 
-        float shade = Mathf.clamp((1f - tmp.y) * 0.5f, 0f, maxShade);
-        Tmp.c1.set(matB ? Tmp.c3 : lightColor).lerp(matB ? Tmp.c2 : shadeColor, shade);
-        Draw.color(Tmp.c1);
+        // 真光照：Lambert 漫反射 + Blinn 镜面高光
+        float diff = rbmk.gfx.Light.diffuse(nx, ny, nz);
+        float sp = rbmk.gfx.Light.spec(nx, ny, nz, metalness);
+
+        // 基础颜色（来自材质或 lightColor）
+        float baseR = lightColor.r, baseG = lightColor.g, baseB = lightColor.b;
+        if(face.mat != null && face.mat.hasColor){
+            Tmp.c3.rgba8888(face.mat.diffuseCol);
+            baseR = Tmp.c3.r; baseG = Tmp.c3.g; baseB = Tmp.c3.b;
+        }
+
+        // 用 shadeColor 抑制暗面（保留 maxShade 语义）
+        // diff 在 [0.5, 1.04]，映射到 [1 - maxShade*0.5, 1]
+        float lum = Mathf.clamp((diff - 0.5f) / 0.54f, 0f, 1f);
+        float shadeAmt = (1f - lum) * maxShade;
+
+        float r = Mathf.lerp(baseR, shadeColor.r, shadeAmt) + sp;
+        float g = Mathf.lerp(baseG, shadeColor.g, shadeAmt) + sp;
+        float b = Mathf.lerp(baseB, shadeColor.b, shadeAmt) + sp;
+
+        Draw.color(
+            Mathf.clamp(r, 0f, 1f),
+            Mathf.clamp(g, 0f, 1f),
+            Mathf.clamp(b, 0f, 1f),
+            1f);
     }
 
     protected void zMedianDraw(Face face){
@@ -889,6 +1269,11 @@ public class WavefrontObject{
                 //   OBJ UV V=0 在底部, 需翻转: 1f - y
                 dface[s + 3] = face.vertexTexture[i].x;
                 dface[s + 4] = 1f - face.vertexTexture[i].y;
+            }else if(debugNoTexture || ZObjs.DEBUG_NO_TEXTURE){
+                // ★ 诊断：强制用白色区域 UV
+                AtlasRegion white = Core.atlas.white();
+                dface[s + 3] = white.u;
+                dface[s + 4] = white.v;
             }else if(!hasTexture || textureB == null){
                 dface[s + 3] = region.u;
                 dface[s + 4] = region.v;
@@ -1006,4 +1391,19 @@ public class WavefrontObject{
         topLight,
         noShading
     }
+
+    /** int[] 归并排序，避免 Integer 装箱开销 */
+    private static void mergeSortInt(int[] a, int[] tmp, float[] keys, int lo, int hi){
+        if(hi - lo <= 1) return;
+        int mid = (lo + hi) >>> 1;
+        mergeSortInt(a, tmp, keys, lo, mid);
+        mergeSortInt(a, tmp, keys, mid, hi);
+        int i = lo, j = mid, o = lo;
+        while(i < mid && j < hi) tmp[o++] = (keys[a[i]] <= keys[a[j]]) ? a[i++] : a[j++];
+        while(i < mid) tmp[o++] = a[i++];
+        while(j < hi) tmp[o++] = a[j++];
+        System.arraycopy(tmp, lo, a, lo, hi - lo);
+    }
+
+    
 }

@@ -6,17 +6,10 @@ import mindustry.game.EventType;
 import mindustry.mod.Mod;
 import mindustry.ui.dialogs.BaseDialog;
 
+import zzw.content.*;
 import zzw.content.blocks.Z_Blocks;
 import zzw.content.blocks.Z_Turrets;
 import zzw.content.blocks.distribution.Z_Distribution;
-import zzw.content.Z_Items;
-import zzw.content.Z_StatusEffects;
-import zzw.content.Z_TechTree;
-import zzw.content.Z_Weathers;
-import zzw.content.Z_Factory;
-import zzw.content.Z_Liquids;
-import zzw.content.Z_Mine;
-import zzw.content.Z_Sounds;
 import zzw.content.exp.Z_Exp;
 import zzw.content.graphics.BlackHoleShader;
 import zzw.content.mechanics.Z_Mechanics;
@@ -38,6 +31,7 @@ import zzw.util.ZObjs;
  * 参考: Mindustry 模组开发指南 — https://github.com/Anuken/MindustryModding
  */
 public class TestMod extends Mod{
+    public static zzw.content.graphics.BlackHoleSFX blackHoleSFX;
     private static final float WELCOME_DIALOG_DELAY = 3f;
 
 
@@ -54,6 +48,9 @@ public class TestMod extends Mod{
             // ★ 注册光学系统 (光照传播 + 光束渲染, PU132 LightProcess)
             zzw.content.optics.LightProcess.register();
         });
+        
+        blackHoleSFX = new zzw.content.graphics.BlackHoleSFX();
+        Events.run(mindustry.game.EventType.Trigger.draw, () -> blackHoleSFX.render());
     }
 
 
@@ -170,11 +167,13 @@ public class TestMod extends Mod{
         // 天气 (timeStorm/debrisStorm)
         Z_Weathers.load();
 
-        // ★ 加载黑洞着色器 (必须在所有内容加载之后, 确保纹理已加载)
-        BlackHoleShader.load();
+        // ★ 加载黑洞后处理系统 (必须在所有内容加载之后, 确保纹理已加载)
+        blackHoleSFX.load();
 
         // ★ 科技树 (必须最后: 把全部 PU 内容挂到原版科技树, 引用所有内容类)
         //Z_TechTree.load();
+
+        Z_Other.load();
     }
     
     /**

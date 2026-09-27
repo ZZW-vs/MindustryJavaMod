@@ -25,6 +25,8 @@ import mindustry.graphics.Layer;
  * 颜色/大小配置移植自 PU_V8 assets/objects/objects.properties
  */
 public class ZObjs {
+    // ★ 临时诊断：改成 true 时，所有模型用纯白渲染（无纹理）
+    public static final boolean DEBUG_NO_TEXTURE = false;
     public static WavefrontObject cube;
     public static WavefrontObject wavefront;
     public static WavefrontObject prism;
@@ -60,6 +62,13 @@ public class ZObjs {
         wavefront.lightColor = Color.white;
         wavefront.shadeColor = Color.valueOf("9e9f9f");
         wavefront.drawLayer = Layer.turret;
+        
+        // ★ 让 wavefront 炮台"躺下"（波浪沿地面延伸）
+        wavefront.extraRotX = -90f;
+        // ★ 翻转前后朝向
+        wavefront.extraRotY = 180f;
+        // ★ 翻转朝向（开口朝向鼠标）
+        wavefront.extraRotZ = 180f;   // 原来是 270f
 
         // prism: UnityPal.monolith=87ceeb, UnityPal.monolithDark=6586b0
         // ★ 原版钻石形 (6顶点+8面), 顶点范围 ~2x2x2.5 (高度 2.5)
@@ -172,6 +181,9 @@ public class ZObjs {
         }
         loaded = true;
         Log.info("[Create] ZObjs.load() 开始加载模型");
+        
+        // ★ Y-up → Z-up 转换测试开关：1=A, 2=B, 3=C, 4=D, 0=不转换
+        WavefrontObject.globalYUpMode = 2;  // 默认方案 B
         loadObj(cube, "cube");
         loadObj(wavefront, "wavefront");
         loadObj(prism, "prism");
@@ -180,6 +192,19 @@ public class ZObjs {
         loadObj(crushingWheel, "crushing_wheel");
         loadObj(cogwheel, "cogwheel");
         loadObj(largeCogwheel, "large_cogwheel");
+
+        // ★ OBJ坐标诊断：打印所有模型的坐标范围
+        Log.info("[Diag] ============ OBJ模型坐标诊断 ============");
+        printDiag("cube", cube);
+        printDiag("wavefront", wavefront);
+        printDiag("prism", prism);
+        printDiag("flywheel", flywheel);
+        printDiag("water_wheel", waterWheel);
+        printDiag("crushing_wheel", crushingWheel);
+        printDiag("cogwheel", cogwheel);
+        printDiag("large_cogwheel", largeCogwheel);
+        Log.info("[Diag] =========================================");
+
         /*
         // 加载OBJ模型 (暂时禁用初音的两个MMD模型)
         // loadObj(mikuBlack, "blander/初音未来/Black");
@@ -196,6 +221,57 @@ public class ZObjs {
         loadObj(mikuBlackObj, "blander/初音未来/初音未来_黑");
         centerMmd(mikuBlackObj);
          */
+        
+        // ★ groundAtLoad 配置：薄片型模型贴地，立体型模型居中
+        // 薄片型模型：Z 本来就贴近 0（或略负），需要贴地
+        flywheel.groundAtLoad = true;
+        waterWheel.groundAtLoad = true;
+        crushingWheel.groundAtLoad = true;
+        cogwheel.groundAtLoad = true;
+        largeCogwheel.groundAtLoad = true;
+        
+        // 立体型模型：保持原始 Z 居中，不贴地
+        cube.groundAtLoad = false;      // 默认就是 false，可以不写
+        prism.groundAtLoad = false;
+        wavefront.groundAtLoad = false; // wavefront 有 extraRotX 处理，不贴地
+        
+        // ★ 金属度配置：不同材质的高光强度
+        // 金属度高 → 高光强
+        flywheel.metalness = 0.6f;      // 金属飞轮，高光强
+        largeCogwheel.metalness = 0.4f; // 金属齿轮
+        cogwheel.metalness = 0.4f;
+        crushingWheel.metalness = 0.5f; // 石质粉碎轮，中等金属
+        waterWheel.metalness = 0.2f;    // 木质水车，低金属
+        wavefront.metalness = 0.3f;
+        prism.metalness = 0.5f;         // 棱镜，高光
+        cube.metalness = 0.3f;
+
+        // 光照开关（先都开）
+        flywheel.useRealLighting = true;
+        largeCogwheel.useRealLighting = true;
+        cogwheel.useRealLighting = true;
+        crushingWheel.useRealLighting = true;
+        waterWheel.useRealLighting = true;
+        wavefront.useRealLighting = true;
+        prism.useRealLighting = true;
+        cube.useRealLighting = true;
+        
+    }
+
+    /** 打印单个模型的坐标诊断信息 */
+    private static void printDiag(String name, WavefrontObject obj) {
+        if(obj == null || obj.vertices.isEmpty()) {
+            Log.info("[Diag] " + name + " 未加载或无顶点");
+            return;
+        }
+        Log.info("[Diag] %s  X=[%.2f,%.2f]  Y=[%.2f,%.2f]  Z=[%.2f,%.2f]  bound=%.2f  verts=%d  faces=%d",
+            name,
+            obj.minX, obj.maxX,
+            obj.minY, obj.maxY,
+            obj.minZ, obj.maxZ,
+            obj.boundRadius,
+            obj.vertices.size,
+            obj.faces.size);
     }
 
     /** 创建 MMD 模型配置 (topLight 着色, 双面渲染, 单 Z 层) */

@@ -913,6 +913,40 @@ public class Z_Bullets {
         float lensR2     = coreR * 3.4f;                      // 引力透镜弧 2
 
         // ============================================================
+        // 0. 空间扭曲弧：一组同心弧，内快外慢，模拟空间被拧动
+        // ============================================================
+        Draw.blend(arc.graphics.Blending.additive);
+        int twistCount = 7;
+        for(int i = 0; i < twistCount; i++){
+            float tNorm = i / (float)(twistCount - 1);       // 0 = 内, 1 = 外
+            float arcR = Mathf.lerp(coreR * 1.15f, coreR * 5.5f, tNorm);
+
+            // 内圈转得快，外圈转得慢
+            float speed = Mathf.lerp(3.5f, 0.6f, tNorm);
+            float angle = Time.time * speed * 60f + i * 23f;
+
+            // 内圈亮，外圈淡
+            float alpha = Mathf.lerp(0.85f, 0.15f, tNorm) * fade * pulse;
+
+            // 内圈暖（金橙），外圈冷（蓝白）
+            float rC = Mathf.lerp(1.0f, 0.5f, tNorm);
+            float gC = Mathf.lerp(0.85f, 0.75f, tNorm);
+            float bC = Mathf.lerp(0.4f, 1.0f, tNorm);
+            Draw.color(rC, gC, bC, alpha);
+
+            // 弧的粗细也是内粗外细
+            float stroke = Mathf.lerp(2.2f, 0.8f, tNorm);
+            Lines.stroke(stroke);
+
+            // 每层画两段错开的弧，看起来像空间被拧过
+            float arcSpan = Mathf.lerp(0.35f, 0.15f, tNorm);
+            Lines.arc(b.x, b.y, arcR, arcSpan, angle);
+            Lines.arc(b.x, b.y, arcR, arcSpan * 0.7f, angle + 140f);
+            Lines.arc(b.x, b.y, arcR, arcSpan * 0.5f, angle + 260f);
+        }
+        Draw.blend();
+
+        // ============================================================
         // 1. 引力透镜背景光晕（最底层，冷色，大范围渐隐）
         // ============================================================
         Draw.blend(arc.graphics.Blending.additive);
@@ -996,9 +1030,7 @@ public class Z_Bullets {
         Draw.color();
         Draw.reset();
     }
-    }
-
-    /** GluonOrbData - 黑洞单位列表管理 (PU_V8 移植) */
+}/** GluonOrbData - 黑洞单位列表管理 (PU_V8 移植) */
     public static class GluonOrbData {
         public Seq<Unit> units = new Seq<>();
     }
