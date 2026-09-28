@@ -5,9 +5,9 @@ version '1.0'
 sourceSets.main.java.srcDirs = ["src"]
 
 repositories{
-    mavenCentral()
-    maven{ url "https://raw.githubusercontent.com/Zelaux/MindustryRepo/master/repository" }
-    maven{ url 'https://www.jitpack.io' }
+    // mavenCentral()  // 暂时注释掉，避免网络超时
+    // maven{ url "https://raw.githubusercontent.com/Zelaux/MindustryRepo/master/repository" }  // 暂时注释掉
+    // maven{ url 'https://www.jitpack.io' }  // 暂时注释掉
 }
 
 java{
