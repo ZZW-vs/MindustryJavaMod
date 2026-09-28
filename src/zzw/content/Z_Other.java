@@ -26,7 +26,7 @@ public class Z_Other {
             requirements(Category.turret, ItemStack.with(Items.copper, 240 , Items.graphite, 240 , Items.thorium, 120));
 
             // 基础属性
-            reload = 40f ; // 重装时间
+            reload = 48f ; // 重装时间
             shake = 3f ; // 屏幕震动
             range = 95f ; // 射程 (与雷光相近)
             recoil = 3f ; // 后坐力
@@ -49,14 +49,14 @@ public class Z_Other {
             ammo(
                 Items.titanium, new ShrapnelBulletType(){{
                     length = 105f ; // 激光长度 (射程 + 10)
-                    damage = 55f ; // 伤害
+                    damage = 58f ; // 伤害
                     ammoMultiplier = 4f ; // 弹药倍率
                     width = 13f ; // 激光宽度 (比雷光细)
                     reloadMultiplier = 1.3f ; // 重装倍率
                 }},
                 Items.thorium, new ShrapnelBulletType(){{
                     length = 105f ; // 激光长度
-                    damage = 95f ; // 伤害
+                    damage = 98f ; // 伤害
                     ammoMultiplier = 5f ; // 弹药倍率
                     width = 13f ; // 激光宽度
                     toColor = Pal.thoriumPink; // 颜色
@@ -64,7 +64,7 @@ public class Z_Other {
                 }},
                 Items.surgeAlloy, new ShrapnelBulletType(){{
                     length = 105f ; // 激光长度
-                    damage = 105f ; // 伤害
+                    damage = 115f ; // 伤害
                     ammoMultiplier = 6f ; // 弹药倍率
                     width = 13f ; // 激光宽度
                     toColor = Pal.surge; // 颜色
@@ -74,13 +74,20 @@ public class Z_Other {
                 Items.plastanium, new ShrapnelBulletType(){{
                     range = 97f ;
                     length = 115f ; // 激光长度 (最长)
-                    damage = 45f ; // 伤害 (最低)
+                    damage = 46f ; // 伤害 (最低)
                     ammoMultiplier = 7f ; // 弹药倍率
                     width = 10f ; // 激光宽度 (最细)
                     reloadMultiplier = 0.8f ; // 射速最快
-                    speed = 1f ; // 飞行速度更快
-                    lifetime = 15f ; // 生命时间最长
+                    speed = 2f ; // 飞行速度更快
+                    lifetime = 30f ; // 生命时间最长
                     toColor = Pal.plastanium; // 颜色
+                    // 确保整个激光突刺都有伤害效果
+                    pierce = true ; // 贯穿效果
+                    pierceBuilding = true ; // 贯穿建筑
+                    // 添加持续伤害效果，让整个激光长度都有伤害
+                    statusDuration = 60f ; // 状态持续时间
+                    buildingDamageMultiplier = 1f ; // 对建筑正常伤害
+                    hitEffect = Fx.hitLaser ; // 击中特效
                 }}
             );
             // 存储冷却时间
@@ -90,12 +97,12 @@ public class Z_Other {
         // ---- T2 破空: 单根巨型炮管, 激光比雷光更大/更远/更粗, 单发极重, 射程最远 ----
         rift = new BoostItemTurret("rift"){{
             //建造需求
-            requirements(Category.turret, ItemStack.with(Items.copper, 290 , Items.graphite, 290 , Items.thorium, 150));
+            requirements(Category.turret, ItemStack.with(Items.copper, 300 , Items.graphite, 300 , Items.thorium, 150));
 
             // 基础属性
-            reload = 60f ; // 重装时间
+            reload = 52f ; // 重装时间
             shake = 8f ; // 屏幕震动
-            range = 130f ; // 射程 (比雷光远)
+            range = 145f ; // 射程 (比雷光远)
             recoil = 9f ; // 后坐力
             shootCone = 30 ; // 射击锥角
             size = 5 ; // 占用格子大小
@@ -131,7 +138,7 @@ public class Z_Other {
                 }},
                 Items.surgeAlloy, new ShrapnelBulletType(){{
                     length = 150f ; // 激光长度
-                    damage = 232f ; // 伤害
+                    damage = 248f ; // 伤害
                     ammoMultiplier = 6f ; // 弹药倍率
                     width = 34f ; // 激光宽度
                     toColor = Pal.surge; // 颜色
@@ -139,15 +146,22 @@ public class Z_Other {
                     status = StatusEffects.shocked; // 附加麻痹效果
                 }},
                 Items.plastanium, new ShrapnelBulletType(){{
-                    range = 132f;
+                    range = 147f ;
                     length = 160f ; // 激光长度 (最长)
-                    damage = 95f ; // 伤害 (最低)
+                    damage = 98f ; // 伤害 (最低)
                     ammoMultiplier = 7f ; // 弹药倍率
                     width = 28f ; // 激光宽度 (较细)
                     reloadMultiplier = 0.8f ; // 射速最快
-                    speed = 1f ; // 飞行速度更快
-                    lifetime = 15f ; // 生命时间最长
+                    speed = 2f ; // 飞行速度更快
+                    lifetime = 30f ; // 生命时间最长
                     toColor = Pal.plastanium; // 颜色
+                    // 确保整个激光突刺都有伤害效果
+                    pierce = true ; // 贯穿效果
+                    pierceBuilding = true ; // 贯穿建筑
+                    // 添加持续伤害效果，让整个激光长度都有伤害
+                    statusDuration = 60f ; // 状态持续时间
+                    buildingDamageMultiplier = 1f ; // 对建筑正常伤害
+                    hitEffect = Fx.hitLaser ; // 击中特效
                 }}
             );
             // 存储冷却时间
@@ -183,14 +197,14 @@ public class Z_Other {
             ammo(
                 Items.titanium, new ShrapnelBulletType(){{
                     length = 120f ; // 激光长度
-                    damage = 72f ; // 伤害
+                    damage = 76f ; // 伤害
                     ammoMultiplier = 4f ; // 弹药倍率
                     width = 18f ; // 激光宽度 (与雷光相近)
                     reloadMultiplier = 1.3f ; // 重装倍率
                 }},
                 Items.thorium, new ShrapnelBulletType(){{
                     length = 120f ; // 激光长度
-                    damage = 112f ; // 伤害
+                    damage = 114f ; // 伤害
                     ammoMultiplier = 5f ; // 弹药倍率
                     width = 18f ; // 激光宽度
                     toColor = Pal.thoriumPink; // 颜色
@@ -198,7 +212,7 @@ public class Z_Other {
                 }},
                 Items.surgeAlloy, new ShrapnelBulletType(){{
                     length = 120f ; // 激光长度
-                    damage = 133f ; // 伤害
+                    damage = 137f ; // 伤害
                     ammoMultiplier = 6f ; // 弹药倍率
                     width = 18f ; // 激光宽度
                     toColor = Pal.surge; // 颜色
@@ -208,13 +222,20 @@ public class Z_Other {
                 Items.plastanium, new ShrapnelBulletType(){{
                     range = 122f ;
                     length = 130f ; // 激光长度 (最长)
-                    damage = 58f ; // 伤害 (最低)
+                    damage = 64f ; // 伤害 (最低)
                     ammoMultiplier = 7f ; // 弹药倍率
                     width = 15f ; // 激光宽度 (较细)
                     reloadMultiplier = 0.8f ; // 射速最快
-                    speed = 1f ; // 飞行速度更快
-                    lifetime =15f ; // 生命时间最长
+                    speed = 2f ; // 飞行速度更快
+                    lifetime =30f ; // 生命时间最长
                     toColor = Pal.plastanium; // 颜色
+                    // 确保整个激光突刺都有伤害效果
+                    pierce = true ; // 贯穿效果
+                    pierceBuilding = true ; // 贯穿建筑
+                    // 添加持续伤害效果，让整个激光长度都有伤害
+                    statusDuration = 60f ; // 状态持续时间
+                    buildingDamageMultiplier = 1f ; // 对建筑正常伤害
+                    hitEffect = Fx.hitLaser ; // 击中特效
                 }}
             );
             // 存储冷却时间
@@ -227,9 +248,9 @@ public class Z_Other {
             requirements(Category.turret, ItemStack.with(Items.copper, 350 , Items.graphite, 350 , Items.thorium, 190));
 
             // 基础属性
-            reload = 56f ; // 重装时间
+            reload = 55f ; // 重装时间
             shake = 7f ; // 屏幕震动
-            range = 135f ; // 射程 (比破空更远)
+            range = 138f ; // 射程 (比破空更远)
             recoil = 7f ; // 后坐力
             shootCone = 30 ; // 射击锥角
             size = 6 ; // 占用格子大小
@@ -250,14 +271,14 @@ public class Z_Other {
             ammo(
                 Items.titanium, new ShrapnelBulletType(){{
                     length = 160f ; // 激光长度
-                    damage = 200f ; // 伤害
+                    damage = 210f ; // 伤害
                     ammoMultiplier = 4f ; // 弹药倍率
                     width = 30f ; // 激光宽度
                     reloadMultiplier = 1.3f ; // 重装倍率
                 }},
                 Items.thorium, new ShrapnelBulletType(){{
                     length = 160f ; // 激光长度
-                    damage = 315f ; // 伤害
+                    damage = 321f ; // 伤害
                     ammoMultiplier = 5f ; // 弹药倍率
                     width = 30f ; // 激光宽度
                     toColor = Pal.thoriumPink; // 颜色
@@ -265,7 +286,7 @@ public class Z_Other {
                 }},
                 Items.surgeAlloy, new ShrapnelBulletType(){{
                     length = 160f ; // 激光长度
-                    damage = 346f ; // 伤害
+                    damage = 362f ; // 伤害
                     ammoMultiplier = 6f ; // 弹药倍率
                     width = 30f ; // 激光宽度
                     toColor = Pal.surge; // 颜色
@@ -275,13 +296,20 @@ public class Z_Other {
                 Items.plastanium, new ShrapnelBulletType(){{
                     range = 137 ;
                     length = 180f ; // 激光长度 (最长)
-                    damage = 165f ; // 伤害 (最低)
+                    damage = 182f ; // 伤害 (最低)
                     ammoMultiplier = 7f ; // 弹药倍率
                     width = 25f ; // 激光宽度 (较细)
                     reloadMultiplier = 0.8f ; // 射速最快
-                    speed = 1f ; // 飞行速度更快
-                    lifetime = 15f ; // 生命时间最长
+                    speed = 2f ; // 飞行速度更快
+                    lifetime = 30f ; // 生命时间最长
                     toColor = Pal.plastanium; // 颜色
+                    // 确保整个激光突刺都有伤害效果
+                    pierce = true ; // 贯穿效果
+                    pierceBuilding = true ; // 贯穿建筑
+                    // 添加持续伤害效果，让整个激光长度都有伤害
+                    statusDuration = 60f ; // 状态持续时间
+                    buildingDamageMultiplier = 1f ; // 对建筑正常伤害
+                    hitEffect = Fx.hitLaser ; // 击中特效
                 }}
             );
             // 存储冷却时间
