@@ -155,6 +155,8 @@ public class PrismTurret extends SoulTurretPowerTurret {
                 // ★ CPU渲染器: Vec3.rotate(Vec3.Z, +deg) = 逆时针 (右手法则)
                 //   prism.obj 默认朝上 (顶点 v3=(0,1,0) 是顶部)
                 //   炮台 rotation=0 朝右, 需模型转 -(rotation-90) = 90-rotation 对齐炮台方向
+                // ★ 炮口朝向修正量: 相对炮台朝向(rotation)的固定偏转, 模型整体+自转轴一起转
+                //   实测: 180f 会让尖端朝反方向 → 取 0f (不做额外偏转)
                 float rZ = 90f - rotation;
                 float rY = prismRotation;
 

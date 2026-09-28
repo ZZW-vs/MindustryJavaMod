@@ -880,6 +880,25 @@ public class Z_Bullets {
                     }
                 });
             }
+
+            // ★ 黑洞全屏后处理：每帧把本子弹位置压入扭曲队列
+            //   Trigger.draw 时 BlackHoleSFX.render() 会消费该队列并 blit 背景扭曲 shader
+            //   强度必须跟着生命末期的收缩一起衰减，否则子弹消失瞬间扭曲会突然断掉
+            if (zzw.TestMod.blackHoleSFX != null) {
+                float life = b.fin();
+                float sc;
+                if (life < 0.2f) {
+                    sc = life / 0.2f;
+                } else if (life > 0.75f) {
+                    sc = (1f - life) / 0.25f;
+                } else {
+                    sc = 1f;
+                }
+                sc = Mathf.clamp(sc, 0f, 1f);
+                sc = (float) Math.sin(sc * Mathf.PI * 0.5f);
+
+                zzw.TestMod.blackHoleSFX.blackHole(b.x, b.y, (1.5f + interp * 2.5f) * sc, 5.0f);
+            }
         }
 
         @Override
@@ -897,7 +916,7 @@ public class Z_Bullets {
         }
         scaleCurve = Mathf.clamp(scaleCurve, 0f, 1f);
         scaleCurve = (float)Math.sin(scaleCurve * Mathf.PI * 0.5f);
-        scaleCurve = Mathf.lerp(0.55f, 1.0f, scaleCurve);   // 保证最小 55% 可见度
+        // 不再抬到 0.55 下限: 让黑洞末端真正收缩到 0, 与 shader 扭曲强度同步淡出
 
         if(scaleCurve < 0.02f) return;
 
@@ -905,8 +924,7 @@ public class Z_Bullets {
         float pulse = 0.85f + 0.15f * Mathf.sin(Time.time * 6f);
 
         // 核心参数
-        float coreR      = (16f + 12f * life) * scaleCurve;   // 事件视界半径
-        float photonR    = coreR * 1.10f;                     // 光子环
+        float coreR      = (8f + 5f * life) * scaleCurve;     // 事件视界半径 (Draw 侧, 黑洞本体由 shader 绘制)
         float diskInner  = coreR * 1.5f;                      // 吸积盘内缘
         float diskOuter  = coreR * 4.2f;                      // 吸积盘外缘
         float lensR1     = coreR * 2.2f;                      // 引力透镜弧 1
@@ -916,10 +934,10 @@ public class Z_Bullets {
         // 0. 空间扭曲弧：一组同心弧，内快外慢，模拟空间被拧动
         // ============================================================
         Draw.blend(arc.graphics.Blending.additive);
-        int twistCount = 7;
+        int twistCount = 4;
         for(int i = 0; i < twistCount; i++){
             float tNorm = i / (float)(twistCount - 1);       // 0 = 内, 1 = 外
-            float arcR = Mathf.lerp(coreR * 1.15f, coreR * 5.5f, tNorm);
+            float arcR = Mathf.lerp(coreR * 1.15f, coreR * 3.0f, tNorm);
 
             // 内圈转得快，外圈转得慢
             float speed = Mathf.lerp(3.5f, 0.6f, tNorm);
@@ -939,10 +957,9 @@ public class Z_Bullets {
             Lines.stroke(stroke);
 
             // 每层画两段错开的弧，看起来像空间被拧过
-            float arcSpan = Mathf.lerp(0.35f, 0.15f, tNorm);
+            float arcSpan = Mathf.lerp(0.30f, 0.14f, tNorm);
             Lines.arc(b.x, b.y, arcR, arcSpan, angle);
-            Lines.arc(b.x, b.y, arcR, arcSpan * 0.7f, angle + 140f);
-            Lines.arc(b.x, b.y, arcR, arcSpan * 0.5f, angle + 260f);
+            Lines.arc(b.x, b.y, arcR, arcSpan * 0.6f, angle + 180f);
         }
         Draw.blend();
 
@@ -951,9 +968,9 @@ public class Z_Bullets {
         // ============================================================
         Draw.blend(arc.graphics.Blending.additive);
 
-        for(int i = 0; i < 3; i++){
+        for(int i = 0; i < 2; i++){
             float rr = diskOuter * (1.0f + i * 0.35f);
-            float a  = (0.12f - i * 0.03f) * fade;
+            float a  = (0.10f - i * 0.03f) * fade;
             Draw.color(Pal.lancerLaser, a);
             Fill.circle(b.x, b.y, rr);
         }
@@ -970,32 +987,20 @@ public class Z_Bullets {
         // ============================================================
         // 2. 水平吸积盘（暖色，橙色为主，两侧各一条弧）
         // ============================================================
-        Draw.color(Color.valueOf("ff7030"), 0.55f * fade * pulse);
-        Lines.stroke(4.0f);
-        Lines.arc(b.x, b.y, diskOuter * 0.85f, 0.28f, 0f);
-        Lines.arc(b.x, b.y, diskOuter * 0.85f, 0.28f, 180f);
+        Draw.color(Color.valueOf("ff7030"), 0.50f * fade * pulse);
+        Lines.stroke(3.4f);
+        Lines.arc(b.x, b.y, diskOuter * 0.80f, 0.26f, 0f);
+        Lines.arc(b.x, b.y, diskOuter * 0.80f, 0.26f, 180f);
 
-        Draw.color(Color.valueOf("ffb050"), 0.75f * fade);
-        Lines.stroke(3.0f);
-        Lines.arc(b.x, b.y, diskInner * 1.6f, 0.32f, 6f);
-        Lines.arc(b.x, b.y, diskInner * 1.6f, 0.32f, 186f);
-
-        Draw.color(Color.valueOf("ffe090"), 0.9f * fade * pulse);
+        Draw.color(Color.valueOf("ffe090"), 0.85f * fade * pulse);
         Lines.stroke(2.0f);
-        Lines.arc(b.x, b.y, diskInner * 1.15f, 0.38f, 12f);
-        Lines.arc(b.x, b.y, diskInner * 1.15f, 0.38f, 192f);
-
-        // ============================================================
-        // 3. 光子环（紧贴事件视界的纯白细线）
-        // ============================================================
-        Draw.color(Color.white, 1.0f * fade);
-        Lines.stroke(1.4f);
-        Lines.circle(b.x, b.y, photonR);
+        Lines.arc(b.x, b.y, diskInner * 1.15f, 0.34f, 12f);
+        Lines.arc(b.x, b.y, diskInner * 1.15f, 0.34f, 192f);
 
         // ============================================================
         // 5. 内向汇聚粒子
         // ============================================================
-        int particles = 14;
+        int particles = 8;
         for(int i = 0; i < particles; i++){
             float seed = i * 1.37f;
             float t = (Time.time * 0.4f + seed) % 1f;
@@ -1015,22 +1020,16 @@ public class Z_Bullets {
         }
 
         // ============================================================
-        // 6. 事件视界（纯黑多边形圆，完全不透明）
+        // 6. 事件视界改由 blackholeshader.frag 绘制（不透明黑核 + 光子环）
+        //    Draw 侧不再画黑圆, 避免之前半透明叠加的问题
         // ============================================================
-        Draw.blend(arc.graphics.Blending.normal);
-        Draw.color(0f, 0f, 0f, 1f);
-        Fill.poly(b.x, b.y, 48, coreR, 0f);
-
-        // 视界外圈描边
-        Draw.color(0.25f, 0.4f, 0.7f, 0.9f * fade);
-        Lines.stroke(1.0f);
-        Lines.circle(b.x, b.y, coreR + 0.6f);
-
         Draw.blend();
         Draw.color();
         Draw.reset();
     }
-}/** GluonOrbData - 黑洞单位列表管理 (PU_V8 移植) */
+}
+
+    /** GluonOrbData - 黑洞单位列表管理 (PU_V8 移植) */
     public static class GluonOrbData {
         public Seq<Unit> units = new Seq<>();
     }

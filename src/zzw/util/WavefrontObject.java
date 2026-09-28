@@ -70,6 +70,14 @@ public class WavefrontObject{
     
     /** 是否启用真光照（false 时回退到旧的假 shading） */
     public boolean useRealLighting = true;
+
+    /** ★ 模型空间光照：用模型本地法线着色，不跟模型旋转
+     *  <p>默认 false（世界空间光照，法线随模型旋转 → 转向/自转时同一面会忽明忽暗）</p>
+     *  <p>设为 true 后，模型的明暗固定在自己身上，自转/瞄准时亮度稳定不闪</p>
+     *  <p>适用于持续旋转的模型（棱镜、飞轮、水车、齿轮等）</p>
+     *  <p>注意：背面剔除仍使用旋转后的法线，不受此开关影响</p>
+     */
+    public boolean lightInModelSpace = false;
     
     /** 是否在加载时把模型 Z 贴地（minZ 移到 0）
      *  默认 false（模型保持原始 Z 居中）
@@ -411,6 +419,9 @@ public class WavefrontObject{
             if(groundAtLoad){
                 groundModel();
             }
+
+            // ★ 预计算模型空间法线（必须在所有加载期顶点/法线变换之后调用）
+            buildLocalFaceNormals();
         }
 
         Log.info("[Create] WavefrontObject loaded: " + drawnVertices.size + " verts, " + faces.size + " faces, boundRadius=" + boundRadius);
@@ -557,6 +568,33 @@ public class WavefrontObject{
         }
         recomputeBounds();
         Log.info("[Ground] @ minZ was @", textureName, minZ);
+    }
+
+    /** ★ 预计算每个面的"模型空间法线"（加载时一次）
+     *  <p>供 lightInModelSpace 着色使用：直接用这份本地法线，模型旋转时明暗不跟着变。</p>
+     *  <p>必须在所有加载期变换（Y-up 转换 / extraRot）之后调用，因为那时 face.normal
+     *  仍指向尚未被 draw() 旋转覆盖的本地法线。</p>
+     *  <p>顺带消掉了每帧"平均法线 + sqrt 归一化"的开销。</p>
+     */
+    private void buildLocalFaceNormals(){
+        if(!hasNormal || faces.isEmpty()) return;
+
+        for(Face face : faces){
+            if(face.normal == null || face.normal.length == 0){
+                face.localNormal = null;
+                continue;
+            }
+            float ax = 0f, ay = 0f, az = 0f;
+            for(Vec3 n : face.normal){
+                ax += n.x; ay += n.y; az += n.z;
+            }
+            float inv = 1f / face.normal.length;
+            ax *= inv; ay *= inv; az *= inv;
+
+            float len = (float)Math.sqrt(ax * ax + ay * ay + az * az);
+            face.localNormal = len < 1e-6f ? null : new Vec3(ax / len, ay / len, az / len);
+        }
+        Log.info("[LocalNormal] @ 预计算 @ 个面的模型空间法线", textureName, faces.size);
     }
 
     /** 把 extraRotX/Y/Z 一次性应用到顶点上（加载时） */
@@ -1086,15 +1124,24 @@ public class WavefrontObject{
             Draw.color(lightColor);
             return;
         }
-        Vec3 tmp = Tmp.v31.setZero();
-        indexerA = 0;
-        for(Vec3 n : face.normal){ tmp.add(n); indexerA++; }
-        tmp.scl(1f / indexerA);
+        // ★ 模型空间光照：直接用加载时预算的本地法线（已归一化），
+        //   同时省掉每帧的"平均法线 + sqrt 归一化"
+        float nx, ny, nz;
+        if(lightInModelSpace && face.localNormal != null){
+            nx = face.localNormal.x; ny = face.localNormal.y; nz = face.localNormal.z;
+        }else{
+            Vec3 tmp = Tmp.v31.setZero();
+            indexerA = 0;
+            for(Vec3 n : face.normal){
+                tmp.add(n);
+                indexerA++;
+            }
+            tmp.scl(1f / indexerA);
 
-        float nx = tmp.x, ny = tmp.y, nz = tmp.z;
-        float len = (float)Math.sqrt(nx*nx + ny*ny + nz*nz);
-        if(len < 1e-6f){ Draw.color(lightColor); return; }
-        nx /= len; ny /= len; nz /= len;
+            float len = (float)Math.sqrt(tmp.x*tmp.x + tmp.y*tmp.y + tmp.z*tmp.z);
+            if(len < 1e-6f){ Draw.color(lightColor); return; }
+            nx = tmp.x / len; ny = tmp.y / len; nz = tmp.z / len;
+        }
 
         if(!useRealLighting){
             // 回退到旧 normalAngle
@@ -1144,18 +1191,24 @@ public class WavefrontObject{
             return;
         }
         // 归一化面法线
-        Vec3 tmp = Tmp.v31.setZero();
-        indexerA = 0;
-        for(Vec3 n : face.normal){
-            tmp.add(n);
-            indexerA++;
-        }
-        tmp.scl(1f / indexerA);
+        // ★ 模型空间光照：直接用加载时预算的本地法线（已归一化），
+        //   同时省掉每帧的"平均法线 + sqrt 归一化"
+        float nx, ny, nz;
+        if(lightInModelSpace && face.localNormal != null){
+            nx = face.localNormal.x; ny = face.localNormal.y; nz = face.localNormal.z;
+        }else{
+            Vec3 tmp = Tmp.v31.setZero();
+            indexerA = 0;
+            for(Vec3 n : face.normal){
+                tmp.add(n);
+                indexerA++;
+            }
+            tmp.scl(1f / indexerA);
 
-        float nx = tmp.x, ny = tmp.y, nz = tmp.z;
-        float len = (float)Math.sqrt(nx*nx + ny*ny + nz*nz);
-        if(len < 1e-6f){ Draw.color(lightColor); return; }
-        nx /= len; ny /= len; nz /= len;
+            float len = (float)Math.sqrt(tmp.x*tmp.x + tmp.y*tmp.y + tmp.z*tmp.z);
+            if(len < 1e-6f){ Draw.color(lightColor); return; }
+            nx = tmp.x / len; ny = tmp.y / len; nz = tmp.z / len;
+        }
 
         if(!useRealLighting){
             // 回退到旧的 topLight
@@ -1313,6 +1366,8 @@ public class WavefrontObject{
         public Material mat;
         public Vertex[] verts;
         public Vec3[] normal;
+        /** ★ 模型空间法线（加载时预计算并归一化），供 lightInModelSpace 着色使用 */
+        public Vec3 localNormal;
         public Vec2[] vertexTexture;
         public float shadingValue = 0f;
         public int size = 0;

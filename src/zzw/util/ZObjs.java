@@ -87,6 +87,11 @@ public class ZObjs {
         prism.cullBackfaces = false;
         // ★ singleZLayer=true: 多个棱镜炮台同时存在时, 每个实例整体用一个 z 渲染, 避免交叉穿插
         prism.singleZLayer = true;
+        // ★ 跳过 Y-up → Z-up 转换: 保持 obj 原始坐标轴
+        //   原版 PU 的旋转语义基于 obj 轴 (瞄准轴=objZ, 自转轴=objY, 长轴=objY)
+        //   mode B 转换会把 objY(长轴) 映射到 localZ, 导致瞄准角 rZ 变成绕自身长轴自转 (轴错位)
+        //   PrismTurret 的 rZ=90-rotation / rY=prismRotation 是按 PU 语义写的, 必须配 obj 轴
+        prism.enableYUpConversion = false;
 
         // flywheel: MC Create 飞轮模型 (258顶点/186面, 金属灰色)
         // 顶点范围 ~0~1.5 (1.5单位立方体), size=3f: defaultScl(4)*3=12倍缩放, 模型 ~18单位 (size=2方块占地16单位)
@@ -254,6 +259,8 @@ public class ZObjs {
         waterWheel.useRealLighting = true;
         wavefront.useRealLighting = true;
         prism.useRealLighting = true;
+        // ★ 模型空间光照: 棱镜持续自转, 用本地法线着色, 避免旋转时同一面忽明忽暗(看着透明)
+        prism.lightInModelSpace = true;
         cube.useRealLighting = true;
         
     }
