@@ -271,14 +271,17 @@ public class ZObjs {
             Log.info("[Diag] " + name + " 未加载或无顶点");
             return;
         }
-        Log.info("[Diag] %s  X=[%.2f,%.2f]  Y=[%.2f,%.2f]  Z=[%.2f,%.2f]  bound=%.2f  verts=%d  faces=%d",
+        // 注意: Arc 的 Log.info 只认 "@" 占位符, 不认 String.format 的 %s/%f/%d,
+        // 所以这里必须先用 String.format 拼好再传给 Log.info,
+        // 否则日志里会原样打印出模板而丢掉所有参数。
+        Log.info(String.format("[Diag] %s  X=[%.2f,%.2f]  Y=[%.2f,%.2f]  Z=[%.2f,%.2f]  bound=%.2f  verts=%d  faces=%d",
             name,
             obj.minX, obj.maxX,
             obj.minY, obj.maxY,
             obj.minZ, obj.maxZ,
             obj.boundRadius,
             obj.vertices.size,
-            obj.faces.size);
+            obj.faces.size));
     }
 
     /** 创建 MMD 模型配置 (topLight 着色, 双面渲染, 单 Z 层) */
