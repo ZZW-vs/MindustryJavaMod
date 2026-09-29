@@ -42,6 +42,9 @@ public class TestMod extends Mod{
 
 
         Events.on(EventType.ClientLoadEvent.class, e -> {
+            // ★ 阻断游戏联网拉取"在线模组列表" (国内网络会超时, 表现为"导入报错")
+            disableOnlineModBrowser();
+
             Time.run(WELCOME_DIALOG_DELAY, this::showWelcomeDialog);
             // ★ 注册世界单位子世界鼠标交互 (悬停显示建筑状态 / 点击打开配置和物品界面)
             zzw.content.type.WorldUnitType.registerInteraction();
@@ -51,6 +54,36 @@ public class TestMod extends Mod{
         
         blackHoleSFX = new zzw.content.graphics.BlackHoleSFX();
         Events.run(mindustry.game.EventType.Trigger.draw, () -> blackHoleSFX.render());
+    }
+
+
+    /**
+     * 阻断游戏"在线模组列表"的网络请求 —— 解决导入模组时报网络错误的问题。
+     * <p>
+     * 现象: 打开"模组"界面时游戏会自动访问
+     * Vars.modJsonURLs (raw.githubusercontent.com / cdn.jsdelivr.net) 拉取在线模组列表。
+     * 国内网络访问不了这两个地址, 于是卡 10 秒后抛 SocketTimeout;
+     * 若服务器返回空内容还会让 ModsDialog.modList 解析成 null, 触发
+     * "Seq.sortComparing ... this.modList is null" 空指针, 看起来就像"导入报错"。
+     * <p>
+     * 原理: ModsDialog.getModList() 开头有一句
+     * "if(modList != null){ 直接用缓存; return; }",
+     * 所以这里提前把 modList 塞成一个空列表, 请求就完全不会发起,
+     * 既不会超时也不会空指针。mod 本身的导入/加载不受任何影响。
+     * <p>
+     * 代价: 游戏内"浏览"页签会显示空列表 (移动端本来也下载不了, 无影响)。
+     * 注意: 依赖 v158.x 的私有字段名 modList, 游戏大版本更新后可能失效;
+     * 已做异常保护, 失效时只是退回原行为, 不会导致崩溃。
+     */
+    private static void disableOnlineModBrowser(){
+        try{
+            java.lang.reflect.Field field = mindustry.ui.dialogs.ModsDialog.class.getDeclaredField("modList");
+            field.setAccessible(true);
+            field.set(mindustry.Vars.ui.mods, new arc.struct.Seq<mindustry.mod.ModListing>());
+            arc.util.Log.info("[Create] 已屏蔽在线模组列表请求 (避免网络超时报错)");
+        }catch(Throwable t){
+            arc.util.Log.err("[Create] 屏蔽在线模组列表失败, 游戏可能仍会尝试联网", t);
+        }
     }
 
 
