@@ -55,22 +55,20 @@ public class ZObjs {
         // wavefront: Color.white, UnityPal.wavefrontDark=9e9f9f
         wavefront = new WavefrontObject();
         wavefront.textureName = "wavefront";
-        // ★ 严格对齐 PU132 assets/objects/objects.properties:
-        //   size=4f (defaultScl=4f → 16 倍缩放), 无任何额外旋转, 无 Y-up 转换
-        //   PU132 直接以 obj 原始轴渲染: objY=炮管长轴, objZ=炮台竖向, 绕 objZ 用 rotation-90 旋转
-        wavefront.size = 4f;
+        // size=15 炮台, defaultScl=4f, wavefront.obj 顶点范围 ~2.5x2.5x0.5
+        // 需要更大的 size 使模型可见 (size=15 炮台占地 120 单位, 模型需 ~60 单位)
+        wavefront.size = 12f;  // 4 * 12 = 48 倍缩放, 模型更大更显眼
         wavefront.shadingSmoothness = 1f;
         wavefront.lightColor = Color.white;
         wavefront.shadeColor = Color.valueOf("9e9f9f");
         wavefront.drawLayer = Layer.turret;
-        // ★ 关掉 Y-up 转换: 保持 obj 原始坐标轴 (与 prism 同理, 遵循 PU132 语义)
-        wavefront.enableYUpConversion = false;
-        // ★ 关掉真光照, 使用 PU132 的 normalAngle 公式:
-        //   面法线与 Z 轴夹角越大越暗 → 两半对称模型的明暗面格外清晰
-        wavefront.useRealLighting = false;
-        // ★ PU132 的 clamp 上限为 1, 允许面完全变暗, 增强明暗对比
-        wavefront.maxShade = 1f;
-        // ★ 无额外旋转 (PU132 的 objects.properties 未配置任何 extraRot)
+        
+        // ★ 让 wavefront 炮台"躺下"（波浪沿地面延伸）
+        wavefront.extraRotX = -90f;
+        // ★ 翻转前后朝向
+        wavefront.extraRotY = 180f;
+        // ★ 翻转朝向（开口朝向鼠标）
+        wavefront.extraRotZ = 180f;   // 原来是 270f
 
         // prism: UnityPal.monolith=87ceeb, UnityPal.monolithDark=6586b0
         // ★ 原版钻石形 (6顶点+8面), 顶点范围 ~2x2x2.5 (高度 2.5)

@@ -20,6 +20,7 @@ import mindustry.game.Team;
 import mindustry.gen.Unit;
 import mindustry.entities.Units;
 import mindustry.world.Tile;
+import mindustry.core.World;
 
 import static mindustry.Vars.world;
 import static mindustry.Vars.indexer;
@@ -288,6 +289,48 @@ public final class UnityUtils {
             float r = Mathf.randomSeedRange(randSeed + h.id(), variance);
             return h.dst2(x, y) + (r * r);
         });
+    }
+
+    /**
+     * PU132 Utils.trueEachBlock: 遍历以 (wx, wy) 为中心、range 为半径内
+     * 所有 (去重后的) 建筑。
+     *
+     * <p>实现要点 (逐步):</p>
+     * <ol>
+     *   <li>把中心坐标换算成 tile 索引, 并向外扩张 {@code range / tilesize + 1}
+     *       个 tile, 得到一个略大于圆形的正方形遍历窗口;</li>
+     *   <li>对窗口内每个 tile 做一次 "圆心到该 tile 中心是否在 range 内" 的
+     *       圆形裁剪 —— 这样得到的才是真正的圆形范围;</li>
+     *   <li>用 {@link #collidedBlocks} (按建筑 id 去重) 保证多格建筑
+     *       (如 14×14 的方块, 覆盖上百个 tile) 只会被回调一次。</li>
+     * </ol>
+     *
+     * @param wx,wy 中心世界坐标
+     * @param range 圆形半径 (世界单位)
+     * @param boolf 过滤谓词 (返回 true 才回调)
+     * @param cons  命中建筑回调
+     */
+    public static void trueEachBlock(float wx, float wy, float range, Boolf<Building> boolf, Cons<Building> cons){
+        collidedBlocks.clear();
+
+        int tx = World.toTile(wx);
+        int ty = World.toTile(wy);
+        int tileRange = Mathf.floorPositive(range / tilesize + 1f);
+
+        for(int x = -tileRange + tx, lenX = tileRange + tx; x <= lenX; x++){
+            for(int y = -tileRange + ty, lenY = tileRange + ty; y <= lenY; y++){
+                if(!Mathf.within(x * tilesize, y * tilesize, wx, wy, range)) continue;
+                Building other = world.build(x, y);
+
+                if(other == null || !boolf.get(other)) continue;
+                if(collidedBlocks.contains(other.id)) continue;
+                collidedBlocks.add(other.id);
+
+                cons.get(other);
+            }
+        }
+
+        collidedBlocks.clear();
     }
 
     /**

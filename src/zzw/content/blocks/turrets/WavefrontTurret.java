@@ -119,14 +119,16 @@ public class WavefrontTurret extends PowerTurret {
             // 之前手动加的 Drawf.shadow() 圆形阴影大小/位置不对, 反而显得乱, 移除
 
             if (object != null && object.faces != null && object.faces.size > 0) {
-                // ★ 严格对齐 PU132 WavefrontTurret:
-                //   inst.transform 用 Utils.q1.set(Vec3.Z, rotation - 90f) 绕模型 Z 轴旋转
-                //   项目 draw() 的手写矩阵已等价于 arc 的 Vec3.rotate 链式调用,
-                //   故直接传 rZ = rotation - 90f, 不再做任何额外倾斜/摆动
-                //   (原实现的 gap*30f 倾斜与 sin 摆动会把"两半对称"模型扭歪)
-                float rZ = rotation - 90f;
+                // 模型绕 Z 轴旋转 (跟随炮台朝向)
+                // ★ CPU渲染器: Vec3.rotate(Vec3.Z, +deg) = 逆时针 (右手法则)
+                //   模型默认朝上(北), 需转 -(rotation-90) = 90-rotation 对齐炮台方向
+                float rZ = 90f - rotation;
+                // gap 作为轻微 X 轴倾斜 (间隙效果)
+                float rX = gap * 30f;
+                // angle 旋转转为 Y 轴摆动
+                float rY = Mathf.sin(angle * Mathf.degRad) * 5f;
 
-                object.draw(x, y, 0f, 0f, rZ);
+                object.draw(x, y, rX, rY, rZ);
             }
         }
     }
