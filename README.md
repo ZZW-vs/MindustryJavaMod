@@ -60,7 +60,8 @@
 - **液体强化数值**：ephemeron / muon / singularity / z-boson / higgs-boson / electron / electrobomb / plasma / current / shockwire / orb 统一为水 135%、冷冻液 185%；ghost / banshee 为水 120%、冷冻液 145%
 - **子弹形态**：z-boson 改为原版长条型（取原版 2/3 长度）；banshee 子弹整体尺寸微增；celsius / kelvin 射速与拖尾还原；ephemeron 阴阳粒子碰撞特效还原
 - **特殊机制**：gluon 结尾改为原版小漩涡；proton 转速微增；shockwire 激光加粗；plasma 射程 65 格；arc-caster / arc-storm 蓄力与六边形效果还原
-- **endgame**：按 PU132 原版**逐行忠实移植**（draw / updateTile / updateEyes / eyeShoot / killUnits / killTiles / shoot / collision / damage 的数值、判定顺序、特效参数与图层全部照抄）——节点式慢速闪电、三层旋转环 + 16 眼追踪光束、攻击时轮盘旋转与底座纹理亮起、眼睛朝目标偏移、内外圈逆时针依次发射秒杀光束、齐射时以自身为中心湮灭爆炸
+- **endgame**：按 PU132 原版**逐行忠实移植**（draw / updateTile / updateEyes / eyeShoot / killUnits / killTiles / shoot / collision / damage 的数值、判定顺序、特效参数与图层全部照抄）——三层旋转环 + 16 眼追踪光束（光束攻击半径 = 炮台射程 820）、攻击时轮盘旋转与底座纹理亮起、眼睛朝目标偏移、内外圈逆时针依次发射秒杀光束、齐射时以自身为中心湮灭爆炸
+  - **慢闪电**：按需求限制在炮台本体附近（延伸距离 10），只命中贴身的单位，不再飞出去攻击远处目标（原版为 810）
   - **通电就亮修复**：v158 中 `efficiency` 会被必选物品消耗（terminum）拖成 0，导致通电也不亮；改用 `power.status`（纯电力满足度）作为"通电"信号，与物品解耦，通电即亮眼睛与底部线路
   - **秒杀机制（强化）**：保留原版全部湮灭/防作弊机制（`annihilateEntity` / `annihilateUnit` 等），并对射程内**所有敌方单位与建筑**（含带复活、真实血量、特殊护盾等神秘机制者）执行强制湮灭，确保无法被常规手段规避
 
