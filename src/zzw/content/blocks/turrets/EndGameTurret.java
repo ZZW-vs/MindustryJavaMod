@@ -104,7 +104,7 @@ public class EndGameTurret extends PowerTurret {
         super(name);
 
         // ★ 与 PU132 EndGameTurret 构造 + UnityBlocks 方块定义逐项一致
-        health = 950000;
+        health = 68000;
         consumePower(320f);
         reload = 430f;
         range = 820f;
@@ -202,12 +202,6 @@ public class EndGameTurret extends PowerTurret {
         protected Vec2[] eyesVecArray = new Vec2[eyeCount];
         /** 16 只眼睛当前锁定的目标。 */
         protected Posc[] targets = new Posc[eyeCount];
-        /** 每只眼睛目标的湮灭延迟计时器 (0.5 秒后击杀)。 */
-        protected float[] annihilateTimers = new float[eyeCount];
-        /** 玩家控制时临时存储的目标（与 eyeCount 对应）。 */
-        protected Posc[] playerTargets = new Posc[eyeCount];
-        /** 玩家控制时目标的湮灭延迟计时器。 */
-        protected float[] playerAnnihilateTimers = new float[eyeCount];
 
         // ===== 反子弹 / 齐射用的临时状态 (PU132 静态字段, 这里改为实例以免多炮台互相污染) =====
         protected float damageFull = 0f, damageB = 0f;
@@ -337,9 +331,6 @@ public class EndGameTurret extends PowerTurret {
         public void add() {
             for(int i = 0; i < eyeCount; i++){
                 targets[i] = null;
-                annihilateTimers[i] = 0f;
-                playerTargets[i] = null;
-                playerAnnihilateTimers[i] = 0f;
             }
             super.add();
         }
@@ -348,13 +339,6 @@ public class EndGameTurret extends PowerTurret {
         public void onRemoved() {
             lightnings.clear();
             entitySeq.clear();
-            // 清除所有光束连接
-            for(int i = 0; i < eyeCount; i++){
-                targets[i] = null;
-                annihilateTimers[i] = 0f;
-                playerTargets[i] = null;
-                playerAnnihilateTimers[i] = 0f;
-            }
             super.onRemoved();
         }
 
@@ -441,11 +425,11 @@ public class EndGameTurret extends PowerTurret {
             l.colorFrom = Color.red;
             l.colorTo = Color.black;
             l.damage = dmg;
-            // 只在炮台附近: 延伸距离与单段长度都压到 100
-            l.range = 100f;
+            // 只在炮台附近: 延伸距离与单段长度都压到 180
+            l.range = 180f;
             l.splitChance = 0.045f;
             l.nodeTime = 5f;
-            l.nodeLength = 100f;
+            l.nodeLength = 180f;
             l.lineWidth = 2f;
             l.lifetime = 140f;
             l.create(team, sx, sy, angle, targetPos);
@@ -482,9 +466,6 @@ public class EndGameTurret extends PowerTurret {
             if(canConsume() && trueEfficiency() > 0.0001f){
                 updateEyesTargeting();
             }
-
-            // 更新每只眼睛的湮灭流程: 先解除 AI, 0.5 秒后湮灭
-            updateAnnihilation();
 
             if(eyeReloads[0] >= 15f){
                 eyeReloads[0] = 0f;
@@ -553,109 +534,43 @@ public class EndGameTurret extends PowerTurret {
             }
         }
 
-        /**
-         * ★ 0.5 秒延迟秒杀机制: 每帧更新湮灭计时器，时间到后执行湮灭。
-         *
-         * <p>流程: 1. 每帧累加计时器 → 2. 0.5 秒后执行湮灭 → 3. 断开光束连接</p>
-         */
-        void updateAnnihilation(){
-            // 处理普通眼睛的目标
-            for(int i = 0; i < eyeCount; i++){
-                if(targets[i] != null && annihilateTimers[i] < 0.5f){
-                    // 每帧累加计时器
-                    annihilateTimers[i] += Time.delta;
-                    
-                    // 0.5 秒后执行湮灭
-                    if(annihilateTimers[i] >= 0.5f){
-                        annihilate(targets[i]);
-                        targets[i] = null;
-                        annihilateTimers[i] = 0f;
-                    }
-                }
-            }
-            
-            // 处理玩家控制时的目标
-            for(int i = 0; i < eyeCount; i++){
-                if(playerTargets[i] != null && playerAnnihilateTimers[i] < 0.5f){
-                    // 每帧累加计时器
-                    playerAnnihilateTimers[i] += Time.delta;
-                    
-                    // 0.5 秒后执行湮灭
-                    if(playerAnnihilateTimers[i] >= 0.5f){
-                        annihilate(playerTargets[i]);
-                        playerTargets[i] = null;
-                        playerAnnihilateTimers[i] = 0f;
-                    }
-                }
-            }
-        }
-
-        /**
-         * ★ 湮灭单位/建筑: 先放特效，再执行击杀。
-         *
-         * <p>步骤: 1. 获取目标坐标 (防击杀后坐标失效) → 2. 放汽化特效 → 3. 执行击杀</p>
-         */
-        void annihilate(Posc t){
-            if(t == null) return;
-            
-            // ★ 必须先固定坐标，防止击杀后坐标变成 NaN
-            float tx = t.getX(), ty = t.getY();
-            
-            if(t instanceof Unit u){
-                // 步骤 1: 先放特效（此时坐标一定有效）
-                SpecialFx.endgameVapourize.at(tx, ty, angleTo(u), new Object[]{this, u});
-                // 步骤 2: 再击杀
-                annihilateUnit(u);
-            } else if(t instanceof Building b){
-                // 步骤 1: 先放特效
-                ScarFx.vapourizeTile.at(tx, ty, b.block.size, new Object[]{this, b});
-                // 步骤 2: 走引擎标准摧毁流程
-                b.kill();
-            }
-        }
-
         // ================= 攻击 =================
 
         /**
          * PU132 eyeShoot(): 指定眼睛发射一束秒杀激光。
          *
-         * <p>★ 改为 0.5 秒延迟秒杀机制:
-         * 1. 连接光束并解除目标 AI（使其无法移动/攻击）
-         * 2. 0.5 秒后湮灭（先放特效，再执行击杀）
-         * 3. 无论客户端还是服务器都要断开光束，避免残留连接</p>
+         * <p>原版逻辑是先对目标造成 {@code 350 * threatLevel} 伤害, 若致死则
+         * 汽化 + 湮灭, 然后<b>无论如何</b>都画一道 {@link ScarFx#endgameLaser}。
+         * 本项目额外强化了秒杀: 目标即使没被这一击打死也会被直接湮灭
+         * (需求: "秒杀这个游戏里几乎所有的单位")。</p>
          */
         void eyeShoot(int index){
             Posc t = targets[index];
             if(t == null) return;
 
-            // 步骤 1: 解除目标 AI (使其无法移动/攻击)
-            // 保存原控制器，以便断电/断弹时恢复
-            // ★ 跳过玩家操控的单位: 直接顶掉 Player 控制器会让玩家
-            //   在单位死亡时收不到 removed() 回调，出现卡死/无法复活，
-            //   因此对玩家单位只做击杀、不做定身。
-            // ★ 跳过联机客户端: 客户端改控制器会造成实体不同步。
-            if(t instanceof Unit && !Vars.net.client()
-                && !((Unit)t).isPlayer()) {
-                Unit u = (Unit)t;
-                // 简单定身：速度清零
-                u.vel.setZero();
-            }
+            float dmg = 350f * threatLevel;
 
-            // 步骤 2: 0.5 秒后湮灭
-            annihilateTimers[index] = 0f; // 重置计时器
+            if(t instanceof Healthc) ((Healthc)t).damage(dmg);
+
+            // ★ 强化秒杀: 只要还活着也一并湮灭 (原版仅在致死时湮灭)
+            if(!Vars.net.client()){
+                if(t instanceof Unit u && u.isValid() && !u.dead()){
+                    SpecialFx.endgameVapourize.at(u.x, u.y, angleTo(u), new Object[]{this, u});
+                    annihilateUnit(u);
+                }else if(t instanceof Building b && b.isValid()){
+                    ScarFx.vapourizeTile.at(b.x, b.y, b.block.size);
+                    annihilateEntity(b);
+                }
+            }
 
             Object[] data = {eyesVecArray[index], t, 0.625f};
             ScarFx.endgameLaser.at(eyesVecArray[index].x, eyesVecArray[index].y, 0f, data);
             Z_Sounds.endgameSmallShoot.at(x, y);
 
-            // 不立即断开连接，让光束持续显示直到 0.5 秒后湮灭
+            targets[index] = null;
         }
 
-        /** PU132 playerShoot(): 玩家手动控制时, 朝鼠标位置 15 范围内秒杀。
-         *
-         * <p>★ 同样采用 0.5 秒延迟机制，但玩家控制时目标判定范围更小，
-         * 且对玩家单位不做 AI 定身（避免玩家单位卡死/无法复活）。</p>
-         */
+        /** PU132 playerShoot(): 玩家手动控制时, 朝鼠标位置 15 范围内秒杀。 */
         void playerShoot(int index){
             final float rnge = 15f;
             float ux = unit.aimX();
@@ -671,19 +586,12 @@ public class EndGameTurret extends PowerTurret {
 
             Units.nearbyEnemies(team, ux - rnge, uy - rnge, rnge * 2f, rnge * 2f, e -> {
                 if(Mathf.within(ux, uy, e.x, e.y, rnge + e.hitSize) && !e.dead){
-                    // ★ 玩家控制时不对玩家单位做 AI 定身，只做 0.5 秒延迟击杀
-                    if(e instanceof Unit && !((Unit)e).isPlayer()){
-                        // 解除 AI（非玩家单位）
-                        if(!Vars.net.client()) {
-                            Unit u = (Unit)e;
-                            // 简单定身：速度清零
-                            u.vel.setZero();
-                        }
+                    e.damage(490f * threatLevel);
+                    if(e.dead){
+                        SpecialFx.endgameVapourize.at(e.x, e.y, angleTo(e), new Object[]{this, e});
+                        annihilateUnit(e);
                     }
-                    
-                    // 0.5 秒后湮灭（使用玩家控制的目标数组）
-                    playerTargets[index] = e;
-                    playerAnnihilateTimers[index] = 0f;
+                    ScarFx.endgameLaser.at(x, y, 0f, new Object[]{new Vec2(ux, uy), e, 0.525f});
                 }
             });
 
@@ -1179,22 +1087,6 @@ public class EndGameTurret extends PowerTurret {
             Draw.blend(Blending.additive);
             for(int i = 0; i < lightnings.size; i++){
                 lightnings.get(i).draw();
-            }
-            Draw.blend();
-
-            // ★ 0.5 秒延迟秒杀机制: 绘制光束连接 (直到 0.5 秒后湮灭才断开)
-            Draw.blend(Blending.additive);
-            for(int i = 0; i < eyeCount; i++){
-                // 绘制普通眼睛的光束
-                if(targets[i] != null && annihilateTimers[i] < 0.5f){
-                    Object[] data = {eyesVecArray[i], targets[i], 0.625f};
-                    ScarFx.endgameLaser.at(eyesVecArray[i].x, eyesVecArray[i].y, 0f, data);
-                }
-                // 绘制玩家控制时的光束
-                if(playerTargets[i] != null && playerAnnihilateTimers[i] < 0.5f){
-                    Object[] data = {eyesVecArray[i], playerTargets[i], 0.625f};
-                    ScarFx.endgameLaser.at(eyesVecArray[i].x, eyesVecArray[i].y, 0f, data);
-                }
             }
             Draw.blend();
 
