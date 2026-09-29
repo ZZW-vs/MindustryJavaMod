@@ -59,6 +59,48 @@ public class ParticleFx{
     });
 
     /**
+     * gluon 能量球消散后的漩涡特效 (65f) — PU132 UnityFx.whirl。
+     * 两条绕中心旋转扩散的短弧线, 形成小漩涡。
+     */
+    public static final Effect whirl = new Effect(65f, e -> {
+        for(int i = 0; i < 2; i++){
+            int h = i * 2;
+            float r1 = Interp.exp5In.apply((Mathf.randomSeedRange(e.id + h, 1f) + 1f) / 2f);
+            float r2 = (Mathf.randomSeedRange(e.id * 2L + h, 360) + 360f) / 2f;
+            float r3 = (Mathf.randomSeedRange(e.id * 4L + h, 5) + 5f) / 2f;
+            float a = r2 + ((180f + r3) * e.fin());
+
+            Vec2 v = new Vec2();
+            v.trns(a, r1 * 70f * e.fout());
+
+            color(mindustry.graphics.Pal.lancerLaser);
+            stroke(e.fout() + 0.25f);
+            lineAngle(e.x + v.x, e.y + v.y, a + 270f + 15f, e.fout() * 8f);
+        }
+    });
+
+    /**
+     * advance 派系火焰弹拖尾 (27f) — PU132 UnityFx.advanceFlameTrail。
+     * advance 亮/暗双色六边形, 随时间收缩旋转。
+     */
+    public static final Effect advanceFlameTrail = new Effect(27f, e -> {
+        color(UnityPal.advance, UnityPal.advanceDark, e.fin());
+        float rot = Mathf.randomSeed(e.id, -1, 1) * 270f;
+        poly(e.x, e.y, 6, e.fout() * 4.1f, e.rotation + e.fin() * rot);
+    });
+
+    /**
+     * advance 派系火焰弹烟雾 (13f) — PU132 UnityFx.advanceFlameSmoke。
+     * 半透明蓝灰六边形烟雾粒子。
+     */
+    public static final Effect advanceFlameSmoke = new Effect(13f, e -> {
+        color(Color.valueOf("4d668f77"), Color.valueOf("35455f00"), e.fin());
+        float rot = Mathf.randomSeed(e.id, -1, 1) * 270f;
+        Angles.randLenVectors(e.id, 2, e.finpow() * 13f, e.rotation, 60f,
+                (x, y) -> poly(e.x + x, e.y + y, 6, e.fout() * 4.1f, e.rotation + e.fin() * rot));
+    });
+
+    /**
      * w-boson 衰变小拖尾 (24f) — PU132 UnityFx.wBosonEffect。
      * 沿弹道短射线。
      */

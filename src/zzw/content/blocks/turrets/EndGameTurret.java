@@ -13,7 +13,6 @@ import arc.util.Time;
 import arc.util.Tmp;
 import mindustry.Vars;
 import mindustry.content.Fx;
-import mindustry.entities.Lightning;
 import mindustry.entities.Units;
 import mindustry.entities.bullet.BulletType;
 import mindustry.entities.units.UnitController;
@@ -23,10 +22,11 @@ import mindustry.gen.Groups;
 import mindustry.gen.Posc;
 import mindustry.gen.Unit;
 import mindustry.graphics.Drawf;
-import mindustry.graphics.Layer;
 import mindustry.world.blocks.defense.turrets.PowerTurret;
 import mindustry.world.meta.Stat;
 import zzw.content.Z_Sounds;
+import zzw.content.units.effects.ScarFx;
+import zzw.content.units.effects.SlowLightning;
 import zzw.content.units.effects.SpecialFx;
 
 /**
@@ -83,9 +83,6 @@ public class EndGameTurret extends PowerTurret {
     public static final int eyeCount = 16;
     /** 每只眼睛锁定后, 从"命中"到"湮灭"的延迟 (帧)。0.5 秒 = 30 帧。 */
     public static final float annihilateDelay = 30f;
-    /** 眼睛光束的发射间隔 (帧)。 */
-    public static final float eyeShotInterval = 14f;
-
     /**
      * 单次受到伤害的上限。
      *
@@ -225,16 +222,23 @@ public class EndGameTurret extends PowerTurret {
         protected Vec2 eyeOffset = new Vec2();
         protected Vec2 eyeTargetOffset = new Vec2();
 
-        /** 眼睛发射的轮转序号。 */
-        protected int eyeSequence = 0;
+        /**
+         * 内外环眼睛的轮转序号 (PU132 eyeSequenceA / eyeSequenceB)。
+         *
+         * <p>内环 8 只按 {@link #eyeSequenceA} 依次发射, 外环 8 只按
+         * {@link #eyeSequenceB} 依次发射, 各自逆时针轮转。</p>
+         */
+        protected int eyeSequenceA = 0, eyeSequenceB = 0;
+        /** 内外环的发射计时 (PU132 eyeReloads[2]): [0]=内环 15f, [1]=外环 5f。 */
+        protected float[] eyeReloads = {0f, 0f};
         /** 光束计数 —— 每 2 条消耗 1 个弹药。 */
         protected int beamCounter = 0;
-        /** 眼睛发射间隔计时。 */
-        protected float eyeReload = 0f;
         /** 目标刷新计时。 */
         protected float targetTimer = 0f;
-        /** 通电时的慢速闪电计时。 */
-        protected float lightningTimer = 0f;
+        /** 当前攻击目标 (用于闪电/眼睛朝其偏转)。 */
+        protected Posc attackTarget = null;
+        /** 本炮台当前存活的所有慢速闪电。 */
+        protected final Seq<SlowLightning> lightnings = new Seq<>();
 
         /** 灯光/眼睛亮度 (0~1)。 */
         protected float lightsAlpha = 0f;
@@ -289,6 +293,7 @@ public class EndGameTurret extends PowerTurret {
         @Override
         public void onRemoved() {
             releaseAllTargets();
+            lightnings.clear();
             super.onRemoved();
         }
 
@@ -325,75 +330,131 @@ public class EndGameTurret extends PowerTurret {
         public void updateTile() {
             enabled = true;
 
-            updateEyeOffsets();
-            updateRingAlpha();
-
             boolean powered = efficiency > 0.0001f;
-
-            // ===== 通电时的慢速闪电 (无弹药也能放, 但不能攻击) =====
-            if (powered) {
-                lightningTimer += Time.delta;
-                if (lightningTimer >= 10f) {
-                    lightningTimer = 0f;
-                    // 随机发射1-4条闪电
-                    int lightningCount = Mathf.random(1, 5);
-                    for (int i = 0; i < lightningCount; i++) {
-                        float a = Mathf.random(360f);
-                        float distance = 18.5f + Mathf.random(-3f, 3f); // 随机距离
-                        Tmp.v1.trns(a, distance).add(x, y);
-                        // 随机伤害和长度
-                        float damage = 520f * efficiency * Mathf.random(0.8f, 1.2f);
-                        int length = 26 + Mathf.random(-5, 5);
-                        Lightning.create(team, scarColor, damage, Tmp.v1.x, Tmp.v1.y, a, length);
-                    }
-                }
-            }
-
-            // ===== 眼睛光束: 必须同时"通电"且"有弹药" =====
             boolean hasItem = items != null && items.total() > 0;
-            if (powered && hasItem) {
+            // ★ 攻击态: 通电 + 有弹药。PU132 中"通电未攻击"只亮眼睛与底部线路,
+            //   轮盘旋转 / 底座纹理 / 环灯 / 闪电 全部只在攻击态出现。
+            boolean attacking = powered && hasItem;
+
+            // 索敌: 攻击态下刷新目标 (眼睛/闪电都要用到 attackTarget)
+            if (attacking) {
                 targetTimer += Time.delta;
                 if (targetTimer >= 15f) {
                     targetTimer = 0f;
                     refreshTargets();
                 }
 
-                // 目标有效性检查
                 for (int i = 0; i < eyeCount; i++) {
                     if (Units.invalidateTarget(targets[i], team, x, y)) {
                         targets[i] = null;
                         annihilateTimers[i] = 0f;
                     }
                 }
-
-                eyeReload += delta();
-                if (eyeReload >= eyeShotInterval) {
-                    eyeReload = 0f;
-                    fireEye();
-                }
             } else {
-                // 失去电力或弹药 → 断开所有光束并恢复单位AI
                 releaseAllTargets();
             }
 
-            updateAnnihilation();
+            // 眼睛偏移 / 环亮度 (依赖攻击态)
+            updateEyeOffsets(attacking);
+            updateRingAlpha(attacking);
 
-            // 基类负责冷却/音效等, 占位子弹不会实际开火 (见 shoot 覆写)
+            if (attacking) {
+                updateLightning();
+                updateEyeSequences();
+            }
+
+            updateAnnihilation();
+            updateLightnings();
+
+            // 基类负责冷却/音效/开火 (占位子弹; 真正的攻击见 shoot 覆写)
             super.updateTile();
         }
 
-        /** 不使用普通子弹发射; 真正的攻击由眼睛光束完成。 */
+        /**
+         * 攻击态下按 PU132 的概率生成慢速闪电。
+         *
+         * <p>每帧以 {@code 0.75 * efficiency} 的概率从距离炮台 18.5 的
+         * 随机方向点生成一条闪电, 方向随机, 并朝当前目标偏转。</p>
+         */
+        protected void updateLightning() {
+            if (!Mathf.chanceDelta(0.75f * efficiency)) {
+                return;
+            }
+
+            float a = Mathf.random(360f);
+            Tmp.v1.trns(a, 18.5f).add(x, y);
+
+            SlowLightning l = new SlowLightning();
+            l.colorFrom = scarColor;
+            l.colorTo = Color.black;
+            l.damage = 2000f * efficiency;
+            l.range = 810f;
+            l.splitChance = 0.045f;
+            l.nodeTime = 5f;      // 传播稍慢 (PU132 默认 3)
+            l.nodeLength = 50f;
+            l.lineWidth = 2f;
+            l.lifetime = 140f;
+            l.create(team, Tmp.v1.x, Tmp.v1.y, a, attackTarget);
+            lightnings.add(l);
+        }
+
+        /** 推进并回收本炮台的慢速闪电。 */
+        protected void updateLightnings() {
+            for (int i = lightnings.size - 1; i >= 0; i--) {
+                SlowLightning l = lightnings.get(i);
+                l.update();
+                if (l.removed) {
+                    lightnings.remove(i);
+                }
+            }
+        }
+
+        /**
+         * ★ 以自身为中心的终局爆炸 (PU132 EndGameTurretBuilding.shoot)。
+         *
+         * <p>基类在装填完成后调用本方法。这里不做普通子弹发射, 而是
+         * 以炮台为中心引爆: 范围内所有敌方单位被光束命中并立即湮灭
+         * (伤害与眼睛光束同为秒杀), 同时播放 {@code endgameShoot} 音效。</p>
+         */
         @Override
         protected void shoot(BulletType type) {
-            // 空实现
+            consume();
+
+            Z_Sounds.endgameShoot.at(x, y, 1f, 1.5f);
+
+            float r = range() / 3f;
+            Units.nearbyEnemies(team, x - r, y - r, r * 2f, r * 2f, u -> {
+                if (u.isValid() && !u.dead() && Mathf.within(x, y, u.x, u.y, r)) {
+                    // 视觉: 从炮台中心射向目标的终局光束
+                    ScarFx.endgameLaser.at(x, y, 0f, new Object[]{this, u, 1f});
+                    // 湮灭 + 汽化 (与眼睛光束一致)
+                    if (!Vars.net.client()) {
+                        SpecialFx.endgameVapourize.at(u.x, u.y, angleTo(u), new Object[]{this, u});
+                        annihilateUnit(u);
+                    }
+                }
+            });
         }
 
         // ================= 眼睛方向 / 亮度 =================
 
-        /** 计算 16 只眼睛的世界坐标 (内环 8 只半径 36.75, 外环 8 只半径 25.75)。 */
-        protected void updateEyeOffsets() {
+        /**
+         * 计算 16 只眼睛的世界坐标 (内环 8 只半径 36.75, 外环 8 只半径 25.75)。
+         *
+         * <p>坐标不含 {@link #eyeOffset} —— 偏移只在 draw() 中按环层系数
+         * 施加 (与 PU132 一致)。攻击时 {@link #eyeTargetOffset} 指向目标,
+         * 使 "全部眼睛都朝攻击目标偏移"。</p>
+         */
+        protected void updateEyeOffsets(boolean attacking) {
+            if (attacking && attackTarget != null) {
+                float dst = Mathf.dst(x, y, attackTarget.getX(), attackTarget.getY());
+                eyeTargetOffset.trns(angleTo(attackTarget), dst / (range() / 3f));
+                eyeTargetOffset.limit(2f);
+            } else {
+                eyeTargetOffset.setZero();
+            }
             eyeOffset.lerpDelta(eyeTargetOffset, 0.12f);
-            eyeTargetOffset.limit(2f);
+            eyeOffset.limit(2f);
 
             for (int i = 0; i < eyeCount; i++) {
                 float angleC = (360f / 8f) * (i % 8);
@@ -403,28 +464,40 @@ public class EndGameTurret extends PowerTurret {
                     Tmp.v1.trns(angleC + ringProgress[0], 36.75f);
                 }
                 eyeVecs[i].set(Tmp.v1.x, Tmp.v1.y).add(x, y);
-                eyeVecs[i].add(eyeOffset);
             }
         }
 
-        /** 灯光与旋转环的淡入淡出。 */
-        protected void updateRingAlpha() {
+        /**
+         * 灯光与旋转环的淡入淡出。
+         *
+         * <p>PU132 语义:</p>
+         * <ul>
+         *   <li><b>眼睛</b>: 只要通电 ({@code efficiency>0}) 就亮;</li>
+         *   <li><b>环灯 / 底座纹理 / 轮盘旋转</b>: 仅攻击态
+         *       ({@code attacking}) 才亮起并旋转, 停火 60 帧后渐渐熄灭。</li>
+         * </ul>
+         */
+        protected void updateRingAlpha(boolean attacking) {
             if (efficiency > 0.0001f) {
+                eyesAlpha = Mathf.lerpDelta(eyesAlpha, efficiency, 0.06f * efficiency);
+            } else {
+                eyesAlpha = Mathf.lerpDelta(eyesAlpha, 0f, 0.06f);
+            }
+
+            if (attacking) {
                 eyeResetTime = 0f;
                 float value = lightsAlpha > efficiency ? 1f : efficiency;
                 lightsAlpha = Mathf.lerpDelta(lightsAlpha, efficiency, 0.07f * value);
-                eyesAlpha = Mathf.lerpDelta(eyesAlpha, efficiency, 0.06f * value);
 
+                // 攻击时轮盘持续旋转 (方向由 ringDirections 决定)
                 for (int i = 0; i < 3; i++) {
-                    ringProgress[i] = Mathf.lerpDelta(ringProgress[i],
-                        360f * ringDirections[i], ringProgresses[i] * efficiency);
+                    ringProgress[i] += ringProgresses[i] * 60f * efficiency * ringDirections[i] * Time.delta;
                 }
             } else {
-                // 失去电力时才熄灭
-                lightsAlpha = Mathf.lerpDelta(lightsAlpha, 0f, 0.07f);
-                eyesAlpha = Mathf.lerpDelta(eyesAlpha, 0f, 0.06f);
-                for (int i = 0; i < 3; i++) {
-                    ringProgress[i] = Mathf.lerpDelta(ringProgress[i], 0f, ringProgresses[i]);
+                // 停火后延迟 60 帧才开始熄灭环灯
+                eyeResetTime += Time.delta;
+                if (eyeResetTime >= 60f) {
+                    lightsAlpha = Mathf.lerpDelta(lightsAlpha, 0f, 0.07f);
                 }
             }
         }
@@ -450,6 +523,7 @@ public class EndGameTurret extends PowerTurret {
             });
 
             if (found.isEmpty()) {
+                attackTarget = null;
                 return;
             }
 
@@ -466,16 +540,49 @@ public class EndGameTurret extends PowerTurret {
                     slot++;
                 }
             }
+
+            // 最近的敌人作为 "攻击目标": 闪电朝它偏转, 全部眼睛朝它偏移
+            attackTarget = found.first();
         }
 
         // ================= 光束发射 / 湮灭 =================
 
-        /** 让轮转到的下一只眼睛开火 (需要已有目标)。 */
-        protected void fireEye() {
-            int index = eyeSequence;
-            eyeSequence = (eyeSequence + 1) % eyeCount;
+        /**
+         * 内外环眼睛按逆时针顺序依次发射秒杀光束 (PU132 updateEyes)。
+         *
+         * <p>内环 (索引 0..7) 每 15 帧轮到下一只, 外环 (索引 8..15)
+         * 每 5 帧轮到下一只; 两环各自独立轮转, 顺序都是逆时针。</p>
+         */
+        protected void updateEyeSequences() {
+            eyeReloads[0] += delta();
+            eyeReloads[1] += delta();
 
-            if (targets[index] == null) {
+            // 内环: 15 帧一只
+            if (eyeReloads[0] >= 15f) {
+                eyeReloads[0] = 0f;
+                eyeShoot(eyeSequenceA);
+                eyeSequenceA = (eyeSequenceA + 1) % 8;
+            }
+
+            // 外环: 5 帧一只 (偏移 8 到外环索引)
+            if (eyeReloads[1] >= 5f) {
+                eyeReloads[1] = 0f;
+                eyeShoot(eyeSequenceB + 8);
+                eyeSequenceB = (eyeSequenceB + 1) % 8;
+            }
+        }
+
+        /**
+         * 指定眼睛发射一道秒杀光束。
+         *
+         * <p>播放 {@link ScarFx#endgameLaser} (从眼睛到目标的红色三层光柱) 与
+         * 小型射击音效, 随后立即湮灭目标 (与爆炸同为秒杀), 并清空该眼睛的锁定。</p>
+         *
+         * @param index 眼睛索引 (0..15)
+         */
+        protected void eyeShoot(int index) {
+            Posc t = targets[index];
+            if (t == null) {
                 return;
             }
 
@@ -486,10 +593,36 @@ public class EndGameTurret extends PowerTurret {
                 consume();
             }
 
+            // 从眼睛位置到目标的三层终局光束
+            ScarFx.endgameLaser.at(eyeVecs[index].x, eyeVecs[index].y, 0f, new Object[]{eyeVecs[index], t, 0.625f});
             Z_Sounds.endgameSmallShoot.at(x, y, Mathf.random(0.95f, 1.05f), 0.6f);
+
+            // ★ 秒杀: 直接走湮灭流程 (含汽化特效), 与自身中心爆炸一致
+            if (!Vars.net.client()) {
+                if (t instanceof Unit u && u.isValid() && !u.dead()) {
+                    SpecialFx.endgameVapourize.at(u.x, u.y, angleTo(u), new Object[]{this, u});
+                    annihilateUnit(u);
+                } else if (t instanceof Building b && b.isValid()) {
+                    SpecialFx.endgameVapourize.at(b.x, b.y, b.angleTo(this), new Object[]{this, b});
+                    try {
+                        b.kill();
+                    } catch (Throwable ignored) {
+                    }
+                }
+            }
+
+            targets[index] = null;
+            annihilateTimers[index] = 0f;
         }
 
-        /** 更新每只眼睛的湮灭流程: 先解除 AI, 0.5 秒后湮灭。 */
+        /**
+         * 清理每只眼睛已失效的锁定。
+         *
+         * <p>★ 与旧实现的区别: 目标的"秒杀"现在由眼睛光束
+         * ({@link #eyeShoot}) 与自身中心爆炸 ({@link #shoot}) 直接完成,
+         * 这里只负责把已死亡 / 超出射程的目标从锁定中剔除, 不再做延迟
+         * 湮灭 (避免出现"没有光束却自己死掉"的违和感)。</p>
+         */
         protected void updateAnnihilation() {
             for (int i = 0; i < eyeCount; i++) {
                 Posc t = targets[i];
@@ -499,31 +632,6 @@ public class EndGameTurret extends PowerTurret {
                 }
 
                 if (Units.invalidateTarget(t, team, x, y)) {
-                    targets[i] = null;
-                    annihilateTimers[i] = 0f;
-                    continue;
-                }
-
-                // 步骤 1: 解除目标 AI (使其无法移动/攻击)
-                // 保存原控制器, 以便断电/断弹时恢复。
-                // ★ 跳过玩家操控的单位: 直接顶掉 Player 控制器会让玩家
-                //   在单位死亡时收不到 removed() 回调, 出现卡死/无法复活,
-                //   因此对玩家单位只做击杀、不做定身。
-                // ★ 跳过联机客户端: 客户端改控制器会造成实体不同步。
-                if (t instanceof Unit && !Vars.net.client()) {
-                    Unit u = (Unit) t;
-                    if (!u.isPlayer() && !(u.controller() instanceof NullAI)) {
-                        u.controller(new NullAI(u.controller()));
-                        u.vel.setZero();
-                    }
-                }
-
-                // 步骤 2: 0.5 秒后湮灭
-                annihilateTimers[i] += Time.delta;
-                if (annihilateTimers[i] >= annihilateDelay) {
-                    annihilate(t);
-                    // 无论客户端还是服务器都要断开光束, 否则会残留一条指向
-                    // 已消失目标的连线。
                     targets[i] = null;
                     annihilateTimers[i] = 0f;
                 }
@@ -1033,47 +1141,13 @@ public class EndGameTurret extends PowerTurret {
             Draw.blend();
             Draw.z(oz);
 
-            // 眼睛光束 (连接锁定目标)
-            drawEyeBeams();
-
-            Draw.reset();
-        }
-
-        /** 绘制所有正在连接目标的眼睛光束。 */
-        protected void drawEyeBeams() {
-            if (eyesAlpha <= 0.001f) {
-                return;
-            }
-
-            float oz = Draw.z();
-            Draw.z(Layer.flyingUnit + 1f);
+            // 慢速闪电 (节点式, 覆盖在炮台上方)
             Draw.blend(Blending.additive);
-
-            for (int i = 0; i < eyeCount; i++) {
-                Posc t = targets[i];
-                if (t == null) {
-                    continue;
-                }
-
-                float ex = eyeVecs[i].x, ey = eyeVecs[i].y;
-                float tx = t.getX(), ty = t.getY();
-                // 轻微脉动
-                float pulse = 1f + 0.35f * Mathf.sin(Time.time / 6f + i * 1.7f);
-                float a = Mathf.clamp(eyesAlpha) * pulse;
-
-                Drawf.light(ex, ey, tx, ty, 14f * a, scarColor, 0.9f);
-
-                Lines.stroke(5f * a);
-                Draw.color(scarColor);
-                Lines.line(ex, ey, tx, ty);
-
-                Lines.stroke(2f * a);
-                Draw.color(Color.white);
-                Lines.line(ex, ey, tx, ty);
+            for (int i = 0; i < lightnings.size; i++) {
+                lightnings.get(i).draw();
             }
-
             Draw.blend();
-            Draw.z(oz);
+
             Draw.reset();
         }
     }

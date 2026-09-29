@@ -1,12 +1,20 @@
 package zzw.content.blocks.turrets;
 
+import arc.Core;
+import arc.graphics.Color;
 import arc.math.Angles;
 import arc.math.Mathf;
 import arc.math.geom.Vec2;
+import arc.struct.ObjectFloatMap;
 import arc.struct.Seq;
+import arc.util.Strings;
 import mindustry.entities.bullet.BulletType;
 import mindustry.entities.pattern.ShootAlternate;
+import mindustry.type.Liquid;
+import mindustry.ui.Styles;
 import mindustry.world.blocks.defense.turrets.ItemTurret;
+import mindustry.world.meta.Stat;
+import mindustry.world.meta.StatUnit;
 
 import static mindustry.Vars.tilesize;
 
@@ -27,8 +35,17 @@ public class BarrelsItemTurret extends ItemTurret {
     protected boolean focus;
     protected Vec2 tr3 = new Vec2();
 
+    /**
+     * 自定义冷却强化表: 液体 → 额外装填速度比例 (0.2 表示 +20%, 即 120%)。
+     * <p>原版公式受液体热容影响, 水/冷冻液算不出整齐的百分比; 这里直接指定固定加成,
+     * 同时覆盖实际冷却效果与详情面板显示。表为空时走原版逻辑。</p>
+     */
+    public ObjectFloatMap<Liquid> coolantBoost = new ObjectFloatMap<>();
+
     public BarrelsItemTurret(String name) {
         super(name);
+        // ★ 挂上自定义建造实体, 让冷却强化表生效
+        buildType = BarrelsItemTurretBuild::new;
         // ★ 弹药消耗修复: PU_V8 原版在 shootBarrel()/focus 模式 shoot() 中显式调用 useAmmo(),
         //   每根炮管每次射击消耗 1 发弹药。v132 的 bullet() 不消耗弹药, 但 v155.4 的 bullet()
         //   在 consumeAmmoOnce == false 时会自动调用 useAmmo() —— 等价于原版行为。
@@ -43,6 +60,36 @@ public class BarrelsItemTurret extends ItemTurret {
 
     public void addBarrel(float x, float y, float reloadTime) {
         barrels.add(new Barrel(x, y, reloadTime));
+    }
+
+    @Override
+    public void setStats() {
+        super.setStats();
+
+        // ★ 自定义冷却强化显示: 直接展示固定百分比 (120% / 145%)
+        if (coolant != null && !coolantBoost.isEmpty()) {
+            stats.replace(Stat.booster, table -> {
+                table.row();
+                table.table(c -> {
+                    for (Liquid liquid : mindustry.Vars.content.liquids()) {
+                        float boost = coolantBoost.get(liquid, -1f);
+                        if (boost < 0f) continue;
+
+                        c.table(Styles.grayPanel, b -> {
+                            b.image(liquid.uiIcon).size(40).pad(10f).left();
+                            b.table(info -> {
+                                info.add(liquid.localizedName).left().row();
+                                info.add(Strings.autoFixed(coolant.amount * 60f, 2) + StatUnit.perSecond.localized())
+                                        .left().color(Color.lightGray);
+                            });
+                            b.add(Core.bundle.format("bullet.reload", Strings.autoFixed((1f + boost) * 100f, 2)))
+                                    .pad(10f).right().grow().padRight(15f);
+                        }).growX().pad(5).row();
+                    }
+                }).growX().colspan(table.getColumns());
+                table.row();
+            });
+        }
     }
 
     /** 从 shoot 模式提取 spread (PU_V8 直接访问 spread 字段, v155.4 需从 ShootAlternate 提取) */
@@ -126,15 +173,53 @@ public class BarrelsItemTurret extends ItemTurret {
                 barrelReloads = new float[barrels.size];
                 barrelShotCounters = new int[barrels.size];
             }
+            // ★ 冷却强化: 使用 coolantBoost 表 (水 120% / 冷冻液 145% 等), 表为空时退化为 1f
+            float boostMul = 1f + currentCoolantBoost();
             for (int i = 0, len = barrels.size; i < len; i++) {
                 if (hasAmmo()) {
                     if (barrelReloads[i] >= barrels.get(i).reloadTime) {
                         shootBarrel(peekAmmo(), i);
                         barrelReloads[i] = 0f;
                     } else {
-                        barrelReloads[i] += delta() * peekAmmo().reloadMultiplier * baseReloadSpeed();
+                        barrelReloads[i] += delta() * peekAmmo().reloadMultiplier * baseReloadSpeed() * boostMul;
                     }
                 }
+            }
+        }
+
+        /** 当前液体的额外装填速度比例 (0.2 = +20%), 表为空或不匹配时为 0。 */
+        protected float currentCoolantBoost() {
+            if (coolantBoost.isEmpty() || coolant == null || coolant.efficiency(this) <= 0f) return 0f;
+            return coolantBoost.get(liquids.current(), 0f);
+        }
+
+        /**
+         * 覆写冷却推进: 使用 {@link BarrelsItemTurret#coolantBoost} 里的固定百分比。
+         *
+         * <p>原版实现是 {@code reloadCounter += 消耗量 × 热容 × coolantMultiplier},
+         * 换成 {@code edelta() × boost} 后, 装填速度正好是 {@code 1 + boost}。</p>
+         */
+        @Override
+        protected void updateCooling() {
+            if (coolantBoost.isEmpty()) {
+                super.updateCooling();
+                return;
+            }
+
+            if (coolant == null || coolant.efficiency(this) <= 0f || efficiency <= 0f) return;
+
+            float boost = coolantBoost.get(liquids.current(), 0f);
+            if (boost <= 0f) {
+                super.updateCooling();
+                return;
+            }
+
+            float amount = coolant.amount * coolant.efficiency(this);
+            coolant.update(this);
+            reloadCounter += edelta() * boost;
+
+            if (Mathf.chance(0.06 * amount)) {
+                coolEffect.at(x + Mathf.range(size * mindustry.Vars.tilesize / 2f), y + Mathf.range(size * mindustry.Vars.tilesize / 2f));
             }
         }
     }

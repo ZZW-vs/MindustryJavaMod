@@ -53,6 +53,16 @@
 - **大型铁块** - 由大量铁板和铁锭制作的大型防御块
   - 高耐久防御设施，由四个小铁块自动合成
 
+#### 炮台系统 (PU132 还原)
+本模组的高级炮台全部对照 PU132 原版逐项还原，主要修正包括：
+- **双炮管交替发射**：apparition / higgs-boson 的两根炮管改为原版交替开火（`ShootAlternate`）
+- **激光粗细还原**：photon 激光变细、graviton 改为原版较细的半透明激光
+- **液体强化数值**：ephemeron / muon / singularity / z-boson / higgs-boson / electron / electrobomb / plasma / current / shockwire / orb 统一为水 135%、冷冻液 185%；ghost / banshee 为水 120%、冷冻液 145%
+- **子弹形态**：z-boson 改为原版长条型（取原版 2/3 长度）；banshee 子弹整体尺寸微增；celsius / kelvin 射速与拖尾还原；ephemeron 阴阳粒子碰撞特效还原
+- **特殊机制**：gluon 结尾改为原版小漩涡；proton 转速微增；shockwire 激光加粗；plasma 射程 65 格；arc-caster / arc-storm 蓄力与六边形效果还原
+- **wavefront**：模型改回原版两半对称、越往外越下的形态，明暗面清晰
+- **endgame**：完整还原原版行为 —— 节点式慢速闪电（更长 / 可分叉 / 传播更慢 / 帧伤约 2000）、攻击时轮盘旋转、通电未攻击仅亮眼睛与底部线路、攻击时底座纹理亮起、全部眼睛朝目标偏移、内外圈眼睛按逆时针顺序依次发射秒杀光束、发射一段时间后以自身为中心爆炸（秒杀 + 湮灭）
+
 #### 3D模型展示设备
 - **MMD模型展示台** - 专门用于展示MMD模型的3D展示台
   - 支持4种MMD模型：初音-黑/白、重音-普通/病娇

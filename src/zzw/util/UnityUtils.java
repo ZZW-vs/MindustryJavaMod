@@ -116,4 +116,61 @@ public class UnityUtils{
             if(vec != null) unit.damage(damage);
         });
     }
+
+    /**
+     * {@link #collideLineDamageOnly(Team, float, float, float, float, float, Bullet)}
+     * 的无子弹重载 (PU132 SlowLightning 连续帧伤使用)。
+     *
+     * <p>慢速闪电没有 Bullet 实体, 但对空中/地面目标都要生效, 因此这里
+     * 直接把 collidesAir/collidesGround 视为 true, 其余判定逻辑完全一致。</p>
+     *
+     * @param team 伤害来源阵营 (跳过友方)
+     * @param damage 施加的固定伤害值
+     * @param x1,y1 直线起点
+     * @param x2,y2 直线终点
+     */
+    public static void collideLineDamageOnly(Team team, float damage, float x1, float y1, float x2, float y2){
+        collidedBlocks.clear();
+
+        // 第1步: 逐格 raycast 伤害路径上的敌方建筑
+        Vars.world.raycastEachWorld(x1, y1, x2, y2, (cx, cy) -> {
+            Building tile = Vars.world.build(cx, cy);
+
+            if(tile != null && !collidedBlocks.contains(tile.pos()) && tile.team != team){
+                tile.damage(damage);
+                collidedBlocks.add(tile.pos());
+            }
+
+            return false;
+        });
+
+        // 第2步: 构造覆盖整条直线的矩形 (从起点到终点, 负宽高翻正)
+        rect.setPosition(x1, y1).setSize(x2 - x1, y2 - y1);
+
+        if(rect.width < 0){
+            rect.x += rect.width;
+            rect.width *= -1;
+        }
+        if(rect.height < 0){
+            rect.y += rect.height;
+            rect.height *= -1;
+        }
+
+        // 外扩 3 格, 保证贴边单位也能被扫到
+        float expand = 3f;
+
+        rect.y -= expand;
+        rect.x -= expand;
+        rect.width += expand * 2;
+        rect.height += expand * 2;
+
+        // 第3步: 对矩形内敌方单位做直线-矩形相交判定 (空/地皆可命中)
+        Units.nearbyEnemies(team, rect, unit -> {
+            unit.hitbox(hitRect);
+
+            Vec2 vec = Geometry.raycastRect(x1, y1, x2, y2, hitRect.grow(expand * 2));
+
+            if(vec != null) unit.damage(damage);
+        });
+    }
 }

@@ -101,6 +101,10 @@ public class Z_Bullets {
     public static class SmokeBulletType extends BasicBulletType {
         public float baseSize = 3f;
         public float growAmount = 4.1f;
+        /** ★ PU132: 拖尾生成随机偏移 */
+        public float trailRand = 0.6f;
+        /** ★ PU132: 烟雾生成随机偏移 */
+        public float smokeRand = 1.7f;
 
         public SmokeBulletType(float speed, float damage) {
             super(speed, damage);
@@ -108,6 +112,21 @@ public class Z_Bullets {
 
         public SmokeBulletType() {
             this(1f, 1f);
+        }
+
+        @Override
+        public void update(Bullet b) {
+            super.update(b);
+
+            // ★ PU132 原版: 每帧生成 advance 火焰拖尾 + 约 70% 概率生成烟雾
+            if (b.timer.get(0, 1)) {
+                zzw.content.units.effects.ParticleFx.advanceFlameTrail.at(
+                        b.x + Mathf.range(trailRand), b.y + Mathf.range(trailRand), b.rotation());
+            }
+            if (Mathf.chanceDelta(0.7f)) {
+                zzw.content.units.effects.ParticleFx.advanceFlameSmoke.at(
+                        b.x + Mathf.range(smokeRand), b.y + Mathf.range(smokeRand), b.rotation());
+            }
         }
 
         @Override
@@ -173,29 +192,28 @@ public class Z_Bullets {
         @Override
         public void update(Bullet b) {
             super.update(b);
-            // ★ 闪电从子弹位置沿子弹方向延伸 (不再随机偏移)
+            // ★ 严格对齐 PU132 ArcBulletType.update:
+            //   闪电位置从弹体沿朝向偏移 radius 再叠加随机抖动, 两道闪电都用 lightningC1 颜色
             if (Mathf.chanceDelta(lightningChance1)) {
+                Tmp.v1.trns(b.rotation() + Mathf.range(2f), radius);
                 Lightning.create(b, lightningC1, lightningDamage1,
-                    b.x, b.y,
-                    b.rotation() + Mathf.range(lightningInaccuracy1),
-                    length1 + Mathf.range(lengthRand1));
+                    b.x + Tmp.v1.x + Mathf.range(radius), b.y + Tmp.v1.y + Mathf.range(radius),
+                    b.rotation() + Mathf.range(lightningInaccuracy1), length1 + Mathf.range(lengthRand1));
             }
-            // ★ 第二道闪电: 随机方向 (用于扩散攻击), 修复颜色 bug (lightningC1 → lightningC2)
+
             if (Mathf.chanceDelta(lightningChance2)) {
-                Lightning.create(b, lightningC2, lightningDamage2,
-                    b.x, b.y,
-                    b.rotation() + Mathf.range(lightningInaccuracy2),
-                    length2 + Mathf.range(lengthRand2));
+                Tmp.v1.trns(b.rotation() + Mathf.range(2f), radius);
+                Lightning.create(b, lightningC1, lightningDamage2,
+                    b.x + Tmp.v1.x + Mathf.range(radius), b.y + Tmp.v1.y + Mathf.range(radius),
+                    b.rotation() + Mathf.range(lightningInaccuracy2), length2 + Mathf.range(lengthRand2));
             }
         }
 
         @Override
         public void draw(Bullet b) {
-            // ★ 电弧弹体: 双层圆 + 旋转光环
+            // ★ PU132 原版: 只绘制旋转六边形 (无内层白圆)
             Draw.color(fromColor, toColor, b.fin());
             Fill.poly(b.x, b.y, 6, 6f + b.fout() * 6.1f, b.rotation());
-            Draw.color(lightningC1, Color.white, b.fout());
-            Fill.circle(b.x, b.y, 3f + b.fout() * 2f);
             Draw.reset();
         }
     }
@@ -386,6 +404,8 @@ public class Z_Bullets {
         public boolean castsLightning;
         public float castInterval = 5f;
         public float minLightningDamage, maxLightningDamage;
+        /** ★ PU132 原版用 "laser"/"laser-end" 贴图绘制光束, 而非简单线段 */
+        public TextureRegion region, endRegion;
 
         public BeamBulletType(float length, float damage) {
             super(0.01f, damage);
@@ -405,6 +425,14 @@ public class Z_Bullets {
 
         public BeamBulletType() {
             this(1f, 1f);
+        }
+
+        @Override
+        public void load() {
+            super.load();
+            // ★ 与 PU132 一致: 使用内置 laser / laser-end 贴图
+            region = arc.Core.atlas.find("laser");
+            endRegion = arc.Core.atlas.find("laser-end");
         }
 
         @Override
@@ -447,9 +475,14 @@ public class Z_Bullets {
             if (b.data instanceof arc.math.geom.Position data) {
                 Tmp.v1.set(data);
                 Draw.color(color);
+                // ★ PU132 原版: 贴图光束 (laser / laser-end), 比 Lines 线段更粗更还原
+                if (region != null && region.found()) {
+                    Drawf.laser(region, endRegion, b.x, b.y, Tmp.v1.x, Tmp.v1.y, beamWidth * b.fout());
+                } else {
+                    Lines.stroke(beamWidth * b.fout() * 3f);
+                    Lines.line(b.x, b.y, Tmp.v1.x, Tmp.v1.y, false);
+                }
                 Drawf.light(b.x, b.y, Tmp.v1.x, Tmp.v1.y, lightWidth * b.fout(), color, 0.6f);
-                Lines.stroke(beamWidth * b.fout() * 3f);
-                Lines.line(b.x, b.y, Tmp.v1.x, Tmp.v1.y, false);
                 Draw.reset();
             }
         }
@@ -524,8 +557,14 @@ public class Z_Bullets {
         }
     }
 
-    /** ===== VelocityLaserBoltBulletType (PU_V8 zBoson) ===== */
+    /** ===== VelocityLaserBoltBulletType (PU_V8 zBoson) =====
+     * ★ PU132 原版用 "circle" 贴图拉伸成长条型光弹 (长度随速度增长)。
+     * 用户要求: 长度改为原版长度的 2/3 (lenScale = 2/3)。
+     */
     public static class VelocityLaserBoltBulletType extends BasicBulletType {
+        /** 长度缩放 (1 = 原版长度, 用户要求 2/3) */
+        public float lenScale = 2f / 3f;
+
         public VelocityLaserBoltBulletType(float speed, float damage) {
             super(speed, damage);
             backColor = Color.valueOf("a9d8ff");
@@ -539,12 +578,22 @@ public class Z_Bullets {
         }
 
         @Override
+        public void load() {
+            super.load();
+            // ★ 使用内置 "circle" 贴图 (PU132 同款) 拉伸为长条
+            frontRegion = arc.Core.atlas.find("circle");
+        }
+
+        @Override
         public void draw(Bullet b) {
-            float vel = b.vel().len() * 4f;
+            float vel = b.vel().len() * 4f * lenScale;
+
             Draw.color(backColor);
-            Fill.circle(b.x, b.y, width / 2f);
+            Draw.rect(frontRegion, b.x, b.y, width, height + vel, b.rotation() - 90f);
+
             Draw.color(frontColor);
-            Fill.circle(b.x, b.y, width / 3f);
+            Draw.rect(frontRegion, b.x, b.y, width * 0.625f, height * 0.625f + (vel / 1.2f), b.rotation() - 90f);
+            Draw.reset();
         }
     }
 
@@ -563,6 +612,7 @@ public class Z_Bullets {
             pierce = true;
             hittable = false;
             absorbable = false;
+            reflectable = false;
             collidesTiles = false;
         }
 
@@ -590,6 +640,8 @@ public class Z_Bullets {
                     b.remove();
                     n.remove();
                     Tmp.v1.set((b.x + n.x) / 2f, (b.y + n.y) / 2f);
+                    // ★ PU132 原版: 阴阳粒子对撞时播放 lightHitLarge 命中特效
+                    zzw.content.units.effects.HitEffect.lightHitLarge.at(Tmp.v1);
                     Damage.damage(b.team, Tmp.v1.x, Tmp.v1.y, 40f, 80f);
                 }
             }
@@ -1033,4 +1085,74 @@ public class Z_Bullets {
     public static class GluonOrbData {
         public Seq<Unit> units = new Seq<>();
     }
+
+    /** ===== GluonWhirlBulletType (PU132 gluon 能量球消散后的漩涡) =====
+     * ★完整移植 PU132 GluonWhirlBulletType:
+     *  - 小漩涡: 持续吸引半径内敌方单位 (force + scaledForce)
+     *  - 每 2 tick 对范围内单位造成持续伤害
+     *  - 渲染双层光球 + 随机 whirl 粒子
+     */
+    public static class GluonWhirlBulletType extends BasicBulletType {
+        public float force = 8f, scaledForce = 7f, radius = 100f;
+
+        public GluonWhirlBulletType(float damage) {
+            super(0.001f, damage);
+            pierce = pierceBuilding = true;
+            despawnEffect = hitEffect = Fx.none;
+        }
+
+        @Override
+        public void init(Bullet b) {
+            super.init(b);
+            b.data = new GluonOrbData();
+        }
+
+        @Override
+        public void update(Bullet b) {
+            super.update(b);
+
+            if (!(b.data instanceof GluonOrbData)) return;
+            GluonOrbData data = (GluonOrbData) b.data;
+
+            if (Mathf.chance(Time.delta * 0.7f * b.fout())) {
+                zzw.content.units.effects.ParticleFx.whirl.at(b);
+            }
+
+            if (b.timer(0, 2f)) {
+                data.units.clear();
+                Units.nearbyEnemies(b.team, b.x - radius, b.y - radius, radius * 2f, radius * 2f, u -> {
+                    if (u != null && Mathf.within(b.x, b.y, u.x, u.y, radius)) {
+                        data.units.add(u);
+                    }
+                });
+                Damage.damage(b.team, b.x, b.y, hitSize, damage);
+            }
+
+            data.units.each(u -> {
+                if (!u.dead) {
+                    float f = force + (1f - u.dst(b) / radius) * scaledForce * Interp.pow2In.apply(b.fout()) * (u.isFlying() ? 1.5f : 1f);
+                    Tmp.v1.trns(u.angleTo(b), f).scl(20f * Time.delta);
+                    u.impulse(Tmp.v1);
+                }
+            });
+        }
+
+        @Override
+        public void draw(Bullet b) {
+            Draw.color(Pal.lancerLaser);
+            Fill.circle(b.x, b.y, b.fout() * 7.5f);
+            Draw.color(Color.white);
+            Fill.circle(b.x, b.y, b.fout() * 5.5f);
+            Draw.reset();
+        }
+    }
+
+    /** gluon 能量球消散后生成的漩涡实例 (PU132 UnityBullets.gluonWhirl) */
+    public static GluonWhirlBulletType gluonWhirl = new GluonWhirlBulletType(4f) {{
+        lifetime = 5f * 60f;
+        hitSize = 12f;
+        // ★ 保留项目原有伤害强度: 漩涡持续伤害
+        damage = 15f;
+        splashDamage = 0f;
+    }};
 }

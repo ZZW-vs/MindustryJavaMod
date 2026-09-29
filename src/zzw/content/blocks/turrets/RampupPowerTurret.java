@@ -20,7 +20,7 @@ import mindustry.world.draw.DrawTurret;
  *       闪电在 updateTile 中触发; 自定义顶贴图 + 速度条渲染保留
  * 参考: PU_V8 main/src/unity/world/blocks/defense/turrets/RampupPowerTurret.java
  */
-public class RampupPowerTurret extends PowerTurret {
+public class RampupPowerTurret extends BoostPowerTurret {
     public float barBaseY, barLength, barStroke = 1.5f;
     public Color[] barColors = {Color.valueOf("00d9ff"), Color.valueOf("ccffff")};
     public float maxSpeedMul = 13f, speedInc = 0.2f, speedDec = 0.05f, accInc = 4f;
@@ -33,6 +33,8 @@ public class RampupPowerTurret extends PowerTurret {
 
     public RampupPowerTurret(String name) {
         super(name);
+        // ★ 覆盖建造实体, 让射速提升逻辑与冷却强化表同时生效
+        buildType = RampupPowerTurretBuild::new;
     }
 
     @Override
@@ -41,7 +43,7 @@ public class RampupPowerTurret extends PowerTurret {
         topRegion = Core.atlas.find(name + "-top");
     }
 
-    public class RampupPowerTurretBuild extends PowerTurretBuild {
+    public class RampupPowerTurretBuild extends BoostPowerTurretBuild {
         public float speed = 1f;
         public boolean wasShootingLast = false;
 
