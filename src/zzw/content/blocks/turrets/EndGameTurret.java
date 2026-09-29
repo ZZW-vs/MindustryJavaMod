@@ -417,7 +417,7 @@ public class EndGameTurret extends PowerTurret {
          * 生成一条慢速闪电。
          *
          * <p>★ 与 PU132 的差异 (按需求调整): PU132 原版 {@code range = 810f},
-         * 闪电会一路延伸出去打远处单位; 本实现把 {@code range} 限制为 10,
+         * 闪电会一路延伸出去打远处单位; 本实现把 {@code range} 限制为 100,
          * 让闪电只在炮台本体附近闪烁、始终连在炮台上, 不再飞出去。</p>
          */
         protected void createLightning(float sx, float sy, float angle, float dmg){
@@ -425,11 +425,11 @@ public class EndGameTurret extends PowerTurret {
             l.colorFrom = Color.red;
             l.colorTo = Color.black;
             l.damage = dmg;
-            // 只在炮台附近: 延伸距离与单段长度都压到 10
-            l.range = 10f;
+            // 只在炮台附近: 延伸距离与单段长度都压到 100
+            l.range = 100f;
             l.splitChance = 0.045f;
             l.nodeTime = 5f;
-            l.nodeLength = 10f;
+            l.nodeLength = 100f;
             l.lineWidth = 2f;
             l.lifetime = 140f;
             l.create(team, sx, sy, angle, targetPos);
