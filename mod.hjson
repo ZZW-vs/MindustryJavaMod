@@ -17,7 +17,9 @@ description: "一个为Mindustry添加了基础金属加工系统与多节Boss�
 version: 2.2.3
 
 #the minimum game build required to run this mod
-minGameVersion: 154
+# ★ 160 分支: 编译目标为 Mindustry 160.1 (Java 17), 不能用于 158;
+#   master 分支保持 v158.1 版本, 两边互不影响
+minGameVersion: 160
 
 #this is a java mod
 java: true

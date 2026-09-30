@@ -11,13 +11,15 @@ repositories{
 }
 
 java{
-    targetCompatibility = 8
-    sourceCompatibility = 8
+    targetCompatibility = 17
+    sourceCompatibility = 17
 }
 
 ext{
     //the build number that this mod is made for
-    mindustryVersion = 'v158.1'
+    // ★ 160 分支: 适配 Mindustry 160.1 (Java 17)
+    //   master 分支保持 v158.1 (Java 8), 两个分支互不影响
+    mindustryVersion = 'v160.1'
     jabelVersion = "93fde537c7"
     //windows sucks
     isWindows = System.getProperty("os.name").toLowerCase().contains("windows")
@@ -27,7 +29,7 @@ ext{
 //java 8 backwards compatibility flag
 allprojects{
     tasks.withType(JavaCompile){
-        options.compilerArgs.addAll(['--release', '8'])
+        options.compilerArgs.addAll(['--release', '17'])
         // ★ UTF-8 源码编码: Windows 默认 GBK, 中文注释按 GBK 解码会报
         //   "不可映射字符" 警告且编译产物字符串乱码 (游戏内中文变问号)
         options.encoding = "UTF-8"
@@ -65,8 +67,10 @@ task jarAndroid{
 
         def d8 = isWindows ? "d8.bat" : "d8"
 
+        // ★ 160 适配: 游戏 160.1 的 Android 端 minSdkVersion = 21, 且核心为 Java 17 字节码,
+        //   这里同步为 21 (原来 14 是为 158 的 Java 8 准备的)
         //dex and desugar files - this requires d8 in your PATH
-        "$d8 $dependencies --min-api 14 --output ${project.archivesBaseName}Android.jar ${project.archivesBaseName}Desktop.jar"
+        "$d8 $dependencies --min-api 21 --output ${project.archivesBaseName}Android.jar ${project.archivesBaseName}Desktop.jar"
             .execute(null, new File("$buildDir/libs")).waitForProcessOutput(System.out, System.err)
     }
 }

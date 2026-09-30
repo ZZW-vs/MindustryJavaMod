@@ -60,34 +60,37 @@ public class TestMod extends Mod{
     /**
      * 阻断游戏"在线列表"的网络请求 —— 解决导入模组 / 打开多人游戏时报网络错误的问题。
      * <p>
-     * 现象: 打开"模组"界面时游戏会自动访问
+     * 现象: 打开"模组"界面的浏览页签时游戏会自动访问
      * Vars.modJsonURLs (raw.githubusercontent.com / cdn.jsdelivr.net) 拉取在线模组列表。
      * 国内网络访问不了这两个地址, 于是卡 10 秒后抛 SocketTimeout;
-     * 若服务器返回空内容还会让 ModsDialog.modList 解析成 null, 触发
-     * "Seq.sortComparing ... this.modList is null" 空指针, 看起来就像"导入报错"。
+     * 若服务器返回空内容还会让列表解析成 null, 触发空指针, 看起来就像"导入报错"。
      * <p>
-     * 原理: ModsDialog.getModList() 开头有一句
+     * 原理: 拉取入口 ModBrowserDialog.getModList(callback) 开头会先判断
      * "if(modList != null){ 直接用缓存; return; }",
      * 所以这里提前把 modList 塞成一个空列表, 请求就完全不会发起,
      * 既不会超时也不会空指针。mod 本身的导入/加载不受任何影响。
      * <p>
+     * ★ 版本差异: 158 的在线列表挂在 ModsDialog.modList 上;
+     *   160 起拆成独立对话框 ModBrowserDialog (即 Vars.ui.mods.browser) 的 modList 字段,
+     *   因此 160 分支改为补丁这个新位置。
+     * <p>
      * 调用时机: ClientLoadEvent —— 此时 Vars.ui.init() 已经执行完,
-     * ui.mods(ModsDialog) 已创建, 且玩家还无法操作界面, 保证在任何一次
-     * 拉取之前完成打补丁。(mod 构造函数里 Vars.ui 还是 null, 不能放那里)
+     * ui.mods(ModsDialog) 与 browser 已创建, 且玩家还无法操作界面,
+     * 保证在任何一次拉取之前完成打补丁。(mod 构造函数里 Vars.ui 还是 null, 不能放那里)
      * <p>
      * 代价: 游戏内"浏览"页签会显示空列表 (移动端本来也下载不了, 无影响)。
-     * 注意: 依赖 v158.x 的私有字段名 modList, 游戏大版本更新后可能失效;
+     * 注意: 依赖私有字段名 modList, 游戏大版本更新后可能失效;
      * 已做异常保护, 失效时只是退回原行为, 不会导致崩溃。
      */
     private static void disableOnlineModBrowser(){
-        // --- 1. 在线模组列表: 预填 modList 空列表, 让 getModList 直接走缓存返回 ---
+        // --- 1. 在线模组列表: 预填 browser.modList 空列表, 让 getModList 直接走缓存返回 ---
         try{
-            if(mindustry.Vars.ui == null || mindustry.Vars.ui.mods == null){
-                arc.util.Log.err("[Create] 屏蔽在线模组列表失败: Vars.ui.mods 尚未初始化");
+            if(mindustry.Vars.ui == null || mindustry.Vars.ui.mods == null || mindustry.Vars.ui.mods.browser == null){
+                arc.util.Log.err("[Create] 屏蔽在线模组列表失败: Vars.ui.mods.browser 尚未初始化");
             }else{
-                java.lang.reflect.Field field = mindustry.ui.dialogs.ModsDialog.class.getDeclaredField("modList");
+                java.lang.reflect.Field field = mindustry.ui.dialogs.ModBrowserDialog.class.getDeclaredField("modList");
                 field.setAccessible(true);
-                field.set(mindustry.Vars.ui.mods, new arc.struct.Seq<mindustry.mod.ModListing>());
+                field.set(mindustry.Vars.ui.mods.browser, new arc.struct.Seq<mindustry.mod.ModListing>());
                 arc.util.Log.info("[Create] 已屏蔽在线模组列表请求 (避免网络超时报错)");
             }
         }catch(Throwable t){
