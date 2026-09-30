@@ -31,6 +31,7 @@ import zzw.content.units.effects.ScarFx;
 import zzw.content.units.effects.SlowLightning;
 import zzw.content.units.effects.SpecialFx;
 import zzw.content.units.util.UnityUtils;
+import zzw.util.AntiCheatBuildings;
 
 /**
  * EndGameTurret 移植自 PU132 (unity.world.blocks.defense.turrets.EndGameTurret)。
@@ -210,6 +211,8 @@ public class EndGameTurret extends PowerTurret {
         protected final Seq<Entityc> entitySeq = new Seq<>(512);
         /** 本炮台当前存活的所有慢速闪电。 */
         protected final Seq<SlowLightning> lightnings = new Seq<>();
+        /** 同时存在的慢速闪电数量上限 (需求: 比原版少一些)。 */
+        protected int maxLightnings = 6;
 
         {
             // 构造阶段就填满眼睛坐标数组, 保证 draw/shoot 任何时刻都不会读到 null
@@ -302,7 +305,11 @@ public class EndGameTurret extends PowerTurret {
          */
         @Override
         public void kill(){
-            if(lastHealth < 10f) super.kill();
+            if(lastHealth < 10f){
+                // 真的被打死了 → 同步注销防作弊登记, 避免守卫把它复活
+                AntiCheatBuildings.remove(this);
+                super.kill();
+            }
         }
 
         /** PU132 collision(): 吸收来袭子弹并按其伤害结算, 同时惩罚射程外的攻击者。 */
@@ -333,12 +340,19 @@ public class EndGameTurret extends PowerTurret {
                 targets[i] = null;
             }
             super.add();
+            // ★ PU132 Unity.antiCheat.addBuilding(this): 登记进建筑防作弊守卫,
+            //   之后即使被外部模组强行从地图上抹掉也会被写回 (见 AntiCheatBuildings)。
+            AntiCheatBuildings.add(this);
         }
 
         @Override
         public void onRemoved() {
             lightnings.clear();
             entitySeq.clear();
+            // 只有"真的死了"才注销登记; 被外部强行移除时保留登记, 由守卫写回地图
+            if(lastHealth <= 0f || health <= 0f){
+                AntiCheatBuildings.remove(this);
+            }
             super.onRemoved();
         }
 
@@ -414,24 +428,37 @@ public class EndGameTurret extends PowerTurret {
         }
 
         /**
-         * 生成一条慢速闪电。
+         * 生成一条慢速闪电 (PU132 原版形态)。
          *
-         * <p>★ 与 PU132 的差异 (按需求调整): PU132 原版 {@code range = 810f},
-         * 闪电会一路延伸出去打远处单位; 本实现把 {@code range} 限制为 100,
-         * 让闪电只在炮台本体附近闪烁、始终连在炮台上, 不再飞出去。</p>
+         * <p>★ 与 PU132 的差异 (按需求调整):</p>
+         * <ul>
+         *   <li><b>延伸距离</b>: PU132 原版 {@code range = 810f}, 闪电会一路延伸出去
+         *       打远处单位; 本实现改为<b>炮台射程的一半</b> (820 / 2 = 410), 只在炮台
+         *       周边闪烁, 不飞出去攻击远处目标;</li>
+         *   <li><b>数量上限</b>: 同时存在的闪电不超过 {@link #maxLightnings} 条。</li>
+         * </ul>
+         *
+         * <p>形态参数沿用 PU132 {@code SlowLightningType} 默认值 —— 单段长度 50、
+         * 生长 5 帧、线宽 2 —— 单段长度远小于延伸距离, 因此闪电会自然弯折并分叉
+         * (旧实现把 {@code nodeLength} 设成与 {@code range} 相等, 只画得出一根
+         * 笔直的光柱, 也就是"太雷霆"的根因)。闪电沿线段连续施加 {@code dmg} 伤害。</p>
          */
         protected void createLightning(float sx, float sy, float angle, float dmg){
+            // ★ 数量上限: 达到上限就不再新增
+            if(lightnings.size >= maxLightnings) return;
+
             SlowLightning l = new SlowLightning();
             l.colorFrom = Color.red;
             l.colorTo = Color.black;
             l.damage = dmg;
-            // 只在炮台附近: 延伸距离与单段长度都压到 180
-            l.range = 180f;
+            // ★ 需求: 延伸距离 = 炮台射程的一半
+            l.range = range * 0.5f;
             l.splitChance = 0.045f;
             l.nodeTime = 5f;
-            l.nodeLength = 180f;
+            // 单段长度取原版 50 (远小于 range) → 弯折 + 分叉
+            l.nodeLength = 50f;
             l.lineWidth = 2f;
-            l.lifetime = 140f;
+            l.lifetime = 120f;
             l.create(team, sx, sy, angle, targetPos);
             lightnings.add(l);
         }
