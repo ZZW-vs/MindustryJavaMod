@@ -9,6 +9,7 @@ import arc.math.Mathf;
 import arc.util.Time;
 import arc.util.io.Reads;
 import arc.util.io.Writes;
+import mindustry.Vars;
 import mindustry.entities.Effect;
 import mindustry.gen.Bullet;
 import mindustry.graphics.Layer;
@@ -17,7 +18,6 @@ import mindustry.ui.Bar;
 import mindustry.world.meta.Stat;
 
 import static arc.Core.atlas;
-import static arc.Core.settings;
 import static mindustry.Vars.tilesize;
 
 /**
@@ -33,6 +33,20 @@ import static mindustry.Vars.tilesize;
  * 贴图命名: shielded-wall.png + shielded-wall-top.png (PU132/PU_V8 原版贴图)
  */
 public class ShieldWall extends LevelLimitWall {
+    /**
+     * 护盾是否使用"实心方块"画法 (与原版一致)。
+     * <p>
+     * 注意: 不能再用 {@code Core.settings.getBool("animatedshields")}。
+     * 158/159 存在 animatedshields 设置项, 但 160 已彻底移除该设置
+     * (160 的 Renderer.animateShields 改由 animatedwater 设置驱动),
+     * 直接读该 key 在 160 会永远返回 false, 导致护盾退化成
+     * "极淡的半透明填充 + 偏移错误的外框", 看起来就是护盾不显示。
+     * 因此统一改用 {@link Vars#renderer}.animateShields, 与原版 160 一致。
+     */
+    public static boolean animatedShields() {
+        return Vars.renderer != null && Vars.renderer.animateShields;
+    }
+
     public float shieldHealth;
     public float repair = 50f;
     public TextureRegion topRegion;
@@ -41,7 +55,7 @@ public class ShieldWall extends LevelLimitWall {
 
     public Effect shieldGen = new Effect(20, e -> {
         Draw.color(e.color, e.fin());
-        if (settings.getBool("animatedshields")) {
+        if (animatedShields()) {
             Fill.rect(e.x, e.y, e.fin() * size * 8, e.fin() * size * 8);
         } else {
             Lines.stroke(1.5f);
@@ -60,7 +74,7 @@ public class ShieldWall extends LevelLimitWall {
 
     public Effect shieldShrink = new Effect(20, e -> {
         Draw.color(e.color, e.fout());
-        if (settings.getBool("animatedshields")) {
+        if (animatedShields()) {
             Fill.rect(e.x, e.y, e.fout() * size * 8, e.fout() * size * 8);
         } else {
             Lines.stroke(1.5f);
@@ -187,7 +201,7 @@ public class ShieldWall extends LevelLimitWall {
 
                 float radius = this.block.size * tilesize * warmup * scl;
 
-                if (settings.getBool("animatedshields")) {
+                if (animatedShields()) {
                     Fill.rect(x, y, radius, radius);
                 } else {
                     Lines.stroke(1.5f);

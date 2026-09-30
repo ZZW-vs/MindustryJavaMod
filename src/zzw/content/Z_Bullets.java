@@ -542,7 +542,8 @@ public class Z_Bullets {
             float[] temp = (float[]) b.data;
             Draw.color(b.team.color, Color.white, Mathf.clamp(temp[1]));
             float radius = ((speed - b.vel.len()) * maxRadius) + 1;
-            if (arc.Core.settings.getBool("animatedshields")) {
+            // ★ 160 已移除 animatedshields 设置项, 改读 renderer.animateShields (与原版一致)
+            if (mindustry.Vars.renderer.animateShields) {
                 Fill.poly(b.x, b.y, 6, radius);
             } else {
                 Lines.stroke(1.5f);
