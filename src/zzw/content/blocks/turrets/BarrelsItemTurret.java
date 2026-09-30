@@ -7,6 +7,7 @@ import arc.math.Mathf;
 import arc.math.geom.Vec2;
 import arc.struct.ObjectFloatMap;
 import arc.struct.Seq;
+import arc.util.Nullable;
 import arc.util.Strings;
 import mindustry.entities.bullet.BulletType;
 import mindustry.entities.pattern.ShootAlternate;
@@ -98,6 +99,32 @@ public class BarrelsItemTurret extends ItemTurret {
             return ((ShootAlternate) shoot).spread;
         }
         return 0f;
+    }
+
+    /**
+     * 带前向偏移的交替射击模式。
+     *
+     * <p>v158 的 {@link ShootAlternate} 只会给出左右 (横向) 偏移, 子弹固定从炮台
+     * 中心射出。多管炮台 (如 ghost) 的炮口其实在炮台前方, 直接沿用会让子弹
+     * "从炮台后面冒出来"。本类在原逻辑上补一个 {@link #yOffset} (前向偏移),
+     * 让这一类子弹从炮口高度射出。</p>
+     */
+    public static class OffsetShootAlternate extends ShootAlternate {
+        /** 前向偏移 (局部坐标, 正值朝炮口方向)。 */
+        public float yOffset = 0f;
+
+        public OffsetShootAlternate(float spread) {
+            super(spread);
+        }
+
+        @Override
+        public void shoot(int totalShots, BulletHandler handler, @Nullable Runnable barrelIncrementer) {
+            for (int i = 0; i < shots; i++) {
+                float index = ((totalShots + i + barrelOffset) % barrels) - (barrels - 1) / 2f;
+                handler.shoot(index * spread * -Mathf.sign(mirror), yOffset, 0f, firstShotDelay + shotDelay * i);
+                if (barrelIncrementer != null) barrelIncrementer.run();
+            }
+        }
     }
 
     protected class Barrel {
