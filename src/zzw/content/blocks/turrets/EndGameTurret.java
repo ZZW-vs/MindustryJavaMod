@@ -438,10 +438,11 @@ public class EndGameTurret extends PowerTurret {
          *   <li><b>数量上限</b>: 同时存在的闪电不超过 {@link #maxLightnings} 条。</li>
          * </ul>
          *
-         * <p>形态参数沿用 PU132 {@code SlowLightningType} 默认值 —— 单段长度 50、
-         * 生长 5 帧、线宽 2 —— 单段长度远小于延伸距离, 因此闪电会自然弯折并分叉
-         * (旧实现把 {@code nodeLength} 设成与 {@code range} 相等, 只画得出一根
-         * 笔直的光柱, 也就是"太雷霆"的根因)。闪电沿线段连续施加 {@code dmg} 伤害。</p>
+         * <p>形态参数完全沿用 PU132 原版 —— 除下方注明的延伸距离外,
+         * {@code nodeTime=3}、{@code nodeLength=50}、{@code lineWidth=2}、
+         * {@code randSpacing=20}、{@code splitRandSpacing=60} 都走
+         * {@link SlowLightning} 里与 {@code SlowLightningType} 对齐的默认值。
+         * 闪电沿线段连续施加 {@code dmg} 伤害。</p>
          */
         protected void createLightning(float sx, float sy, float angle, float dmg){
             // ★ 数量上限: 达到上限就不再新增
@@ -451,14 +452,11 @@ public class EndGameTurret extends PowerTurret {
             l.colorFrom = Color.red;
             l.colorTo = Color.black;
             l.damage = dmg;
-            // ★ 需求: 延伸距离 = 炮台射程的一半
+            // ★ 需求: 延伸距离 = 炮台射程的一半 (原版为 810)
             l.range = range * 0.5f;
-            l.splitChance = 0.045f;
-            l.nodeTime = 5f;
-            // 单段长度取原版 50 (远小于 range) → 弯折 + 分叉
-            l.nodeLength = 50f;
-            l.lineWidth = 2f;
-            l.lifetime = 120f;
+            // 其余形态参数全部沿用 SlowLightning 中 PU132 的默认值, 不要在这里覆盖
+            // (曾经把 nodeTime 改成 5、并在 SlowLightning 里把纠偏量乘上 nodeTime,
+            //  导致每段都被强行拧回目标方向 —— 就是"闪电笔直"的根因)
             l.create(team, sx, sy, angle, targetPos);
             lightnings.add(l);
         }
