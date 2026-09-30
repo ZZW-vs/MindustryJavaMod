@@ -223,9 +223,7 @@ public class Z_Turrets {
             coolantMultiplier = 0.5f;
             inaccuracy = 3f;
             // ★ PU_V8: spread=21, shots=2, alternate=true
-            // ★ 视觉修正: pattern 的左右两颗子弹改为从"边上大炮管"的炮口射出
-            //   (横向 ±40 对齐炮口, 前方 115 对齐炮口高度), 不再从炮台中心(炮管后面)冒出
-            shoot = new BarrelsItemTurret.OffsetShootAlternate(80f) {{ shots = 2; yOffset = 115f; }};
+            shoot = new ShootAlternate(21f) {{ shots = 2; }};
             shootSound = Sounds.shootSpectre;  // v155.4 无 Sounds.shootBig, 用 shootSpectre 替代
             recoil = 5.5f;
             rotateSpeed = 3.5f;
@@ -239,8 +237,8 @@ public class Z_Turrets {
             ammo(Items.graphite, new BasicBulletType(7.5f * 1.3f, 50f * 1.7f) {{
                 // standardDenseHeavy (石墨弹)
                 lifetime = 40f;
-                width = 11f * 1.32f;
-                height = 16f * 1.32f;
+                width = 15f * 1.32f;
+                height = 21f * 1.32f;
                 hitSize = 4.8f;
                 shootEffect = Fx.shootBig;
                 ammoMultiplier = 4;
@@ -252,8 +250,8 @@ public class Z_Turrets {
             }}, Items.silicon, new BasicBulletType(7.5f * 1.3f, 50f * 1.4f) {{
                 // standardHomingHeavy (硅弹, 追踪型)
                 lifetime = 40f;
-                width = 11f * 1.19f;
-                height = 16f * 1.19f;
+                width = 15f * 1.19f;
+                height = 21f * 1.19f;
                 hitSize = 4.8f;
                 shootEffect = Fx.shootBig;
                 ammoMultiplier = 4;
@@ -266,8 +264,8 @@ public class Z_Turrets {
             }}, Items.pyratite, new BasicBulletType(7f * 1.3f, 70f * 1.7f) {{
                 // standardIncendiaryHeavy (火成岩弹, 燃烧型)
                 lifetime = 40f;
-                width = 12f * 1.32f;
-                height = 16f * 1.32f;
+                width = 16f * 1.32f;
+                height = 21f * 1.32f;
                 hitSize = 5f;
                 shootEffect = Fx.shootBig;
                 frontColor = Pal.lightishOrange;
@@ -284,8 +282,8 @@ public class Z_Turrets {
             }}, Items.thorium, new BasicBulletType(8f * 1.3f, 80f * 1.7f) {{
                 // standardThoriumHeavy (钍弹, 穿透型)
                 lifetime = 40f;
-                width = 12f * 1.32f;
-                height = 17f * 1.32f;
+                width = 16f * 1.32f;
+                height = 23f * 1.32f;
                 hitSize = 5f;
                 shootEffect = Fx.shootBig;
                 pierceCap = 2;
