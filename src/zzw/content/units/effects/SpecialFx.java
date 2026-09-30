@@ -62,6 +62,20 @@ import static arc.graphics.g2d.Draw.color;
 public class SpecialFx{
     private static final Rand rand = new Rand();
 
+    /** 瘟疫特效专用随机源 (PU132 {@code Utils.seedr})。 */
+    private static final Rand plagueRand = new Rand(), plagueHitRand = new Rand();
+
+    /**
+     * 三角分布随机数 —— PU132 {@code Utils.randomTriangularSeed} 移植。
+     *
+     * <p>返回两个均匀随机数之差, 取值范围 [-1, 1] 且中间概率高,
+     * 用于让烟雾粒子的角度分布更集中在发射方向附近。</p>
+     */
+    private static float randomTriangularSeed(long seed){
+        plagueRand.setSeed(seed * 9999L);
+        return plagueRand.nextFloat() - plagueRand.nextFloat();
+    }
+
     public static Effect
 
     /**
@@ -271,6 +285,85 @@ public class SpecialFx{
             }
         }
     }).layer(Layer.effect + 0.03f),
+
+    /**
+     * 瘟疫烟雾炮口特效 (35f) —— PU132 {@code ShootFx.plagueShootSmokeLarge}。
+     *
+     * <p>toxoswarmer 的巡航射手弹每发射一发火焰弹时播放。</p>
+     *
+     * <p>步骤:</p>
+     * <ol>
+     *   <li>12 颗烟雾圆粒子: 角度 = 三角分布随机 (±90°) + 发射角,
+     *       距离 = finpow × 20 × 随机 (0~1), 半径 = 5 × 曲线(fout) × 随机 (0.8~1.1),
+     *       颜色由瘟疫暗色渐变到 灰 → 深灰;</li>
+     *   <li>前 20f (scaled 子时间轴): 5 条白 → 瘟疫色短线沿发射方向飞散。</li>
+     * </ol>
+     */
+    plagueShootSmokeLarge = new Effect(35f, e -> {
+        Draw.color(UnityPal.plagueDark, Color.gray, Color.darkGray, e.fin());
+        for(int i = 0; i < 12; i++){
+            float r = (randomTriangularSeed((e.id * 191L) + i) * 90f) + e.rotation;
+            Vec2 v = Tmp.v1.trns(r, e.finpow() * 20f * Mathf.randomSeed(e.id * 81L + i)).add(e.x, e.y);
+            Fill.circle(v.x, v.y, 5f * Mathf.curve(e.fout(), 0f, 0.7f) * Mathf.randomSeed(e.id * 9L + i, 0.8f, 1.1f));
+        }
+        e.scaled(20f, s -> {
+            Lines.stroke(1.5f);
+            Draw.color(UnityPal.plague, Color.white, s.fin());
+            Angles.randLenVectors(e.id, 5, 25f * s.finpow() + 0.1f, e.rotation, 20f, (x, y) -> {
+                float r = Mathf.angle(x, y);
+                Lines.lineAngle(e.x + x, e.y + y, r, 5f * s.fout());
+            });
+        });
+    }),
+
+    /**
+     * 瘟疫重型命中特效 (80f) —— PU132 {@code HitFx.plagueLargeHit}。
+     *
+     * <p>步骤 (三层错峰时间轴):</p>
+     * <ol>
+     *   <li>全程: 9 颗灰 → 深灰双圆烟雾粒子 (外圈 9, 内圈 5),
+     *       沿随机方向铺开 35 像素, 前 10% 寿命内错峰启动;</li>
+     *   <li>前 40f: 6 颗瘟疫色粒子沿正弦摆动轨迹飞出最多 50 像素;</li>
+     *   <li>前 15f: 一圈瘟疫色扩散环 (半径 finpow × 50)。</li>
+     * </ol>
+     */
+    plagueLargeHit = new Effect(80f, e -> {
+        float fOffset = 0.1f;
+        float fOffsetA = 0.05f;
+        Rand r = plagueHitRand;
+        r.setSeed(e.id * 99999L);
+
+        for(int i = 0; i < 9; i++){
+            float f = r.nextFloat() * fOffset;
+            float fin = Mathf.curve(e.fin(), f, f + 1 - fOffset);
+            float ex = Interp.pow3Out.apply(fin) * 35f * r.nextFloat();
+            Vec2 v = Tmp.v1.trns(r.random(360f), ex);
+
+            Draw.color(Color.gray, Color.darkGray, fin);
+            Fill.circle(e.x + v.x, e.y + v.y, 9f * Mathf.curve(1f - fin, 0f, 0.7f));
+            Fill.circle(e.x + v.x * 0.5f, e.y + v.y * 0.5f, 5f * Mathf.curve(1f - fin, 0f, 0.7f));
+        }
+
+        e.scaled(40f, s -> {
+            Draw.color(UnityPal.plague);
+            for(int i = 0; i < 6; i++){
+                float f = r.nextFloat() * fOffsetA;
+                float fin = Mathf.curve(s.fin(), f, f + 1 - fOffsetA);
+                float ifin = Interp.pow3Out.apply(fin);
+                float scl = r.nextFloat();
+                float ex = ifin * 50f * scl;
+                float slope = Interp.pow3Out.apply(Mathf.slope(ifin));
+                Vec2 v = Tmp.v1.trns(r.random(360f), ex, Mathf.sin(ifin * Mathf.PI, 1f / r.random(1f, 5f), slope * scl * r.random(6f, 11f))).add(e.x, e.y);
+                Fill.circle(v.x, v.y, 6f * s.fout());
+            }
+        });
+
+        e.scaled(15f, s -> {
+            Draw.color(UnityPal.plague);
+            Lines.stroke(2f * s.fout());
+            Lines.circle(e.x, e.y, 50f * s.finpow());
+        });
+    }),
 
     /**
      * 聚能爆破光球 (23f, 裁剪 600): 多层颜色同心圆 (每层半径递减

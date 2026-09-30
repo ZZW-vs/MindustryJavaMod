@@ -1789,9 +1789,9 @@ public class Z_Units {
         // ═══════════════════════════════════════════════════════════
         //  Exowalker (PU132 exowalker, Plague 阵营地面单位)
         //  - 8腿 (完整移植 PU132 TriJointLegsComp 三节腿系统), 6000 血, 速度 0.7
-        //  - 5武器: 4×plagueSmallMount (瘟疫导弹) + 1×drain-laser (吸血激光)
+        //  - 5武器: 4×plagueSmallMount (瘟疫导弹) + 1×drain-laser (碎片激光)
         //  - ★ PU132 用 TriJointLegsc 自定义腿组件, v158 用 TriJointLegsAbility 移植
-        //  - ★ PU132 ShrapnelBulletType (碎片子弹), v158 用 SapBulletType (吸血子弹) 替代
+        //  - ★ PU132 原版不设 armor (即 0), 位移速度/武器数值全部照抄
         // ═══════════════════════════════════════════════════════════
         exowalker = new zzw.content.units.types.MixedLegUnitType("exowalker") {{
             health = 6000f;
@@ -1799,7 +1799,6 @@ public class Z_Units {
             drag = 0.1f;
             hitSize = 33f;
             rotateSpeed = 2f;
-            armor = 4f;
 
             // ===== 腿配置 (PU132 原值, 由 TriJointLegsAbility 接管三节腿渲染/IK) =====
             // 原生腿 (LegsUnit) 仍保留用于碰撞和地面交互, 但不参与渲染
@@ -1834,6 +1833,7 @@ public class Z_Units {
             weapons.add(new Weapon("create-small-plague-launcher") {{
                 x = 9.5f;
                 y = 8f;
+                otherSide = 2;  // ★ PU132 原值: 与第3门配对 (后坐力/交替)
                 shootY = 4.75f;
                 reload = 1.5f * 60f;
                 shoot.shots = 4;
@@ -1841,8 +1841,7 @@ public class Z_Units {
                 mirror = false;
                 alternate = true;
                 rotate = true;
-                rotateSpeed = 5f;
-                shootCone = 30f;
+                // ★ PU132 原版 plagueSmallMount 未设 rotateSpeed / shootCone, 此处保持引擎默认
                 shootSound = zzw.content.Z_Sounds.endMissile;  // ★ v158 无 Sounds.missile, 用自定义 endMissile
                 bullet = new mindustry.entities.bullet.MissileBulletType(3.8f, 9f) {{
                     width = 8f;
@@ -1864,6 +1863,7 @@ public class Z_Units {
             weapons.add(new Weapon("create-small-plague-launcher") {{
                 x = -9.5f;
                 y = 8f;
+                otherSide = 0;  // ★ PU132 原值: 与第1门配对
                 shootY = 4.75f;
                 reload = 1.5f * 60f;
                 shoot.shots = 4;
@@ -1871,9 +1871,7 @@ public class Z_Units {
                 mirror = false;
                 alternate = true;
                 rotate = true;
-                rotateSpeed = 5f;
-                shootCone = 30f;
-                flipSprite = true;
+                flipSprite = true;  // ★ PU132 原版第2门 flipSprite=true
                 shootSound = zzw.content.Z_Sounds.endMissile;  // ★ v158 无 Sounds.missile, 用自定义 endMissile
                 bullet = new mindustry.entities.bullet.MissileBulletType(3.8f, 9f) {{
                     width = 8f;
@@ -1896,6 +1894,7 @@ public class Z_Units {
             weapons.add(new Weapon("create-small-plague-launcher-flipped") {{
                 x = 12.25f;
                 y = -12.25f;
+                otherSide = 3;  // ★ PU132 原值: 与第4门配对
                 shootY = 4.75f;
                 reload = 1.5f * 60f;
                 shoot.shots = 4;
@@ -1903,8 +1902,6 @@ public class Z_Units {
                 mirror = false;
                 alternate = true;
                 rotate = true;
-                rotateSpeed = 5f;
-                shootCone = 30f;
                 flipSprite = true;
                 shootSound = zzw.content.Z_Sounds.endMissile;  // ★ v158 无 Sounds.missile, 用自定义 endMissile
                 bullet = new mindustry.entities.bullet.MissileBulletType(3.8f, 9f) {{
@@ -1927,6 +1924,7 @@ public class Z_Units {
             weapons.add(new Weapon("create-small-plague-launcher-flipped") {{
                 x = -12.25f;
                 y = -12.25f;
+                otherSide = 1;  // ★ PU132 原值: 与第2门配对
                 shootY = 4.75f;
                 reload = 1.5f * 60f;
                 shoot.shots = 4;
@@ -1934,8 +1932,6 @@ public class Z_Units {
                 mirror = false;
                 alternate = true;
                 rotate = true;
-                rotateSpeed = 5f;
-                shootCone = 30f;
                 flipSprite = true;
                 shootSound = zzw.content.Z_Sounds.endMissile;  // ★ v158 无 Sounds.missile, 用自定义 endMissile
                 bullet = new mindustry.entities.bullet.MissileBulletType(3.8f, 9f) {{
@@ -1955,41 +1951,34 @@ public class Z_Units {
                 }};
             }});
 
-            // ===== 武器5: drain-laser (吸血激光) =====
-            // PU132: ShrapnelBulletType (碎片子弹), v158 简化为 SapBulletType (吸血子弹)
-            // SapBulletType 自动回血, 类似于 PU132 的 drain 效果
+            // ===== 武器5: drain-laser (碎片激光) =====
+            // ★ PU132 原版: 直接使用引擎自带 ShrapnelBulletType (不吸血, 不是 SapBulletType),
+            //   只设 damage=43f / length=80f / toColor=UnityPal.plague, 其余保持默认
+            // ★ PU132 未设 rotateSpeed / shootCone, 此处保持引擎默认
             weapons.add(new Weapon("create-drain-laser") {{
                 x = 16f;
                 y = -2.25f;
                 shootY = 6.25f;
                 mirror = true;
                 rotate = true;
-                rotateSpeed = 5f;
-                shootCone = 30f;
                 shoot.shots = 3;
-                shoot.shotDelay = 17.5f;  // ★ v158 用 shotDelay 替代 PU132 burstSpacing
+                shoot.shotDelay = 17.5f;  // ★ v158 用 shotDelay 替代 PU132 的 burstSpacing(spacing)
                 reload = 1.5f * 60f;
                 shootSound = zzw.content.Z_Sounds.devourerMainLaser;  // ★ v158 无 Sounds.laser, 用自定义 devourerMainLaser
-                bullet = new mindustry.entities.bullet.SapBulletType() {{
-                    sapStrength = 0.4f;  // 吸血强度
-                    length = 80f;
+                bullet = new mindustry.entities.bullet.ShrapnelBulletType() {{
                     damage = 43f;
-                    color = Color.valueOf("a3f080");  // plague (SapBulletType 用 color 字段)
-                    lightColor = Color.valueOf("a3f080");
-                    width = 4f;
-                    lifetime = 20f;
-                    hitEffect = mindustry.content.Fx.sapExplosion;  // ★ v158 无 Fx.sap, 用 sapExplosion
-                    despawnEffect = mindustry.content.Fx.none;
+                    length = 80f;
+                    toColor = Color.valueOf("a3f080");  // PU132 UnityPal.plague
                 }};
             }});
         }};
 
         // ═══════════════════════════════════════════════════════════
         //  Toxoswarmer (PU132 toxoswarmer, Plague 阵营地面单位)
-        //  - 6腿 (PU132 用 CLegType 5条腿, v158 简化为 legCount=6 偶数对称)
+        //  - 腿: 2 组 CLegType (小腿 3 条×镜像 / 大腿 2 条×镜像), 共 5 条×镜像
         //  - 7000 血, 速度 1.1
-        //  - 1武器: toxo-launcher (8连发追踪导弹, 命中后产生火焰)
-        //  - ★ 简化: PU132 ShootingBulletType (追踪+持续射击), v158 用 MissileBulletType + fragBullet 火焰弹
+        //  - 1武器: toxo-launcher (8连发巡航射手弹, 持续发射火焰弹)
+        //  - ★ PU132 原版不设 armor (即 0), 武器数值全部照抄
         // ═══════════════════════════════════════════════════════════
         toxoswarmer = new zzw.content.units.types.MixedLegUnitType("toxoswarmer") {{
             health = 7000f;
@@ -1997,7 +1986,6 @@ public class Z_Units {
             drag = 0.1f;
             hitSize = 22.25f;
             rotateSpeed = 3f;
-            armor = 4f;
 
             // ===== 腿配置 (原生腿用于碰撞/移动, CustomLegsAbility 用于渲染) =====
             // PU132 原版: 2组 CLegType.createGroup (CLegComp 系统)
@@ -2072,9 +2060,11 @@ public class Z_Units {
                 }});
             }});
 
-            // ===== 武器: toxo-launcher (8连发追踪导弹+火焰) =====
-            // PU132: ShootingBulletType (追踪+持续射击 FlameBulletType)
-            // v158 简化: MissileBulletType + fragBullet (火焰弹), 到达后分裂出火焰
+            // ===== 武器: toxo-launcher (8连发巡航射手弹) =====
+            // ★ PU132 原版: ShootingBulletType —— 导弹飞向最近敌人, 在其外侧 60 像素处绕飞,
+            //   每 4 帧朝目标发射一发 FlameBulletType 火焰弹 (武器 8 连发)
+            // ★ PU132 未设 shootCone, 此处保持引擎默认 (rotateSpeed=3f 是原值, 保留)
+            // ★ 武器本身不发声: 声音由 ShootingBulletType.shootSound = Sounds.flame 提供
             weapons.add(new Weapon("create-toxo-launcher") {{
                 x = 17f;
                 y = -8.25f;
@@ -2084,51 +2074,31 @@ public class Z_Units {
                 inaccuracy = 16f;
                 rotate = true;
                 rotateSpeed = 3f;
-                shootCone = 30f;
-                shootSound = zzw.content.Z_Sounds.endMissile;  // ★ v158 无 Sounds.missile, 用自定义 endMissile
-                bullet = new mindustry.entities.bullet.MissileBulletType(4f, 200f) {{
+                bullet = new zzw.content.units.bullets.ShootingBulletType("create-toxo-missile", 4f, 200f) {{
                     lifetime = 4f * 60f;
-                    homingPower = 0.08f;
-                    weaveScale = 12f;
-                    weaveMag = 2f;
-                    width = 9f;
-                    height = 9f;
+                    reloadTime = 4f;
+                    minTargetRange = 60f;
+                    maxRange = 220f;
                     trailColor = lightColor = lightningColor = Color.valueOf("54de3b");  // plagueDark
-                    backColor = Color.valueOf("54de3b");
-                    frontColor = Color.valueOf("a3f080");  // plague
-                    shrinkY = 0f;
-                    drag = -0.01f;
-
-                    splashDamage = 30f;
-                    splashDamageRadius = 35f;
-
-                    // 闪电效果 (PU132: lightning=3, length=3, damage=15)
                     lightning = 3;
                     lightningLength = 3;
                     lightningDamage = 15f;
-                    lightningColor = Color.valueOf("54de3b");
+                    shootInaccuracy = 4f;
 
-                    hitEffect = mindustry.content.Fx.blastExplosion;
-                    despawnEffect = mindustry.content.Fx.blastExplosion;
-
-                    // ★ 简化: PU132 ShootingBulletType 到达后 shoot FlameBulletType
-                    //   v158 用 fragBullet 模拟: 子弹命中后分裂出 2 个火焰弹
-                    fragBullets = 2;
-                    fragVelocityMax = 1.2f;
-                    fragVelocityMin = 0.5f;
-                    fragRandomSpread = 120f;  // ★ v158 用 fragRandomSpread 替代 PU132 fragCone
-                    fragBullet = new mindustry.entities.bullet.FireBulletType() {{
-                        damage = 15f;
+                    // 子子弹: 火焰弹 (每 reloadTime 帧朝目标发射)
+                    shootSound = mindustry.gen.Sounds.shootFlame;  // ★ PU132 原版为 Sounds.flame, v160 中该音效名为 shootFlame
+                    shootBullet = new zzw.content.units.bullets.FlameBulletType(5f, 15f) {{
                         lifetime = 20f;
-                        pierce = true;
+                        colors = new Color[]{Color.valueOf("a3f080"), Color.valueOf("54de3b"), Color.darkGray, Color.gray};  // plague, plagueDark, darkGray, gray
+                        pierceBuilding = pierce = true;
                         collidesAir = true;
                         knockback = 0.001f;
+                        pierceCap = 2;
+                        statusDuration = 60f;
                         splashDamage = 4f;
                         splashDamageRadius = 25f;
-                        status = mindustry.content.StatusEffects.burning;
-                        statusDuration = 60f * 4f;
-                        frontColor = Color.valueOf("a3f080");  // plague
-                        lightColor = Color.valueOf("a3f080");
+                        particleSizeScl = 2.25f;
+                        particleSpread = 4f;
                     }};
                 }};
             }});

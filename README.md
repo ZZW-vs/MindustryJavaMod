@@ -186,16 +186,18 @@
 - ★ constructor 改用 `EndGroundUnit::create`（extends LegsUnit），同时具备防作弊系统和正常显示腿
 
 #### 外径行者 (exowalker)
-- Plague 阵营地面单位（8 腿），6000 血，速度 0.7，护甲 4（PU132 移植）
-- **武器1-4：瘟疫导弹发射器**（small-plague-launcher，4 连发，9 伤害 + 17 范围伤害，蛇形追踪，1.5 秒冷却）
-- **武器5：吸血激光**（drain-laser / SapBulletType，43 伤害，长度 80，吸血 0.4%，3 连发间隔 17.5tick）
+- Plague 阵营地面单位（8 腿），6000 血，速度 0.7（PU132 原版不设护甲，即 0）
+- **武器1-4：瘟疫导弹发射器**（small-plague-launcher，4 连发，9 伤害 + 17 范围伤害，蛇形追踪，1.5 秒冷却，`otherSide` 配对 2↔0 / 3↔1）
+- **武器5：碎片激光**（drain-laser / 引擎原生 ShrapnelBulletType，43 伤害，长度 80，toColor=瘟疫色，3 连发间隔 17.5tick）
 - 8 腿行走，瘟疫色（#a3f080）涂装
 - 不具备防作弊系统（仅 End 系列单位具备）
 
 #### 瘟疫蜂群 (toxoswarmer)
-- Plague 阵营地面单位（10 腿），7000 血，速度 1.1，护甲 4（PU132 移植）
-- **武器1：8 连发追踪导弹**（toxo-launcher / MissileBulletType，200 伤害 + 30 范围伤害，蛇形飞行 4 秒持续）
-  - 命中后分裂 2 个火焰弹（fragBullet FireBulletType，15 伤害 + 燃烧状态 4 秒）
+- Plague 阵营地面单位，7000 血，速度 1.1（PU132 原版不设护甲，即 0）
+- **武器1：8 连发巡航射手弹**（toxo-launcher / `ShootingBulletType`，200 伤害 + 30 溅射，40 溅射半径）
+  - 导弹飞向最近敌人并在其外侧 60 像素处绕飞（smoothness 35、reloadTime 4），
+    每 4 帧朝目标发射一发 `FlameBulletType` 火焰弹（5 速 / 15 伤害，4 色渐变，穿透 2，命中小范围 4 溅射）
+  - 复刻 PU132 `ShootFx.plagueShootSmokeLarge`（炮口烟雾）与 `HitFx.plagueLargeHit`（重型命中）特效
 - ★ 腿系统改用 `CustomLegsAbility`（完整移植 PU132 CLegGroup），2 组腿（小腿组 6 条 + 大腿组 4 条），由 `MixedLegUnitType.drawLegs()` 委托渲染
 - 瘟疫色（#a3f080）涂装，不具备防作弊系统（仅 End 系列单位具备）
 
