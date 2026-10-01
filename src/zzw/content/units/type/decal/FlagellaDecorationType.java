@@ -221,9 +221,42 @@ public class FlagellaDecorationType extends UnitDecorationType{
         outliner.get(end);
     }
 
-    /** PU132 clampedAngle: 将 angle 限制在 relative ± limit 范围内 (处理角度环绕) */
+    /**
+     * PU132 Utils.angleDistSigned: 带符号角度差, 返回 -180 ~ 180。
+     *
+     * <p>必须用带符号版本! arc 自带的 {@link Angles#angleDist(float, float)} 是
+     * <b>无符号</b>距离 (0~180), 用它做"角度限幅"会丢失方向, 导致尾巴永远只往
+     * 单侧弯 (转向时瞬间反向卷起并抽搐)。</p>
+     */
+    static float angleDistSigned(float a, float b){
+        a += 360f;
+        a %= 360f;
+        b += 360f;
+        b %= 360f;
+        float d = Math.abs(a - b) % 360f;
+        int sign = (a - b >= 0f && a - b <= 180f) || (a - b <= -180f && a - b >= -360f) ? 1 : -1;
+        return (d > 180f ? 360f - d : d) * sign;
+    }
+
+    /**
+     * PU132 clampedAngle: 把 angle 相对 relative 限制在 ±limit 内 (带方向)。
+     *
+     * <p>算法 (PU132 Utils.clampedAngle 原版):
+     * <br>1. limit >= 180 → 不限制, 直接返回 angle;
+     * <br>2. limit <= 0 → 完全锁死, 返回 relative;
+     * <br>3. 求带符号差值 dst = angleDistSigned(angle, relative);
+     * <br>4. |dst| <= limit → 在范围内, 返回原 angle;
+     * <br>5. 超出 → 夹到 relative ± limit (按 dst 的正负决定方向)。</p>
+     */
     static float clampedAngle(float angle, float relative, float limit){
-        return Mathf.clamp(Angles.angleDist(angle, relative), -limit, limit) + relative;
+        if(limit >= 180f) return angle;
+        if(limit <= 0f) return relative;
+        float dst = angleDistSigned(angle, relative);
+        if(Math.abs(dst) > limit){
+            float val = dst > 0f ? dst - limit : dst + limit;
+            return (angle - val) % 360f;
+        }
+        return angle;
     }
 
     /** 鞭毛尾巴状态实例 (每单位独立) */
