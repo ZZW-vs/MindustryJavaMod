@@ -114,6 +114,12 @@ public class EndGameTurret extends PowerTurret {
         rotate = false;
         shake = 2.2f;
         absorbLasers = true;
+        // ★ 允许索敌敌方建筑: v160 的 TurretBuild.findEnemy() 只有在
+        //   Turret.targetBlocks && BulletType.targetBlocks 同时为 true 时
+        //   才会把建筑纳入 bestTarget; 否则基类 target 永远只是单位,
+        //   而眼睛发射 (updateEyesTargeting) 又以 target != null 为前置条件 ——
+        //   结果就是"范围内只有敌方建筑时眼睛完全不开火"。
+        targetBlocks = true;
         outlineIcon = false;
         noUpdateDisabled = false;
         hasItems = true;
@@ -133,6 +139,9 @@ public class EndGameTurret extends PowerTurret {
             collides = false;
             hittable = false;
             absorbable = false;
+            // 见上方 targetBlocks 注释: 占位子弹也必须声明可索敌建筑,
+            // 否则 findEnemy() 的 buildingPred 恒为 false, 基类 target 取不到建筑
+            targetBlocks = true;
             despawnEffect = hitEffect = shootEffect = smokeEffect = Fx.none;
         }};
         ammoUseEffect = Fx.none;

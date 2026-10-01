@@ -290,6 +290,10 @@
 
 ## 更新日志
 
+- 修复 endgame 炮台"普通眼睛光束对敌方建筑无伤害"：v160 中炮台索敌建筑需
+  `Turret.targetBlocks` 与 `BulletType.targetBlocks` 同时为 true（原占位子弹与方块均未开启），
+  导致基类 `target` 永远取不到建筑，而眼睛发射以 `target != null` 为前置条件，范围内只有建筑时眼睛完全不开火；
+  现已两者同时开启，眼睛光束可正常索敌并湮灭敌方建筑（与齐射光束行为一致）
 - 修复坩埚系统旧存档加载的两处崩溃隐患（配方表改动后存档原料 id 可能失效）：
   - 坩埚网络读档：原料 id 解析不到时跳过该条目，不再把 ingredient 为 null 的流体写入网络（避免 `OrderedMap` 的 `key.hashCode()` 空指针）
   - 铸模读档：改用 `instanceof` 判定，避免 id 指向非物品原料时强制转换抛 `ClassCastException`
