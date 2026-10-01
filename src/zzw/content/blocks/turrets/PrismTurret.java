@@ -140,12 +140,12 @@ public class PrismTurret extends SoulTurretPowerTurret {
             if (object != null && object.faces != null && object.faces.size > 0) {
                 // 保存原始颜色 (WavefrontObject 是共享实例)
                 Color origLight = object.lightColor.cpy();
-                Color origShade = object.shadeColor.cpy();
 
-                // 计算当前颜色 (fromColor → toColor 渐变)
+                // ★ PU132 原版: 整个模型只用"单一材质色" = fromColor→toColor 渐变,
+                //   光照只在材质色上做乘性变暗 (shadeColor 取黑, 见 ZObjs.prism), 不再单独设置
+                //   一个不同色相的 shadeColor —— 否则每个面会呈现两种色调, 与原版观感不一致。
                 Color col = currentColor();
                 object.lightColor.set(col);
-                object.shadeColor.set(fromColor).lerp(toColor, prismHeat * 0.5f);
 
                 // 模型位置: 炮台中心 + 偏移 (考虑后坐力)
                 float px = x + Angles.trnsx(rotation, prismOffset - recoil);
@@ -168,7 +168,6 @@ public class PrismTurret extends SoulTurretPowerTurret {
 
                 // 恢复原始颜色
                 object.lightColor.set(origLight);
-                object.shadeColor.set(origShade);
             }
         }
     }

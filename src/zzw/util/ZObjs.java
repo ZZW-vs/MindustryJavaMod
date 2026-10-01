@@ -74,14 +74,17 @@ public class ZObjs {
         // ★ 原版钻石形 (6顶点+8面), 顶点范围 ~2x2x2.5 (高度 2.5)
         // size=2.5f: defaultScl(4) * 2.5 = 10倍缩放, 模型实际高度 2.5 * 10 = 25单位 (匹配炮台size=5占地50单位的1/2)
         // PrismTurret 中 prismOffset=10f (距炮台中心10单位), 模型高度25单位, 总占用35单位 (合理)
-        // ★ 使用 topLight 着色: 法线Y分量决定明暗, 避免旋转时面因法线与Z轴夹角大而变暗(看起来透明)
+        // ★ 着色按 PU132 原版对齐 (Models.java 光照环境 + PrismTurret 材质色):
+        //   原版用单一材质色 (fromColor→toColor 渐变), 光照只在材质色上做"乘法变暗"(约 0.4~0.96),
+        //   不改变色相; 因此这里 shadeColor 取纯黑 (lerp 到黑 = 乘性变暗), maxShade=0.6 (最暗约 40% 亮度,
+        //   对应原版 ambient 0.4 + 平行光 0.56 的下限)。
         prism = new WavefrontObject();
         prism.textureName = "prism";
         prism.size = 2.5f;
         prism.shadingType = WavefrontObject.ShadingType.topLight;
         prism.lightColor = Color.valueOf("87ceeb");
-        prism.shadeColor = Color.valueOf("6586b0");
-        prism.maxShade = 0.8f;
+        prism.shadeColor = Color.black;   // ★ 原版: 光照变暗不偏色, 用乘性变暗 (lerp 到黑)
+        prism.maxShade = 0.6f;            // ★ 原版最暗 ≈ 40% 亮度 (ambient 0.4)
         prism.drawLayer = Layer.turret;
         // ★ 关闭 cullBackfaces: 旋转后某些面法线朝下会被剔除, 导致"透明"
         prism.cullBackfaces = false;
