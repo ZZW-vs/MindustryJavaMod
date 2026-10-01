@@ -295,6 +295,11 @@
   - 经验球被接收时增加命中标记与消散特效（对齐 PU_V8 `accepted`）
   - 坩埚泵还原 PU_V8：改为扭矩转速驱动（`curve(lastVelocity,0,50)*0.2`）、泵送量正比于源网络熔融存量、不再耗电，注册力矩图（`GraphTorque(0.1f,10f)` 连接 `(0,1,0,1)`）
   - 复核确认铸模（PU_V8 无 priority 概念）与燃烧加热器（与 PU132 逐行一致）无需修改
+- 单位/弹体机制审计（对照 PU132/PU_V8）后补回明确遗漏项：
+  - 段身受击"记仇"：`SegmentUnitEntity.damage` 恢复 PU132 `WormSegmentUnit.damage` 行为——段身被打时通知头部 `WormAI.setTarget`，头部转而追踪攻击者（此前 `setTarget` 定义后从未调用，机制长期失效）
+  - 磁轨炮弹寿命缩放：araneidae / theraphosidae 的磁轨炮弹补回 `scaleLife=true`（PU132 `scaleVelocity`，v159 改名），弹体寿命随距离缩放
+  - 海军单位朝向：fin / blue 补回 `faceTarget=false`（PU_V8），舰船朝行进方向而非盯着目标
+  - 复核确认：段身随玩家头部瞄准齐射（`SegmentUnitEntity` 弹幕同步）已实现；WormAI 接敌距离与段身记仇等模组注释明示的有意改动、以及 `TimeStopAbility` 等 README 已记载的简化，均保留不动
 
 ## 安装说明
 

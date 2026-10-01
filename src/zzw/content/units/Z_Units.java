@@ -3269,6 +3269,7 @@ public class Z_Units {
                     height = 23f;
                     shrinkY = 0f;
                     collidesAir = false;
+                    scaleLife = true;   // PU132 scaleVelocity (v159 改名 scaleLife): 弹体寿命随距离缩放
                     pierceCap = 2;
                     status = mindustry.content.StatusEffects.sapped;
                     statusDuration = 60f * 10;
@@ -3435,6 +3436,7 @@ public class Z_Units {
                     height = 27f;
                     shrinkY = 0f;
                     collidesAir = false;
+                    scaleLife = true;   // PU132 scaleVelocity (v159 改名 scaleLife): 弹体寿命随距离缩放
                     pierceCap = 3;
                     status = mindustry.content.StatusEffects.sapped;
                     statusDuration = 60f * 10;
@@ -4423,6 +4425,7 @@ public class Z_Units {
             armor = 17f;
             accel = 0.19f;
             rotateSpeed = 0.86f;
+            faceTarget = false;   // PU_V8: 海军单位朝行进方向, 不盯着目标
             constructor = mindustry.gen.UnitWaterMove::create;
 
             trailLength = 70;
@@ -4536,6 +4539,7 @@ public class Z_Units {
             armor = 18f;
             accel = 0.19f;
             rotateSpeed = 0.78f;
+            faceTarget = false;   // PU_V8: 海军单位朝行进方向, 不盯着目标
             constructor = mindustry.gen.UnitWaterMove::create;
 
             trailLength = 70;

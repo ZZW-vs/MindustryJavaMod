@@ -1,6 +1,7 @@
 package zzw.content.units.entities;
 
 import zzw.content.units.ZEntityRegister;
+import zzw.content.units.ai.WormAI;
 import zzw.content.units.effects.WormDecal;
 
 import arc.graphics.Color;
@@ -168,6 +169,11 @@ public class SegmentUnitEntity extends UnitEntity {
      */
     @Override
     public void damage(float amount) {
+        // ★ PU132 WormSegmentUnit.damage L97-99: 段身受击时通知头部 AI "记仇"
+        //   让头部 AI 把攻击者所在的段身位置记为追踪目标 (score 高的覆盖低的, 持续 180 帧)
+        if (head != null && head.isAdded() && head.controller() instanceof WormAI wormAi) {
+            wormAi.setTarget(x, y, amount);
+        }
         if (head != null && head.isAdded() && !head.splittable) {
             // 非分裂模式: 伤害转移给头部
             head.damage(amount);
