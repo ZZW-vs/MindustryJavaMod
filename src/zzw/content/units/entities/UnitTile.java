@@ -53,15 +53,15 @@ public class UnitTile extends Tile{
         }
         if(block.hasBuilding()){
             build = entityprov.get();
-            if(build.block == null){
-                // ★ 新创建的建筑: 完整初始化 block/team/health/模块 (修复 block 为 null 的崩溃),
-                //   shouldAdd=false 不加入主世界 Groups (子世界建筑由单位手动驱动)
-                build.init(this, team, false, rotation);
-            }else{
-                // 已存在的建筑 (吸收主世界建筑 / 读档恢复): 保持原状态, 只绑定 tile 和朝向
-                build.rotation = rotation;
-                build.tile = this;
-            }
+            // ★ 新建筑与已存在建筑 (吸收主世界建筑 / 读档恢复) 一律走完整 init:
+            //   已存在建筑 initialized=true, init 内部会跳过 create() —— 物品/液体/电力等
+            //   模块状态原样保留; 但 init 一定会调用 created(), 这是关键修复点 ——
+            //   图结构方块 (导热管/扭矩/温度等) 的图模块 gms 只在 created() 里重建。
+            //   旧实现只绑定 tile/rotation 不调 init, 导致吸收来的方块 gms 仍停留在
+            //   主世界 remove() 之后的 dead 状态 (onUpdate 直接 return):
+            //   表现为贴图不拼接 + 扭矩/热量网络完全不工作; 读档恢复同理 (gms 甚至为 null)。
+            //   shouldAdd=false 保证子世界建筑不进主世界 Groups (仍由单位手动驱动更新)。
+            build.init(this, team, false, rotation);
         }
     }
 
