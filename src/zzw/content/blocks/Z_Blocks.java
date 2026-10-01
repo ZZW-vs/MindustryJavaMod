@@ -1,6 +1,7 @@
 package zzw.content.blocks;
 
 import arc.struct.Seq;
+import mindustry.content.Blocks;
 import mindustry.content.Items;
 import mindustry.content.Liquids;
 import mindustry.content.UnitTypes;
@@ -138,6 +139,14 @@ public class Z_Blocks {
 
 
     public static void load() {
+        // ★ PU 原版: 钻头钻"石头地板/岩坑地板"可获得"石头"物品
+        //   (参考 PU_V8 KoruhBlocks.load() 开头: Blocks.stone/craters.itemDrop = UnityItems.stone)
+        //   playerUnmineable=true 与原版一致: 禁止玩家手动挖, 只允许钻头开采。
+        Blocks.stone.itemDrop = Z_Items.stone;
+        Blocks.stone.playerUnmineable = true;
+        Blocks.craters.itemDrop = Z_Items.stone;
+        Blocks.craters.playerUnmineable = true;
+
         // ★ 3D展示方块最先创建, 避免前面方法异常导致无法注册
         create3DDisplayBlocks();
         createDefenseBlocks();

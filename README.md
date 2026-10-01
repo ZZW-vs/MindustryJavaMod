@@ -58,6 +58,7 @@
   - **铜镍合金墙（cupronickel-wall / -large）** - `HeatWall`：接入坩埚热量网络，墙体温度越高越持续灼烧并伤害周围单位
   - **限伤墙（ustone/dense/steel/dirium-wall）** - `LimitWall` / `LevelLimitWall`：补回限伤命中（`withstandFx`）与闪烁免伤（`blinkFx`）特效；迪里姆墙恢复原版 `sparkle` 待机特效
   - **经验限伤墙（ExpLimitWall）** - 对齐原版 `hubValid`/`canHub` 逻辑，血条旁显示减伤百分比图标
+  - **石头开采（PU 原版机制）** - 原版石头地板 / 岩坑地板（`Blocks.stone` / `Blocks.craters`）设置 `itemDrop = stone`，用钻头钻取可获得「石头」物品；与原版一致设为 `playerUnmineable`，禁止手动挖掘
 
 #### 炮台系统 (PU132 还原)
 本模组的高级炮台全部对照 PU132 原版逐项还原，主要修正包括：
