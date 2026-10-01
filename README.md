@@ -290,6 +290,8 @@
 
 ## 更新日志
 
+- 螺旋石油钻井 (oil-derrick) 产量下调：标准产出改为 10 单位/秒（满扭矩、整块铺在油层），
+  `pumpAmount` 由 0.2 调整为 10/60/2 ≈ 0.083（效率仍随扭矩转速平方变化）
 - 修复 endgame 炮台"普通眼睛光束对敌方建筑无伤害"：v160 中炮台索敌建筑需
   `Turret.targetBlocks` 与 `BulletType.targetBlocks` 同时为 true（原占位子弹与方块均未开启），
   导致基类 `target` 永远取不到建筑，而眼睛发射以 `target != null` 为前置条件，范围内只有建筑时眼睛完全不开火；

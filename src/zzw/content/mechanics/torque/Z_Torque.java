@@ -178,6 +178,9 @@ public class Z_Torque{
 
         // oil-derrick (螺旋石油钻井): 扭矩驱动的石油抽取器
         // 与机械提取器同为 SolidPump, 但抽取石油, 且必须建在带石油属性的地层上
+        // 产出: SolidPump 每秒产量 = pumpAmount * 60 * (validTiles + 地层属性) * 效率,
+        //   满油层时 (validTiles≈1 + 地层属性≈1) 地层倍率约 2, 效率再由扭矩转速平方决定;
+        //   目标"标准 10 单位/秒"(满扭矩、整块铺在油层) → pumpAmount = 10 / 60 / 2 ≈ 0.083
         oilDerrick = new OilDerrick("oil-derrick"){{
             requirements(Category.production, with(Items.lead, 150, Items.copper, 100, Items.titanium, 60, Items.metaglass, 30));
             hasPower = false;
@@ -185,7 +188,7 @@ public class Z_Torque{
             health = 1500;
             result = Liquids.oil;
             attribute = Attribute.oil;
-            pumpAmount = 0.2f;
+            pumpAmount = 10f / 60f / 2f;
             liquidCapacity = 60f;
 
             addGraph(new GraphTorqueConsume(45f, 8f, 1.0f, 0.06f, 0.3f).setAccept(0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
