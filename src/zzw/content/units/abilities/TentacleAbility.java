@@ -135,7 +135,11 @@ public class TentacleAbility extends Ability {
                 seg.vx *= 1f - (drag * Time.delta);
                 seg.vy *= 1f - (drag * Time.delta);
 
-                if (swayScls[t] >= 0.0001f) {
+                // ★ 仅在攻击状态下摆动: 无目标时保持静止
+                // <p>原版待机时 swayScl→1 会持续摆动, 而多条触手的 swayOffset 相位各不相同
+                // (0/90/120/70), 叠在一起看起来像"无目标也在乱戳"。这里额外要求 attacking,
+                // 没有目标时完全不摆动; 攻击时 swayScl→0, 行为与原版一致。</p>
+                if (attacking[t] && swayScls[t] >= 0.0001f) {
                     int swayIdx = segs.length - 1 - s;
                     float sin = swayScls[t] * Mathf.sin(Time.time + swayOffset + (swayIdx * swaySegmentOffset), swayScl, swayMag) * Mathf.sign(flipSprite != flip);
                     seg.rotation += sin;
