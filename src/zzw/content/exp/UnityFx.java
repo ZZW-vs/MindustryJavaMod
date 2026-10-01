@@ -9,6 +9,8 @@ import arc.graphics.g2d.TextureRegion;
 import arc.math.Angles;
 import arc.math.Interp;
 import arc.math.Mathf;
+import arc.math.Rand;
+import arc.math.geom.Position;
 import arc.math.geom.Vec2;
 import arc.util.Tmp;
 import arc.util.Time;
@@ -24,6 +26,9 @@ import mindustry.graphics.Pal;
  * 参考: PU_V8 main/src/unity/content/UnityFx.java L104-146, L819-828
  */
 public class UnityFx {
+
+    /** 闪电链抖动使用的随机数发生器 (PU132 里为静态导入的 rand) */
+    private static final Rand rand = new Rand();
 
     public static final Effect
         expPoof = new Effect(60f, e -> {
@@ -191,7 +196,309 @@ public class UnityFx {
             Draw.color(Color.white, e.color, e.fin());
             Lines.stroke(e.fout() * 1.5f);
             Lines.circle(u.x, u.y, 8f);
+        }),
+
+        // ===== 经验激光炮台特效 (PU132 UnityFx / ShootFx 移植) =====
+
+        /** 蓄力火花 (PU132 UnityFx.laserCharge): 沿炮口方向随机散布的短线段 */
+        laserCharge = new Effect(38f, e -> {
+            Draw.color(e.color);
+            Angles.randLenVectors(e.id, e.id % 3 + 1, 1f + 20f * e.fout(), e.rotation, 120f, (x, y) ->
+                Lines.lineAngle(e.x + x, e.y + y, Mathf.angle(x, y), e.fslope() * 3f + 1f)
+            );
+        }),
+
+        /** 短蓄力火花 (PU132 UnityFx.laserChargeShort): 单点小方块, 用于连发蓄力炮台 */
+        laserChargeShort = new Effect(18f, e -> {
+            Draw.color(e.color);
+            Angles.randLenVectors(e.id, 1, 1f + 20f * e.fout(), e.rotation, 120f, (x, y) ->
+                Fill.square(e.x + x, e.y + y, e.fslope() * 1.5f + 0.1f, 45f)
+            );
+        }),
+
+        /**
+         * 蓄力开始方块 (PU132 UnityFx.laserChargeBegin): 由大到小再收敛的旋转方块.
+         * <p>v160 无 {@code Effect.scaled}, 这里用 {@code e.fin()} 直接复现内外两层进度.</p>
+         */
+        laserChargeBegin = new Effect(60f, e -> {
+            Draw.color(e.color);
+            Fill.square(e.x, e.y, e.fin() * 3f, 45f);
+
+            Draw.color();
+            Fill.square(e.x, e.y, e.fin() * 2f, 45f);
+        }),
+
+        /**
+         * 裂缝激光蓄力 (PU132 UnityFx.laserFractalCharge): 3 条由外向内收敛的线段.
+         * <p>v160 无 {@code Effect.scaled}, 用固定时长 (60/30 tick) 代替原版的嵌套子特效.</p>
+         */
+        laserFractalCharge = new Effect(120f, e -> {
+            float radius = 10f * 8f;
+            // 生成半径: 前半段维持, 后半段向外扩张 (对应原版 pow3Out(1 - fout(0.5)))
+            float grow = radius / 2f + Interp.pow3Out.apply(1f - e.fout(0.5f)) * radius * 1.25f;
+            // 线段亮度: 前 60 tick 内衰减
+            float life = Mathf.curve(1f - Mathf.clamp(e.time / 60f), 0f, 0.5f);
+            // 收敛进度: 前 30 tick 由外向内
+            float conv = Interp.pow2.apply(Mathf.clamp(e.time / 30f));
+
+            Angles.randLenVectors(e.id, 3, grow, (x, y) -> {
+                Lines.stroke(life, Tmp.c1.set(Pal.lancerLaser).lerp(Pal.sapBullet, 0.5f).a(life));
+                Lines.line(e.x + x, e.y + y, e.x + Mathf.lerp(x, 0f, conv), e.y + Mathf.lerp(y, 0f, conv));
+            });
+        }),
+
+        /**
+         * 裂缝激光蓄力起始 (PU132 UnityFx.laserFractalChargeBegin): 4 条旋转弧线.
+         * <p>v160 无 {@code Effect.scaled}, 用 {@code e.time/lifetime} 直接换算各弧线半径.</p>
+         */
+        laserFractalChargeBegin = new Effect(90f, e -> {
+            float r0 = 9f * Mathf.clamp(e.time / 60f);
+            float r1 = 10f * Mathf.clamp(e.time / 40f);
+            float r2 = 11f * Mathf.clamp(e.time / 40f);
+            float r3 = 12f * Mathf.clamp(e.time / 60f);
+
+            Draw.color(Tmp.c1.set(UnityPal.lancerSap3).a(0.1f + 0.55f * e.fslope()));
+            Lines.arc(e.x, e.y, r0, 0.6f, Time.time * 8f - 60f);
+            Lines.arc(e.x, e.y, r1, 0.6f, Time.time * 5f);
+
+            Draw.color(Tmp.c1.set(Pal.lancerLaser).lerp(Pal.sapBullet, 0.5f + 0.5f * Mathf.sin(16f * e.fin())).a(0.25f + 0.8f * e.fslope()));
+            Lines.arc(e.x, e.y, r2, 0.4f, Time.time * -6f + 121f);
+            Lines.arc(e.x, e.y, r3, 0.4f, Time.time * -4f + 91f);
+        }),
+
+        /**
+         * 冻结爆裂 (PU132 UnityFx.freezeEffect): 六边形扩散 + 双圈雪花.
+         * <p>数据: e.rotation 为强度, e.color 为冰色.</p>
+         */
+        freezeEffect = new Effect(30f, e -> {
+            Draw.color(Color.white, e.color, e.fin());
+            Lines.stroke(e.fout() * 2f);
+            Lines.poly(e.x, e.y, 6, 4f + e.rotation * 1.5f * e.finpow(), Mathf.randomSeed(e.id) * 360f);
+            Draw.color();
+
+            // ★ 原版用静态计数器 integer 派生随机种子, 这里用局部数组实现同样的效果
+            int[] idx = {0};
+            Angles.randLenVectors(e.id, 5, e.rotation * 1.6f * e.fin() + 16f, e.fin() * 33f, 360f, (x, y) ->
+                snowFlake(e.x + x, e.y + y, e.finpow() * 60f, Mathf.randomSeed(e.id + idx[0]++) * 2f + 2f)
+            );
+            Angles.randLenVectors(e.id + 1, 3, e.rotation * 2.1f * e.fin() + 7f, e.fin() * -19f, 360f, (x, y) ->
+                snowFlake(e.x + x, e.y + y, e.finpow() * 60f, Mathf.randomSeed(e.id + idx[0]++) * 2f + 2f)
+            );
+        }),
+
+        /** 冰片射击 (PU132 UnityFx.shootFlake): 6 向冰针 */
+        shootFlake = new Effect(21f, e -> {
+            Draw.color(e.color, Color.white, e.fout());
+
+            for(int i = 0; i < 6; i++){
+                Drawf.tri(e.x, e.y, 3f * e.fout(), 12f, e.rotation + Mathf.randomSeed(e.id, 360f) + 60f * i);
+            }
+        }),
+
+        /** 蓄力开火 (PU132 ShootFx.laserChargeShoot): 4 向旋转尖刺 */
+        laserChargeShoot = new Effect(21f, e -> {
+            Draw.color(e.color, Color.white, e.fout());
+
+            for(int i = 0; i < 4; i++){
+                Drawf.tri(e.x, e.y, 4f * e.fout(), 29f, e.rotation + 90f * i + e.finpow() * 112f);
+            }
+        }),
+
+        /** 连发蓄力开火 (PU132 ShootFx.laserChargeShootShort): 扩散方框 */
+        laserChargeShootShort = new Effect(15f, e -> {
+            Draw.color(e.color, Color.white, e.fout());
+            Lines.stroke(2f * e.fout());
+            Lines.square(e.x, e.y, 0.1f + 20f * e.finpow(), 45f);
+        }),
+
+        /**
+         * 裂缝激光开火 (PU132 ShootFx.laserFractalShoot): 4 向尖刺 + 5 组散射碎片.
+         * <p>v160 无 PU 的 {@code Utils.pow25Out}, 用 {@link Interp#pow2Out} 近似.</p>
+         */
+        laserFractalShoot = new Effect(40f, e -> {
+            Draw.color(Tmp.c1.set(e.color).lerp(Color.white, e.fout()));
+
+            for(int i = 0; i < 4; i++){
+                Drawf.tri(e.x, e.y, 4f * e.fout(), 29f, e.rotation + 90f * i + e.finpow() * 112f);
+            }
+
+            for(int h = 1; h <= 5; h++){
+                float mul = h % 2;
+                float rm = 1f + mul * 0.5f;
+                float rot = 90f + (1f - e.finpow()) * Mathf.randomSeed(e.id + (long)(mul * 2f), 210f * rm, 360f * rm);
+                for(int i = 0; i < 2; i++){
+                    float m = i == 0 ? 1f : 0.5f;
+                    float w = 8f * e.fout() * m;
+                    float length = 8f * 3f / (2f - mul);
+                    Tmp.v1.trns(rot, length - 4f);
+                    float fx = Tmp.v1.x + e.x, fy = Tmp.v1.y + e.y;
+                    length *= Interp.pow2Out.apply(e.fout());
+
+                    Drawf.tri(fx, fy, w, length * m, rot + 180f);
+                    Drawf.tri(fx, fy, w, length / 3f * m, rot);
+
+                    Draw.alpha(0.5f);
+                    Drawf.tri(e.x, e.y, w, length * m, rot + 360f);
+                    Drawf.tri(e.x, e.y, w, length / 3f * m, rot);
+                    Fill.square(fx, fy, 3f * e.fout(), rot + 45f);
+                }
+            }
+        }),
+
+        /** 扭曲状态特效 (PU132 UnityFx.distortFx): 数据为 Float, 表示方块旋转角 */
+        distortFx = new Effect(18f, e -> {
+            if(!(e.data instanceof Float)) return;
+            Draw.color(Pal.lancerLaser, Pal.place, e.fin());
+            Fill.square(e.x, e.y, 0.1f + e.fout() * 2.5f, (Float)e.data);
+        }),
+
+        /** 力场扩散波纹 (PU132 UnityFx.distSplashFx): 数据为 Float[]{半径, 生命周期} */
+        distSplashFx = new Effect(80f, e -> {
+            if(!(e.data instanceof Float[] data)) return;
+            Draw.color(Pal.lancerLaser, Pal.place, e.fin());
+            Lines.stroke(2f * e.fout());
+            Lines.circle(e.x, e.y, data[0] * e.fin());
+        }){
+            @Override
+            public void at(float x, float y, float rotation, Object data){
+                // ★ 原版行为: 用数据里的第二项临时覆盖特效生存时间
+                if(data instanceof Float[] f) lifetime = f[1];
+                create(x, y, rotation, Color.white, data);
+            }
+        },
+
+        /** 力场生成 (PU132 UnityFx.distStart): 数据为 Float, 表示半径 */
+        distStart = new Effect(45f, e -> {
+            if(!(e.data instanceof Float data)) return;
+
+            float centerf = Color.clear.toFloatBits();
+            float edgef = Tmp.c1.set(Pal.lancerLaser).a(e.fout()).toFloatBits();
+            float sides = Mathf.ceil(Lines.circleVertices(data) / 2f) * 2f;
+            float space = 360f / sides;
+
+            for(int i = 0; i < sides; i += 2){
+                float px = Angles.trnsx(space * i, data);
+                float py = Angles.trnsy(space * i, data);
+                float px2 = Angles.trnsx(space * (i + 1), data);
+                float py2 = Angles.trnsy(space * (i + 1), data);
+                float px3 = Angles.trnsx(space * (i + 2), data);
+                float py3 = Angles.trnsy(space * (i + 2), data);
+                Fill.quad(e.x, e.y, centerf, e.x + px, e.y + py, edgef, e.x + px2, e.y + py2, edgef, e.x + px3, e.y + py3, edgef);
+            }
+        }),
+
+        /** 小闪电链 (PU132 UnityFx.smallChainLightning): 数据为 Position (目标点) */
+        smallChainLightning = new Effect(40f, 300f, e -> {
+            if(!(e.data instanceof Position p)) return;
+
+            float tx = p.getX(), ty = p.getY(), dst = Mathf.dst(e.x, e.y, tx, ty);
+            Tmp.v1.set(p).sub(e.x, e.y).nor();
+
+            float normx = Tmp.v1.x, normy = Tmp.v1.y;
+            float range = 6f;
+            int links = Mathf.ceil(dst / range);
+            float spacing = dst / links;
+
+            Lines.stroke(2.5f * e.fout());
+            Draw.color(Color.white, e.color, e.fin());
+
+            Lines.beginLine();
+
+            Lines.linePoint(e.x, e.y);
+            rand.setSeed(e.id);
+
+            for(int i = 0; i < links; i++){
+                float nx, ny;
+                if(i == links - 1){
+                    nx = tx;
+                    ny = ty;
+                }else{
+                    float len = (i + 1) * spacing;
+                    Tmp.v1.setToRandomDirection(rand).scl(range / 2f);
+                    nx = e.x + normx * len + Tmp.v1.x;
+                    ny = e.y + normy * len + Tmp.v1.y;
+                }
+                Lines.linePoint(nx, ny);
+            }
+
+            Lines.endLine();
+        }),
+
+        /** 闪电链 (PU132 UnityFx.chainLightning): 数据为 Position (目标点) */
+        chainLightning = new Effect(30f, 300f, e -> {
+            if(!(e.data instanceof Position p)) return;
+
+            float tx = p.getX(), ty = p.getY(), dst = Mathf.dst(e.x, e.y, tx, ty);
+            Tmp.v1.set(p).sub(e.x, e.y).nor();
+
+            float normx = Tmp.v1.x, normy = Tmp.v1.y;
+            float range = 6f;
+            int links = Mathf.ceil(dst / range);
+            float spacing = dst / links;
+
+            Lines.stroke(4f * e.fout());
+            Draw.color(Color.white, e.color, e.fin());
+
+            Lines.beginLine();
+
+            Lines.linePoint(e.x, e.y);
+            rand.setSeed(e.id);
+
+            for(int i = 0; i < links; i++){
+                float nx, ny;
+                if(i == links - 1){
+                    nx = tx;
+                    ny = ty;
+                }else{
+                    float len = (i + 1) * spacing;
+                    Tmp.v1.setToRandomDirection(rand).scl(range / 2f);
+                    nx = e.x + normx * len + Tmp.v1.x;
+                    ny = e.y + normy * len + Tmp.v1.y;
+                }
+                Lines.linePoint(nx, ny);
+            }
+
+            Lines.endLine();
+        }),
+
+        /** 闪光 (PU132 UnityFx.sparkle): dirium-wall 的 updateEffect, 随机火花 */
+        sparkle = new Effect(55f, e -> {
+            Draw.color(e.color);
+            // ★ 原版用静态计数器 integer 派生随机种子, 这里用局部数组复现
+            int[] idx = {0};
+            Angles.randLenVectors(e.id, e.id % 3 + 1, 8f, (x, y) -> {
+                idx[0]++;
+                spark(e.x + x, e.y + y, e.fout() * 2.5f, 0.5f + e.fout(), e.id * idx[0]);
+            });
+        }),
+
+        /** 限伤命中特效 (PU132 UnityFx.maxDamageFx): 橙色扩张方框 */
+        maxDamageFx = new Effect(16f, e -> {
+            Draw.color(Color.orange);
+            Lines.stroke(2.5f * e.fin());
+            Lines.square(e.x, e.y, e.rotation * 4f);
+        }),
+
+        /** 承受限伤特效 (PU132 UnityFx.withstandFx): 橙色收缩方框 */
+        withstandFx = new Effect(16f, e -> {
+            Draw.color(Color.orange);
+            Lines.stroke(1.2f * e.rotation * e.fout());
+            Lines.square(e.x, e.y, e.rotation * 4f);
+        }),
+
+        /** 闪烁免伤特效 (PU132 UnityFx.blinkFx): 白→迪里姆色方框 */
+        blinkFx = new Effect(30f, e -> {
+            Draw.color(Color.white, UnityPal.dirium, e.fin());
+            Lines.stroke(3f * e.rotation * e.fout());
+            Lines.square(e.x, e.y, e.rotation * 4f * e.finpow());
         });
+
+    /** 雪花 (PU132 UnityDrawf.snowFlake): 三条夹角 60° 的线段 */
+    private static void snowFlake(float x, float y, float r, float s){
+        for(int i = 0; i < 3; i++){
+            Lines.lineAngleCenter(x, y, r + 60 * i, s);
+        }
+    }
 
     /** 绘制多边形部分弧线 (PU132 polySeg, 原版未定义自行实现) */
     private static void polySeg(int sides, int start, int end, float x, float y, float radius, float rotation){

@@ -9,6 +9,7 @@ import mindustry.entities.Damage;
 import mindustry.entities.Lightning;
 import mindustry.entities.bullet.LaserBulletType;
 import mindustry.gen.Bullet;
+import mindustry.gen.Healthc;
 import mindustry.graphics.Pal;
 import zzw.content.exp.ExpTurret;
 import zzw.content.exp.UnityPal;
@@ -73,6 +74,18 @@ public class ExpLaserBulletType extends LaserBulletType {
         return Tmp.c2.set(fromColor).lerp(toColor, getLevelf(b));
     }
 
+    /**
+     * 命中回调, 默认空实现, 供子类覆写.
+     * <p>当激光射线沿途命中单位或建筑时, 由 {@link #init(Bullet)} 在命中点调用,
+     * 典型用途是 PU132 frostLaser 的冻结圈 (freezePos)。</p>
+     *
+     * @param b 当前激光子弹
+     * @param x 命中点 x 坐标
+     * @param y 命中点 y 坐标
+     */
+    public void onHit(Bullet b, float x, float y){
+    }
+
     @Override
     public void init(Bullet b){
         // Apply damage increase based on level (PU_V8 setDamage)
@@ -83,6 +96,12 @@ public class ExpLaserBulletType extends LaserBulletType {
         // Use dynamic length for collision (PU_V8 getLength)
         float resultLength = Damage.collideLaser(b, getLength(b), largeHit, laserAbsorb, pierceCap);
         float rot = b.rotation();
+
+        // 命中检测: 沿射线找到第一个可命中目标后触发 onHit (不施加额外伤害, 仅作为回调)
+        Healthc target = Damage.linecast(b, b.x, b.y, rot, getLength(b));
+        if(target != null){
+            onHit(b, target.getX(), target.getY());
+        }
 
         laserEffect.at(b.x, b.y, rot, resultLength * 0.75f);
 

@@ -52,6 +52,12 @@
   - 高耐久防御设施，由四个小铜块自动合成
 - **大型铁块** - 由大量铁板和铁锭制作的大型防御块
   - 高耐久防御设施，由四个小铁块自动合成
+- **PU 墙体系统**（对照 PU132 原版补齐功能）：
+  - **玻璃墙（metaglass-wall / -large）** - `LightWall`：光可穿过墙体并按 `suppression=0.8` 衰减，接入光学系统
+  - **单极子墙（electrophobic-wall / -large）** - `PowerWall`：受能量弹（激光/闪电等）攻击时按弹种倍率转化为电力输出，效率超 1 过载扣血，效率超阈值显示热图；友方治疗弹命中清零
+  - **铜镍合金墙（cupronickel-wall / -large）** - `HeatWall`：接入坩埚热量网络，墙体温度越高越持续灼烧并伤害周围单位
+  - **限伤墙（ustone/dense/steel/dirium-wall）** - `LimitWall` / `LevelLimitWall`：补回限伤命中（`withstandFx`）与闪烁免伤（`blinkFx`）特效；迪里姆墙恢复原版 `sparkle` 待机特效
+  - **经验限伤墙（ExpLimitWall）** - 对齐原版 `hubValid`/`canHub` 逻辑，血条旁显示减伤百分比图标
 
 #### 炮台系统 (PU132 还原)
 本模组的高级炮台全部对照 PU132 原版逐项还原，主要修正包括：
@@ -61,6 +67,11 @@
 - **子弹形态**：z-boson 改为原版长条型（取原版 2/3 长度）；banshee 子弹整体尺寸微增；celsius / kelvin 射速与拖尾还原；ephemeron 阴阳粒子碰撞特效还原
 - **特殊机制**：gluon 结尾改为原版小漩涡；proton 转速微增；shockwire 激光加粗；plasma 射程 65 格；arc-caster / arc-storm 蓄力与六边形效果还原
 - **supernova**：三项还原修正——① 蓄力光球按原版前移到炮口（`shootLength = size × tilesize / 2 − 8 = 20`，此前误设为 8，光球贴在炮台中心）；② 补回"开火结束后炮管泛蓝"的热感发光（原版 `cooldown = 0.006f` 约 2.8 秒才褪完，v160 该字段拆为 `cooldownTime`，默认 20f 只需 0.33 秒就褪光，肉眼看不到 → 换算为 `cooldownTime = 166.7f`）；③ 转向改为读取 block 上的 `firingMoveFract`（原先写死 0.2f，导致该配置项失效），光束存在期间按该系数减速，其余时间全速跟随目标（玩家操控时即始终跟随鼠标）
+- **经验激光炮台（charge / frost / fractal / swarm）**：四项按 PU132 原版还原攻击方式与特效——
+  - `charge-laser-turret`：改为**蓄力单发**（`shoot.firstShotDelay = 50`，蓄力播放 `laserCharge` + `laserChargeBegin`、开火播放 `laserChargeShoot`），弹药换成原版 `shardLaser`（150 长度 / 30 伤害 + 电击状态 + 激光碎片）
+  - `frost-laser-turret`：弹药换成原版 `frostLaser`（170 / 130 + 冻结状态 + 冰片射击特效），命中生成**冻结圈**（`freezeEffect` + 冻结音效 + 范围冻结/瘫痪）；原版该炮台**无炮台贴图**，故暂时将本体/液体/顶部各层置为透明区域（png 资源保留）
+  - `fractal-laser-turret`：改为**蓄力裂缝激光**（蓄力 `laserFractalCharge` / `laserFractalChargeBegin`，开火 `laserFractalShoot`），命中生成 `DistFieldBulletType` **扭曲力场**（减速场内敌方单位及其子弹）并播放闪电链 + 多个随机小力场
+  - `swarm-laser-turret`：由"简化版 ExpPowerTurret"改为新建的 `BurstChargePowerTurret`——**一次装填按 20 tick 间隔依次蓄力发射 4 发**，每发独立播放蓄力特效（忠实还原原版连发蓄力攻击方式），弹药为 `branchLaser`（140 / 20 + 3 发分裂碎片）
 - **endgame**：按 PU132 原版**逐行忠实移植**（draw / updateTile / updateEyes / eyeShoot / killUnits / killTiles / shoot / collision / damage 的数值、判定顺序、特效参数与图层全部照抄）——三层旋转环 + 16 眼追踪光束（光束攻击半径 = 炮台射程 820）、攻击时轮盘旋转与底座纹理亮起、眼睛朝目标偏移、内外圈逆时针依次发射秒杀光束、齐射时以自身为中心湮灭爆炸
   - **慢闪电**：改为 PU132 原版的慢闪电形态——单段长度回到原版 50（远小于延伸距离，因此会自然**弯折 + 分叉**，不再是笔直光柱），延伸距离按需求取**炮台射程的一半**（820 / 2 = 410，原版为 810），并限制同时存在数量不超过 6 条；沿线段连续施加 520 × 效率 的伤害
   - **通电就亮修复**：v158 中 `efficiency` 会被必选物品消耗（terminum）拖成 0，导致通电也不亮；改用 `power.status`（纯电力满足度）作为"通电"信号，与物品解耦，通电即亮眼睛与底部线路

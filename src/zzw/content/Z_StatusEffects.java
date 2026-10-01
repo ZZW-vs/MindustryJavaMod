@@ -1,8 +1,15 @@
 package zzw.content;
 
 import arc.graphics.Color;
+import arc.math.Mathf;
+import arc.util.Tmp;
+import mindustry.content.Fx;
 import mindustry.content.StatusEffects;
+import mindustry.entities.units.StatusEntry;
+import mindustry.gen.Unit;
+import mindustry.graphics.Pal;
 import mindustry.type.StatusEffect;
+import zzw.content.exp.UnityFx;
 import zzw.content.units.effects.ParticleFx;
 
 /**
@@ -27,6 +34,9 @@ public class Z_StatusEffects{
 
     /** 瘫痪 (PU132 UnityStatusEffects.disabled): 移速/装填归零 + 缴械 */
     public static StatusEffect disabled;
+
+    /** 扭曲 (PU132 UnityStatusEffects.distort): 力场内单位移速降至 35% */
+    public static StatusEffect distort;
 
     public static void load(){
         blueBurn = new StatusEffect("blue-burn"){{
@@ -54,5 +64,24 @@ public class Z_StatusEffects{
             speedMultiplier = 0f;
             disarm = true;
         }};
+
+        // PU132 UnityStatusEffects.distort: fractal-laser-turret 力场对敌人的减速
+        // ★ v160 适配: 原版 effect.at(..., 45f) 的 data 为方块旋转角, 这里保持一致
+        distort = new StatusEffect("distort"){
+            {
+                speedMultiplier = 0.35f;
+                color = Pal.lancerLaser;
+                effect = UnityFx.distortFx;
+            }
+
+            @Override
+            public void update(Unit unit, StatusEntry entry){
+                // 与 PU132 一致: 不调用 super, 仅播放带旋转角数据的扭曲特效
+                if(effect != Fx.none && Mathf.chanceDelta(effectChance)){
+                    Tmp.v1.rnd(unit.type.hitSize / 2f);
+                    effect.at(unit.x + Tmp.v1.x, unit.y + Tmp.v1.y, 0f, 45f);
+                }
+            }
+        };
     }
 }

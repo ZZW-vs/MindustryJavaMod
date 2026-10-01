@@ -20,4 +20,13 @@ public class UnityPal {
         diriumLight = Color.valueOf("ccffe4");
 
     public static final Color lancerLaser = Pal.lancerLaser;
+
+    // ===== 经验激光炮台色阶 (PU132 UnityPal.lancerSap1..5) =====
+    // 由 lancerLaser 向 sapBullet 逐级插值, 用于激光炮台的等级配色 (effectColors)
+    public static final Color
+        lancerSap1 = Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.167f),
+        lancerSap2 = Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.333f),
+        lancerSap3 = Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.5f),
+        lancerSap4 = Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.667f),
+        lancerSap5 = Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.833f);
 }
