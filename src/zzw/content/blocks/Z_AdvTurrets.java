@@ -429,6 +429,12 @@ public class Z_AdvTurrets {
             rotateSpeed = 1.5f;  // 转动速度上限调小
             firingMoveFract = 0.5f;
             recoil = 4f;
+            // ★ 蓝光修复 (开火后炮管变蓝): 原版 PU132 设 cooldown = 0.006f,
+            //   即 heat 每帧衰减 0.006 → 约 2.8 秒才褪完, 所以开火结束后炮管会明显泛蓝。
+            //   v160 把该字段拆成 cooldownTime (TurretBuild: heat = approachDelta(heat, 0, 1/cooldownTime)),
+            //   默认 20f 只需 0.33 秒就褪光, 肉眼几乎看不到 → 表现为"没有蓝光"。
+            //   换算: 1 / 0.006 ≈ 166.7f, 与原版观感一致。
+            cooldownTime = 166.7f;
             shootCone = 15f;
             // ★ 范围一致性修复: 显示圈 = 实际光束长度 (PU132 length=280),
             //   之前 range=250 < length=280, 玩家看到的目标在圈内却打不到/反之

@@ -84,8 +84,14 @@ public class SupernovaTurret extends SoulLaserTurret {
     public Effect pullEffect = UnityFx.supernovaPullEffect;
     public Effect chargeBeginEffect = UnityFx.supernovaChargeBegin;
 
-    /** v155.4 Turret 无 shootLength 字段, 自定义 */
-    public float shootLength = 8f;
+    /**
+     * 炮口长度: 蓄力光球与 chargeBeginEffect 相对炮台中心的偏移距离。
+     * <p>
+     * v155.4 的 Turret 没有 shootLength 字段, 这里自定义。
+     * 原版 PU132 UnityBlocks 中为 {@code shootLength = size * tilesize / 2f - 8f},
+     * size = 7 时 = 20f。(此字段会被 updateTile 与 draw 共用, 改一处即可整体前移)
+     */
+    public float shootLength = 20f;
 
     /** PU132 UnityPal.monolith → Color.valueOf("87ceeb") */
     public static final Color monolithColor = Color.valueOf("87ceeb");
@@ -257,16 +263,19 @@ public class SupernovaTurret extends SoulLaserTurret {
         public float starHeat;
 
         /**
-         * ★ 操控修复 (v158 LaserTurret.firingMoveFract 等效):
-         * 原版 (PU132) 持续射击中转向减速至 20%, 让光束"甩尾"平滑;
-         * v158 适配时没带这个行为 → 射击时炮塔仍全速旋转, 操控感突兀。
-         * turnToTarget 在 super.updateTile() 内被调用, 无法直接覆写参数,
-         * 这里在射击期间临时压低 block.rotateSpeed 的使用值。
+         * 与 v160 原版 LaserTurretBuild.turnToTarget 完全一致的转向逻辑:
+         * <p>
+         * - 平时 (无光束): 按 100% 速度跟随目标 —— 玩家操控时即"一直转动面向鼠标";
+         * - 光束存在期间 (bullets 非空): 速度乘以 block 的 firingMoveFract,
+         *   让激光"甩尾"更平滑。
+         * <p>
+         * 注意: 这里原先写死 0.2f, 使 block 上的 firingMoveFract 成了死配置,
+         * 现改为读取 block 字段 (与原版行为一致, 数值由 Z_AdvTurrets 统一配置)。
          */
         @Override
         public void turnToTarget(float targetRot){
             rotation = Angles.moveToward(rotation, targetRot,
-                efficiency * rotateSpeed * delta() * (bullets.any() ? 0.2f : 1f));
+                efficiency * rotateSpeed * delta() * (bullets.any() ? firingMoveFract : 1f));
         }
 
         /**
