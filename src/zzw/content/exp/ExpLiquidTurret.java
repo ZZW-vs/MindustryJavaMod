@@ -110,7 +110,8 @@ public class ExpLiquidTurret extends ExpTurret {
         @Override
         public void updateTile(){
             //PU_V8: unit.ammo(unit.type().ammoCapacity * liquids.currentAmount() / liquidCapacity)
-            unit.ammo(unit.type().ammoCapacity * liquids.currentAmount() / liquidCapacity);
+            // ★ v160: UnitType.ammoCapacity 已废弃 (UnitTypes.block 的值为 1), 直接用液体比例
+            unit.ammo(liquids.currentAmount() / liquidCapacity);
 
             super.updateTile();
         }

@@ -52,10 +52,12 @@ public class BarrelsItemTurret extends ItemTurret {
         //   之前未设置此字段 (默认 true), 导致炮管射击 (bullet()) 永不消耗弹药:
         //   只要还剩 1 发弹药 hasAmmo() 恒为 true, 炮管无限开火 (banshee 无限攻击 bug)。
         consumeAmmoOnce = false;
-        // ★ v155.4 bullet(type, xOffset, yOffset, ...) 期望 LOCAL 局部坐标 (rotation-90 坐标系)
-        // 默认 shootY = size*tilesize/2 (前向半身高偏移), 我们自定义每个炮管的前向偏移
-        // 所以将默认值清零, 这样 yOffset 就是相对于炮台中心的前向距离
-        shootY = 0f;
+        // ★ 保留 shootY 默认值 (NEGATIVE_INFINITY → Turret.init() 会设为 size*tilesize/2, 即炮口前向深度)。
+        //   这是非 focus 模式 (super.shoot → ShootAlternate 模式) 的子弹生成高度, 必须等于炮管口位置,
+        //   否则两半交替射击的子弹会从炮台中心 (偏后) 射出, 而不是从炮口射出 (ghost 两半开火偏后 bug)。
+        // ★ 由于 v155.4 的 bullet() 会把 shootY 叠加到每个炮管的 yOffset 上, 炮管路径 (shootBarrel)
+        //   与 focus 分支在传 yOffset 时都会减去 shootY 做补偿, 保证它们仍按"相对炮台中心"的
+        //   前向距离发射 (与 PU 原版 v6 里 tr 不叠加 shootY 的行为一致)。
     }
 
     public void addBarrel(float x, float y, float reloadTime) {
@@ -132,9 +134,10 @@ public class BarrelsItemTurret extends ItemTurret {
                 // ★ v155.4 bullet() 期望 LOCAL 局部坐标 (rotation-90 坐标系), 不是世界坐标
                 // 之前错误地传入了已旋转的 tr3.x/tr3.y 导致双重旋转, 子弹位置偏移
                 float xOff = spread * i;
-                float yOff = size * tilesize / 2f;
-                // 用 tr3 (世界坐标) 仅用于角度计算 (从炮口位置到目标点的角度)
-                tr3.trns(rotation - 90f, xOff, yOff);
+                // ★ 减去 shootY 补偿: bullet() 会叠加 shootY, 这里要的是"相对炮台中心"的前向距离
+                float yOff = size * tilesize / 2f - shootY;
+                // 用 tr3 (世界坐标) 仅用于角度计算 (从炮口位置到目标点的角度), 这里用真实炮口前向距离
+                tr3.trns(rotation - 90f, xOff, size * tilesize / 2f);
                 Vec2 targetVec = new Vec2();
                 targetVec.trns(rotation, Math.max(Mathf.dst(x, y, targetPos.x, targetPos.y), size * tilesize));
                 float rot = Angles.angle(tr3.x, tr3.y, targetVec.x, targetVec.y);
@@ -152,11 +155,12 @@ public class BarrelsItemTurret extends ItemTurret {
             float i = barrelShotCounters[index] % 2 - 0.5f;
             // ★ v155.4 bullet() 期望 LOCAL 局部坐标 (rotation-90 坐标系)
             float xOff = barrels.get(index).x * i;
-            float yOff = barrels.get(index).y;
+            // ★ 减去 shootY 补偿: 炮管前向距离按"相对炮台中心"传入 (与 PU 原版 tr 行为一致)
+            float yOff = barrels.get(index).y - shootY;
             float rot = rotation;
             if (focus) {
-                // 用 tr3 (世界坐标) 仅用于角度计算
-                tr3.trns(rotation - 90f, xOff, yOff);
+                // 用 tr3 (世界坐标) 仅用于角度计算, 这里用真实炮口前向距离
+                tr3.trns(rotation - 90f, xOff, barrels.get(index).y);
                 Vec2 targetVec = new Vec2();
                 targetVec.trns(rotation, Math.max(Mathf.dst(x, y, targetPos.x, targetPos.y), size * tilesize));
                 rot = Angles.angle(tr3.x, tr3.y, targetVec.x, targetVec.y);

@@ -96,12 +96,12 @@ public class ExpTurret extends Turret {
 
     //setStats is untouched
     @Override
-    public void checkStats(){
-        if(!stats.intialized){
-            setStats();
-            addExpStats();
-            stats.intialized = true;
-        }
+    public Stats computeStats(){
+        // ★ v160: checkStats() 已废弃, Stats.intialized 已无作用 (不再缓存);
+        //   改为重写 computeStats(): 每次显示统计时重建 stats 并追加经验统计
+        Stats s = super.computeStats();
+        addExpStats();
+        return s;
     }
 
     public void addExpStats(){

@@ -95,7 +95,11 @@ public class BurstChargePowerTurret extends ExpPowerTurret {
             Time.run(chargeTime, () -> {
                 if(dead) return;
                 // ExpTurretBuild.bullet() 内部已处理 后坐/热量/特效/音效/弹药消耗 以及 xRand 横向散布
-                bullet(type, 0f, shootLength, angleOffset, null);
+                // ★ 修复: v160 的 bullet() 会把 yOffset 叠加到默认的 shootY (size * tilesize / 2) 之上,
+                //   若直接传 shootLength, 子弹实际生成在 shootY + shootLength 处 (比炮口偏前约 1 格),
+                //   与上方蓄力特效 (按 shootLength 定位) 不一致。
+                //   减去 shootY 后, 子弹与特效同在 shootLength 处, 与 PU132 原版一致。
+                bullet(type, 0f, shootLength - shootY, angleOffset, null);
             });
         }
 

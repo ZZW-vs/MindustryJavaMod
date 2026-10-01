@@ -95,7 +95,8 @@ public class ExpItemTurret extends ExpTurret {
 
         @Override
         public void updateTile(){
-            unit.ammo((float)unit.type().ammoCapacity * totalAmmo / maxAmmo);
+            // ★ v160: UnitType.ammoCapacity 已废弃 (UnitTypes.block 的值为 1), 直接用弹药比例
+            unit.ammo((float)totalAmmo / maxAmmo);
 
             super.updateTile();
         }

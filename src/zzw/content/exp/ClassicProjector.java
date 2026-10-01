@@ -23,6 +23,7 @@ import mindustry.graphics.Pal;
 import mindustry.type.Category;
 import mindustry.world.meta.Stat;
 import mindustry.world.meta.StatUnit;
+import mindustry.world.meta.Stats;
 import zzw.content.graphics.UnityPal;
 
 import static mindustry.Vars.tilesize;
@@ -167,12 +168,11 @@ public class ClassicProjector extends mindustry.world.blocks.defense.ForceProjec
 
     /** 经验信息面板 (与 ExpTurret.addExpStats 相同结构: EField 折线图 + 升级来源 + 经验容量) */
     @Override
-    public void checkStats(){
-        if(!stats.intialized){
-            setStats();
-            addExpStats();
-            stats.intialized = true;
-        }
+    public Stats computeStats(){
+        // ★ v160: checkStats() 已废弃, Stats.intialized 已无作用; 改为重写 computeStats()
+        Stats s = super.computeStats();
+        addExpStats();
+        return s;
     }
 
     public void addExpStats(){

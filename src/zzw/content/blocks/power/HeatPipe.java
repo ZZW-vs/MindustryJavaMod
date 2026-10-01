@@ -36,6 +36,14 @@ public class HeatPipe extends GraphBlock{
     /** 热色贴图 16 变体 (8x2 切片) */
     TextureRegion[] heatRegions, regions;
 
+    /** 单位灼烧判定的计时器槽位。
+     * <p>★ 与 PU132 差异: 原版写的是 {@code timer(dumpTime, 20f)}, 在 PU132 的旧版
+     * Building.timer 语义下第一个参数是间隔; 但 Mindustry v160 的
+     * {@link mindustry.gen.Building#timer(int, float)} 第一个参数是计时器槽位索引,
+     * 索引 0 已被 Block.timerDump 占用, 直接传 dumpTime 会越界崩溃
+     * ("Out of bounds! Max timer size is 1!")。因此这里单独申请一个槽位。</p> */
+    protected final int timerUnitBurn = timers++;
+
     public HeatPipe(String name){
         super(name);
     }
@@ -69,7 +77,7 @@ public class HeatPipe extends GraphBlock{
 
         @Override
         public void unitOn(Unit unit){
-            if(timer(dumpTime, 20f)){
+            if(timer(timerUnitBurn, 20f)){
                 float intensity = Mathf.clamp(Mathf.map(heat().getTemp(), 400f, 1000f, 0f, 1f));
                 unit.apply(StatusEffects.burning, intensity * 20f + 5f);
                 unit.damage(intensity * 10f);

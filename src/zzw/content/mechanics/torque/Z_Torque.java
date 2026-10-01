@@ -1,6 +1,7 @@
 package zzw.content.mechanics.torque;
 
 import mindustry.content.Items;
+import mindustry.content.Liquids;
 import mindustry.type.Category;
 import mindustry.type.ItemStack;
 import mindustry.world.meta.BuildVisibility;
@@ -22,9 +23,14 @@ import zzw.content.blocks.production.CruciblePump;
 import zzw.content.mechanics.torque.blocks.GraphBlock;
 import zzw.content.mechanics.torque.blocks.distribution.DriveShaft;
 import zzw.content.mechanics.torque.blocks.distribution.InlineGearbox;
+import zzw.content.mechanics.torque.blocks.distribution.DriveBelt;
 import zzw.content.mechanics.torque.blocks.distribution.SimpleTransmission;
 import zzw.content.mechanics.torque.blocks.power.ElectricMotor;
+import zzw.content.mechanics.torque.blocks.power.FlyWheel;
 import zzw.content.mechanics.torque.blocks.power.HandCrank;
+import zzw.content.mechanics.torque.blocks.power.HeatRadiator;
+import zzw.content.mechanics.torque.blocks.power.SeebeckGenerator;
+import zzw.content.mechanics.torque.blocks.power.SteamPiston;
 import zzw.content.mechanics.torque.blocks.power.TorqueGenerator;
 import zzw.content.mechanics.torque.blocks.power.WaterTurbine;
 import zzw.content.mechanics.torque.blocks.power.WindTurbine;
@@ -67,11 +73,25 @@ public class Z_Torque{
     public static ElectricMotor electricMotor;
     public static TorqueGenerator infiTorque;
 
+    // ===== PU160 蒸汽动力 (蒸汽活塞 ↔ 飞轮) =====
+    /** 飞轮: 高惯量扭矩节点, 由蒸汽活塞推动 */
+    public static FlyWheel flywheel;
+    /** 蒸汽活塞: 消耗水+热量, 推动前方飞轮 */
+    public static SteamPiston steamPiston;
+    /** 塞贝克发电机: 热网温差发电 */
+    public static SeebeckGenerator seebeckGenerator;
+
+    // ===== PU160 传动带 =====
+    /** 小型传动带: 跨距离传递扭矩 (最多 1 条链接, 5 格范围) */
+    public static DriveBelt driveBeltSmall;
+    /** 大型传动带: 3x3, 最多 6 条链接, 10 格范围 */
+    public static DriveBelt driveBeltLarge;
+
     // ===== PU132 热力系统 =====
     /** 热管: 热量网络传输管道 */
     public static HeatPipe heatPipe;
     /** 小型散热器: 热量网络耗散端 */
-    public static GraphBlock smallRadiator;
+    public static HeatRadiator smallRadiator;
     /** 地热加热器: 热液地板产热 */
     public static ThermalHeater thermalHeater;
     /** 燃烧加热器: 焚烧可燃物产热 */
@@ -170,6 +190,27 @@ public class Z_Torque{
             addGraph(new GraphTorqueTrans(0.05f, 25f).setRatio(1f, 2.5f).setAccept(2, 1, 0, 0, 1, 2, 0, 0));
         }};
 
+        // ===== PU160 传动带 (YoungchaBlocks L306-332) =====
+
+        // small-drive-belt (L306): 1x1, rotate, 单侧固定接口, 1 条链接 (范围 5 格)
+        // 节点参数忠实还原 TransmissionTorqueGraphNode(0.03f, 8f, ratio=1)
+        driveBeltSmall = new DriveBelt("small-drive-belt"){{
+            requirements(Category.distribution, with(Z_Items.nickel, 50, Items.graphite, 20));
+            health = 150;
+            addGraph(new GraphTorque(0.03f, 8f).setAccept(0, 0, 1, 0));
+        }};
+
+        // large-drive-belt (L318): 3x3, rotate, 单侧固定接口, 6 条链接 (范围 10 格)
+        driveBeltLarge = new DriveBelt("large-drive-belt"){{
+            requirements(Category.distribution, with(Z_Items.cupronickel, 30, Items.silicon, 40, Items.graphite, 50));
+            size = 3;
+            health = 1750;
+            maxRange = 10f;
+            wheelSize = 8f;
+            maxConnections = 6;
+            addGraph(new GraphTorque(0.05f, 30f).setAccept(0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
+        }};
+
         // ===== 动力方块 (扭矩产生) =====
         // hand-crank (PU_V8 L3085): GraphTorque(0.01f, 3f) accept(1,0,0,0)
         handCrank = new HandCrank("hand-crank"){{
@@ -207,6 +248,33 @@ public class Z_Torque{
             addGraph(new GraphTorqueGenerate(0.1f, 25f, 10f, 16f).setAccept(0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
         }};
 
+        // ===== PU160 蒸汽动力 (YoungchaBlocks L473-497) =====
+
+        // flywheel (PU160 L473): 3x3, rotate, GraphTorque(0.05f, 1000f), 前后中间各 1 口
+        flywheel = new FlyWheel("flywheel"){{
+            requirements(Category.power, with(Z_Items.nickel, 50, Items.titanium, 50, Items.lead, 150));
+            size = 3;
+            health = 2600;
+            addGraph(new GraphTorque(0.05f, 1000f).setAccept(0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
+        }};
+
+        // steam-piston (PU160 L485): 3x3, rotate, 耗水 0.1/s, GraphHeat(9f, 0.1f, 0.01f), 单侧 1 口
+        steamPiston = new SteamPiston("steam-piston"){{
+            requirements(Category.power, with(Items.graphite, 20, Z_Items.nickel, 30, Items.titanium, 50, Items.lead, 150));
+            size = 3;
+            health = 2000;
+            consumeLiquid(Liquids.water, 0.1f);
+            addGraph(new GraphHeat(9f, 0.1f, 0.01f).setAccept(0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
+        }};
+
+        // seebeck-generator (PU160 L540): 3x3, rotate, 热网温差发电, GraphHeat(9f, 0.01f, 0.01f), 前后中间各 1 口
+        seebeckGenerator = new SeebeckGenerator("seebeck-generator"){{
+            requirements(Category.power, with(Z_Items.nickel, 50, Items.graphite, 30, Items.copper, 120, Items.titanium, 100, Z_Items.cupronickel, 30));
+            size = 3;
+            health = 2200;
+            addGraph(new GraphHeat(9f, 0.01f, 0.01f).setAccept(0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
+        }};
+
         // infi-heater (PU132 L3160): 沙盒无限热源, GraphHeat(1000f, 1f, 0f) accept(1,1,1,1)
         infiHeater = new HeatSource("infi-heater"){{
             requirements(Category.power, BuildVisibility.sandboxOnly, with());
@@ -242,12 +310,13 @@ public class Z_Torque{
             addGraph(new GraphHeat(5f, 0.7f, 0.008f).setAccept(1, 1, 1, 1));
         }};
 
-        // small-radiator: 小型散热器, GraphHeat(10f, 0.7f, 0.05f) accept(1,1,1,1)
-        smallRadiator = new GraphBlock("small-radiator"){{
-            requirements(Category.power, with(Items.copper, 30, Z_Items.cupronickel, 20, Z_Items.nickel, 15));
-            health = 200;
-            solid = true;
-            addGraph(new GraphHeat(10f, 0.7f, 0.05f).setAccept(1, 1, 1, 1));
+        // small-radiator: 散热器 (PU160 HeatRadiator L553), 2x2, rotate
+        // GraphHeat(capacity 4.0, conductivity 0.15, radiativity 0.4), accept 左右两侧各 2 口
+        smallRadiator = new HeatRadiator("small-radiator"){{
+            requirements(Category.power, with(Z_Items.nickel, 30, Items.graphite, 30, Items.copper, 100, Z_Items.cupronickel, 30));
+            size = 1;
+            health = 1100;
+            addGraph(new GraphHeat(4f, 0.15f, 0.4f).setAccept(0, 0, 1, 1, 0, 0, 1, 1));
         }};
 
         // thermal-heater: 地热加热器, GraphHeat(40f, 0.6f, 0.004f) accept(1,1,0,0,0,0,0,0)

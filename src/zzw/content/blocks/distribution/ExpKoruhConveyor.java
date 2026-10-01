@@ -105,12 +105,11 @@ public class ExpKoruhConveyor extends KoruhConveyor {
     }
 
     @Override
-    public void checkStats() {
-        if (!stats.intialized) {
-            setStats();
-            addExpStats();
-            stats.intialized = true;
-        }
+    public Stats computeStats() {
+        // ★ v160: checkStats() 已废弃, Stats.intialized 已无作用; 改为重写 computeStats()
+        Stats s = super.computeStats();
+        addExpStats();
+        return s;
     }
 
     public void addExpStats() {

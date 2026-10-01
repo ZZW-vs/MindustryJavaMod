@@ -35,7 +35,8 @@ public class ExpPowerTurret extends ExpTurret {
 
         @Override
         public void updateTile(){
-            unit.ammo(power.status * unit.type().ammoCapacity);
+            // ★ v160: UnitType.ammoCapacity 已废弃 (UnitTypes.block 的值为 1), 直接用 0..1 比例
+            unit.ammo(power.status);
 
             super.updateTile();
         }
