@@ -23,6 +23,7 @@ import zzw.content.blocks.production.CrucibleChannel;
 import zzw.content.blocks.production.CrucibleFluidLoader;
 import zzw.content.blocks.production.CruciblePump;
 import zzw.content.blocks.production.CrucibleSource;
+import zzw.content.blocks.production.ModularCrucible;
 import zzw.content.mechanics.torque.blocks.GraphBlock;
 import zzw.content.mechanics.torque.blocks.distribution.DriveShaft;
 import zzw.content.mechanics.torque.blocks.distribution.InlineGearbox;
@@ -121,6 +122,8 @@ public class Z_Torque{
     public static CastingMold castingMold;
     /** 坩埚源: 沙盒用无限原料源 */
     public static CrucibleSource crucibleSource;
+    /** 拼装式坩埚 (PU132 1x1 可自由拼装版, 与 PU_V8 3x3 熔炉并存) */
+    public static ModularCrucible modularCrucible;
 
     // ===== PU132 磁力系统 =====
     /** 镍定子: 永磁体 (2Wb) */
@@ -377,6 +380,15 @@ public class Z_Torque{
             health = 400;
             addGraph(new GraphCrucible().setAccept(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1));
             addGraph(new GraphHeat(75f, 0.2f, 0.006f).setAccept(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1));
+        }};
+
+        // modular-crucible: 拼装式坩埚 (PU132 1x1 原版配置, UnityBlocks L2974-2979)
+        // 与上面的 PU_V8 3x3 熔炉并存: 1x1 单元, 相邻自动拼接外壁, 可自由拼出任意形状
+        modularCrucible = new ModularCrucible("modular-crucible"){{
+            requirements(Category.crafting, with(Z_Items.nickel, 10, Items.titanium, 15));
+            health = 400;
+            addGraph(new GraphCrucible().setAccept(1, 1, 1, 1));
+            addGraph(new GraphHeat(75f, 0.2f, 0.006f).setAccept(1, 1, 1, 1));
         }};
 
         // crucible-pump: 坩埚泵, PU_V8 YoungchaBlocks L463: CrucibleGraph(容量5) + TorqueGraphNode(0.1f, 10f)

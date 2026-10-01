@@ -46,9 +46,40 @@ public class CrucibleGraph extends BaseGraph<GraphCrucibleModule, CrucibleGraph>
     private final Seq<CrucibleIngredient> boilOrder = new Seq<>();
     private final Seq<CrucibleIngredient> coolOrder = new Seq<>();
 
+    /** 拼装坩埚方块名 (连接白名单的主角) */
+    private static final String MODULAR = "modular-crucible";
+    /** 坩埚泵方块名 (拼装坩埚允许相连) */
+    private static final String CRUCIBLE_PUMP = "crucible-pump";
+    /** 保温坩埚方块名 (拼装坩埚允许相连) */
+    private static final String HOLDING = "holding-crucible";
+
     @Override
     public CrucibleGraph create(){
         return new CrucibleGraph();
+    }
+
+    /**
+     * 连接判定 (用户要求): 拼装坩埚 (modular-crucible) 自成一张网络, 只允许与
+     * 同类拼装坩埚、坩埚泵 (crucible-pump) 与保温坩埚 (holding-crucible) 相连;
+     * 其余坩埚系统方块 (3x3 坩埚 / 坩埚通道 / 铸造模具 / 液体装载器 / 坩埚源)
+     * 都不能与它自动连通。
+     *
+     * <p>连边是双向的, 因此只要任一侧是拼装坩埚, 就要求另一侧也在白名单内;
+     * 两侧都不是拼装坩埚时保持原行为 (默认可连)。</p>
+     */
+    @Override
+    boolean canConnect(GraphCrucibleModule b1, GraphCrucibleModule b2){
+        String n1 = b1.parent.build.asBuilding().block.name;
+        String n2 = b2.parent.build.asBuilding().block.name;
+        boolean m1 = MODULAR.equals(n1), m2 = MODULAR.equals(n2);
+
+        if(!m1 && !m2) return true;
+        return isModularPartner(n1) && isModularPartner(n2);
+    }
+
+    /** 拼装坩埚允许连接的方块白名单 */
+    private static boolean isModularPartner(String name){
+        return MODULAR.equals(name) || CRUCIBLE_PUMP.equals(name) || HOLDING.equals(name);
     }
 
     /** 获取 (不存在则创建) 指定原料的流体数据 */

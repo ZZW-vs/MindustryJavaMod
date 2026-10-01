@@ -4,6 +4,7 @@ import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
+import arc.math.geom.Geometry;
 import arc.math.geom.Vec2;
 import arc.util.Time;
 import mindustry.Vars;
@@ -70,15 +71,20 @@ public class Crucible extends GraphBlock{
         /** 四个正交方向的相邻坩埚连通状态 (东/北/西/南), 决定底座是否开口 */
         final boolean[] connection = new boolean[4];
 
-        /** 计算四方向相邻坩埚 (取方块每边中点的外侧一格) */
+        /**
+         * 计算四方向相邻坩埚是否连通 (等价 PU_V8 CrucibleBlock.onConnectionChanged)。
+         *
+         * <p>★ 修复"自动开口方向奇怪": 原实现用 {{size,size/2},{size/2,size},{-1,size/2},{size/2,-1}}
+         * 这类不对称偏移。对 3x3 而言, 西侧 (-1,1) 与南侧 (1,-1) 的取样点落在方块自身范围内,
+         * nearby() 会返回自己, 于是被判定为"已连通", 导致西/南底座永远显示开口贴图。
+         * 现按 PU_V8 写法: 从中心格沿 d4 方向偏移 size/2+1 格 (3x3 即 2 格, 正好是方块边外一格)。
+         * Mindustry 的 {@link Geometry#d4} 顺序为 [东,北,西,南], 与绘制循环的 connection 下标一致。</p>
+         */
         void updateConnections(){
-            int s = (int)size;
-            int h = s / 2;
-            int[][] off = {{s, h}, {h, s}, {-1, h}, {h, -1}};
-
+            int off = size / 2 + 1;
             for(int i = 0; i < 4; i++){
-                Building b = nearby(off[i][0], off[i][1]);
-                connection[i] = b instanceof GraphBuildBase g && g.crucible() != null;
+                Building b = nearby(Geometry.d4x(i) * off, Geometry.d4y(i) * off);
+                connection[i] = b != this && b instanceof GraphBuildBase g && g.crucible() != null;
             }
         }
 

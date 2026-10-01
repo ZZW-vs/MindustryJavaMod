@@ -71,7 +71,7 @@ public class CruciblePump extends GraphBlock{
             table.table(t -> {
                 int i = 0;
                 for(var ing : CrucibleRecipes.ingredients.values()){
-                    t.button(new TextureRegionDrawable(ing.icon), Styles.clearNonei, () -> configure(ing.id)).size(40f).pad(2f);
+                    t.button(new TextureRegionDrawable(ing.icon()), Styles.clearNonei, () -> configure(ing.id)).size(40f).pad(2f);
                     if(++i % 8 == 0) t.row();
                 }
             }).grow().pad(4f).row();
@@ -86,7 +86,7 @@ public class CruciblePump extends GraphBlock{
                 sub.clearChildren();
                 sub.left();
                 if(config != null){
-                    sub.image(config.icon).size(iconMed);
+                    sub.image(config.icon()).size(iconMed);
                     sub.label(() -> Strings.fixed(flowRate * 10f, 2) + "units" + ps).color(Color.lightGray);
                 }else{
                     sub.labelWrap(Core.bundle.get("stat.unity.crucible.nofilter", "No filter selected")).color(Color.lightGray);
