@@ -63,7 +63,11 @@ public class GraphCrucibleModule extends GraphModule<GraphCrucible, GraphCrucibl
         CrucibleFluid[] cache = (CrucibleFluid[])saveCache.get(index);
         graph.fluids.clear();
         if(cache == null) return;
-        for(var f : cache) graph.fluids.put(f.getIngredient(), f);
+        for(var f : cache){
+            // 跳过无效条目 (readLocal 中原料已不存在的槽位为 null)
+            if(f == null || f.getIngredient() == null) continue;
+            graph.fluids.put(f.getIngredient(), f);
+        }
     }
 
     @Override
@@ -123,7 +127,15 @@ public class GraphCrucibleModule extends GraphModule<GraphCrucible, GraphCrucibl
             int id = read.s();
             float solid = read.f();
             float melted = read.f();
-            CrucibleFluid f = new CrucibleFluid(CrucibleRecipes.ingredients.get(id));
+
+            // 先读完数据保证读流位置正确, 再判断原料是否仍存在
+            CrucibleIngredient ing = CrucibleRecipes.ingredients.get(id);
+            // ★ 旧存档中已不存在的原料 (配方表改动过) → 跳过该条目。
+            // 否则会构造出 ingredient 为 null 的 CrucibleFluid, 之后被 put 进网络的
+            // OrderedMap 时会因 key.hashCode() 抛空指针。
+            if(ing == null) continue;
+
+            CrucibleFluid f = new CrucibleFluid(ing);
             f.solid = solid;
             f.melted = melted;
             save[i] = f;

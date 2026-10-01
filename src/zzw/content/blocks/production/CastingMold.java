@@ -227,7 +227,10 @@ public class CastingMold extends GraphBlock{
         @Override
         public void readExt(Reads read, byte revision){
             int id = read.i();
-            castingMelt = id < 0 ? null : (CrucibleItem)CrucibleRecipesGet(id);
+            // ★ 用 instanceof 判定而非强制转换: 配方表改动后同一 id 可能已指向非物品原料,
+            // 直接 (CrucibleItem) 转换会抛 ClassCastException。
+            CrucibleIngredient ing = id < 0 ? null : CrucibleRecipesGet(id);
+            castingMelt = ing instanceof CrucibleItem ci ? ci : null;
             if(castingMelt != null) outputItem = castingMelt.item;
             pourProgress = read.f();
             castProgress = read.f();
