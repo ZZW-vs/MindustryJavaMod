@@ -146,7 +146,11 @@ public abstract class GraphModule<T extends Graph, M extends GraphModule<T, M, G
             for(int i = 0, len = portArray.length; i < len; i++){
                 int j = portArray[i] - 1;
                 if(portArray[i] == 0 || covered[j]) continue;
-                getNetworkOfPort(j).rebuildGraphIndex((M)this, i);
+                // ★ 修复 NPE: getNetworkOfPort 接收的是"端口索引"而非"网络索引".
+                //   原代码把 j(=端口值-1) 当端口索引传入, 只有当 graph.accept[j] 恰为非 0 时才不崩;
+                //   对于像 (1,0,2,0) 这类端口值与其所在下标不对应的配置, graph.accept[j]==0
+                //   会使 getNetworkOfPort 返回 null → 空指针. 这里改传真实端口索引 i.
+                getNetworkOfPort(i).rebuildGraphIndex((M)this, i);
                 covered[j] = true;
             }
             if(networkSaveState){
