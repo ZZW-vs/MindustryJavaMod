@@ -5,6 +5,7 @@ import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
+import arc.math.geom.Vec2;
 import arc.scene.ui.layout.Table;
 import arc.struct.OrderedMap;
 import arc.struct.OrderedSet;
@@ -13,7 +14,6 @@ import arc.util.io.Reads;
 import arc.util.io.Writes;
 import mindustry.gen.Building;
 import mindustry.type.Item;
-import zzw.content.graphics.UnityDrawf;
 import zzw.content.mechanics.torque.blocks.GraphBlock;
 import zzw.content.mechanics.torque.blocks.GraphBlockBase.GraphBuildBase;
 import zzw.content.mechanics.torque.graph.CrucibleGraph;
@@ -24,17 +24,28 @@ import zzw.content.mechanics.torque.meta.GraphData;
 import zzw.content.mechanics.torque.modules.GraphCrucibleModule;
 
 import static mindustry.Vars.iconMed;
+import static mindustry.Vars.itemSize;
 
 /**
- * 铸模 (PU_V8 CrucibleCaster 思路移植到项目框架)
+ * 铸模 (PU_V8 unity.world.blocks.production.CrucibleCaster 移植)
  *
- * <p>从坩埚网络抽出熔融物 (取第一种熔融量足够的物品原料), 浇注 (pourProgress)
- * 后冷却凝固 (castProgress 与温度负相关), 产出原物品。
- * 温度过高时无法冷却 ("温度过高，无法铸造！")。</p>
+ * <p>3x3 方块。从坩埚网络抽出熔融物 (取第一种熔融量足够的物品原料), 浇注 (pourProgress)
+ * 后冷却凝固 (castProgress 与温度负相关), 产出原物品。温度过高时无法冷却 ("温度过高，无法铸造！")。</p>
+ *
+ * <p>绘制忠实还原 PU_V8 贴图布局: 地板 → 铸盘 (含四角铸件与熔液) → 四方向底座 → 熔融网络色液体 → 队伍标。</p>
  */
 public class CastingMold extends GraphBlock{
-    /** 4 方向底座/顶盖贴图 */
-    final TextureRegion[] baseRegions = new TextureRegion[4], topRegions = new TextureRegion[4];
+    /** 地板 / 铸盘 / 铸盘侧面 / 浇注熔液贴图 */
+    TextureRegion floor, platter, platterside, castliquid;
+    /** 4 方向底座贴图 */
+    final TextureRegion[] base = new TextureRegion[4];
+    /** 铸件在铸盘上的四角位置 */
+    final Vec2[] itemPos = {
+        new Vec2(0.4f * 8f, 0.4f * 8f),
+        new Vec2(-0.4f * 8f, 0.4f * 8f),
+        new Vec2(-0.4f * 8f, -0.4f * 8f),
+        new Vec2(0.4f * 8f, -0.4f * 8f)
+    };
 
     public CastingMold(String name){
         super(name);
@@ -47,9 +58,13 @@ public class CastingMold extends GraphBlock{
     public void load(){
         super.load();
 
+        floor = Core.atlas.find(name + "-floor");
+        platter = Core.atlas.find(name + "-platter");
+        platterside = Core.atlas.find(name + "-platterside");
+        castliquid = Core.atlas.find(name + "-cast-liquid");
+
         for(int i = 0; i < 4; i++){
-            baseRegions[i] = Core.atlas.find(name + "-base" + (i + 1));
-            topRegions[i] = Core.atlas.find(name + "-top" + (i + 1));
+            base[i] = Core.atlas.find(name + "-base" + (i + 1));
         }
     }
 
@@ -170,21 +185,35 @@ public class CastingMold extends GraphBlock{
 
         @Override
         public void draw(){
-            Draw.rect(baseRegions[rotation], x, y);
-            if(outputItem != null){
-                if(pourProgress > 0f){
-                    Draw.color(outputItem.color, 1f - Math.abs(pourProgress - 0.5f) * 2f);
-                    Draw.rect(liquidRegion, x, y, rotdeg());
+            Draw.rect(floor, x, y);
 
-                    Draw.color();
-                    Draw.rect(outputItem.fullIcon, x, y, pourProgress * 8f, pourProgress * 8f);
+            float prog = Mathf.curve(pourProgress, 0f, 1f);
+            if(outputItem != null && pourProgress > 0f){
+                // 铸盘 + 浇注熔液 + 四角逐渐成形的铸件
+                Draw.rect(platter, x, y);
+
+                Draw.color(outputItem.color, prog);
+                Draw.rect(castliquid, x, y);
+                Draw.color();
+
+                float siz = itemSize * prog;
+                for(int i = 0; i < itemPos.length; i++){
+                    Draw.rect(outputItem.fullIcon, x + itemPos[i].x, y + itemPos[i].y, siz, siz);
                 }
-                if(castProgress < 1f && pourProgress > 0f){
-                    UnityDrawf.drawHeat(outputItem.fullIcon, x, y, 0f, Mathf.map(castProgress, 0f, 1f, castingMelt == null ? 1073f : castingMelt.meltingpoint, 275f));
-                }
+            }else{
+                Draw.rect(platter, x, y);
             }
 
-            Draw.rect(topRegions[rotation], x, y);
+            Draw.rect(base[rotation], x, y);
+
+            // 熔融网络色铺底
+            GraphCrucibleModule dex = crucible();
+            if(dex != null && dex.getNetwork() != null){
+                Draw.color(dex.getNetwork().color);
+                Draw.rect(liquidRegion, x, y, rotdeg());
+                Draw.color();
+            }
+
             drawTeamTop();
         }
 

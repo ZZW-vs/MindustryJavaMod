@@ -4,163 +4,142 @@ import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
-import arc.scene.ui.layout.Table;
-import arc.struct.OrderedMap;
+import arc.math.geom.Vec2;
+import arc.util.Time;
+import mindustry.Vars;
 import mindustry.gen.Building;
-import mindustry.gen.Icon;
 import mindustry.type.Item;
-import mindustry.ui.Styles;
 import zzw.content.graphics.UnityDrawf;
 import zzw.content.mechanics.torque.blocks.GraphBlock;
+import zzw.content.mechanics.torque.blocks.GraphBlockBase.GraphBuildBase;
 import zzw.content.mechanics.torque.graph.CrucibleGraph;
 import zzw.content.mechanics.torque.graph.CrucibleGraph.CrucibleFluid;
 import zzw.content.mechanics.torque.meta.CrucibleRecipes;
 import zzw.content.mechanics.torque.meta.CrucibleRecipes.CrucibleIngredient;
 import zzw.content.mechanics.torque.modules.GraphCrucibleModule;
-import zzw.content.util.GraphicUtils;
-import zzw.content.util.SVec2;
 
 import static arc.Core.atlas;
 
 /**
  * 坩埚熔炉 (PU_V8 unity.world.blocks.production.CrucibleBlock 移植)
  *
- * <p>接收可熔物品 (在 {@link CrucibleRecipes} 注册过的), 在热量图中加热熔化,
- * 多种熔融物按 {@link CrucibleRecipes.CrucibleRecipe} 合成合金。
- * 点击眼睛按钮可切换开盖视角 (查看内容物)。</p>
+ * <p>3x3 方块。接收可熔物品 (在 {@link CrucibleRecipes} 注册过的), 在热量图中加热熔化,
+ * 多种熔融物按 {@link CrucibleRecipes.CrucibleRecipe} 合成合金。</p>
  *
- * <p>内容物以"固/液两态"表示, 见 {@link CrucibleGraph}。</p>
+ * <p>绘制方式忠实还原 PU_V8: 地板 → 熔融液 → 未熔固体碎块 → 四方向底座 (锥口) → 热量叠加。
+ * 四方向底座根据相邻坩埚是否连通选择"闭合"或"开口"贴图。</p>
  */
 public class Crucible extends GraphBlock{
-    /** 当前查看视角的网络 (null = 正常屋顶显示) */
-    CrucibleGraph viewPos;
-
-    /** 固体物品随机摆放位置表 (打包坐标) */
-    private static final long[] randomPos = new long[]{
-        SVec2.construct(0f, 0f),
-        SVec2.construct(-1.6f, 1.6f),
-        SVec2.construct(-1.6f, -1.6f),
-        SVec2.construct(1.6f, -1.6f),
-        SVec2.construct(-1.6f, -1.6f),
-        SVec2.construct(0f, 0f)
-    };
-
-    /** 液体 / 底座 / 屋顶 / 固体条 / 热量贴图 (12x4 切片) */
-    public TextureRegion[] liquidRegions, baseRegions, roofRegions, solidItemStrips, heatRegions;
-    /** 笼底 / 固体物品贴图 */
-    public TextureRegion floorRegion, solidItem;
+    /** 地板 / 熔融液 / 热量 / 固体碎块贴图 */
+    TextureRegion floor, liquid, heat, chunks;
+    /** 闭合底座贴图 [0]=南北向 [1]=东西向 */
+    TextureRegion[] base = new TextureRegion[2];
+    /** 开口底座贴图 (与连通方向接通) */
+    TextureRegion[] baseopen = new TextureRegion[2];
+    /** 固体碎块在方块内的随机散布位置 */
+    Vec2[] pos;
 
     public Crucible(String name){
         super(name);
 
-        configurable = solid = true;
+        solid = true;
     }
 
     @Override
     public void load(){
         super.load();
 
-        liquidRegions = GraphicUtils.getRegions(liquidRegion, 12, 4);
-        baseRegions = GraphicUtils.getRegions(atlas.find(name + "-base"), 12, 4);
-        floorRegion = atlas.find(name + "-floor");
-        roofRegions = GraphicUtils.getRegions(atlas.find(name + "-roof"), 12, 4);
+        floor = atlas.find(name + "-floor");
+        heat = atlas.find(name + "-heat");
+        liquid = atlas.find(name + "-liquid");
+        chunks = atlas.find(name + "-solid");
 
-        solidItem = atlas.find(name + "-solid");
-        solidItemStrips = GraphicUtils.getRegions(atlas.find(name + "-solidstrip"), 6, 1);
-        heatRegions = GraphicUtils.getRegions(heatRegion, 12, 4);
+        base[0] = atlas.find(name + "-base1");
+        base[1] = atlas.find(name + "-base2");
+        baseopen[0] = atlas.find(name + "-base-open1");
+        baseopen[1] = atlas.find(name + "-base-open2");
+
+        // PU_V8: 30 个随机碎块位置, 散布范围与方块尺寸相关
+        pos = new Vec2[30];
+        for(int i = 0; i < pos.length; i++){
+            pos[i] = new Vec2(Mathf.range(size * 8f * 0.5f * 0.25f), Mathf.range(size * 8f * 0.5f * 0.25f));
+        }
     }
 
     public class CrucibleBuild extends GraphBuild{
-        /** 内容物混合颜色缓存 */
-        final Color color = Color.clear.cpy();
+        /** 四个正交方向的相邻坩埚连通状态 (东/北/西/南), 决定底座是否开口 */
+        final boolean[] connection = new boolean[4];
 
-        @Override
-        public void buildConfiguration(Table table){
-            table.button(Icon.eye, Styles.clearNonei, () -> configure(0)).size(50f);
+        /** 计算四方向相邻坩埚 (取方块每边中点的外侧一格) */
+        void updateConnections(){
+            int s = (int)size;
+            int h = s / 2;
+            int[][] off = {{s, h}, {h, s}, {-1, h}, {h, -1}};
+
+            for(int i = 0; i < 4; i++){
+                Building b = nearby(off[i][0], off[i][1]);
+                connection[i] = b instanceof GraphBuildBase g && g.crucible() != null;
+            }
         }
-
-        @Override
-        public void configured(mindustry.gen.Unit builder, Object value){
-            CrucibleGraph thisG = crucible().getNetwork();
-            viewPos = viewPos == thisG ? null : thisG;
-        }
-
-        @Override
-        public void drawConfigure(){}
 
         @Override
         public void draw(){
             GraphCrucibleModule dex = crucible();
-            byte tileIndex = UnityDrawf.tileMap[dex.tilingIndex];
+            if(dex == null) return;
 
-            if(viewPos == dex.getNetwork()){
-                Draw.rect(floorRegion, x, y, 8f, 8f);
-                drawContents(dex, tileIndex);
+            updateConnections();
 
-                Draw.rect(baseRegions[tileIndex], x, y, 8f, 8f, 4f, 4f, 0f);
-                UnityDrawf.drawHeat(heatRegions[tileIndex], x, y, 0f, heat().getTemp());
-            }else{
-                Draw.rect(roofRegions[tileIndex], x, y, 8f, 8f, 4f, 4f, 0f);
+            Draw.rect(floor, x, y);
+
+            // 熔融液: 使用网络加权颜色铺满, 叠加一层慢速呼吸高光
+            CrucibleGraph net = dex.getNetwork();
+            Color liquidColor = net == null ? Color.clear : net.color;
+            if(liquidColor.a > 0.01f){
+                Draw.color(liquidColor);
+                Draw.rect(liquid, x, y);
+                Draw.alpha(Mathf.absin(Time.time * 0.3f, 1f, 1f) * 0.35f);
+                Draw.rect(liquid, x, y);
+                Draw.color();
             }
+
+            // 未熔固体碎块 (按各原料 solid 量比例分配位置)
+            float total = 0f;
+            for(var f : dex.getContained()) total += f.value.solid;
+            if(total > 0f){
+                int am = (int)Math.min(pos.length, total);
+                int idx = 0;
+
+                for(var f : dex.getContained()){
+                    float pieces = am * f.value.solid / total;
+                    Draw.color(f.key.color);
+                    for(int a = 0; a < (int)pieces; a++){
+                        if(idx >= pos.length) break;
+                        Draw.rect(chunks, x + pos[idx].x, y + pos[idx].y, Vars.itemSize, Vars.itemSize);
+                        idx++;
+                    }
+                }
+                Draw.color();
+            }
+
+            // 四方向底座 (锥口): 连通侧画开口贴图, 否则闭合
+            for(int i = 0; i < 4; i++){
+                Draw.rect(connection[i] ? baseopen[i == 2 || i == 3 ? 0 : 1] : base[i == 2 || i == 3 ? 0 : 1],
+                    x, y, 180f + i * 90f);
+            }
+
+            if(heat() != null) UnityDrawf.drawHeat(heat, x, y, 0f, heat().getTemp());
 
             drawTeamTop();
         }
 
         @Override
         public boolean acceptItem(Building source, Item item){
-            return crucible().canContainMore(1f) && CrucibleRecipes.items.containsKey(item);
+            return crucible() != null && crucible().canContainMore(1f) && CrucibleRecipes.items.containsKey(item);
         }
 
         @Override
         public void handleItem(Building source, Item item){
             crucible().addItem(item);
-        }
-
-        /**
-         * 绘制坩埚内容物: 熔融部分按熔融量加权混合颜色铺液体贴图;
-         * 未熔部分画固体物品贴图 (数量多时叠加固体条)。
-         */
-        protected void drawContents(GraphCrucibleModule crucGraph, int tIndex){
-            OrderedMap<CrucibleIngredient, CrucibleFluid> cc = crucGraph.getContained();
-            if(cc.isEmpty()) return;
-
-            float fraction = crucGraph.getTotalLiquidCapacity() > 0f
-                ? crucGraph.liquidCap / crucGraph.getTotalLiquidCapacity() : 0f;
-
-            // 熔融液
-            color.set(0f, 0f, 0f);
-            float tLiquid = 0f;
-            for(var f : cc){
-                float lv = f.value.melted;
-                tLiquid += lv;
-                color.r += f.key.color.r * lv;
-                color.g += f.key.color.g * lv;
-                color.b += f.key.color.b * lv;
-            }
-            if(tLiquid > 0f){
-                float invt = 1f / tLiquid;
-                Draw.color(color.mul(invt), Mathf.clamp(tLiquid * fraction * 2f));
-                Draw.rect(liquidRegions[tIndex], x, y, 8f, 8f);
-            }
-
-            // 未熔固体
-            for(var f : cc){
-                float ddd = f.value.solid * fraction;
-                if(ddd <= 0.1f) continue;
-
-                Draw.color(f.key.color);
-                if(ddd > 1f){
-                    int stripIndex = Mathf.clamp(Mathf.floor(ddd) - 1, 0, solidItemStrips.length - 1);
-                    Draw.rect(solidItemStrips[stripIndex], x, y, 8f, 8f);
-                }
-
-                float siz = 8f * (ddd % 1f);
-                long pos = randomPos[Mathf.clamp(Mathf.floor(ddd), 0, randomPos.length - 1)];
-
-                Draw.rect(solidItem, SVec2.x(pos) + x, SVec2.y(pos) + y, siz, siz);
-            }
-
-            Draw.color();
         }
     }
 }

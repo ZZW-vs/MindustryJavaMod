@@ -3,6 +3,7 @@ package zzw.content.blocks.production;
 import arc.Core;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
+import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
 import arc.scene.style.TextureRegionDrawable;
@@ -15,7 +16,6 @@ import mindustry.type.Item;
 import mindustry.type.Liquid;
 import mindustry.ui.Styles;
 import mindustry.world.meta.StatUnit;
-import zzw.content.graphics.UnityDrawf;
 import zzw.content.mechanics.torque.blocks.GraphBlock;
 import zzw.content.mechanics.torque.graph.CrucibleGraph;
 import zzw.content.mechanics.torque.graph.CrucibleGraph.CrucibleFluid;
@@ -28,17 +28,17 @@ import static mindustry.Vars.iconMed;
 /**
  * 坩埚泵 (PU_V8 unity.world.blocks.production.CruciblePump 移植)
  *
- * <p>把背面网络 (set1) 中指定原料的熔融液泵送到正面网络 (set0)。
+ * <p>1x1 方块。把背面网络 (set1) 中指定原料的熔融液泵送到正面网络 (set0)。
  * 可配置目标原料 (物品或液体)。</p>
  *
  * <p>泵送由扭矩驱动 (PU_V8): 效率 eff = curve(lastVelocity, 0, 50) * 0.2,
  * 单帧泵送量 ∝ 源网络该原料的熔融存量 (eff * melted + 0.001), 受目标网络剩余空间限制。</p>
+ *
+ * <p>绘制忠实还原 PU_V8 贴图布局: 地板 → 网络熔融色铺底 → 底座 → 流向箭头 → 队伍标。</p>
  */
 public class CruciblePump extends GraphBlock{
-    /** 4 方向顶盖贴图 */
-    public final TextureRegion[] topRegions = new TextureRegion[4];
-    /** 底座 / 地板贴图 */
-    public TextureRegion bottomRegion, floorRegion;
+    /** 地板 / 底座 / 流向箭头贴图 */
+    public TextureRegion floor, base, arrow;
 
     public CruciblePump(String name){
         super(name);
@@ -54,16 +54,16 @@ public class CruciblePump extends GraphBlock{
     public void load(){
         super.load();
 
-        for(int i = 0; i < 4; i++) topRegions[i] = Core.atlas.find(name + "-top" + (i + 1));
-        bottomRegion = Core.atlas.find(name + "-bottom");
-        floorRegion = Core.atlas.find(name + "-floor");
+        floor = Core.atlas.find(name + "-floor");
+        base = Core.atlas.find(name + "-base");
+        arrow = Core.atlas.find(name + "-arrow");
     }
 
     public class CruciblePumpBuild extends GraphBuild{
         /** 泵送的原料 (null = 不泵送) */
         CrucibleIngredient config;
-        /** 最近泵送量 (动画/显示用, 每帧减半) */
-        float flowRate, flowAnimation;
+        /** 最近泵送量 (显示用, 每帧减半) */
+        float flowRate;
 
         @Override
         public void buildConfiguration(Table table){
@@ -71,7 +71,7 @@ public class CruciblePump extends GraphBlock{
             table.table(t -> {
                 int i = 0;
                 for(var ing : CrucibleRecipes.ingredients.values()){
-                    t.button(new TextureRegionDrawable(ing.icon()), Styles.clearNonei, () -> configure(ing.id)).size(40f).pad(2f);
+                    t.button(new TextureRegionDrawable(ing.icon), Styles.clearNonei, () -> configure(ing.id)).size(40f).pad(2f);
                     if(++i % 8 == 0) t.row();
                 }
             }).grow().pad(4f).row();
@@ -86,7 +86,7 @@ public class CruciblePump extends GraphBlock{
                 sub.clearChildren();
                 sub.left();
                 if(config != null){
-                    sub.image(config.icon()).size(iconMed);
+                    sub.image(config.icon).size(iconMed);
                     sub.label(() -> Strings.fixed(flowRate * 10f, 2) + "units" + ps).color(Color.lightGray);
                 }else{
                     sub.labelWrap(Core.bundle.get("stat.unity.crucible.nofilter", "No filter selected")).color(Color.lightGray);
@@ -123,21 +123,26 @@ public class CruciblePump extends GraphBlock{
                     }
                 }
             }
-            flowAnimation += flowRate * 0.4f;
         }
 
         @Override
         public void draw(){
-            Draw.rect(bottomRegion, x, y);
-            if(config != null){
-                Draw.color(config.color, Mathf.clamp(flowRate * 60f));
-                UnityDrawf.drawSlideRect(liquidRegion, x, y, 16f, 16f, 32f, 16f, rotdeg() + 180f, 16, flowAnimation);
+            Draw.rect(floor, x, y);
 
+            GraphCrucibleModule dex = crucible();
+            if(dex != null && dex.getNetwork() != null){
+                Draw.color(dex.getNetwork().color);
+                Fill.rect(x, y, 8f, 8f);
                 Draw.color();
             }
 
-            if(heat() != null) UnityDrawf.drawHeat(heatRegion, x, y, rotdeg(), heat().getTemp());
-            Draw.rect(topRegions[rotation], x, y);
+            Draw.rect(base, x, y, rotdeg());
+
+            if(config != null){
+                Draw.color(config.color);
+                Draw.rect(arrow, x, y, rotdeg());
+                Draw.color();
+            }
 
             drawTeamTop();
         }

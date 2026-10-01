@@ -369,32 +369,36 @@ public class Z_Torque{
 
         // ===== PU132 坩埚系统 (UnityBlocks L2974-3004 原版配置) =====
 
-        // crucible: 坩埚熔炉, GraphCrucible + GraphHeat(75f, 0.2f, 0.006f) accept(1,1,1,1)
+        // crucible: 坩埚熔炉 (PU_V8 3x3), GraphCrucible + GraphHeat(75f, 0.2f, 0.006f)
+        // 3x3 方块每边 3 个端口, 全部允许连接 (12 项 accept)
         crucible = new Crucible("crucible"){{
             requirements(Category.crafting, with(Z_Items.nickel, 10, Items.titanium, 15));
+            size = 3;
             health = 400;
-            addGraph(new GraphCrucible().setAccept(1, 1, 1, 1));
-            addGraph(new GraphHeat(75f, 0.2f, 0.006f).setAccept(1, 1, 1, 1));
+            addGraph(new GraphCrucible().setAccept(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1));
+            addGraph(new GraphHeat(75f, 0.2f, 0.006f).setAccept(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1));
         }};
 
         // crucible-pump: 坩埚泵, PU_V8 YoungchaBlocks L463: CrucibleGraph(容量5) + TorqueGraphNode(0.1f, 10f)
         // 力矩连接 (0,1,0,1); 由扭矩转速驱动泵送, 不耗电
         cruciblePump = new CruciblePump("crucible-pump"){{
             requirements(Category.crafting, with(Z_Items.cupronickel, 50, Z_Items.nickel, 50, Items.metaglass, 15));
-            size = 2;
+            size = 1;
             health = 500;
-            addGraph(new GraphCrucible(10f, false).setAccept(1, 1, 0, 0, 2, 2, 0, 0).multi());
-            addGraph(new GraphHeat(50f, 0.1f, 0.003f).setAccept(1, 1, 1, 1, 1, 1, 1, 1));
+            // 1x1 方块: 端口 0=正面(目标网络 set0), 端口 2=背面(源网络 set1)
+            addGraph(new GraphCrucible(10f, false).setAccept(1, 0, 2, 0).multi());
+            addGraph(new GraphHeat(50f, 0.1f, 0.003f).setAccept(1, 1, 1, 1));
             addGraph(new GraphTorque(0.1f, 10f).setAccept(0, 1, 0, 1));
         }};
 
-        // casting-mold: 铸模, GraphCrucible(2f, false) + GraphHeat(55f, 0.2f, 0f)
+        // casting-mold: 铸模 (PU_V8 3x3), GraphCrucible(2f, false) + GraphHeat(55f, 0.2f, 0f)
+        // 坩埚接口位于背面 (端口 index 7 = 侧 2 中间), 铸造产物向其余邻居输出
         castingMold = new CastingMold("casting-mold"){{
             requirements(Category.crafting, with(Items.titanium, 70, Z_Items.nickel, 30));
-            size = 2;
+            size = 3;
             health = 700;
-            addGraph(new GraphCrucible(2f, false).setAccept(0, 0, 0, 0, 1, 1, 0, 0));
-            addGraph(new GraphHeat(55f, 0.2f, 0f).setAccept(1, 1, 1, 1, 1, 1, 1, 1));
+            addGraph(new GraphCrucible(2f, false).setAccept(0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
+            addGraph(new GraphHeat(55f, 0.2f, 0f).setAccept(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1));
         }};
 
         // crucible-channel: 坩埚通道 (连接坩埚网络, 四方向)
