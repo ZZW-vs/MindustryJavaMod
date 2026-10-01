@@ -146,6 +146,7 @@ public class CrucibleRecipes{
 
     /** 通用原料: 物品/液体的共同父类, 记录相变参数 */
     public static class CrucibleIngredient{
+        /** 贴图缓存 (注册阶段各 Content 尚未 load(), fullIcon 为 null, 由 {@link #icon()} 延迟解析) */
         public TextureRegion icon;
         public String name;
         public Color color = Color.pink;
@@ -163,6 +164,23 @@ public class CrucibleRecipes{
             this.icon = icon;
             this.name = name;
             this.id = id;
+        }
+
+        /**
+         * 获取贴图 (延迟解析)。
+         * <p>坩埚配方在 {@code loadContent()} 阶段注册, 此时各 Content 的 {@code load()} 尚未调用,
+         * {@code item/liquid.fullIcon} 仍为 null (注册时捕获到的贴图即为 null)。
+         * 因此这里在首次真正需要时再从 item/liquid 重新读取, 避免 UI 面板因 null 贴图崩溃。</p>
+         */
+        public TextureRegion icon(){
+            if(icon == null){
+                if(this instanceof CrucibleItem it){
+                    icon = it.item.fullIcon;
+                }else if(this instanceof CrucibleLiquid lq){
+                    icon = lq.liquid.fullIcon;
+                }
+            }
+            return icon;
         }
 
         public void onVapourise(GraphBuildBase cgn, float am){}

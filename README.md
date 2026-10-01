@@ -300,6 +300,7 @@
   - 磁轨炮弹寿命缩放：araneidae / theraphosidae 的磁轨炮弹补回 `scaleLife=true`（PU132 `scaleVelocity`，v159 改名），弹体寿命随距离缩放
   - 海军单位朝向：fin / blue 补回 `faceTarget=false`（PU_V8），舰船朝行进方向而非盯着目标
   - 复核确认：段身随玩家头部瞄准齐射（`SegmentUnitEntity` 弹幕同步）已实现；WormAI 接敌距离与段身记仇等模组注释明示的有意改动、以及 `TimeStopAbility` 等 README 已记载的简化，均保留不动
+- 修复坩埚源/坩埚泵配置面板崩溃：`CrucibleIngredient.icon` 在 `loadContent()` 注册阶段捕获的 `fullIcon` 为 null，导致打开配置面板时 `TextureRegionDrawable` 空指针崩溃；改为 `icon()` 延迟解析（首次使用时从 item/liquid 重新读取），并同步更新坩埚源/泵/显示元素调用点
 
 ## 安装说明
 

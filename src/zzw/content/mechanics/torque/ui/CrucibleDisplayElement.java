@@ -59,9 +59,9 @@ public class CrucibleDisplayElement extends Element{
             }
 
             Draw.color(Pal.darkerGray);
-            Draw.rect(fluid.key.icon, xpos + 16f, ypos + 14f, 24f, 24f);
+            Draw.rect(fluid.key.icon(), xpos + 16f, ypos + 14f, 24f, 24f);
             Draw.color();
-            Draw.rect(fluid.key.icon, xpos + 16f, ypos + 18f, 24f, 24f);
+            Draw.rect(fluid.key.icon(), xpos + 16f, ypos + 18f, 24f, 24f);
 
             String text = Strings.fixed(fluid.value.total(), 1);
             lay.setText(font, text);
