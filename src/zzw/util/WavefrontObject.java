@@ -118,6 +118,19 @@ public class WavefrontObject{
     protected int indexerA;
     protected float indexerZ;
 
+    // ===== 光照升级 1.3 =====
+    /** ★ 当前帧的旋转矩阵 (由 draw() 写入, 供着色阶段旋转法线复用)
+     *  <p>把矩阵存到实例字段后, 着色阶段可以对"加载时预计算的模型空间法线"只做一次旋转,
+     *  而不用再对每个面的 face.normal[] 求平均 + 开方。高面数模型每帧可省下大量运算。</p> */
+    protected float rm00, rm01, rm02, rm10, rm11, rm12, rm20, rm21, rm22;
+    /** ★ 当前面的世界空间单位法线 (faceNormal() 的输出, 用字段返回避免装箱/构造) */
+    protected float nrmX, nrmY, nrmZ;
+
+    /** ★ 高光是否按金属度混合材质本色 (1.3 新增)
+     *  <p>true: 金属高光偏材质本色, 非金属偏白, 避免纯白高光把有色材质"洗白"</p>
+     *  <p>false: 沿用旧版纯白高光</p> */
+    public boolean tintedSpecular = true;
+
     // ===== GPU Mesh 渲染 (高面数模型用, 兼容手机端 GLES 2.0) =====
     /** GPU Shader (所有实例共享, 兼容 GLES 2.0) */
     protected static Shader gpuShader;
@@ -139,14 +152,11 @@ public class WavefrontObject{
     }
 
     // ===== 排序缓存 (手机端崩溃修复: 避免每帧分配大数组) =====
-    /** drawBatched 排序缓存: 7万面模型每帧 new float[7万] + new Integer[7万](装箱)
-     *  = 60fps 下 84MB/s 垃圾分配, Android GC 被打爆 → 卡死/OOM 崩溃 */
-    protected float[] batchZVals;
-    protected Integer[] batchOrder;
-    /** draw() singleZLayer 路径排序缓存 (同上, 小模型也复用) */
+    /** drawBatched 排序缓存 (复用, 小模型也复用): 7万面模型每帧 new float[7万] + 装箱整数
+     *  = 60fps 下 84MB/s 垃圾分配, Android GC 被打爆 → 卡死/OOM 崩溃
+     *  <p>注: 原先残留的 batchZVals/batchOrder/sortIndices/sortedFaces 字段已无任何引用
+     *  (随 singleZLayer 排序死代码一并移除), 这里只保留真正在用的缓存。</p> */
     protected float[] sortZVals;
-    protected Integer[] sortIndices;
-    protected Face[] sortedFaces;
     /** int[] 归并排序缓存，避免 Integer 装箱开销 */
     protected int[] sortIdxInt;
     protected int[] sortTmpInt;
@@ -710,6 +720,10 @@ public class WavefrontObject{
         float p00 = cz*n00 - sz*n10,  p01 = cz*n01 - sz*n11,  p02 = cz*n02 - sz*n12;
         float p10 = sz*n00 + cz*n10,  p11 = sz*n01 + cz*n11,  p12 = sz*n02 + cz*n12;
         float p20 = n20,              p21 = n21,              p22 = n22;
+        // ★ 光照升级 1.3: 把旋转矩阵存到实例字段, 供着色阶段旋转预计算法线 (见 realLightDraw)
+        rm00 = p00; rm01 = p01; rm02 = p02;
+        rm10 = p10; rm11 = p11; rm12 = p12;
+        rm20 = p20; rm21 = p21; rm22 = p22;
         float scl = defaultScl * size;
         
         for(int i = 0; i < drawnVertices.size; i++){
@@ -734,6 +748,12 @@ public class WavefrontObject{
 
             if(cons != null) cons.get(v);
 
+            // ★ 性能优化 (光照升级 1.3): 逐顶点法线旋转只在"需要背面剔除"时才做。
+            //   着色现已改用加载期预计算的 face.localNormal (见 faceNormal), 不再依赖这里的
+            //   drawnNormals; 而 face.normal[] 在运行时的唯一消费者就是 cullBackfaces 判定。
+            //   因此 cullBackfaces=false (默认) 时, 这一整圈法线矩阵变换都是白做的, 直接跳过。
+            if(!cullBackfaces) continue;
+
             // 法线也用同一矩阵旋转（注意：法线不缩放、不平移）
             if(i <= drawnNormals.size - 1){
                 Vec3 nsrc = normals.get(i);
@@ -756,43 +776,12 @@ public class WavefrontObject{
             return;
         }
 
-        // ★ singleZLayer 模式: 按面深度排序 (远的先画, 近的后画), 保证前面覆盖后面
-        // 排序后每个面仍按自己的 z 值设置 Draw.z (与非 singleZLayer 一致), 避免 Y 轴旋转对称模型面搅和
-        // ★ 排序结果存入临时数组 drawOrder, 不修改原始 faces (避免多实例共享模型竞态)
-        Face[] drawOrder;
-        if(singleZLayer){
-            int n = faces.size;
-            // ★ 手机端崩溃修复: 排序数组缓存复用 (避免每帧分配)
-            if(sortIdxInt == null || sortIdxInt.length != n){
-                sortIdxInt = new int[n];
-                sortTmpInt = new int[n];
-                sortZVals = new float[n];
-                for(int i = 0; i < n; i++) sortIdxInt[i] = i;
-            }
-            float[] zVals = sortZVals;
-            for(int i = 0; i < n; i++){
-                float z = 0;
-                Face f = faces.get(i);
-                for(Vertex v : f.verts) z += v.source.z;
-                // ★ 加索引微偏移保证 z 值唯一, 避免纯 Float.compare 返回 0 时帧间排序跳变
-                //   (不能用混合比较规则, 否则违反传递性 → TimSort 抛 IllegalArgumentException)
-                zVals[i] = z / f.verts.length + i * 1e-6f;
-            }
-            // 归并排序前先重置索引顺序（因为上次排序已经打乱）
-            for(int i = 0; i < n; i++) sortIdxInt[i] = i;
-            mergeSortInt(sortIdxInt, sortTmpInt, zVals, 0, n);
-            
-            // 构建排序后的面数组
-            if(sortedFaces == null || sortedFaces.length != n){
-                sortedFaces = new Face[n];
-            }
-            for(int i = 0; i < n; i++) sortedFaces[i] = faces.get(sortIdxInt[i]);
-            drawOrder = sortedFaces;
-        }else{
-            drawOrder = faces.toArray(Face.class);
-        }
-
-        for(Face face : drawOrder){
+        // ★ 性能优化 (光照升级 1.3): 走到这里必然不是 singleZLayer (上面已提前 return),
+        //   直接用模型原始面顺序遍历即可。
+        //   旧代码此处有一段 `if(singleZLayer){...}else{ drawOrder = faces.toArray(Face.class); }`,
+        //   其中 singleZLayer 分支永远不可达 (死代码), 而 else 分支每帧都分配一个 Face[] →
+        //   7 万面模型 60fps 下产生大量垃圾。现改为直接遍历 faces, 零分配。
+        for(Face face : faces){
             // 所有模式都按面z值设置Draw.z, 让 batch 能区分面层次
             indexerA = 0;
             indexerZ = 0f;
@@ -1119,63 +1108,106 @@ public class WavefrontObject{
         return vi;
     }
 
+    /** 法线着色 (normalAngle 语义) —— 光照升级 1.3 后统一走真光照, 仅 useRealLighting=false 时回退旧版 */
     protected void normalAngleDraw(Face face){
-        if(!hasNormal){
+        if(!useRealLighting){
+            legacyNormalAngleDraw(face);
+            return;
+        }
+        realLightDraw(face);
+    }
+
+    /** 顶光着色 (topLight 语义) —— 光照升级 1.3 后统一走真光照, 仅 useRealLighting=false 时回退旧版 */
+    protected void topLightDraw(Face face){
+        if(!useRealLighting){
+            legacyTopLightDraw(face);
+            return;
+        }
+        realLightDraw(face);
+    }
+
+    /** 取出该面的世界空间单位法线, 结果写入 nrmX/nrmY/nrmZ
+     *  <p>光照升级 1.3 的性能核心: 优先使用加载时预计算的模型空间法线 {@code face.localNormal},
+     *  每帧只需用当前帧的旋转矩阵旋转<b>这一个</b>向量; 旧实现则要对 face.normal[] 逐顶点求平均
+     *  再做一次 sqrt 归一化。高面数模型(数万面)每帧可省下海量运算。</p>
+     *  @return 法线是否有效; false 时调用方应回退到纯色绘制 */
+    protected boolean faceNormal(Face face){
+        if(!hasNormal) return false;
+
+        if(face.localNormal != null){
+            float x = face.localNormal.x, y = face.localNormal.y, z = face.localNormal.z;
+            if(lightInModelSpace){
+                // 模型空间光照: 直接用本地法线 (模型自转时明暗稳定)
+                nrmX = x; nrmY = y; nrmZ = z;
+            }else{
+                // 世界空间光照: 用当前帧旋转矩阵把本地法线转到世界空间
+                nrmX = rm00*x + rm01*y + rm02*z;
+                nrmY = rm10*x + rm11*y + rm12*z;
+                nrmZ = rm20*x + rm21*y + rm22*z;
+            }
+            return true;
+        }
+
+        // 兜底: 极少数没有预计算法线的面, 现场求平均 + 归一化
+        Vec3 tmp = Tmp.v31.setZero();
+        indexerA = 0;
+        for(Vec3 n : face.normal){
+            tmp.add(n);
+            indexerA++;
+        }
+        if(indexerA == 0) return false;
+        tmp.scl(1f / indexerA);
+        float len = (float)Math.sqrt(tmp.x*tmp.x + tmp.y*tmp.y + tmp.z*tmp.z);
+        if(len < 1e-6f) return false;
+        nrmX = tmp.x / len; nrmY = tmp.y / len; nrmZ = tmp.z / len;
+        return true;
+    }
+
+    /** ★ 光照升级 1.3: 统一的真光照着色 (normalAngle 与 topLight 共用同一份实现)
+     *  <p>光照模型: 环境光 + Lambert 漫反射 (来自 {@link rbmk.gfx.Light#diffuse}) 决定明暗;
+     *  Blinn 镜面高光 (来自 {@link rbmk.gfx.Light#spec}) 叠加高亮。</p>
+     *  <p>相比旧版重复的两份代码, 本次升级:</p>
+     *  <ol>
+     *    <li>统一为一份实现, 消除 normalAngle / topLight 两套光照公式的差异;</li>
+     *    <li>高光可按金属度在"白"与"材质本色"之间取色 ({@code tintedSpecular}),
+     *        避免纯白高光把有色材质洗白 (金属反射带本色, 非金属偏白);</li>
+     *    <li>法线复用加载期预计算结果, 只做一次矩阵旋转 (见 {@link #faceNormal})。</li>
+     *  </ol>
+     */
+    protected void realLightDraw(Face face){
+        if(!faceNormal(face)){
             Draw.color(lightColor);
             return;
         }
-        // ★ 模型空间光照：直接用加载时预算的本地法线（已归一化），
-        //   同时省掉每帧的"平均法线 + sqrt 归一化"
-        float nx, ny, nz;
-        if(lightInModelSpace && face.localNormal != null){
-            nx = face.localNormal.x; ny = face.localNormal.y; nz = face.localNormal.z;
-        }else{
-            Vec3 tmp = Tmp.v31.setZero();
-            indexerA = 0;
-            for(Vec3 n : face.normal){
-                tmp.add(n);
-                indexerA++;
-            }
-            tmp.scl(1f / indexerA);
 
-            float len = (float)Math.sqrt(tmp.x*tmp.x + tmp.y*tmp.y + tmp.z*tmp.z);
-            if(len < 1e-6f){ Draw.color(lightColor); return; }
-            nx = tmp.x / len; ny = tmp.y / len; nz = tmp.z / len;
-        }
-
-        if(!useRealLighting){
-            // 回退到旧 normalAngle
-            boolean matB = face.mat != null && face.mat.hasColor;
-            if(matB){
-                Tmp.c3.rgba8888(face.mat.diffuseCol);
-                Tmp.c2.set(Tmp.c3.r * 0.3f, Tmp.c3.g * 0.3f, Tmp.c3.b * 0.3f, 1f);
-                Tmp.c4.rgba8888(face.mat.emitCol);
-                Tmp.c2.r = Mathf.lerp(Tmp.c2.r, Tmp.c3.r, Tmp.c4.r);
-                Tmp.c2.g = Mathf.lerp(Tmp.c2.g, Tmp.c3.g, Tmp.c4.g);
-                Tmp.c2.b = Mathf.lerp(Tmp.c2.b, Tmp.c3.b, Tmp.c4.b);
-            }
-            float angle = (Math.abs((float)Math.acos(Mathf.clamp(nz, -1f, 1f))) / (45f * Mathf.degRad)) / shadingSmoothness;
-            Tmp.c1.set(matB ? Tmp.c3 : lightColor).lerp(matB ? Tmp.c2 : shadeColor, Mathf.clamp(angle, 0f, maxShade));
-            Draw.color(Tmp.c1);
-            return;
-        }
-
-        // 真光照（和 topLight 相同的公式）
-        float diff = rbmk.gfx.Light.diffuse(nx, ny, nz);
-        float sp = rbmk.gfx.Light.spec(nx, ny, nz, metalness);
-
+        // 基础颜色 (材质色优先, 否则用 lightColor)
         float baseR = lightColor.r, baseG = lightColor.g, baseB = lightColor.b;
         if(face.mat != null && face.mat.hasColor){
             Tmp.c3.rgba8888(face.mat.diffuseCol);
             baseR = Tmp.c3.r; baseG = Tmp.c3.g; baseB = Tmp.c3.b;
         }
 
+        // Light.diffuse 输出区间约 [0.5, 1.04] → 归一到 [0,1] 亮度
+        float diff = rbmk.gfx.Light.diffuse(nrmX, nrmY, nrmZ);
         float lum = Mathf.clamp((diff - 0.5f) / 0.54f, 0f, 1f);
         float shadeAmt = (1f - lum) * maxShade;
 
-        float r = Mathf.lerp(baseR, shadeColor.r, shadeAmt) + sp;
-        float g = Mathf.lerp(baseG, shadeColor.g, shadeAmt) + sp;
-        float b = Mathf.lerp(baseB, shadeColor.b, shadeAmt) + sp;
+        float r = Mathf.lerp(baseR, shadeColor.r, shadeAmt);
+        float g = Mathf.lerp(baseG, shadeColor.g, shadeAmt);
+        float b = Mathf.lerp(baseB, shadeColor.b, shadeAmt);
+
+        // 高光: 按金属度在"白"与"材质本色"之间取色
+        float sp = rbmk.gfx.Light.spec(nrmX, nrmY, nrmZ, metalness);
+        if(sp != 0f){
+            if(tintedSpecular){
+                float tR = Mathf.lerp(1f, baseR, metalness);
+                float tG = Mathf.lerp(1f, baseG, metalness);
+                float tB = Mathf.lerp(1f, baseB, metalness);
+                r += sp * tR; g += sp * tG; b += sp * tB;
+            }else{
+                r += sp; g += sp; b += sp;
+            }
+        }
 
         Draw.color(
             Mathf.clamp(r, 0f, 1f),
@@ -1184,74 +1216,44 @@ public class WavefrontObject{
             1f);
     }
 
-    /** ★ 顶光着色: 模拟从上方(Y轴正方向)照射的环境光 */
-    protected void topLightDraw(Face face){
-        if(!hasNormal){
+    /** 旧版 normalAngle 着色 (useRealLighting=false 时的回退路径) */
+    protected void legacyNormalAngleDraw(Face face){
+        if(!faceNormal(face)){
             Draw.color(lightColor);
             return;
         }
-        // 归一化面法线
-        // ★ 模型空间光照：直接用加载时预算的本地法线（已归一化），
-        //   同时省掉每帧的"平均法线 + sqrt 归一化"
-        float nx, ny, nz;
-        if(lightInModelSpace && face.localNormal != null){
-            nx = face.localNormal.x; ny = face.localNormal.y; nz = face.localNormal.z;
-        }else{
-            Vec3 tmp = Tmp.v31.setZero();
-            indexerA = 0;
-            for(Vec3 n : face.normal){
-                tmp.add(n);
-                indexerA++;
-            }
-            tmp.scl(1f / indexerA);
-
-            float len = (float)Math.sqrt(tmp.x*tmp.x + tmp.y*tmp.y + tmp.z*tmp.z);
-            if(len < 1e-6f){ Draw.color(lightColor); return; }
-            nx = tmp.x / len; ny = tmp.y / len; nz = tmp.z / len;
+        boolean matB = face.mat != null && face.mat.hasColor;
+        if(matB){
+            Tmp.c3.rgba8888(face.mat.diffuseCol);
+            Tmp.c2.set(Tmp.c3.r * 0.3f, Tmp.c3.g * 0.3f, Tmp.c3.b * 0.3f, 1f);
+            Tmp.c4.rgba8888(face.mat.emitCol);
+            Tmp.c2.r = Mathf.lerp(Tmp.c2.r, Tmp.c3.r, Tmp.c4.r);
+            Tmp.c2.g = Mathf.lerp(Tmp.c2.g, Tmp.c3.g, Tmp.c4.g);
+            Tmp.c2.b = Mathf.lerp(Tmp.c2.b, Tmp.c3.b, Tmp.c4.b);
         }
+        float angle = (Math.abs((float)Math.acos(Mathf.clamp(nrmZ, -1f, 1f))) / (45f * Mathf.degRad)) / shadingSmoothness;
+        Tmp.c1.set(matB ? Tmp.c3 : lightColor).lerp(matB ? Tmp.c2 : shadeColor, Mathf.clamp(angle, 0f, maxShade));
+        Draw.color(Tmp.c1);
+    }
 
-        if(!useRealLighting){
-            // 回退到旧的 topLight
-            float shade = Mathf.clamp((1f - ny) * 0.5f, 0f, maxShade);
-            boolean matB = face.mat != null && face.mat.hasColor;
-            if(matB){
-                Tmp.c3.rgba8888(face.mat.diffuseCol);
-                Tmp.c2.set(Tmp.c3.r * 0.3f, Tmp.c3.g * 0.3f, Tmp.c3.b * 0.3f, 1f);
-                Tmp.c4.rgba8888(face.mat.emitCol);
-                Tmp.c2.r = Mathf.lerp(Tmp.c2.r, Tmp.c3.r, Tmp.c4.r);
-                Tmp.c2.g = Mathf.lerp(Tmp.c2.g, Tmp.c3.g, Tmp.c4.g);
-                Tmp.c2.b = Mathf.lerp(Tmp.c2.b, Tmp.c3.b, Tmp.c4.b);
-            }
-            Tmp.c1.set(matB ? Tmp.c3 : lightColor).lerp(matB ? Tmp.c2 : shadeColor, shade);
-            Draw.color(Tmp.c1);
+    /** 旧版 topLight 着色 (useRealLighting=false 时的回退路径) */
+    protected void legacyTopLightDraw(Face face){
+        if(!faceNormal(face)){
+            Draw.color(lightColor);
             return;
         }
-
-        // 真光照：Lambert 漫反射 + Blinn 镜面高光
-        float diff = rbmk.gfx.Light.diffuse(nx, ny, nz);
-        float sp = rbmk.gfx.Light.spec(nx, ny, nz, metalness);
-
-        // 基础颜色（来自材质或 lightColor）
-        float baseR = lightColor.r, baseG = lightColor.g, baseB = lightColor.b;
-        if(face.mat != null && face.mat.hasColor){
+        float shade = Mathf.clamp((1f - nrmY) * 0.5f, 0f, maxShade);
+        boolean matB = face.mat != null && face.mat.hasColor;
+        if(matB){
             Tmp.c3.rgba8888(face.mat.diffuseCol);
-            baseR = Tmp.c3.r; baseG = Tmp.c3.g; baseB = Tmp.c3.b;
+            Tmp.c2.set(Tmp.c3.r * 0.3f, Tmp.c3.g * 0.3f, Tmp.c3.b * 0.3f, 1f);
+            Tmp.c4.rgba8888(face.mat.emitCol);
+            Tmp.c2.r = Mathf.lerp(Tmp.c2.r, Tmp.c3.r, Tmp.c4.r);
+            Tmp.c2.g = Mathf.lerp(Tmp.c2.g, Tmp.c3.g, Tmp.c4.g);
+            Tmp.c2.b = Mathf.lerp(Tmp.c2.b, Tmp.c3.b, Tmp.c4.b);
         }
-
-        // 用 shadeColor 抑制暗面（保留 maxShade 语义）
-        // diff 在 [0.5, 1.04]，映射到 [1 - maxShade*0.5, 1]
-        float lum = Mathf.clamp((diff - 0.5f) / 0.54f, 0f, 1f);
-        float shadeAmt = (1f - lum) * maxShade;
-
-        float r = Mathf.lerp(baseR, shadeColor.r, shadeAmt) + sp;
-        float g = Mathf.lerp(baseG, shadeColor.g, shadeAmt) + sp;
-        float b = Mathf.lerp(baseB, shadeColor.b, shadeAmt) + sp;
-
-        Draw.color(
-            Mathf.clamp(r, 0f, 1f),
-            Mathf.clamp(g, 0f, 1f),
-            Mathf.clamp(b, 0f, 1f),
-            1f);
+        Tmp.c1.set(matB ? Tmp.c3 : lightColor).lerp(matB ? Tmp.c2 : shadeColor, shade);
+        Draw.color(Tmp.c1);
     }
 
     protected void zMedianDraw(Face face){
