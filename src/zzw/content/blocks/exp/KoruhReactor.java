@@ -17,17 +17,18 @@ import zzw.content.graphics.UnityFx;
 import zzw.content.graphics.UnityPal;
 
 /**
- * 经验反应堆 (PU132 unity.world.blocks.exp.KoruhReactor 移植, 稳定发电机版)
+ * 经验反应堆 (PU132 unity.world.blocks.exp.KoruhReactor 移植)
  * <p>继承 ImpactReactor。消耗经验 (exp) 维持反应。</p>
  *
- * <p>★ 稳定化调整 (应用户要求): 移除红温热量累积与熔毁爆炸机制 ——
- * 反应堆为稳定发电机, 无经验时仅停止产出 (ImpactReactor 原版的
- * warmup/plasma 动画与电力启停逻辑不受影响), 被打爆时喷出全部经验球。</p>
+ * <p>★ 机制对齐 PU132 原版 (updateTile):
+ * 只要"工作时(必要消耗满足)"就检查经验 —— 经验充足则高效运转时随机外喷经验球;
+ * 经验不足则每 tick 扣 1 点血持续掉血, 生命归零的同一刻喷出全部经验球。</p>
  *
  * <p>适配说明:
  * <ul>
- *   <li>PU132 原版经验不足时每 tick 扣血缓慢致死 → 移除 (稳定发电)</li>
- *   <li>保留: 经验经验球喷出 (高效运转时随机外喷 / 摧毁时全量喷出)</li>
+ *   <li>PU132 原版用 {@code consValid()} 判定工作时间; v160 已移除该方法,
+ *       按项目惯例用等价的 {@code shouldConsume()} (必要消耗满足) 替代</li>
+ *   <li>经验球喷出只在"经验不足致死"时内联执行 (与 PU132 一致), onDestroyed 为空</li>
  *   <li>bundle key "explib.expAmount" 不存在主 bundle, 用硬编码字符串兜底</li>
  * </ul></p>
  */
@@ -108,10 +109,24 @@ public class KoruhReactor extends ImpactReactor{
         @Override
         public void updateTile(){
             super.updateTile();
-            // 稳定发电机: 无经验惩罚, 经验充足且高效运转时随机外喷经验球
-            if(shouldConsume() && exp >= expUse
-                && productionEfficiency >= 0.8f && Mathf.randomBoolean(0.001f)){
-                dumpExpOrb();
+            // ★ 对齐 PU132 原版 (consValid() 在 v160 已移除, 按项目惯例用 shouldConsume() 等价替代):
+            //   只要"工作时(必要消耗满足)"就检查经验:
+            if(shouldConsume()){
+                if(exp >= expUse){
+                    // 经验充足: 高效运转时随机外喷经验球
+                    if(productionEfficiency >= 0.8f && Mathf.randomBoolean(0.001f)){
+                        dumpExpOrb();
+                    }
+                }else{
+                    // ★ 经验不足: 每 tick 扣 1 点血, 持续掉血直至生命归零
+                    damage(1);
+                    // ★ 生命归零的同一刻喷出全部经验球 (PU132 原版在 damage 后判 health<=0 内联执行)
+                    if(health <= 0f){
+                        for(int i = 0, m = Mathf.ceilPositive(exp * 1.5f); i < m; i++){
+                            Time.run(i * 10, this::dumpExpOrb);
+                        }
+                    }
+                }
             }
         }
 
@@ -124,13 +139,10 @@ public class KoruhReactor extends ImpactReactor{
             Time.run(UnityFx.expDump.lifetime, () -> ExpOrbs.spreadExp(vec.x, vec.y, 10, 0));
         }
 
-        /** 被摧毁时喷出全部经验球 */
+        /** ★ 对齐 PU132 原版: onDestroyed 为空, 经验球喷出只在"经验不足致死"时内联执行 (见 updateTile) */
         @Override
         public void onDestroyed(){
             super.onDestroyed();
-            for(int i = 0, m = Mathf.ceilPositive(exp * 1.5f); i < m; i++){
-                Time.run(i * 10, this::dumpExpOrb);
-            }
         }
 
         @Override
