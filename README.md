@@ -70,7 +70,7 @@
 - **经验激光炮台（charge / frost / fractal / swarm）**：四项按 PU132 原版还原攻击方式与特效——
   - `charge-laser-turret`：改为**蓄力单发**（`shoot.firstShotDelay = 50`，蓄力播放 `laserCharge` + `laserChargeBegin`、开火播放 `laserChargeShoot`），弹药换成原版 `shardLaser`（150 长度 / 30 伤害 + 电击状态 + 激光碎片）
   - `frost-laser-turret`：弹药换成原版 `frostLaser`（170 / 130 + 冻结状态 + 冰片射击特效），命中生成**冻结圈**（`freezeEffect` + 冻结音效 + 范围冻结/瘫痪）；命中按原版 `expGain = 2` 给炮台加经验（该炮台无碎片弹，这是它唯一的升级途径）；炮台贴图沿用原版（此前误判为无贴图，已恢复）
-  - `fractal-laser-turret`：改为**蓄力裂缝激光**（蓄力 `laserFractalCharge` / `laserFractalChargeBegin`，开火 `laserFractalShoot`），命中生成 `DistFieldBulletType` **扭曲力场**（减速场内敌方单位及其子弹）并播放闪电链 + 多个随机小力场；原版该炮台**无炮台贴图**，故将本体/DrawTurret 各层置为透明区域（png 资源保留）
+  - `fractal-laser-turret`：改为**蓄力裂缝激光**（蓄力 `laserFractalCharge` / `laserFractalChargeBegin`，开火 `laserFractalShoot`），命中生成 `DistFieldBulletType` **扭曲力场**（减速场内敌方单位及其子弹）并播放闪电链 + 多个随机小力场；炮台贴图沿用原版（经核对 PU_V8 参考，`fractal-laser-turret.png` 存在且为完整炮台贴图，此前误判为无贴图，已撤销透明化处理并恢复）
   - `swarm-laser-turret`：由"简化版 ExpPowerTurret"改为新建的 `BurstChargePowerTurret`——**一次装填按 20 tick 间隔依次蓄力发射 4 发**，每发独立播放蓄力特效（忠实还原原版连发蓄力攻击方式），弹药为 `branchLaser`（140 / 20 + 3 发分裂碎片）
 - **endgame**：按 PU132 原版**逐行忠实移植**（draw / updateTile / updateEyes / eyeShoot / killUnits / killTiles / shoot / collision / damage 的数值、判定顺序、特效参数与图层全部照抄）——三层旋转环 + 16 眼追踪光束（光束攻击半径 = 炮台射程 820）、攻击时轮盘旋转与底座纹理亮起、眼睛朝目标偏移、内外圈逆时针依次发射秒杀光束、齐射时以自身为中心湮灭爆炸
   - **慢闪电**：改为 PU132 原版的慢闪电形态——单段长度回到原版 50（远小于延伸距离，因此会自然**弯折 + 分叉**，不再是笔直光柱），延伸距离按需求取**炮台射程的一半**（820 / 2 = 410，原版为 810），并限制同时存在数量不超过 6 条；沿线段连续施加 520 × 效率 的伤害

@@ -552,31 +552,7 @@ public class Z_Exp {
             pregrade = chargeLaserTurret;
             pregradeLevel = 15;
             effectColors = new arc.graphics.Color[]{fromColor, Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.75f), Pal.sapBullet};
-        }
-
-            /**
-             * 隐藏贴图: PU132 原版该炮台没有炮台贴图 (frost-laser-turret 才是有贴图的那个),
-             * 但保留 assets 下的 png 文件.
-             * <p>把本体与 DrawTurret 各层替换为空区域, 避免渲染时显示错误图形。</p>
-             *
-             * <p>★ 注意: 绝不能设置 {@code dt.liquid = clear}!
-             * DrawTurret.drawTurret 用 {@code if(liquid.found())} 判断后<b>无条件</b>读取
-             * {@code build.liquids.current()}, 而本炮台 hasLiquids=false, build.liquids 为 null,
-             * 会抛 NullPointerException 崩溃。保持默认值 (name+"-liquid" 未找到) 即可跳过液体层。
-             * 同理 heat 也保持默认, 避免无谓绘制。</p>
-             */
-            @Override
-            public void load(){
-                super.load();
-                var clear = arc.Core.atlas.find("clear");
-                region = clear;
-
-                var dt = (mindustry.world.draw.DrawTurret)drawer;
-                dt.base = clear;
-                dt.top = clear;
-                dt.preview = clear;
-            }
-        };
+        }};
 
         // ===== swarmLaserTurret (PU132 UnityBlocks L1915-1960, BurstChargePowerTurret)
         // 连发蓄力: 一次装填按 burstSpacing 依次蓄力发射 shots 发, 每发独立播放蓄力特效
