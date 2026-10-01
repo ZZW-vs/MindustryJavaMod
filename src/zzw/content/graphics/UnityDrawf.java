@@ -1,9 +1,12 @@
 package zzw.content.graphics;
 
 import arc.Core;
+import arc.func.Cons;
+import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
+import mindustry.graphics.Shaders;
 
 /**
  * 绘图工具 (PU132 unity.graphics.UnityDrawf 移植, 仅图系统所需方法)
@@ -78,5 +81,34 @@ public class UnityDrawf{
         nRegion.u += Mathf.map(offset % 1, 0f, 1f, 0f, texW * step / tw);
         nRegion.u2 = nRegion.u + scaleX * texW;
         Draw.rect(nRegion, x, y, w, h, w * 0.5f, h * 0.5f, rot);
+    }
+
+    /**
+     * 绘制"建造进度"特效 (PU132 unity.graphics.UnityDrawf.drawConstruct 移植)。
+     *
+     * <p>用 build 着色器按 progress 从下往上扫出已建造的部分, 蓝图未建满时
+     * 显示扫描光带效果。Chopper 未付满造价时用它绘制刀刃半成品。</p>
+     *
+     * @param region   待绘制贴图
+     * @param progress 建造进度 (0~1)
+     * @param color    扫描颜色
+     * @param alpha    透明度
+     * @param time     动画时间 (内部会折算为着色器 time)
+     * @param layer    绘制层级
+     * @param func     实际绘制回调 (负责摆放贴图)
+     */
+    public static void drawConstruct(TextureRegion region, float progress, Color color, float alpha, float time, float layer, Cons<TextureRegion> func){
+        nRegion.set(region);
+        Draw.draw(layer, () -> {
+            Shaders.build.region = nRegion;
+            Shaders.build.progress = progress;
+            Shaders.build.color.set(color);
+            Shaders.build.color.a = alpha;
+            Shaders.build.time = -time / 20f;
+            Draw.shader(Shaders.build);
+            func.get(nRegion);
+            Draw.shader();
+            Draw.reset();
+        });
     }
 }

@@ -2,8 +2,14 @@ package zzw.content.mechanics.torque;
 
 import mindustry.content.Items;
 import mindustry.type.Category;
+import mindustry.type.ItemStack;
 import mindustry.world.meta.BuildVisibility;
+import arc.math.geom.Point2;
 import zzw.content.Z_Items;
+import zzw.content.blocks.modular.Chopper;
+import zzw.content.blocks.modular.PartStat;
+import zzw.content.blocks.modular.PartStatType;
+import zzw.content.blocks.modular.PartType;
 import zzw.content.blocks.power.CombustionHeater;
 import zzw.content.blocks.power.HeatPipe;
 import zzw.content.blocks.power.HeatSource;
@@ -101,6 +107,10 @@ public class Z_Torque{
     public static RotorBlock electricRotorSmall;
     /** 大型电力转子: 磁通→扭矩发电 (3x3) */
     public static RotorBlock electricRotor;
+
+    // ===== PU132 模块化系统 =====
+    /** 蓝图剁刀: 模块化扭矩切割方块 (PU132 Chopper) */
+    public static Chopper chopper;
 
     public static void load(){
         // ===== 生产方块 (扭矩消耗) =====
@@ -375,6 +385,29 @@ public class Z_Torque{
             consumePower(16f);
             addGraph(new GraphFlux(false).setAccept(0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1));
             addGraph(new GraphTorque(0.05f, 150f).setAccept(0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
+        }};
+
+        // ===== PU132 模块化系统 (UnityBlocks L2877 原版配置) =====
+        // chopper: 蓝图剁刀 (零件网格 7x1, 4 个零件: 枢轴/刀刃/锯刃/连杆)
+        // 注: UnityItems.nickel → Z_Items.nickel; 零件文案走 part.unity.* 无前缀键
+        chopper = new Chopper("chopper"){{
+            requirements(Category.turret, with(Z_Items.nickel, 50, Items.titanium, 50, Items.lead, 30));
+            health = 650;
+            setGridW(7);
+            setGridH(1);
+            addPart(arc.Core.bundle.get("part.unity.pivot.name"), arc.Core.bundle.get("part.unity.pivot.info"), PartType.blade, 4, 0, 1, 1, true, true,
+                new Point2(0, 0), new ItemStack[0], new byte[]{1, 0, 0, 0}, new byte[]{0, 0, 0, 0},
+                new PartStat(PartStatType.mass, 1), new PartStat(PartStatType.collides, false), new PartStat(PartStatType.hp, 10));
+            addPart(arc.Core.bundle.get("part.unity.blade.name"), arc.Core.bundle.get("part.unity.blade.info"), PartType.blade, 0, 0, 1, 1,
+                with(Z_Items.nickel, 3, Items.titanium, 5), new byte[]{1, 0, 0, 0}, new byte[]{0, 0, 1, 0},
+                new PartStat(PartStatType.mass, 2), new PartStat(PartStatType.collides, true), new PartStat(PartStatType.hp, 80), new PartStat(PartStatType.damage, 5));
+            addPart(arc.Core.bundle.get("part.unity.serrated-blade.name"), arc.Core.bundle.get("part.unity.serrated-blade.info"), PartType.blade, 2, 0, 2, 1,
+                with(Z_Items.nickel, 8, Items.lead, 5), new byte[]{1, 0, 0, 0, 0, 0}, new byte[]{0, 0, 0, 1, 0, 0},
+                new PartStat(PartStatType.mass, 6), new PartStat(PartStatType.collides, true), new PartStat(PartStatType.hp, 120), new PartStat(PartStatType.damage, 12));
+            addPart(arc.Core.bundle.get("part.unity.rod.name"), arc.Core.bundle.get("part.unity.rod.info"), PartType.blade, 1, 0, 1, 1,
+                with(Items.titanium, 3), new byte[]{1, 0, 0, 0}, new byte[]{0, 0, 1, 0},
+                new PartStat(PartStatType.mass, 1), new PartStat(PartStatType.collides, false), new PartStat(PartStatType.hp, 40));
+            addGraph(new GraphTorque(0.03f, 5f).setAccept(1, 0, 0, 0));
         }};
     }
 }

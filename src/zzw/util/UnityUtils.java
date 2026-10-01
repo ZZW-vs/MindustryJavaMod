@@ -3,6 +3,7 @@ package zzw.util;
 import arc.math.geom.Geometry;
 import arc.math.geom.Rect;
 import arc.math.geom.Vec2;
+import arc.struct.IntSeq;
 import arc.struct.IntSet;
 import mindustry.Vars;
 import mindustry.entities.Units;
@@ -172,5 +173,44 @@ public class UnityUtils{
 
             if(vec != null) unit.damage(damage);
         });
+    }
+
+    /**
+     * 行程解包 (PU132 unity.util.Utils.unpackInts 移植)。
+     *
+     * <p>把 {@link zzw.content.blocks.modular.IntPacker} 打包出的 IntSeq 还原成
+     * 原始字节序列: 每个 int 含两组 (count 8位 + value 8位)。</p>
+     *
+     * @param intpack 打包后的整数序列
+     * @return 解包后的字节序列
+     */
+    public static IntSeq unpackInts(IntSeq intpack){
+        IntSeq out = new IntSeq();
+        for(int i = 0, len = intpack.size * 2; i < len; i++){
+            int cint = intpack.get(i / 2);
+            int value = (cint >>> (i % 2 == 0 ? 0 : 16)) & 65535;
+            int am = (value >> 8) & 255;
+            for(int k = 0; k < am; k++) out.add(value & 255);
+        }
+        return out;
+    }
+
+    /**
+     * 字符串行程解包 (PU132 unity.util.Utils.unpackIntsFromString 移植)。
+     *
+     * <p>把 {@link zzw.content.blocks.modular.IntPacker#toStringPack()} 产生的
+     * 字符串还原成字节序列 (每两个字符一组: 前一个为数量, 后一个为值)。</p>
+     *
+     * @param sintpack 打包字符串
+     * @return 解包后的字节序列
+     */
+    public static IntSeq unpackIntsFromString(String sintpack){
+        IntSeq out = new IntSeq();
+        for(int i = 0, len = sintpack.length(); i < len; i += 2){
+            int val = sintpack.codePointAt(i + 1);
+            int am = sintpack.codePointAt(i);
+            for(int k = 0; k < am; k++) out.add(val);
+        }
+        return out;
     }
 }

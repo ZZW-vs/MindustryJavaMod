@@ -118,6 +118,14 @@
 - **太阳能集热器 / 太阳反射镜** - 反射镜为集热器聚焦光线产热
 - **无限热源 / 无限冷源** - 沙盒专用热量源与冷源（冷源使网络热量归零）
 
+#### 模块化系统 (PU132 移植)
+- **剁刀 (chopper)** - 扭矩驱动的模块化切割方块（PU132 `Chopper` 完整移植）
+  - 内置**蓝图编辑器**：在 7x1 零件网格上摆放旋转枢轴 / 刀刃 / 锯齿刀刃 / 连杆，实时显示连接端口、零件造价与总造价
+  - 蓝图经 `IntPacker` 行程压缩后存入方块配置，支持存档读写（`writeExt`/`readExt`）
+  - 按蓝图收取材料：未建满时用 `drawConstruct` 着色器绘制半成品扫描光带；可从核心自动补料（`updateAutoBuild`，沙盒/无限资源下瞬间建成）
+  - 建满后随扭矩网络转速旋转，转速 >0.8 时对路径上的敌人与建筑造成分段伤害并产生击退扭矩
+  - 移植支撑类：`PartInfo`/`PartType`/`PartStat`/`PartStatType`/`StatContainer`/`Segment`/`IntPacker`/`ConnectData`/`ModularConstructorUI`/`BorderImage`（`zzw.content.blocks.modular`）
+
 ### 新增单位 (PU132 移植)
 
 本模组的多节单位系统完全照搬 PU132 原版算法，包括速度传播、约束修正、血量分布等核心机制。段身带有正弦波蠕动动画，更具生物活性。
