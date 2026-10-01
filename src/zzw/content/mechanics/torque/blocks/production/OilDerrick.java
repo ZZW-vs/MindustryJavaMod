@@ -14,16 +14,16 @@ import static arc.Core.*;
 /**
  * 螺旋石油钻井 (OilDerrick)
  *
- * <p>扭矩驱动的石油抽取器: 本质与 {@link MechanicalExtractor}(旋转抽水机) 相同,
- * 都是 {@link SolidPump} + 图网络管线, 区别在于抽取的液体与所需地层。</p>
+ * <p>扭矩驱动的石油合成器: 本质是 {@link GenericCrafter} + 图网络管线,
+ * 消耗"水 + 沙子"合成石油, 整体工作速度由扭矩转速决定 (效率 = 转速效率的平方)。</p>
  *
- * <p>注册时通过 {@code result = Liquids.oil; attribute = Attribute.oil;} 指定:
- * 必须建在带有石油属性的地层上, 由扭矩转速决定抽取速度, 转速越高抽得越快,
- * 抽到的石油存入自身液体缓冲并向前输出。</p>
+ * <p>注册时通过 {@code outputLiquid = oil; consumeLiquid(water); consumeItem(sand);} 指定配方,
+ * 与普通工厂一致: 水按 tick 连续抽走、沙子按次消耗、石油按进度连续产出,
+ * 三者都随 {@code efficiency} 同步缩放, 因此停机(缺料/无扭矩/油满)时不会空耗。</p>
  *
  * <p>绘制上做成"螺旋钻杆"样式: 底座 + 随扭矩旋转的螺旋钻杆 + 顶部井架 + 石油液位。</p>
  */
-public class OilDerrick extends SolidPump implements GraphBlockBase{
+public class OilDerrick extends GenericCrafter implements GraphBlockBase{
     protected final Graphs graphs = new Graphs();
 
     /** 底座 (3x3) */
@@ -82,7 +82,7 @@ public class OilDerrick extends SolidPump implements GraphBlockBase{
         return graphs;
     }
 
-    public class OilDerrickBuild extends SolidPumpBuild implements GraphBuildBase{
+    public class OilDerrickBuild extends GenericCrafterBuild implements GraphBuildBase{
         protected GraphModules gms;
 
         @Override

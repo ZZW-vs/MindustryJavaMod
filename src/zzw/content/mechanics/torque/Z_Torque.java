@@ -4,6 +4,7 @@ import mindustry.content.Items;
 import mindustry.content.Liquids;
 import mindustry.type.Category;
 import mindustry.type.ItemStack;
+import mindustry.type.LiquidStack;
 import mindustry.world.meta.Attribute;
 import mindustry.world.meta.BuildVisibility;
 import arc.math.geom.Point2;
@@ -176,20 +177,23 @@ public class Z_Torque{
             addGraph(new GraphTorqueConsume(45f, 8f, 1.0f, 0.06f, 0.3f).setAccept(0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
         }};
 
-        // oil-derrick (螺旋石油钻井): 扭矩驱动的石油抽取器
-        // 与机械提取器同为 SolidPump, 但抽取石油, 且必须建在带石油属性的地层上
-        // 产出: SolidPump 每秒产量 = pumpAmount * 60 * (validTiles + 地层属性) * 效率,
-        //   满油层时 (validTiles≈1 + 地层属性≈1) 地层倍率约 2, 效率再由扭矩转速平方决定;
-        //   目标"标准 10 单位/秒"(满扭矩、整块铺在油层) → pumpAmount = 10 / 60 / 2 ≈ 0.083
+        // oil-derrick (螺旋石油钻井): 扭矩驱动的石油合成器
+        // 配方: 消耗 水 10/秒 + 沙子 2/秒, 产出 石油 10/秒
+        //   GenericCrafter 的量纲: consumeLiquid / outputLiquid 按 tick (×60 = 每秒),
+        //   consumeItem 按次 (60 / craftTime 次每秒, craftTime = 60 → 1 次/秒)
+        //   整体速度 = 扭矩转速效率的平方 (见 OilDerrickBuild.updateTile)
         oilDerrick = new OilDerrick("oil-derrick"){{
             requirements(Category.production, with(Items.lead, 150, Items.copper, 100, Items.titanium, 60, Items.metaglass, 30));
             hasPower = false;
             size = 3;
             health = 1500;
-            result = Liquids.oil;
-            attribute = Attribute.oil;
-            pumpAmount = 10f / 60f / 2f;
+            craftTime = 60f;
             liquidCapacity = 60f;
+            outputLiquid = new LiquidStack(Liquids.oil, 10f / 60f);
+
+            // 每秒消耗 10 单位水 + 2 个沙子
+            consumeLiquid(Liquids.water, 10f / 60f);
+            consumeItem(Items.sand, 2);
 
             addGraph(new GraphTorqueConsume(45f, 8f, 1.0f, 0.06f, 0.3f).setAccept(0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
         }};
