@@ -122,14 +122,14 @@ public class TestMod extends Mod{
         // 加载自定义物品（基础资源; PU 物品在同文件内排在自创物品之后）
         Z_Items.load();
 
-        // 加载坩埚熔化/合金配方 (引用 Z_Items 自定义物品, 必须在 Z_Items 之后)
+        // 加载自定义液体（坩埚配方会引用 Z_Liquids.lava, 必须排在其之前）
+        Z_Liquids.load();
+
+        // 加载坩埚熔化/合金配方 (引用 Z_Items 自定义物品与 Z_Liquids, 必须在两者之后)
         zzw.content.mechanics.torque.meta.CrucibleRecipes.load();
 
         // 加载自定义状态效果 (blueBurn 等, 炮台子弹引用; 必须在炮台之前)
         Z_StatusEffects.load();
-
-        // 加载自定义液体（需要物品之前或并行）
-        Z_Liquids.load();
 
         // 加载矿物（需要物品）
         Z_Mine.load();
