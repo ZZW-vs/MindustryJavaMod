@@ -4,6 +4,7 @@ import mindustry.content.Items;
 import mindustry.content.Liquids;
 import mindustry.type.Category;
 import mindustry.type.ItemStack;
+import mindustry.world.meta.Attribute;
 import mindustry.world.meta.BuildVisibility;
 import arc.math.geom.Point2;
 import zzw.content.Z_Items;
@@ -40,6 +41,7 @@ import zzw.content.mechanics.torque.blocks.power.WaterTurbine;
 import zzw.content.mechanics.torque.blocks.power.WindTurbine;
 import zzw.content.mechanics.torque.blocks.production.AugerDrill;
 import zzw.content.mechanics.torque.blocks.production.MechanicalExtractor;
+import zzw.content.mechanics.torque.blocks.production.OilDerrick;
 import zzw.content.mechanics.torque.graphs.GraphCrucible;
 import zzw.content.mechanics.torque.graphs.GraphFlux;
 import zzw.content.mechanics.torque.blocks.power.Magnet;
@@ -63,6 +65,7 @@ public class Z_Torque{
     // 生产 (扭矩消耗)
     public static AugerDrill augerDrill;
     public static MechanicalExtractor mechanicalExtractor;
+    public static OilDerrick oilDerrick;
 
     // 分配 (扭矩传输)
     public static DriveShaft driveShaft;
@@ -157,14 +160,33 @@ public class Z_Torque{
             addGraph(new GraphTorqueConsume(45f, 8f, 1.5f, 0.03f, 0.15f).setAccept(0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
         }};
 
-        // mechanical-extractor (PU_V8 L2890): 3x3, GraphTorqueConsume(45f, 8f, 1.0f, 0.06f, 0.3f)
+        // mechanical-extractor (PU_V8 L2890 旋转抽水机): 3x3, GraphTorqueConsume(45f, 8f, 1.0f, 0.06f, 0.3f)
         // 效率调优: oversupplyFalloff 0.7→1.0 (平方关系下不宜过高)
+        // 抽水: 补回 PU_V8 rotary-water-extractor 的 result/attribute, 否则方块抽不出任何液体
         mechanicalExtractor = new MechanicalExtractor("mechanical-extractor"){{
             requirements(Category.production, with(Items.lead, 100, Items.copper, 75));
             hasPower = false;
             size = 3;
             health = 1000;
-            pumpAmount = 0.4f;
+            result = Liquids.water;
+            attribute = Attribute.water;
+            pumpAmount = 0.2f;
+            liquidCapacity = 60f;
+
+            addGraph(new GraphTorqueConsume(45f, 8f, 1.0f, 0.06f, 0.3f).setAccept(0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
+        }};
+
+        // oil-derrick (螺旋石油钻井): 扭矩驱动的石油抽取器
+        // 与机械提取器同为 SolidPump, 但抽取石油, 且必须建在带石油属性的地层上
+        oilDerrick = new OilDerrick("oil-derrick"){{
+            requirements(Category.production, with(Items.lead, 150, Items.copper, 100, Items.titanium, 60, Items.metaglass, 30));
+            hasPower = false;
+            size = 3;
+            health = 1500;
+            result = Liquids.oil;
+            attribute = Attribute.oil;
+            pumpAmount = 0.2f;
+            liquidCapacity = 60f;
 
             addGraph(new GraphTorqueConsume(45f, 8f, 1.0f, 0.06f, 0.3f).setAccept(0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
         }};

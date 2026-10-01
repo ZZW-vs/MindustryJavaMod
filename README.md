@@ -116,8 +116,9 @@
 - **内联变速箱** - 可调节传动比的变速设备
 - **轴路由器** - 分配和路由动力的设备
 - **简单传动** - 简单的动力传输装置
-- **螺旋钻机** - 旋转钻探设备，可挖掘资源
-- **机械提取器** - 自动提取资源的机械装置
+- **螺旋钻头 (auger-drill)** - 旋转钻探设备，可挖掘资源（3x3）
+- **螺旋抽水机 (mechanical-extractor)** - 扭矩驱动抽水，需建在水层上（3x3）
+- **螺旋石油钻井 (oil-derrick)** - 扭矩驱动抽取石油，需建在油层上（3x3）
 
 #### 热力系统 (PU132 移植)
 - **热管** - 连接热量网络的导热管道，贴图按 4 邻居连接位掩码自动拼接；高温时发光并灼烧踩上方的单位
@@ -316,6 +317,8 @@
 - 修复坩埚源/坩埚泵配置面板崩溃：`CrucibleIngredient.icon` 在 `loadContent()` 注册阶段捕获的 `fullIcon` 为 null，导致打开配置面板时 `TextureRegionDrawable` 空指针崩溃；改为 `icon()` 延迟解析（首次使用时从 item/liquid 重新读取），并同步更新坩埚源/泵/显示元素调用点
 - 剁刀（chopper）蓝图编辑器：网格由原版 7 格加长至 9 格（枢轴仍位于网格 x=0，即方块旋转中心）；自动隐藏没有任何可放置零件的空分类标签（如原版空置的 saw）
 - 剁刀伤害与命中判定：刀身零件伤害提高约 50%（刀刃 5→8、锯齿刀刃 12→18）；命中判定由原版"径向环 + 角度门"改为按刀身几何的精确线段判定（沿刀刃方向定位分段、垂直方向限定判定带，判定带随转速加宽做扫掠补偿），侧后方不再误命中
+- 扭矩钻头功能区分：修复螺旋抽水机（mechanical-extractor）缺失 `result`/`attribute` 的问题——补回 PU_V8 `rotary-water-extractor` 的 `result=Liquids.water`、`attribute=Attribute.water`、`pumpAmount=0.2`、`liquidCapacity=60`，此前该方块抽不出任何液体
+- 新增螺旋石油钻井（oil-derrick）：扭矩驱动的石油抽取器（`SolidPump`，`result=Liquids.oil`、`attribute=Attribute.oil`，需建在油层上），绘制为螺旋钻杆样式（类 `zzw.content.mechanics.torque.blocks.production.OilDerrick`）
 
 ## 安装说明
 
