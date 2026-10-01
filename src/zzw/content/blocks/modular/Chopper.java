@@ -223,13 +223,29 @@ public class Chopper extends GraphBlock{
             bladeRadius = r;
         }
 
+        /**
+         * 精确的刀刃命中判定: 把目标相对旋转中心的位置分解到"沿刀刃方向 (along)"与
+         * "垂直刀刃方向 (perp)", 仅当目标落在刀身分段范围内、且横向偏差不超过判定带宽度时才命中。
+         *
+         * <p>相比 PU132 原版的"径向环 + 角度门"判定, 这里直接按刀身几何判定:
+         * 不再把侧后方的目标算作命中, 也不会漏掉贴近刀身的目标。</p>
+         */
         float getHitDamage(float rx, float ry, float rot){
-            float dist = Mathf.dst(rx, ry);
             float drx = Mathf.cosDeg(rot);
             float dry = Mathf.sinDeg(rot);
-            if(rx * drx / dist + ry * dry / dist < Mathf.cosDeg(Mathf.clamp(speedDmgMul * 10f, 0f, 180f))) return 0f;
+            // 沿刀刃方向 / 垂直刀刃方向的偏移 (世界单位)
+            float along = rx * drx + ry * dry;
+            float perp = ry * drx - rx * dry;
+            // 位于旋转中心后方 → 不在刀身上
+            if(along <= 0f) return 0f;
+            // 判定带半宽 = 半个格 (4) + 转速扫掠补偿 (转得越快, 一帧扫过越宽)
+            float halfWidth = 4f + Mathf.clamp(speedDmgMul * 2f, 0f, 16f);
+            if(Math.abs(perp) > halfWidth) return 0f;
+            // 沿刀身方向落在哪个分段上 (网格索引 → 世界单位: ×8)
             for(var seg : hitSegments){
-                if(seg.start * 8 + 4 < dist && seg.end * 8 + 4 > dist) return seg.damage * Mathf.clamp(dist * 0.1f);
+                if(seg.start * 8f <= along && seg.end * 8f >= along){
+                    return seg.damage * Mathf.clamp(along * 0.1f);
+                }
             }
             return 0f;
         }

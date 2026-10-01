@@ -359,10 +359,10 @@ public class ClassicProjector extends mindustry.world.blocks.defense.ForceProjec
             return effectColors[Math.min((int)(levelf() * effectColors.length), effectColors.length - 1)];
         }
 
-        /** 经验等级护盾半径 */
+        /** 经验等级护盾半径 (PU_V8: 等级半径 + 相变加成, 再乘展开系数) */
         @Override
         public float realRadius(){
-            return (rangeField == null ? radius : rangeField.fromLevel(level())) * radscl;
+            return ((rangeField == null ? radius : rangeField.fromLevel(level())) + phaseHeat * phaseRadiusBoost) * radscl;
         }
 
         /** 子弹命中处理: 偏折/吸收 + 获得经验 (PU132 ClassicProjectorBuild.hitBullet) */
@@ -391,13 +391,63 @@ public class ClassicProjector extends mindustry.world.blocks.defense.ForceProjec
             if(Mathf.chance(expChance)) handleExp(expGain);
         }
 
+        /**
+         * 力场投影仪主逻辑 (PU_V8 ClassicProjector.ClassicProjectorBuild.updateTile 忠实移植)。
+         *
+         * <p>★ 关键: 这里 <b>不能</b> 调用 super.updateTile()。
+         * 原版 {@link mindustry.world.blocks.defense.ForceProjector.ForceBuild#updateTile()}
+         * 末尾会执行 deflectBullets() 直接吸收所有命中子弹; 若再叠加本类的 hitBullet 扫描,
+         * 子弹会先被原版吸收 (导致偏折永不触发), 且护盾堆积量翻倍。
+         * PU_V8 的做法是完全重写本方法, 用自己的 hitBullet 取代原版吸收逻辑。</p>
+         */
         @Override
         public void updateTile(){
-            super.updateTile();
+            boolean phaseValid = hasItems && itemConsumer != null && itemConsumer.efficiency(this) > 0;
+
+            phaseHeat = Mathf.lerpDelta(phaseHeat, Mathf.num(phaseValid), 0.1f);
+
+            if(phaseValid && !broken && timer(timerUse, phaseUseTime) && efficiency > 0){
+                consume();
+            }
+
+            radscl = Mathf.lerpDelta(radscl, broken ? 0f : warmup, 0.05f);
+
+            if(Mathf.chanceDelta(buildup / shieldHealth * 0.1f)){
+                Fx.reactorsmoke.at(x + Mathf.range(tilesize / 2f), y + Mathf.range(tilesize / 2f));
+            }
+
+            warmup = Mathf.lerpDelta(warmup, efficiency, 0.1f);
+
+            if(buildup > 0){
+                float scale = !broken ? cooldownNormal : cooldownBrokenBase;
+
+                if(hasLiquids && coolantConsumer != null){
+                    if(coolantConsumer.efficiency(this) > 0){
+                        coolantConsumer.update(this);
+                        scale *= (cooldownLiquid * (1f + (liquids.current().heatCapacity - 0.4f) * 0.9f));
+                    }
+                }
+
+                buildup -= delta() * scale;
+            }
+
+            if(broken && buildup <= 0){
+                broken = false;
+            }
+
+            if(buildup >= shieldHealth + phaseShieldBoost * phaseHeat && !broken){
+                broken = true;
+                buildup = shieldHealth;
+                shieldBreakEffect.at(x, y, realRadius(), effectColor());
+            }
+
+            if(hit > 0f){
+                hit -= 1f / 5f * Time.delta;
+            }
 
             if(updateExpFields) setEFields(level());
 
-            // 护盾范围内子弹拦截 (PU132 原版: super 不做 intersect, 手动扫描)
+            // 护盾范围内子弹拦截: 偏折/吸收由本类 hitBullet 处理
             float realRadius = realRadius();
             if(realRadius > 0 && !broken){
                 Groups.bullet.intersect(x - realRadius, y - realRadius, realRadius * 2f, realRadius * 2f, (arc.func.Cons<Bullet>)b -> hitBullet(b, realRadius));
@@ -421,8 +471,8 @@ public class ClassicProjector extends mindustry.world.blocks.defense.ForceProjec
             }
 
             if(buildup > 0f){
-                Draw.alpha(buildup / shieldHealth * 0.75f);
                 Draw.color(effectColor());
+                Draw.alpha(buildup / shieldHealth * 0.75f);
                 Draw.blend(Blending.additive);
                 Draw.rect(topRegion, x, y);
                 Draw.blend();
