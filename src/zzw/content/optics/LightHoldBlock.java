@@ -75,10 +75,25 @@ public class LightHoldBlock extends GenericCrafter {
         }
     }
 
-    public class LightHoldBuild extends GenericCrafterBuild {
+    public class LightHoldBuild extends GenericCrafterBuild implements LightHolder {
         public LightAcceptor[] slots;
         /** 光指向需重新交互 (转动后) */
         public transient boolean needsReinteract;
+
+        @Override
+        public Building building() {
+            return this;
+        }
+
+        @Override
+        public LightAcceptor[] lightSlots() {
+            return slots;
+        }
+
+        @Override
+        public boolean needsReinteract() {
+            return needsReinteract;
+        }
 
         @Override
         public void created() {

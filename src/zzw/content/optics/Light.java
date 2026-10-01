@@ -68,8 +68,8 @@ public class Light implements QuadTree.QuadTreeObject {
     public volatile float queueRotation = 0f;
     public volatile long queuePosition = 0;
 
-    public volatile LightHoldBlock.LightHoldBuild source = null;
-    public volatile LightHoldBlock.LightHoldBuild queueSource = null;
+    public volatile LightHolder source = null;
+    public volatile LightHolder queueSource = null;
 
     public volatile int color = Color.whiteRgba;
     public volatile int queueColor = SColor.a(Color.whiteRgba, 0f);
@@ -80,7 +80,7 @@ public class Light implements QuadTree.QuadTreeObject {
     /** 已排队移除 (防重复 queueRemove → 同一实例重复进池) */
     public boolean pendingRemove = false;
 
-    public volatile LightHoldBlock.LightHoldBuild pointed;
+    public volatile LightHolder pointed;
     public volatile boolean rotationChanged = false;
 
     /** 父光 → 强度倍率 */
@@ -147,7 +147,7 @@ public class Light implements QuadTree.QuadTreeObject {
         clearInvalid();
 
         // 无光源且无父光 → 移除
-        if ((source == null || !source.isValid()) && parentsAny(p -> p.size <= 0)) {
+        if ((source == null || !source.building().isValid()) && parentsAny(p -> p.size <= 0)) {
             queueRemove();
             return;
         }
@@ -165,7 +165,7 @@ public class Light implements QuadTree.QuadTreeObject {
                 return true;
             }
 
-            if (tile.build instanceof LightHoldBlock.LightHoldBuild hold) {
+            if (tile.build instanceof LightHolder hold) {
                 // 光源自身或父光指向的建筑: 穿过
                 if (hold == source || parentsAny(parents -> {
                     for (var e : parents.entries()) {

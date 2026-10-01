@@ -1,8 +1,8 @@
 package zzw.content.optics;
 
-import arc.func.Cons2;
 import arc.struct.Seq;
 import mindustry.core.World;
+import mindustry.gen.Building;
 
 import static mindustry.Vars.*;
 
@@ -12,13 +12,13 @@ import static mindustry.Vars.*;
  */
 public class LightAcceptor {
     public final LightAcceptorType type;
-    public final LightHoldBlock.LightHoldBuild hold;
+    public final LightHolder hold;
 
     /** 接收状态数据 (原版 StemData, 这里用 float 字段) */
     public float dataFloat;
     public Seq<Light> sources = new Seq<>(2);
 
-    public LightAcceptor(LightAcceptorType type, LightHoldBlock.LightHoldBuild hold) {
+    public LightAcceptor(LightAcceptorType type, LightHolder hold) {
         this.type = type;
         this.hold = hold;
     }
@@ -37,8 +37,9 @@ public class LightAcceptor {
 
     /** 光的落点 tile 是否在本槽范围内 (PU132 原版算法) */
     public boolean accepts(Light light, int x, int y) {
-        int dx = World.toTile((x * tilesize) - (hold.x - hold.block.size * tilesize / 2f + tilesize / 2f)),
-            dy = -World.toTile((y * tilesize) - (hold.y + hold.block.size * tilesize / 2f - tilesize / 2f));
+        Building b = hold.building();
+        int dx = World.toTile((x * tilesize) - (b.x - b.block.size * tilesize / 2f + tilesize / 2f)),
+            dy = -World.toTile((y * tilesize) - (b.y + b.block.size * tilesize / 2f - tilesize / 2f));
 
         return
             dx >= type.x && dx < type.x + type.width &&

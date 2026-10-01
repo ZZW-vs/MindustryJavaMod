@@ -1,8 +1,10 @@
 package zzw.content.blocks;
 
 import arc.util.Time;
+import mindustry.entities.Effect;
 import mindustry.world.blocks.defense.Wall;
 import mindustry.world.meta.Stat;
+import zzw.content.exp.UnityFx;
 
 import static arc.Core.bundle;
 
@@ -19,6 +21,13 @@ public class LimitWall extends Wall {
     public float over9000 = 90000000f;
     /** 闪烁帧间隔 (>0 时启用, 每隔此帧数完全免伤一次) */
     public float blinkFrame = -1f;
+
+    /** 限伤命中特效 (PU132 LimitWall.maxDamageFx) */
+    protected Effect maxDamageFx = UnityFx.maxDamageFx;
+    /** 承受限伤特效 (PU132 LimitWall.withstandFx) */
+    protected Effect withstandFx = UnityFx.withstandFx;
+    /** 闪烁免伤特效 (PU132 LimitWall.blinkFx) */
+    protected Effect blinkFx = UnityFx.blinkFx;
 
     public LimitWall(String name) {
         super(name);
@@ -40,12 +49,14 @@ public class LimitWall extends Wall {
             if (blinkFrame > 0f) {
                 if (Time.time - blink >= blinkFrame) {
                     blink = Time.time;
+                    blinkFx.at(x, y, size);
                 } else {
                     return 0f;
                 }
             }
             // maxDamage 限伤
             if (maxDamage > 0f && amount > maxDamage && amount < over9000) {
+                withstandFx.at(x, y, size);
                 return super.handleDamage(Math.min(amount, maxDamage));
             }
             return super.handleDamage(amount);

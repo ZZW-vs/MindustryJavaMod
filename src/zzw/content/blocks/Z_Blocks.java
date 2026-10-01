@@ -4,6 +4,10 @@ import arc.struct.Seq;
 import mindustry.content.Items;
 import mindustry.content.Liquids;
 import mindustry.content.UnitTypes;
+import mindustry.entities.bullet.ContinuousLaserBulletType;
+import mindustry.entities.bullet.LaserBoltBulletType;
+import mindustry.entities.bullet.LaserBulletType;
+import mindustry.entities.bullet.LightningBulletType;
 import mindustry.gen.Sounds;
 import mindustry.game.EventType;
 import mindustry.type.Category;
@@ -24,6 +28,8 @@ import zzw.content.blocks.units.ModularConstructorPart;
 import zzw.content.blocks.units.TerraCore;
 import zzw.content.blocks.units.SelectableReconstructor;
 import zzw.content.exp.EField;
+import zzw.content.exp.UnityFx;
+import zzw.content.mechanics.torque.graphs.GraphHeat;
 import zzw.content.units.Z_KoruhUnits;
 import zzw.content.units.Z_MonolithUnits;
 import zzw.content.units.Z_Units;
@@ -38,9 +44,12 @@ import arc.graphics.g2d.Draw;
  * 1. 基础方块: 铜/铁方块、南瓜等装饰性方块
  * 2. 3D展示系统: 支持.obj和.pmx模型展示的专用方块
  * 3. PU_V8移植: 完整的墙体系统，包括：
- *    - LimitWall: 限制最大伤害的特殊墙体
- *    - LevelLimitWall: 基于经验等级成长的墙体
+ *    - LimitWall / LevelLimitWall: 限制最大伤害的墙体（限伤/闪烁免伤特效）
+ *    - ExpLimitWall: 经验等级 + 减伤墙体
  *    - ShieldWall: 带护盾的强化墙体
+ *    - PowerWall: 吸收能量弹转化为电力的单极子墙
+ *    - HeatWall: 接入热量网络、高温灼烧周围的铜镍合金墙
+ *    - LightWall: 允许光穿透并衰减的玻璃墙
  *    - StaticWall: 环境装饰墙体
  * 4. 地板系统: 包括发光地板、覆盖层地板等
  * 
@@ -88,8 +97,8 @@ public class Z_Blocks {
     public static Wall metaglassWall, metaglassWallLarge;
     // electrophobic-wall (单极子墙)
     public static Wall electrophobicWall, electrophobicWallLarge;
-    // cupronickel-wall (铜镍合金墙)
-    public static Wall cupronickelWall, cupronickelWallLarge;
+    // cupronickel-wall (铜镍合金墙, HeatWall 接入热量网络)
+    public static Block cupronickelWall, cupronickelWallLarge;
     // sharpslate-wall (锐板岩墙, StaticWall 环境墙)
     public static Block sharpslateWall, infusedSharpslateWall;
 
@@ -267,6 +276,7 @@ public class Z_Blocks {
             maxDamage = 76f;
             blinkFrame = 30f;
             health = 760;
+            updateEffect = UnityFx.sparkle;
             maxLevel = 6;
             expFields = new EField[]{
                 new EField.ERational(v -> maxDamage = v, 152f, 50f, -3f, Stat.abilities, v -> arc.Core.bundle.format("stat.unity.maxdamage", v)).formatAll(false),
@@ -279,6 +289,7 @@ public class Z_Blocks {
             blinkFrame = 30f;
             health = 3040;
             size = 2;
+            updateEffect = UnityFx.sparkle;
             maxLevel = 12;
             expFields = new EField[]{
                 new EField.ERational(v -> maxDamage = v, 304f, 50f, -2f, Stat.abilities, v -> arc.Core.bundle.format("stat.unity.maxdamage", v)).formatAll(false),
@@ -315,37 +326,57 @@ public class Z_Blocks {
             };
         }};
 
-        // metaglass-wall: 玻璃墙 (简化为 vanilla Wall, 移除光照交互)
-        metaglassWall = new Wall("metaglass-wall") {{
+        // metaglass-wall: 玻璃墙 (LightWall, 光可穿透并按 suppression 衰减)
+        metaglassWall = new LightWall("metaglass-wall") {{
             requirements(Category.defense, ItemStack.with(Items.lead, 6, Items.metaglass, 6));
             health = 350;
         }};
-        metaglassWallLarge = new Wall("metaglass-wall-large") {{
+        metaglassWallLarge = new LightWall("metaglass-wall-large") {{
             requirements(Category.defense, ItemStack.with(Items.lead, 24, Items.metaglass, 24));
             health = 1400;
             size = 2;
         }};
 
-        // electrophobic-wall: 单极子墙 (简化为 vanilla Wall, 移除热图/能量倍率)
-        electrophobicWall = new Wall("electrophobic-wall") {{
+        // electrophobic-wall: 单极子墙 (PowerWall, 吸收能量弹转化为电力, 过载扣血)
+        electrophobicWall = new PowerWall("electrophobic-wall") {{
             requirements(Category.defense, ItemStack.with(Z_Items.monolite, 4, Items.silicon, 2));
             health = 400;
+
+            energyMultiplier.put(LightningBulletType.class, 15f);
+            energyMultiplier.put(LaserBulletType.class, 9f);
+            energyMultiplier.put(ContinuousLaserBulletType.class, 12f);
+            energyMultiplier.put(LaserBoltBulletType.class, 9f);
         }};
-        electrophobicWallLarge = new Wall("electrophobic-wall-large") {{
+        electrophobicWallLarge = new PowerWall("electrophobic-wall-large") {{
             requirements(Category.defense, ItemStack.with(Z_Items.monolite, 16, Items.silicon, 8));
             health = 1600;
             size = 2;
+            powerProduction = 4f;
+            damageThreshold = 300f;
+
+            energyMultiplier.put(LightningBulletType.class, 15f);
+            energyMultiplier.put(LaserBulletType.class, 9f);
+            energyMultiplier.put(ContinuousLaserBulletType.class, 12f);
+            energyMultiplier.put(LaserBoltBulletType.class, 9f);
         }};
 
-        // cupronickel-wall: 铜镍合金墙 (简化为 vanilla Wall, 移除热图)
-        cupronickelWall = new Wall("cupronickel-wall") {{
+        // cupronickel-wall: 铜镍合金墙 (HeatWall, 接入热量网络, 高温灼烧周围)
+        cupronickelWall = new HeatWall("cupronickel-wall") {{
             requirements(Category.defense, ItemStack.with(Z_Items.cupronickel, 8, Z_Items.nickel, 5));
             health = 500;
+            addGraph(new GraphHeat(50f, 0.5f, 0.03f).setAccept(1, 1, 1, 1));
         }};
-        cupronickelWallLarge = new Wall("cupronickel-wall-large") {{
+        cupronickelWallLarge = new HeatWall("cupronickel-wall-large") {{
             requirements(Category.defense, ItemStack.with(Z_Items.cupronickel, 36, Z_Items.nickel, 20));
-            health = 2000;
             size = 2;
+            health = 2000;
+            minStatusRadius = 8f;
+            statusRadiusMul = 40f;
+            minStatusDuration = 5f;
+            statusDurationMul = 120f;
+            statusTime = 120f;
+            maxDamage = 40f;
+            addGraph(new GraphHeat(200f, 0.5f, 0.09f).setAccept(1, 1, 1, 1, 1, 1, 1, 1));
         }};
 
         // sharpslate-wall: 锐板岩墙 (StaticWall 环境墙, vanilla)

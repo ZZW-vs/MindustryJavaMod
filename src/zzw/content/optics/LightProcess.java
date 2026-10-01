@@ -92,12 +92,12 @@ public class LightProcess {
     }
 
     /** 光命中 (或打到实心方块) — 处理指向建筑的注册/交互 (原版 queuePoint) */
-    public void queuePoint(Light light, LightHoldBlock.LightHoldBuild hold) {
+    public void queuePoint(Light light, LightHolder hold) {
         if (hold == null) {
             queue.add(() -> {
                 light.clearChildren();
 
-                LightHoldBlock.LightHoldBuild pointed = light.pointed;
+                LightHolder pointed = light.pointed;
                 if (pointed != null) {
                     pointed.removeLight(light);
                     light.pointed = null;
@@ -105,8 +105,8 @@ public class LightProcess {
             });
         } else {
             queue.add(() -> {
-                LightHoldBlock.LightHoldBuild pointed = light.pointed;
-                if (light.rotationChanged || pointed != hold || hold.needsReinteract) {
+                LightHolder pointed = light.pointed;
+                if (light.rotationChanged || pointed != hold || hold.needsReinteract()) {
                     light.clearChildren();
 
                     if (pointed != null) pointed.removeLight(light);

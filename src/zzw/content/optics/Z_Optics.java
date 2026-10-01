@@ -109,46 +109,46 @@ public class Z_Optics {
             // 四角受光槽 (每角 required=1.0, update 热度动画 + draw 加色贴图) — 不用局部变量声明
             acceptors.add(
                 new LightAcceptorType(0, 0, 1f)
-                    .update((LightHoldBlock.LightHoldBuild b, LightAcceptor s) ->
+                    .update((LightHolder b, LightAcceptor s) ->
                         s.dataFloat = Mathf.lerpDelta(s.dataFloat, Mathf.clamp(s.status()), 0.05f))
-                    .draw((LightHoldBlock.LightHoldBuild b, LightAcceptor s) -> {
+                    .draw((LightHolder b, LightAcceptor s) -> {
                         Draw.z(Layer.block + 0.01f);
                         Draw.alpha(s.dataFloat);
                         Draw.blend(Blending.additive);
-                        Draw.rect(forgeTopRegions[0], b.x, b.y);
+                        Draw.rect(forgeTopRegions[0], b.building().x, b.building().y);
                         Draw.blend();
                     }),
 
                 new LightAcceptorType(size - 1, 0, 1f)
-                    .update((LightHoldBlock.LightHoldBuild b, LightAcceptor s) ->
+                    .update((LightHolder b, LightAcceptor s) ->
                         s.dataFloat = Mathf.lerpDelta(s.dataFloat, Mathf.clamp(s.status()), 0.05f))
-                    .draw((LightHoldBlock.LightHoldBuild b, LightAcceptor s) -> {
+                    .draw((LightHolder b, LightAcceptor s) -> {
                         Draw.z(Layer.block + 0.01f);
                         Draw.alpha(s.dataFloat);
                         Draw.blend(Blending.additive);
-                        Draw.rect(forgeTopRegions[1], b.x, b.y);
+                        Draw.rect(forgeTopRegions[1], b.building().x, b.building().y);
                         Draw.blend();
                     }),
 
                 new LightAcceptorType(size - 1, size - 1, 1f)
-                    .update((LightHoldBlock.LightHoldBuild b, LightAcceptor s) ->
+                    .update((LightHolder b, LightAcceptor s) ->
                         s.dataFloat = Mathf.lerpDelta(s.dataFloat, Mathf.clamp(s.status()), 0.05f))
-                    .draw((LightHoldBlock.LightHoldBuild b, LightAcceptor s) -> {
+                    .draw((LightHolder b, LightAcceptor s) -> {
                         Draw.z(Layer.block + 0.01f);
                         Draw.alpha(s.dataFloat);
                         Draw.blend(Blending.additive);
-                        Draw.rect(forgeTopRegions[2], b.x, b.y);
+                        Draw.rect(forgeTopRegions[2], b.building().x, b.building().y);
                         Draw.blend();
                     }),
 
                 new LightAcceptorType(0, size - 1, 1f)
-                    .update((LightHoldBlock.LightHoldBuild b, LightAcceptor s) ->
+                    .update((LightHolder b, LightAcceptor s) ->
                         s.dataFloat = Mathf.lerpDelta(s.dataFloat, Mathf.clamp(s.status()), 0.05f))
-                    .draw((LightHoldBlock.LightHoldBuild b, LightAcceptor s) -> {
+                    .draw((LightHolder b, LightAcceptor s) -> {
                         Draw.z(Layer.block + 0.01f);
                         Draw.alpha(s.dataFloat);
                         Draw.blend(Blending.additive);
-                        Draw.rect(forgeTopRegions[3], b.x, b.y);
+                        Draw.rect(forgeTopRegions[3], b.building().x, b.building().y);
                         Draw.blend();
                     })
             );

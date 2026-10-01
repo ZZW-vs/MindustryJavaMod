@@ -4,10 +4,12 @@ import arc.Core;
 import arc.audio.Sound;
 import arc.graphics.Color;
 import arc.math.Mathf;
+import arc.scene.ui.Image;
 import arc.scene.ui.Label;
 import arc.scene.ui.layout.Table;
 import arc.scene.ui.layout.Collapser;
 import mindustry.gen.Icon;
+import arc.util.Align;
 import arc.util.Nullable;
 import arc.util.Strings;
 import arc.util.io.Reads;
@@ -20,6 +22,7 @@ import mindustry.graphics.Pal;
 import mindustry.ui.Bar;
 import mindustry.ui.Styles;
 import mindustry.world.meta.Stat;
+import mindustry.world.meta.Stats;
 import zzw.content.exp.EField;
 import zzw.content.exp.ExpHub;
 import zzw.content.exp.ExpHolder;
@@ -74,16 +77,25 @@ public class ExpLimitWall extends LimitWall {
     }
 
     /**
-     * ★ 重写 checkStats: 在 setStats() 之后追加经验统计
-     * (与 ExpTurret.checkStats 一致, 复刻 PU_V8 @Dupe 生成逻辑)
+     * ★ 移除默认 health 条 (PU132 生成代码 setBars): 改由 buildHBar 在血条旁显示
+     * 减伤百分比图标, 见 {@code ExpLimitWallBuild.displayBars}。
      */
     @Override
-    public void checkStats() {
-        if (!stats.intialized) {
-            setStats();
-            addExpStats();
-            stats.intialized = true;
-        }
+    public void setBars() {
+        super.setBars();
+        removeBar("health");
+    }
+
+    /**
+     * ★ 重写 computeStats: 在 setStats() 之后追加经验统计
+     * (与 ExpTurret.computeStats 一致, 复刻 PU_V8 @Dupe 生成逻辑)
+     * v160: checkStats() 已废弃, Stats.intialized 已无作用
+     */
+    @Override
+    public Stats computeStats() {
+        Stats s = super.computeStats();
+        addExpStats();
+        return s;
     }
 
     /**
@@ -258,6 +270,9 @@ public class ExpLimitWall extends LimitWall {
 
         @Override
         public void displayBars(Table table) {
+            // 先画含减伤图标的血条 (PU132 生成代码: buildHBar → super.displayBars → 经验条)
+            table.table(this::buildHBar).pad(0).growX().padTop(8).padBottom(4);
+            table.row();
             super.displayBars(table);
             table.table(t -> {
                 t.defaults().height(18f).pad(4);
@@ -265,6 +280,31 @@ public class ExpLimitWall extends LimitWall {
                 t.add(new Bar(() -> level() >= maxLevel ? "MAX" : Core.bundle.format("bar.expp", (int)(expf() * 100f)), () -> UnityPal.exp, this::expf)).growX();
             }).pad(0).growX().padTop(4).padBottom(4);
             table.row();
+        }
+
+        /**
+         * 血条 + 减伤百分比图标 (复刻 PU132 生成代码 ExpLimitWall.buildHBar)。
+         *
+         * <p>{@code setBars()} 移除了默认 "health" 条, 这里重画:
+         * 减伤 >= 1% 时在血条左侧叠加一个防御图标 + 百分比数字; 否则挂一个 update
+         * 监听, 等级变化时重画。</p>
+         */
+        public void buildHBar(Table t) {
+            t.clearChildren();
+            t.defaults().height(18f).pad(4);
+            final int l = level();
+            if (damageReduction.fromLevel(level()) >= 0.01f) {
+                Image ii = new Image(Icon.defense, Pal.health);
+                ii.setSize(14f);
+                Label ll = new Label(() -> Mathf.roundPositive(damageReduction.fromLevel(level()) * 100) + "");
+                ll.setStyle(new Label.LabelStyle(Styles.outlineLabel));
+                ll.setSize(26f, 18f);
+                ll.setAlignment(Align.center);
+                t.stack(ii, ll).size(26f, 18f).pad(4).padRight(8).center();
+            } else t.update(() -> {
+                if (level() != l) buildHBar(t);
+            });
+            t.add(new Bar("stat.health", Pal.health, this::healthf).blink(Color.white)).growX();
         }
 
         @Override
@@ -299,7 +339,8 @@ public class ExpLimitWall extends LimitWall {
 
         @Override
         public boolean canHub(Building build) {
-            return hubbable() && build.team == team && (build instanceof ExpHolder h) && h.acceptOrb();
+            // PU132 生成代码: 已链接有效 hub 时只允许 hub 本身; 否则允许任意
+            return !hubValid() || (build != null && build == hub);
         }
 
         @Override
@@ -307,8 +348,11 @@ public class ExpLimitWall extends LimitWall {
             this.hub = hub;
         }
 
+        /** hub 是否仍有效 (PU132 生成代码: 必须存活且在 hub.links 中), 无效则断开 */
         public boolean hubValid() {
-            return hub != null;
+            boolean val = hub != null && hub.isValid() && !hub.dead && hub.links.contains(pos());
+            if (!val) hub = null;
+            return val;
         }
     }
 }

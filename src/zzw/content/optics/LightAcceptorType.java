@@ -18,8 +18,8 @@ public class LightAcceptorType {
     /** 需求光强 [0..1], <=0 表示不需要光 */
     public float required;
 
-    public Cons2<LightHoldBlock.LightHoldBuild, LightAcceptor> update = (e, s) -> {};
-    public Cons2<LightHoldBlock.LightHoldBuild, LightAcceptor> draw = (e, s) -> {};
+    public Cons2<LightHolder, LightAcceptor> update = (e, s) -> {};
+    public Cons2<LightHolder, LightAcceptor> draw = (e, s) -> {};
 
     public LightAcceptorType() {
         this(0, 0, 1f);
@@ -37,17 +37,17 @@ public class LightAcceptorType {
         this.required = required;
     }
 
-    public <T extends LightHoldBlock.LightHoldBuild, V extends LightAcceptor> LightAcceptorType update(Cons2<T, V> update) {
-        this.update = (Cons2<LightHoldBlock.LightHoldBuild, LightAcceptor>) update;
+    public <T extends LightHolder, V extends LightAcceptor> LightAcceptorType update(Cons2<T, V> update) {
+        this.update = (Cons2<LightHolder, LightAcceptor>) update;
         return this;
     }
 
-    public <T extends LightHoldBlock.LightHoldBuild, V extends LightAcceptor> LightAcceptorType draw(Cons2<T, V> draw) {
-        this.draw = (Cons2<LightHoldBlock.LightHoldBuild, LightAcceptor>) draw;
+    public <T extends LightHolder, V extends LightAcceptor> LightAcceptorType draw(Cons2<T, V> draw) {
+        this.draw = (Cons2<LightHolder, LightAcceptor>) draw;
         return this;
     }
 
-    public LightAcceptor create(LightHoldBlock.LightHoldBuild hold) {
+    public LightAcceptor create(LightHolder hold) {
         return new LightAcceptor(this, hold);
     }
 }
