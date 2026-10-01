@@ -29,7 +29,6 @@ import mindustry.game.EventType.BuildRotateEvent;
 import mindustry.game.Team;
 import mindustry.game.Teams.TeamData;
 import mindustry.gen.Building;
-import mindustry.gen.Bullet;
 import mindustry.gen.Groups;
 import mindustry.gen.Unit;
 import mindustry.gen.UnitEntity;
@@ -44,7 +43,6 @@ import mindustry.world.blocks.defense.turrets.ReloadTurret.ReloadTurretBuild;
 import mindustry.world.blocks.defense.turrets.Turret.TurretBuild;
 import mindustry.world.blocks.power.PowerNode.PowerNodeBuild;
 import mindustry.world.blocks.storage.CoreBlock.CoreBuild;
-import zzw.content.Z_Bullets;
 import zzw.content.blocks.units.TerraCore;
 
 import java.io.ByteArrayInputStream;
@@ -103,10 +101,8 @@ public class WorldUnitEntity extends UnitEntity {
     }
 
     
-    /** 子世界建筑 id 集合 (子弹归属判断用, O(1) 查询) */
+    /** 子世界建筑 id 集合 (悬停/渲染归属过滤用, O(1) 查询) */
     protected transient IntSet buildingIds = new IntSet(16);
-    /** 上一帧位置/朝向 (计算本帧位移, 驱动子弹跟随) */
-    protected transient float lastX, lastY, lastRotation;
     /** 子世界平台尺寸 (世界像素, createWorld 时计算; 长方形碰撞箱用) */
     protected transient float platW, platH;
     /** 子世界网格偏移 (0=居中; TerraCore 2x2 吸收后落子世界正中心, 大地核心居中) */
@@ -223,43 +219,6 @@ public class WorldUnitEntity extends UnitEntity {
         // ★ TimeReflect: 恢复 Time.runs 为原始主世界队列
         TimeReflect.resetRuns();
         Vars.world = ow;
-
-        // ★ 子弹跟随: 子世界炮台发射的子弹 (含蓄力激光) 每帧跟随单位移动旋转,
-        //   否则激光突刺类长寿命子弹会停在发射位置不随单位走
-        followBullets();
-    }
-
-    /**
-     * 让子世界建筑发射的子弹跟随单位本帧的位移和旋转.
-     * <p>子弹是独立实体, 生成后位置固定; 蓄力激光 (LaserBulletType 等长寿命子弹)
-     * 会一直停留在发射位置 —— 单位移动时看起来"激光留在原地"。
-     * 这里按上一帧位置差计算 delta, 对归属子弹做平移 + 绕单位中心旋转。</p>
-     * <p>归属判断: bullet.owner 是本单位的子世界建筑 (buildingIds 集合 O(1) 查询)。</p>
-     */
-    protected void followBullets() {
-        float dx = x - lastX, dy = y - lastY;
-        float dr = rotation - lastRotation;
-
-        if ((dx != 0f || dy != 0f || dr != 0f) && buildingIds.size > 0) {
-            for (Bullet blt : Groups.bullet) {
-                if (blt.owner instanceof Building ob && buildingIds.contains(ob.id)
-                    // ★ 护盾力场子弹 (Shielder) 排除: 长寿命驻场子弹, 停在原地保护目标 ——
-                    //   拖拽会让力场悬空挂在单位旁边跟着跑 (原版无子弹跟随, 力场留在原地)
-                    && !(blt.type instanceof Z_Bullets.ShieldBulletType)) {
-                    if (dr != 0f) {
-                        // 绕单位中心旋转 (与子世界渲染投影公式一致)
-                        Tmp.v1.set(blt.x, blt.y).sub(this).rotate(dr).add(this);
-                        blt.set(Tmp.v1.x, Tmp.v1.y);
-                        blt.rotation(blt.rotation() + dr);
-                    } else {
-                        blt.set(blt.x + dx, blt.y + dy);
-                    }
-                }
-            }
-        }
-        lastX = x;
-        lastY = y;
-        lastRotation = rotation;
     }
 
     // ===== setup / absorb (召唤初始化 + 吸收建筑到子世界) =====
@@ -422,7 +381,7 @@ public class WorldUnitEntity extends UnitEntity {
         }
     }
 
-    /** 判断建筑是否属于本单位的子世界 (子弹归属/渲染过滤用, O(1)) */
+    /** 判断建筑是否属于本单位的子世界 (悬停/渲染归属过滤用, O(1)) */
     public boolean ownsBuilding(Building b) {
         return buildingIds.contains(b.id);
     }
