@@ -26,6 +26,11 @@ public class ExpSource extends Block {
         super(name);
         update = true;
         solid = rotate = false;
+        configurable = true;
+
+        config(Boolean.class, (ExpSourceBuild entity, Boolean b) -> {
+            if(b) entity.clicked();
+        });
     }
 
     @Override
@@ -44,7 +49,8 @@ public class ExpSource extends Block {
         @Override
         public void updateTile(){
             if(enabled && timer.get(produceTimer, reload)){
-                ExpOrbs.spreadExp(x, y, amount, 6f);
+                // 与 PU_V8 一致: 仅向相邻经验方块注入 (原版 spreadExp 调用被注释),
+                // 手动点按产生的经验球见 configTapped()/clicked()
                 for(Building b : proximity){
                     if(b instanceof ExpHolder exp) exp.handleExp(99999999);
                 }
@@ -66,6 +72,17 @@ public class ExpSource extends Block {
         public void onDestroyed(){
             ExpOrbs.spreadExp(x, y, amount * 5, 8f);
             super.onDestroyed();
+        }
+
+        @Override
+        public boolean configTapped(){
+            configure(true);
+            return false;
+        }
+
+        /** 点按放出一次经验球 (PU_V8 clicked) */
+        public void clicked(){
+            ExpOrbs.spreadExp(x, y, amount, 6f);
         }
     }
 }

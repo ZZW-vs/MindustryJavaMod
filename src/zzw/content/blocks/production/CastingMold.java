@@ -6,8 +6,8 @@ import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.TextureRegion;
 import arc.math.Mathf;
 import arc.scene.ui.layout.Table;
+import arc.struct.OrderedMap;
 import arc.struct.OrderedSet;
-import arc.struct.Seq;
 import arc.util.Strings;
 import arc.util.io.Reads;
 import arc.util.io.Writes;
@@ -16,19 +16,21 @@ import mindustry.type.Item;
 import zzw.content.graphics.UnityDrawf;
 import zzw.content.mechanics.torque.blocks.GraphBlock;
 import zzw.content.mechanics.torque.blocks.GraphBlockBase.GraphBuildBase;
-import zzw.content.mechanics.torque.meta.CrucibleData;
+import zzw.content.mechanics.torque.graph.CrucibleGraph;
+import zzw.content.mechanics.torque.graph.CrucibleGraph.CrucibleFluid;
+import zzw.content.mechanics.torque.meta.CrucibleRecipes.CrucibleIngredient;
+import zzw.content.mechanics.torque.meta.CrucibleRecipes.CrucibleItem;
 import zzw.content.mechanics.torque.meta.GraphData;
-import zzw.content.mechanics.torque.meta.MeltInfo;
 import zzw.content.mechanics.torque.modules.GraphCrucibleModule;
 
 import static mindustry.Vars.iconMed;
 
 /**
- * 铸模 (PU132 unity.world.blocks.production.CastingMold 移植)
+ * 铸模 (PU_V8 CrucibleCaster 思路移植到项目框架)
  *
- * <p>从坩埚网络抽出熔融物 (按 MeltInfo.priority 优先级), 浇注 (pourProgress)
+ * <p>从坩埚网络抽出熔融物 (取第一种熔融量足够的物品原料), 浇注 (pourProgress)
  * 后冷却凝固 (castProgress 与温度负相关), 产出原物品。
- * 温度过高时无法冷却 ("Too hot to cast!")。</p>
+ * 温度过高时无法冷却 ("温度过高，无法铸造！")。</p>
  */
 public class CastingMold extends GraphBlock{
     /** 4 方向底座/顶盖贴图 */
@@ -54,8 +56,10 @@ public class CastingMold extends GraphBlock{
     public class CastingMoldBuild extends GraphBuild{
         /** 输出目标建筑缓存 (非坩埚的 8 邻居) */
         final OrderedSet<Building> outputBuildings = new OrderedSet<>(8);
-        /** 当前铸造的熔融物 */
-        MeltInfo castingMelt;
+        /** 当前铸造的原料 (物品类) */
+        CrucibleItem castingMelt;
+        /** 铸造产物 */
+        Item outputItem;
 
         /** 浇注进度 / 冷却进度 / 冷却速度 */
         float pourProgress, castProgress, castSpeed;
@@ -77,10 +81,9 @@ public class CastingMold extends GraphBlock{
                 sub.clearChildren();
                 sub.left();
 
-                if(castingMelt != null){
-                    sub.image(castingMelt.item.uiIcon).size(iconMed);
+                if(outputItem != null){
+                    sub.image(outputItem.uiIcon).size(iconMed);
                     sub.label(() -> {
-                        // ★ 汉化: 过热提示走 bundle (stat.unity.casting.toohot)
                         if(pourProgress == 1f && castSpeed == 0f) return Core.bundle.get("stat.unity.casting.toohot", "温度过高，无法铸造！");
 
                         return Strings.fixed((pourProgress + castProgress) * 50f, 2) + "%";
@@ -128,45 +131,39 @@ public class CastingMold extends GraphBlock{
                 return;
             }
             GraphCrucibleModule dex = crucible();
+            if(dex == null || dex.getNetwork() == null) return;
 
-            // 选料: 取可抽出量 > 1 且优先级最高的熔融物
+            // 选料: 取第一种熔融量 > 1 的物品原料
             if(castingMelt == null){
                 pourProgress = 0f;
                 castProgress = 0f;
 
-                Seq<CrucibleData> cc = dex.getContained();
-                MeltInfo[] melts = MeltInfo.all;
-
+                OrderedMap<CrucibleIngredient, CrucibleFluid> cc = dex.getContained();
                 if(cc.isEmpty()) return;
 
-                CrucibleData hpMelt = null;
-                MeltInfo hpMeltType = null;
-
-                for(var i : cc){
-                    MeltInfo meltType = melts[i.id];
-                    if(i.meltedRatio * i.volume > 1f && (hpMelt == null || meltType.priority > hpMeltType.priority) && meltType.item != null){
-                        hpMelt = i;
-                        hpMeltType = meltType;
+                for(var f : cc){
+                    if(f.key instanceof CrucibleItem ci && f.value.melted > 1f){
+                        castingMelt = ci;
+                        outputItem = ci.item;
+                        f.value.melted -= 1f;
+                        break;
                     }
                 }
-                if(hpMelt != null){
-                    dex.getNetwork().addLiquidToSlot(hpMelt, -1f);
-                    castingMelt = hpMeltType;
-                }
-            }else{
+            }else if(castingMelt != null){
                 // 浇注 → 冷却 → 产出
                 if(pourProgress < 1f){
                     pourProgress += edelta() * 0.05f;
                     if(pourProgress > 1f) pourProgress = 1f;
                 }else if(castProgress < 1f){
-                    // 冷却速度: 温度超过 75K + 熔点后归零 (Too hot to cast)
-                    castSpeed = Math.max(0f, (1f - (heat().getTemp() - 75f) / castingMelt.meltPoint) * castingMelt.meltSpeed * 1.5f);
+                    // 冷却速度: 温度超过 75K + 熔点后归零
+                    castSpeed = Math.max(0f, (1f - (heat().getTemp() - 75f) / castingMelt.meltingpoint) * castingMelt.meltspeed * 1.5f);
                     castProgress += castSpeed;
 
                     if(castProgress > 1f) castProgress = 1f;
                 }else{
-                    items.add(castingMelt.item, 1);
+                    items.add(outputItem, 1);
                     castingMelt = null;
+                    outputItem = null;
                 }
             }
         }
@@ -174,16 +171,16 @@ public class CastingMold extends GraphBlock{
         @Override
         public void draw(){
             Draw.rect(baseRegions[rotation], x, y);
-            if(castingMelt != null){
+            if(outputItem != null){
                 if(pourProgress > 0f){
-                    Draw.color(castingMelt.item.color, 1f - Math.abs(pourProgress - 0.5f) * 2f);
+                    Draw.color(outputItem.color, 1f - Math.abs(pourProgress - 0.5f) * 2f);
                     Draw.rect(liquidRegion, x, y, rotdeg());
 
                     Draw.color();
-                    Draw.rect(castingMelt.item.fullIcon, x, y, pourProgress * 8f, pourProgress * 8f);
+                    Draw.rect(outputItem.fullIcon, x, y, pourProgress * 8f, pourProgress * 8f);
                 }
                 if(castProgress < 1f && pourProgress > 0f){
-                    UnityDrawf.drawHeat(castingMelt.item.fullIcon, x, y, 0f, Mathf.map(castProgress, 0f, 1f, castingMelt.meltPoint, 275f));
+                    UnityDrawf.drawHeat(outputItem.fullIcon, x, y, 0f, Mathf.map(castProgress, 0f, 1f, castingMelt == null ? 1073f : castingMelt.meltingpoint, 275f));
                 }
             }
 
@@ -200,9 +197,16 @@ public class CastingMold extends GraphBlock{
 
         @Override
         public void readExt(Reads read, byte revision){
-            castingMelt = MeltInfo.all[read.i()];
+            int id = read.i();
+            castingMelt = id < 0 ? null : (CrucibleItem)CrucibleRecipesGet(id);
+            if(castingMelt != null) outputItem = castingMelt.item;
             pourProgress = read.f();
             castProgress = read.f();
         }
+    }
+
+    /** 通过 id 取回原料 (封装 null 处理) */
+    static CrucibleIngredient CrucibleRecipesGet(int id){
+        return zzw.content.mechanics.torque.meta.CrucibleRecipes.ingredients.get(id);
     }
 }

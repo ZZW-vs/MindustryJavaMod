@@ -19,7 +19,10 @@ import zzw.content.blocks.power.SolarReflector;
 import zzw.content.blocks.power.ThermalHeater;
 import zzw.content.blocks.production.CastingMold;
 import zzw.content.blocks.production.Crucible;
+import zzw.content.blocks.production.CrucibleChannel;
+import zzw.content.blocks.production.CrucibleFluidLoader;
 import zzw.content.blocks.production.CruciblePump;
+import zzw.content.blocks.production.CrucibleSource;
 import zzw.content.mechanics.torque.blocks.GraphBlock;
 import zzw.content.mechanics.torque.blocks.distribution.DriveShaft;
 import zzw.content.mechanics.torque.blocks.distribution.InlineGearbox;
@@ -108,11 +111,16 @@ public class Z_Torque{
     // ===== PU132 坩埚系统 =====
     /** 坩埚熔炉: 熔化物品/合成合金 */
     public static Crucible crucible;
-    /** 坩埚容器: 熔融物网络缓存 (Z_Factory 注册 holdingCrucible) */
+    /** 坩埚通道: 连接坩埚网络的通道 */
+    public static CrucibleChannel crucibleChannel;
+    /** 坩埚液体装载器: 把普通液体注入坩埚网络 */
+    public static CrucibleFluidLoader crucibleFluidLoader;
     /** 坩埚泵: 熔融物网络间传输 */
     public static CruciblePump cruciblePump;
     /** 铸模: 熔融物冷却铸回物品 */
     public static CastingMold castingMold;
+    /** 坩埚源: 沙盒用无限原料源 */
+    public static CrucibleSource crucibleSource;
 
     // ===== PU132 磁力系统 =====
     /** 镍定子: 永磁体 (2Wb) */
@@ -386,6 +394,29 @@ public class Z_Torque{
             health = 700;
             addGraph(new GraphCrucible(2f, false).setAccept(0, 0, 0, 0, 1, 1, 0, 0));
             addGraph(new GraphHeat(55f, 0.2f, 0f).setAccept(1, 1, 1, 1, 1, 1, 1, 1));
+        }};
+
+        // crucible-channel: 坩埚通道 (连接坩埚网络, 四方向)
+        crucibleChannel = new CrucibleChannel("crucible-channel"){{
+            requirements(Category.crafting, with(Z_Items.nickel, 10, Items.graphite, 10));
+            health = 300;
+            underBullets = true;
+            addGraph(new GraphCrucible(5f, false).setAccept(1, 1, 1, 1));
+        }};
+
+        // crucible-fluid-loader: 液体装载器 (把普通液体注入坩埚网络)
+        crucibleFluidLoader = new CrucibleFluidLoader("crucible-fluid-loader"){{
+            requirements(Category.crafting, with(Z_Items.nickel, 30, Items.silicon, 30, Items.metaglass, 30));
+            health = 300;
+            rotate = solid = true;
+            liquidCapacity = 20f;
+            addGraph(new GraphCrucible(15f, false).setAccept(1, 1, 1, 1));
+        }};
+
+        // crucible-source: 坩埚源 (沙盒用无限原料源)
+        crucibleSource = new CrucibleSource("crucible-source"){{
+            requirements(Category.crafting, BuildVisibility.sandboxOnly, with());
+            addGraph(new GraphCrucible(99f, false).setAccept(1, 1, 1, 1));
         }};
 
         // ===== PU132 磁力系统 (UnityBlocks L3059-3108, 3181-3185 原版配置) =====

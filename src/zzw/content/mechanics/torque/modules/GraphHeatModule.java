@@ -104,4 +104,12 @@ public class GraphHeatModule extends GraphModule<GraphHeat, GraphHeatModule, Hea
     void setTemp(float t){
         heat = t * graph.baseHeatCapacity;
     }
+
+    /**
+     * 直接增减热量 (供坩埚等系统做相变能量交换)。
+     * <p>正值吸热升温, 负值放热降温; 温度由 {@link #getTemp()} 反映。
+     */
+    public void addHeatEnergy(float e){
+        heat += e;
+    }
 }

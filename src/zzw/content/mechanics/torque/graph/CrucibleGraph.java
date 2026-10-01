@@ -3,122 +3,129 @@ package zzw.content.mechanics.torque.graph;
 import arc.graphics.Color;
 import arc.math.Mathf;
 import arc.math.geom.Geometry;
+import arc.struct.OrderedMap;
 import arc.struct.Seq;
 import arc.util.Time;
 import mindustry.type.Item;
 import mindustry.world.Tile;
-import zzw.content.graphics.UnityPal;
 import zzw.content.mechanics.torque.blocks.GraphBlockBase.GraphBuildBase;
-import zzw.content.mechanics.torque.meta.CrucibleData;
-import zzw.content.mechanics.torque.meta.CrucibleRecipe;
-import zzw.content.mechanics.torque.meta.MeltInfo;
+import zzw.content.mechanics.torque.meta.CrucibleRecipes;
+import zzw.content.mechanics.torque.meta.CrucibleRecipes.CrucibleIngredient;
+import zzw.content.mechanics.torque.meta.CrucibleRecipes.CrucibleItem;
+import zzw.content.mechanics.torque.meta.CrucibleRecipes.RecipeIngredient;
 import zzw.content.mechanics.torque.modules.GraphCrucibleModule;
+import zzw.content.mechanics.torque.modules.GraphHeatModule;
 
 /**
- * 坩埚网络 (PU132 unity.world.graph.CrucibleGraph 移植)
+ * 坩埚网络 (PU_V8 unity.world.graph.CrucibleGraph 移植)
  * <p>
- * 管理连接的坩埚模块之间的熔融物共享、熔化、合金、蒸发等逻辑。
+ * 新模型用 {@link CrucibleIngredient} 作为键、{@link CrucibleFluid} 作为值,
+ * 每种原料在此网络中同时存在"固态 solid"和"熔融 melted"两种量, 依据热量网络的
+ * 温度与相变能量相互转化:
+ * <ul>
+ *   <li>固→液 (熔化): 温度 ≥ 熔点, 消耗热量</li>
+ *   <li>液→固 (凝固): 温度 &lt; 熔点, 释放热量</li>
+ *   <li>液→汽 (汽化): 温度 ≥ 沸点, 消耗热量, 触发液体自身的汽化特效</li>
+ *   <li>合金: 满足配方成分与最低温度时, 消耗输入生成输出</li>
+ * </ul>
  * <p>
- * 核心功能:
- * <ol>
- *   <li>{@link #addItem(Item)} - 添加物品到坩埚网络</li>
- *   <li>{@link #updateGraph()} - 每帧更新熔化/合金/蒸发</li>
- *   <li>{@link #updateOnGraphChanged()} - 网络拓扑变化时重算容量和 tiling 索引</li>
- *   <li>{@link #updateColor()} - 根据熔融物颜色更新网络颜色</li>
- * </ol>
+ * 与老实现一致, 内容物集中存储在网络侧 (而非 PU_V8 的节点自存),
+ * 通过容量按方块比例分摊给绘制。
  */
 public class CrucibleGraph extends BaseGraph<GraphCrucibleModule, CrucibleGraph>{
-    static final float[] capacityMul = new float[]{0f, 0.1f, 0.2f, 0.5f, 1f};
+    /** 网络内所有内容物的加权平均颜色 (用于绘制) */
     public final Color color = Color.clear.cpy();
-    final Seq<CrucibleData> contains = new Seq<>();
-    float totalVolume, totalCapacity, containedAmCache;
-    boolean containChanged = true, crafts = true;
+    /** 网络内容物: 原料 → 固/液两态量 */
+    public final OrderedMap<CrucibleIngredient, CrucibleFluid> fluids = new OrderedMap<>();
+
+    float totalCapacity;
+    boolean crafts = true;
+
+    // 更新用临时序列 (避免每帧分配)
+    private final Seq<CrucibleIngredient> smeltOrder = new Seq<>();
+    private final Seq<CrucibleIngredient> boilOrder = new Seq<>();
+    private final Seq<CrucibleIngredient> coolOrder = new Seq<>();
 
     @Override
     public CrucibleGraph create(){
         return new CrucibleGraph();
     }
 
-    /** 获取网络中熔融物的总体积 */
+    /** 获取 (不存在则创建) 指定原料的流体数据 */
+    public CrucibleFluid getFluid(CrucibleIngredient i){
+        CrucibleFluid f = fluids.get(i);
+        if(f == null){
+            f = new CrucibleFluid(i);
+            fluids.put(i, f);
+        }
+        return f;
+    }
+
+    /** 网络内容物总体积 */
     public float getVolumeContained(){
-        if(containChanged){
-            containedAmCache = 0f;
-            for(int i = 0, len = contains.size; i < len; i++) containedAmCache += contains.get(i).volume;
-        }
-        return containedAmCache;
-    }
-
-    /** 添加物品到坩埚网络, 返回是否成功 */
-    public boolean addItem(Item item){
-        MeltInfo meltProd = MeltInfo.map.get(item);
-        if(meltProd == null) return false;
-        if(meltProd.additive){
-            return addMeltItem(meltProd.additiveID, meltProd.additiveWeight, false);
-        }else{
-            return addMeltItem(meltProd, 1f, false);
-        }
-    }
-
-    /** 根据 MeltInfo id 获取熔融物数据 */
-    public CrucibleData getMeltFromID(int id){
-        return contains.find(i -> i.id == id);
-    }
-
-    /**
-     * 添加熔融物到坩埚网络
-     * @param meltProd 熔化信息
-     * @param am 数量
-     * @param liquid 是否为液态
-     * @return 是否成功
-     */
-    public boolean addMeltItem(MeltInfo meltProd, float am, boolean liquid){
-        CrucibleData avalslot = null;
-        int totalContained = 0;
-
-        for(var i : contains){
-            if(i.id == meltProd.id) avalslot = i;
-            totalContained += i.volume;
-        }
-
-        if(totalContained + am > totalCapacity) return false;
-        if(avalslot != null){
-            if(liquid) addLiquidToSlot(avalslot, am);
-            else addSolidToSlot(avalslot, am);
-        }else{
-            contains.add(new CrucibleData(meltProd.id, am, liquid ? 1f : 0f, meltProd.item));
-        }
-
-        containChanged = true;
-        return true;
-    }
-
-    /** 是否还能容纳更多 */
-    public boolean canContainMore(float amount){
-        return getVolumeContained() + amount <= totalCapacity;
+        float t = 0f;
+        for(var f : fluids) t += f.value.total();
+        return t;
     }
 
     /** 剩余空间 */
     public float getRemainingSpace(){
-        return Math.max(0, totalCapacity - getVolumeContained());
+        return Math.max(0f, totalCapacity - getVolumeContained());
     }
 
-    void addSolidToSlot(CrucibleData slot, float am){
-        float melted = slot.meltedRatio * slot.volume;
-        slot.volume += am;
-        slot.meltedRatio = melted / slot.volume;
-
-        if(slot.volume <= 0f || slot.meltedRatio <= 0f) slot.meltedRatio = 0f;
-        containChanged = true;
+    public boolean canContainMore(float amount){
+        return getVolumeContained() + amount <= totalCapacity;
     }
 
-    /** 向指定槽位添加液体 (am 可为负, 表示取出) */
-    public void addLiquidToSlot(CrucibleData slot, float am){
-        float melted = slot.meltedRatio * slot.volume + am;
-        slot.volume += am;
-        slot.meltedRatio = melted / slot.volume;
+    /** 添加一个物品 (固态), 返回是否成功 */
+    public boolean addItem(Item item){
+        CrucibleItem ci = CrucibleRecipes.items.get(item);
+        if(ci == null) return false;
+        return addIngredient(ci, 1f) > 0f;
+    }
 
-        if(slot.volume <= 0f || slot.meltedRatio <= 0f) slot.meltedRatio = 0f;
-        containChanged = true;
+    /** 添加固态原料, 返回实际加入量 */
+    public float addIngredient(CrucibleIngredient i, float amount){
+        if(i == null || amount <= 0f) return 0f;
+        CrucibleFluid f = getFluid(i);
+        float space = totalCapacity - getVolumeContained();
+        float add = Math.min(amount, Math.max(0f, space));
+        if(add <= 0f) return 0f;
+        f.solid += add;
+        return add;
+    }
+
+    /** 添加液态原料, 返回实际加入量 */
+    public float addLiquidIngredient(CrucibleIngredient i, float amount){
+        if(i == null || amount <= 0f) return 0f;
+        CrucibleFluid f = getFluid(i);
+        float space = totalCapacity - getVolumeContained();
+        float add = Math.min(amount, Math.max(0f, space));
+        if(add <= 0f) return 0f;
+        f.melted += add;
+        return add;
+    }
+
+    public float totalCapacity(){
+        return totalCapacity;
+    }
+
+    /** 按熔融量加权计算网络颜色, 透明度随填充度提升 */
+    public void updateColor(){
+        float r = 0f, g = 0f, b = 0f, t = 0f;
+        for(var fluid : fluids){
+            float tt = fluid.value.melted;
+            t += tt;
+            r += fluid.key.color.r * tt;
+            g += fluid.key.color.g * tt;
+            b += fluid.key.color.b * tt;
+        }
+        if(t <= 0f){
+            color.set(Color.clear);
+            return;
+        }
+        float inv = 1f / t;
+        color.set(r * inv, g * inv, b * inv, Mathf.clamp(10f * t / totalCapacity));
     }
 
     @Override
@@ -135,180 +142,166 @@ public class CrucibleGraph extends BaseGraph<GraphCrucibleModule, CrucibleGraph>
                 module.tilingIndex = 0;
                 return;
             }
-            int directNeighbour = 0;
             for(int i = 0; i < 8; i++){
                 Tile tile = module.parent.build.asBuilding().tile.nearby(Geometry.d8(i));
-
                 if(tile == null || !(tile.build instanceof GraphBuildBase build)) continue;
 
                 GraphCrucibleModule conModule = build.crucible();
                 if(conModule == null || conModule.dead() || !canConnect(module, conModule)) continue;
-                if(i % 2 == 0) directNeighbour++;
 
                 bitmask += 1 << i;
             }
 
+            // PU_V8 模型: 每个方块贡献固定的基础容量 (旧版按直连邻居数打折会令孤立坩埚容量为 0)
             module.tilingIndex = bitmask;
-            module.liquidCap = (module.parent.build.asBuilding().block.size == 1 ? capacityMul[directNeighbour] : 1f) * module.graph.baseLiquidCapacity;
-
+            module.liquidCap = module.graph.baseLiquidCapacity;
             totalCapacity += module.liquidCap;
             crafts |= module.graph.doesCrafting;
         }
-        if(getVolumeContained() > totalCapacity){
+
+        // 网络收缩时按比例削减内容物
+        if(getVolumeContained() > totalCapacity && totalCapacity > 0f){
             float decRatio = totalCapacity / getVolumeContained();
-
-            for(int i = 0, len = contains.size; i < len; i++) contains.get(i).volume *= decRatio;
-            containChanged = true;
-        }
-    }
-
-    /** 获取网络平均温度 (K) */
-    public float getAverageTemp(){
-        float speed = 0f;
-        int count = 0;
-
-        for(var module : connected){
-            if(!module.graph.doesCrafting) continue;
-            speed += module.parent.build.heat().getTemp();
-            count++;
-        }
-        if(count == 0) return 0f;
-        return speed / count;
-    }
-
-    float getAverageTempDecay(float meltPoint, float meltSpeed, float tmpDep, float coolDep){
-        float speed = 0f;
-        int count = 0;
-
-        for(var module : connected){
-            if(!module.graph.doesCrafting) continue;
-
-            float temp = module.parent.build.heat().getTemp();
-
-            if(temp > meltPoint){
-                speed += (1f + temp / meltPoint * tmpDep) * meltSpeed;
-            }else{
-                speed -= (1f - temp / meltPoint) * coolDep * meltSpeed;
-            }
-            count++;
-        }
-        if(count == 0) return 0;
-
-        return speed / count;
-    }
-
-    float getAverageMeltSpeed(MeltInfo m, float tmpDep, float coolDep){
-        return getAverageTempDecay(m.meltPoint, m.meltSpeed, tmpDep, coolDep);
-    }
-
-    float getAverageMeltSpeedIndex(int index, float tmpDep, float coolDep){
-        return getAverageMeltSpeed(MeltInfo.all[index], tmpDep, coolDep);
-    }
-
-    /** 更新网络颜色 (根据所有熔融物的加权平均颜色) */
-    public void updateColor(){
-        color.set(0f, 0f, 0f);
-        float tLiquid = 0f;
-
-        for(var i : contains){
-            if(i.meltedRatio > 0f){
-                float liquidVol = i.meltedRatio * i.volume;
-                tLiquid += liquidVol;
-                Color itemCol = UnityPal.youngchaGray;
-                if(i.item != null) itemCol = i.item.color;
-                color.r += itemCol.r * liquidVol;
-                color.g += itemCol.g * liquidVol;
-                color.b += itemCol.b * liquidVol;
+            for(var f : fluids){
+                f.value.solid *= decRatio;
+                f.value.melted *= decRatio;
             }
         }
-        float invt = 1f / tLiquid;
-        color.mul(invt).a(Mathf.clamp(2f * tLiquid / totalCapacity));
     }
 
     @Override
     void updateGraph(){
-        if(contains.isEmpty()) return;
+        if(fluids.isEmpty()) return;
         if(!crafts){
-            removeEmptyMelts();
             updateColor();
             return;
         }
 
-        float capcityMul = Mathf.sqrt(totalCapacity / 15f);
-
-        for(var i : contains){
-            float meltMul = Time.delta / i.volume;
-
-            if(i.id < MeltInfo.all.length){
-                MeltInfo m = MeltInfo.all[i.id];
-                i.meltedRatio += meltMul * getAverageMeltSpeed(m, 0.002f, 0.5f) * 0.4f * capcityMul;
-                i.meltedRatio = Mathf.clamp(i.meltedRatio);
-
-                if(m.evaporationTemp >= 0f){
-                    float evap = getAverageTempDecay(m.evaporationTemp, m.evaporation, 0f, 1f);
-                    if(evap > 0f){
-                        i.volume -= evap;
-                        containChanged = true;
-                    }
-                }
-            }
+        for(var module : connected){
+            if(!module.graph.doesCrafting) continue;
+            updateModule(module);
         }
-        for(var z : CrucibleRecipe.all){
-            boolean valid = true;
-            float maxCraftable = 9999999f;
-            int len = z.input.length;
-            int[] inputSlots = new int[len];
 
-            for(int r = 0; r < len; r++){
-                boolean found = false;
-                for(var ingre : contains){
-                    CrucibleRecipe.InputRecipe alyInput = z.input[r];
-                    if(MeltInfo.all[ingre.id] == alyInput.material && (!alyInput.needsLiquid || ingre.meltedRatio > 0f)){
-                        found = true;
-                        inputSlots[r] = ingre.id;
-                        maxCraftable = Math.min(maxCraftable, (alyInput.needsLiquid ? ingre.meltedRatio : 1f) * ingre.volume / alyInput.amount);
-                        break;
-                    }
-                }
-                if(!found){
-                    valid = false;
-                    break;
-                }
-            }
-            if(valid && maxCraftable > 0f){
-                float craftAm = Math.min(maxCraftable, z.alloySpeed * Time.delta * 0.2f * capcityMul);
-                if(craftAm <= 0f) return;
-
-                for(int r = 0; r < len; r++){
-                    CrucibleRecipe.InputRecipe alyInput = z.input[r];
-                    if(alyInput.needsLiquid){
-                        addLiquidToSlot(contains.get(inputSlots[r]), -alyInput.amount * craftAm);
-                    }else{
-                        contains.get(inputSlots[r]).volume -= alyInput.amount * craftAm;
-                        containChanged = true;
-                    }
-                }
-                addMeltItem(z.melt, craftAm, true);
-            }
-        }
-        removeEmptyMelts();
+        removeEmpty();
         updateColor();
     }
 
-    void removeEmptyMelts(){
-        contains.removeAll(i -> i.volume <= 0f);
+    /** 对单个参与合成的坩埚方块执行熔化/凝固/汽化/合金 */
+    private void updateModule(GraphCrucibleModule module){
+        GraphHeatModule heat = module.parent.build.heat();
+        if(heat == null) return;
+
+        float temp = heat.getTemp();
+        float heatCapacity = heat.graph.baseHeatCapacity;
+
+        // 内容物集中在网络侧 (PU_V8 为节点自存), 因此每个合成方块只能处理"自己容量份额"的那部分,
+        // 否则网络内 N 个方块会把同一份内容物重复处理 N 次 → 熔化/合金速率放大 N 倍。
+        float share = totalCapacity > 0f ? module.liquidCap / totalCapacity : 1f;
+        if(share <= 0f) return;
+
+        smeltOrder.clear();
+        coolOrder.clear();
+        boilOrder.clear();
+
+        for(var fluid : fluids){
+            CrucibleIngredient i = fluid.key;
+            if(i.meltingpoint != -1 && temp >= i.meltingpoint && fluid.value.solid > 0){
+                smeltOrder.add(i);
+            }
+            if(i.meltingpoint != -1 && temp < i.meltingpoint && fluid.value.melted > 0){
+                coolOrder.add(i);
+            }
+            if(i.boilpoint != -1 && temp >= i.boilpoint && fluid.value.melted > 0){
+                boilOrder.add(i);
+            }
+        }
+
+        smeltOrder.sort((a, b) -> Float.compare(a.meltingpoint, b.meltingpoint));
+        coolOrder.sort((a, b) -> -Float.compare(a.meltingpoint, b.meltingpoint));
+        boilOrder.sort((a, b) -> -Float.compare(a.boilpoint, b.boilpoint));
+
+        // 凝固 (放热)
+        for(var item : coolOrder){
+            float remaining = (item.meltingpoint - temp) * heatCapacity;
+            if(remaining <= 0f) break;
+
+            float reqSmelt = share * Math.min(fluids.get(item).melted, Math.max(0.1f, fluids.get(item).melted * item.meltspeed * Time.delta));
+            float reqSmeltEnergy = reqSmelt * item.phaseChangeEnergy;
+            if(reqSmeltEnergy <= 0f) continue;
+            float smeltRatio = Mathf.clamp(remaining / reqSmeltEnergy);
+            getFluid(item).melt(-smeltRatio * reqSmelt);
+            heat.addHeatEnergy(smeltRatio * reqSmeltEnergy);
+        }
+
+        // 熔化 (吸热)
+        for(var item : smeltOrder){
+            float remaining = (temp - item.meltingpoint) * heatCapacity;
+            if(remaining <= 0f) break;
+
+            float reqSmelt = share * Math.min(fluids.get(item).solid, Math.max(0.1f, fluids.get(item).solid * item.meltspeed * Time.delta));
+            float reqSmeltEnergy = reqSmelt * item.phaseChangeEnergy;
+            if(reqSmeltEnergy <= 0f) continue;
+            float smeltRatio = Mathf.clamp(remaining / reqSmeltEnergy);
+            getFluid(item).melt(smeltRatio * reqSmelt);
+            heat.addHeatEnergy(-smeltRatio * reqSmeltEnergy);
+        }
+
+        // 汽化 (吸热 + 特效)
+        for(var item : boilOrder){
+            float remaining = (temp - item.boilpoint) * heatCapacity;
+            if(remaining <= 0f) break;
+
+            float reqSmelt = share * Math.min(fluids.get(item).melted, Math.max(0.1f, fluids.get(item).melted * item.boilspeed * Time.delta));
+            float reqSmeltEnergy = reqSmelt * item.phaseChangeEnergy;
+            if(reqSmeltEnergy <= 0f) continue;
+            float smeltRatio = Mathf.clamp(remaining / reqSmeltEnergy);
+            float am = smeltRatio * reqSmelt;
+            getFluid(item).vapourise(am);
+            item.onVapourise(module.parent.build, am);
+            heat.addHeatEnergy(-smeltRatio * reqSmeltEnergy);
+        }
+
+        // 合金合成
+        for(var recipe : CrucibleRecipes.recipes){
+            if(recipe.minTemp > temp) continue;
+
+            float maxam = totalCapacity - getFluid(recipe.output).total();
+            for(RecipeIngredient ri : recipe.items){
+                CrucibleFluid fluid = getFluid(ri.ingredient);
+                if(fluid.total() == 0f){
+                    maxam = 0f;
+                    break;
+                }
+                maxam = Math.min(maxam, (ri.melted ? fluid.melted : (ri.requiresSolid ? fluid.solid : fluid.total())) / ri.amount);
+            }
+
+            if(maxam <= 0f) continue;
+            maxam *= recipe.speed * share;
+
+            for(RecipeIngredient ri : recipe.items){
+                CrucibleFluid fluid = getFluid(ri.ingredient);
+                if(ri.melted){
+                    fluid.melted -= maxam * ri.amount;
+                }else if(ri.requiresSolid){
+                    fluid.solid -= maxam * ri.amount;
+                }else{
+                    fluid.melted -= maxam * ri.amount;
+                    if(fluid.melted < 0f){
+                        fluid.solid += fluid.melted;
+                        fluid.melted = 0f;
+                    }
+                }
+            }
+            getFluid(recipe.output).melted += maxam;
+        }
     }
 
-    @Override
-    void killGraph(){
-        for(var module : connected){
-            Seq<CrucibleData> nc = new Seq<>();
-            float ratio = module.liquidCap / totalCapacity;
-
-            for(var i : contains) nc.add(new CrucibleData(i.id, i.volume * ratio, i.meltedRatio, i.item));
-            module.propsList.put(module.getPortOfNetwork(this), nc);
+    private void removeEmpty(){
+        Seq<CrucibleIngredient> rm = new Seq<>();
+        for(var f : fluids){
+            if(f.value.total() <= 0.0001f) rm.add(f.key);
         }
-        connected.clear();
+        for(var k : rm) fluids.remove(k);
     }
 
     @Override
@@ -319,32 +312,79 @@ public class CrucibleGraph extends BaseGraph<GraphCrucibleModule, CrucibleGraph>
         int port = module.getPortOfNetwork(this);
         totalCapacity += module.liquidCap;
 
-        Seq<CrucibleData> cc = module.propsList.get(port);
+        Seq<CrucibleFluid> cc = module.propsList.get(port);
         if(cc == null || cc.isEmpty()) return;
-        MeltInfo[] melts = MeltInfo.all;
 
-        for(var i : cc){
-            addMeltItem(melts[i.id], i.volume * (1f - i.meltedRatio), false);
-            addMeltItem(melts[i.id], i.volume * i.meltedRatio, true);
+        for(var f : cc){
+            addIngredient(f.getIngredient(), f.solid);
+            addLiquidIngredient(f.getIngredient(), f.melted);
         }
     }
 
     @Override
     void mergeStats(CrucibleGraph graph){
-        MeltInfo[] melts = MeltInfo.all;
         totalCapacity += graph.totalCapacity;
-
-        for(var i : graph.contains){
-            addMeltItem(melts[i.id], i.volume * (1f - i.meltedRatio), false);
-            addMeltItem(melts[i.id], i.volume * i.meltedRatio, true);
+        for(var f : graph.fluids){
+            addIngredient(f.key, f.value.solid);
+            addLiquidIngredient(f.key, f.value.melted);
         }
     }
 
-    public Seq<CrucibleData> contains(){
-        return contains;
+    @Override
+    void killGraph(){
+        for(var module : connected){
+            float ratio = totalCapacity > 0f ? module.liquidCap / totalCapacity : 0f;
+            Seq<CrucibleFluid> nc = new Seq<>();
+            for(var f : fluids){
+                CrucibleFluid copy = new CrucibleFluid(f.key);
+                copy.solid = f.value.solid * ratio;
+                copy.melted = f.value.melted * ratio;
+                nc.add(copy);
+            }
+            module.propsList.put(module.getPortOfNetwork(this), nc);
+        }
+        connected.clear();
     }
 
-    public float totalCapacity(){
-        return totalCapacity;
+    /**
+     * 坩埚中的一种原料: 记录固态与熔融态的量。
+     */
+    public static class CrucibleFluid{
+        CrucibleIngredient ingredient;
+        public float melted;
+        public float solid;
+
+        public CrucibleFluid(CrucibleIngredient item){
+            this.ingredient = item;
+        }
+
+        public float total(){
+            return solid + melted;
+        }
+
+        public float meltedRatio(){
+            return total() <= 0f ? 0f : melted / total();
+        }
+
+        public CrucibleIngredient getIngredient(){
+            return ingredient;
+        }
+
+        public Item getItem(){
+            if(ingredient instanceof CrucibleItem ci) return ci.item;
+            return null;
+        }
+
+        /** 固↔液转化: t>0 表示熔化 t, t<0 表示凝固 */
+        public void melt(float t){
+            solid -= t;
+            melted += t;
+        }
+
+        /** 汽化: 减少熔融量 */
+        public void vapourise(float t){
+            melted -= t;
+            if(melted < 0f) melted = 0f;
+        }
     }
 }
