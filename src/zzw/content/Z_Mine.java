@@ -4,18 +4,14 @@ import mindustry.world.Block;
 import mindustry.world.blocks.environment.OreBlock;
 
 /**
- * 自定义矿物与钻头注册 - 安山岩矿、镍/铟/铝/熔核等矿石
+ * 自定义矿物与钻头注册 - 镍/铟/铝/熔核等矿石
  * 继承 OreBlock/Drill，使用 PU_V8 矿石生成参数
  */
 public class Z_Mine {
-    public static Block Andesite;
-
     // PU132 矿石 (产物已在 Z_Items 中定义)
     public static Block oreNickel, oreUmbrium, oreLuminum, oreImberium, oreMonolite;
 
     public static void load() {
-        Andesite = new OreBlock("andesite", Z_Items.Andesite);
-
         // ===== PU132 矿石移植 (oreDefault=false, 不在默认地形生成) =====
         // 贴图: assets/sprites/矿石/nickel1-3.png 等 (PU132 blocks/environment/ 复制)
         // 名称: 使用物品名作为方块名, OreBlock自动加载 name+1/2/3 变体贴图

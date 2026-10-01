@@ -28,7 +28,7 @@ public class Z_Items {
     public static Item contagium, denseAlloy, imberium, irradiantSurge, luminum, monolite, nickel, steel, stone,
             umbrium, xenium, uranium;
     // 基础金属
-    public static Item Iron, Gold, Andesite, Andesite_Alloy, Brass, Zinc;
+    public static Item Iron, Gold, Andesite_Alloy, Brass, Zinc;
     // 金属板材
     public static Item Iron_Sheet, Gold_Sheet, Copper_Sheet, Brass_Sheet;
     // 农作物相关
@@ -187,7 +187,6 @@ public class Z_Items {
         // 基础金属
         Iron = basic("iron", "cfcfcf");
         Gold = basic("gold", "f2df82");
-        Andesite = basic("andesite", "8b8680");
         Andesite_Alloy = basic("andesite_alloy", "cfcfcf");
         Brass = basic("brass", "f2df82");
         Zinc = basic("zinc", "f2df82");
