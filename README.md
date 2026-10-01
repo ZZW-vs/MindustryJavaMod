@@ -59,6 +59,7 @@
   - **限伤墙（ustone/dense/steel/dirium-wall）** - `LimitWall` / `LevelLimitWall`：补回限伤命中（`withstandFx`）与闪烁免伤（`blinkFx`）特效；迪里姆墙恢复原版 `sparkle` 待机特效
   - **经验限伤墙（ExpLimitWall）** - 对齐原版 `hubValid`/`canHub` 逻辑，血条旁显示减伤百分比图标
   - **石头开采（PU 原版机制）** - 原版石头地板 / 岩坑地板（`Blocks.stone` / `Blocks.craters`）设置 `itemDrop = stone`，用钻头钻取可获得「石头」物品；与原版一致设为 `playerUnmineable`，禁止手动挖掘
+  - **经验墙信息面板（PU 原版）** - 还原 `exp.tooltip` 详细经验说明：主动等级方块与 Exp. 球、古代塔/卸载器交互且经验可自由传输；被动等级方块不与 Exp. 球/塔交互，缓慢获得经验但无法自由利用
 
 #### 炮台系统 (PU132 还原)
 本模组的高级炮台全部对照 PU132 原版逐项还原，主要修正包括：
