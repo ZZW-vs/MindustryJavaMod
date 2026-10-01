@@ -498,7 +498,7 @@ public class Z_Torque{
         chopper = new Chopper("chopper"){{
             requirements(Category.turret, with(Z_Items.nickel, 50, Items.titanium, 50, Items.lead, 30));
             health = 650;
-            setGridW(7);
+            setGridW(9);   // 蓝图网格 7→9 格, 允许拼出更长的刀身 (枢轴仍在网格 x=0, 即方块旋转中心)
             setGridH(1);
             addPart(arc.Core.bundle.get("part.unity.pivot.name"), arc.Core.bundle.get("part.unity.pivot.info"), PartType.blade, 4, 0, 1, 1, true, true,
                 new Point2(0, 0), new ItemStack[0], new byte[]{1, 0, 0, 0}, new byte[]{0, 0, 0, 0},

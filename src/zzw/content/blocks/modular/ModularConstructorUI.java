@@ -122,6 +122,15 @@ public class ModularConstructorUI extends Element{
         Table catTable = new Table();
         catTable.margin(12f).top().left();
         for(var i : categories){
+            // 跳过没有任何可放置零件的空分类 (PU132 原版 saw 分类即为空, 点击只会得到空白列表)
+            boolean usable = false;
+            for(var p : partsConfig){
+                if(p.category == i && !p.cannotPlace){
+                    usable = true;
+                    break;
+                }
+            }
+            if(!usable) continue;
             ImageButton catButt = new ImageButton(i.region, Styles.clearTogglei);
             catButt.clicked(() -> {
                 currentCat = i;
