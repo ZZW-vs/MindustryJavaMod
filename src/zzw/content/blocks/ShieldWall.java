@@ -51,8 +51,6 @@ public class ShieldWall extends LevelLimitWall {
     public float repair = 50f;
     public TextureRegion topRegion;
 
-    private final int timerHeal = timers++;
-
     public Effect shieldGen = new Effect(20, e -> {
         Draw.color(e.color, e.fin());
         if (animatedShields()) {
@@ -132,7 +130,10 @@ public class ShieldWall extends LevelLimitWall {
             warmup = Mathf.lerpDelta(warmup, 1f, 0.05f);
             scl = Mathf.lerpDelta(scl, shieldBroke ? 0f : 1f, 0.05f);
 
-            if (timer(timerHeal, 60f) && shieldBroke && gotDamage > 0) {
+            // 护盾破碎后按 repair/秒 持续回复 (与原版一致: regenSpeed * edelta)。
+            // 注意: 不能用 timer(timerHeal, 60f) 门控 —— 该方法的 time 参数单位为"秒",
+            // 再乘 delta() 会让回复速度只剩 1/60, 护盾破碎后几乎永远无法恢复, 表现为"护盾不再显示"。
+            if (shieldBroke && gotDamage > 0) {
                 gotDamage -= repair * delta();
             }
 
