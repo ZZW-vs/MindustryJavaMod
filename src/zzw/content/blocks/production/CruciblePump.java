@@ -29,7 +29,10 @@ import static mindustry.Vars.iconMed;
  * 坩埚泵 (PU_V8 unity.world.blocks.production.CruciblePump 移植)
  *
  * <p>把背面网络 (set1) 中指定原料的熔融液泵送到正面网络 (set0)。
- * 可配置目标原料 (物品或液体)。泵送量受电力效率影响。</p>
+ * 可配置目标原料 (物品或液体)。</p>
+ *
+ * <p>泵送由扭矩驱动 (PU_V8): 效率 eff = curve(lastVelocity, 0, 50) * 0.2,
+ * 单帧泵送量 ∝ 源网络该原料的熔融存量 (eff * melted + 0.001), 受目标网络剩余空间限制。</p>
  */
 public class CruciblePump extends GraphBlock{
     /** 4 方向顶盖贴图 */
@@ -93,9 +96,13 @@ public class CruciblePump extends GraphBlock{
 
         @Override
         public void updatePost(){
-            float rate = 0.08f * Mathf.clamp(efficiency, 0f, 1f);
             GraphCrucibleModule dex = crucible();
             flowRate /= 2f;
+
+            // PU_V8: 由扭矩转速决定泵送效率 (非电力)
+            var tGraph = torque();
+            float eff = (tGraph == null || tGraph.getNetwork() == null) ? 0f
+                : Mathf.curve(tGraph.getNetwork().lastVelocity, 0f, 50f) * 0.2f;
 
             if(config != null && dex != null){
                 CrucibleGraph fromNet = dex.getNetworkFromSet(1);
@@ -104,11 +111,14 @@ public class CruciblePump extends GraphBlock{
                 if(fromNet != null && toNet != null){
                     CrucibleFluid f = fromNet.fluids.get(config);
                     if(f != null && f.melted > 0f){
-                        float transfer = Math.min(toNet.getRemainingSpace(), Math.min(rate * edelta(), f.melted));
-                        if(transfer > 0f){
-                            f.melted -= transfer;
-                            toNet.addLiquidIngredient(config, transfer);
-                            flowRate = transfer;
+                        // PU_V8 公式: 单帧移出量 ∝ 源存量 (+0.001 保证低速也缓慢输送),
+                        // 受源存量与目标网络剩余空间双重限制
+                        float remove = Mathf.clamp(eff > 0f ? eff * f.melted + 0.001f : 0f, 0f,
+                            Math.min(f.melted, toNet.getRemainingSpace()));
+                        if(remove > 0f){
+                            f.melted -= remove;
+                            toNet.addLiquidIngredient(config, remove);
+                            flowRate = remove;
                         }
                     }
                 }

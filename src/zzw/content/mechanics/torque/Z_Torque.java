@@ -377,14 +377,15 @@ public class Z_Torque{
             addGraph(new GraphHeat(75f, 0.2f, 0.006f).setAccept(1, 1, 1, 1));
         }};
 
-        // crucible-pump: 坩埚泵, GraphCrucible(10f, false) multi + GraphHeat(50f, 0.1f, 0.003f)
+        // crucible-pump: 坩埚泵, PU_V8 YoungchaBlocks L463: CrucibleGraph(容量5) + TorqueGraphNode(0.1f, 10f)
+        // 力矩连接 (0,1,0,1); 由扭矩转速驱动泵送, 不耗电
         cruciblePump = new CruciblePump("crucible-pump"){{
             requirements(Category.crafting, with(Z_Items.cupronickel, 50, Z_Items.nickel, 50, Items.metaglass, 15));
             size = 2;
             health = 500;
-            consumePower(1f);
             addGraph(new GraphCrucible(10f, false).setAccept(1, 1, 0, 0, 2, 2, 0, 0).multi());
             addGraph(new GraphHeat(50f, 0.1f, 0.003f).setAccept(1, 1, 1, 1, 1, 1, 1, 1));
+            addGraph(new GraphTorque(0.1f, 10f).setAccept(0, 1, 0, 1));
         }};
 
         // casting-mold: 铸模, GraphCrucible(2f, false) + GraphHeat(55f, 0.2f, 0f)
