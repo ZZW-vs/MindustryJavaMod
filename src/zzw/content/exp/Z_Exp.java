@@ -1,9 +1,15 @@
 package zzw.content.exp;
 
 import arc.graphics.Color;
+import arc.graphics.g2d.Draw;
+import arc.graphics.g2d.Lines;
 import mindustry.content.Items;
+import mindustry.content.Liquids;
 import mindustry.content.StatusEffects;
+import mindustry.entities.Damage;
 import mindustry.entities.bullet.BasicBulletType;
+import mindustry.entities.effect.MultiEffect;
+import mindustry.gen.Bullet;
 import mindustry.gen.Sounds;
 import mindustry.graphics.Pal;
 import mindustry.type.Category;
@@ -12,8 +18,11 @@ import mindustry.world.Block;
 import mindustry.world.blocks.defense.turrets.Turret;
 import zzw.content.Z_Sounds;
 import zzw.content.Z_Items;
+import zzw.content.Z_StatusEffects;
 import zzw.content.blocks.exp.KoruhReactor;
+import zzw.content.units.bullets.DistFieldBulletType;
 import zzw.content.units.bullets.ExpLaserBulletType;
+import zzw.content.units.bullets.ExpLaserFieldBulletType;
 import zzw.content.units.bullets.GeyserBulletType;
 import zzw.content.units.bullets.GeyserLaserBulletType;
 
@@ -254,6 +263,102 @@ public class Z_Exp {
      * ★ 物品栏顺序 = 注册顺序, 由 TestMod 在 imber 之后 monolith 之前调用。
      */
     public static void loadTurrets() {
+        // ===== PU132 UnityBullets.shardLaserFrag (charge-laser-turret 的激光碎片) =====
+        // 白色短线段碎片, 覆写 draw 手动绘制, 不依赖贴图
+        BasicBulletType shardLaserFrag = new BasicBulletType(2f, 10f){
+            {
+                lifetime = 20f;
+                pierceCap = 10;
+                pierceBuilding = true;
+                backColor = Color.white.cpy().lerp(Pal.lancerLaser, 0.1f);
+                frontColor = Color.white;
+                hitEffect = mindustry.content.Fx.none;
+                despawnEffect = mindustry.content.Fx.none;
+                smokeEffect = mindustry.content.Fx.hitLaser;
+                hittable = false;
+                reflectable = false;
+                lightColor = Color.white;
+                lightOpacity = 0.6f;
+            }
+
+            @Override
+            public void draw(Bullet b){
+                Draw.color(Pal.lancerLaser);
+                Lines.stroke(2f * b.fout(0.7f) + 0.01f);
+                Lines.lineAngleCenter(b.x, b.y, b.rotation(), 8f);
+                Lines.stroke(1.3f * b.fout(0.7f) + 0.01f);
+                Draw.color(frontColor);
+                Lines.lineAngleCenter(b.x, b.y, b.rotation(), 5f);
+                Draw.reset();
+            }
+        };
+
+        // ===== PU132 UnityBullets.branchLaserFrag (swarm-laser-turret 的分裂碎片) =====
+        BasicBulletType branchLaserFrag = new BasicBulletType(3.5f, 15f){{
+            trailWidth = 2f;
+            weaveScale = 0.6f;
+            weaveMag = 0.5f;
+            homingPower = 0.4f;
+            lifetime = 30f;
+            shootEffect = mindustry.content.Fx.hitLancer;
+            hitEffect = mindustry.content.Fx.hitLancer;
+            despawnEffect = mindustry.content.Fx.hitLancer;
+            pierceCap = 10;
+            pierceBuilding = true;
+            splashDamageRadius = 4f;
+            splashDamage = 4f;
+            status = StatusEffects.burning;  // PU132 UnityStatusEffects.plasmaed → v160 burning 近似
+            statusDuration = 180f;
+            trailLength = 6;
+            trailColor = Color.white;
+            frontColor = Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.5f);
+            backColor = Pal.sapBullet;
+            hitColor = Pal.sapBullet;
+        }};
+
+        // ===== PU132 UnityBullets.distField / smallDistField (fractal-laser-turret 的扭曲力场) =====
+        DistFieldBulletType distFieldBullet = new DistFieldBulletType(0f, -1f){{
+            centerColor = Pal.lancerLaser.cpy().a(0f);
+            edgeColor = Pal.place;
+            distSplashFx = UnityFx.distSplashFx;
+            distStart = UnityFx.distStart;
+            distStatus = Z_StatusEffects.distort;
+
+            collidesTiles = false;
+            collides = false;
+            collidesAir = false;
+            keepVelocity = false;
+
+            lifetime = 6f * 60f;
+            radius = 3f * 8f;
+            radiusInc = 0.1f * 8f;
+            bulletSlow = 0.1f;
+            bulletSlowInc = 0.025f;
+            damageLimit = 100f;
+            distDamage = 0.1f;
+        }};
+
+        DistFieldBulletType smallDistFieldBullet = new DistFieldBulletType(0f, -1f){{
+            centerColor = Pal.lancerLaser.cpy().a(0f);
+            edgeColor = Pal.place;
+            distSplashFx = UnityFx.distSplashFx;
+            distStart = UnityFx.distStart;
+            distStatus = Z_StatusEffects.distort;
+
+            collidesTiles = false;
+            collides = false;
+            collidesAir = false;
+            keepVelocity = false;
+
+            lifetime = 2.5f * 60f;
+            radius = 1.5f * 8f;
+            radiusInc = 0.05f * 8f;
+            bulletSlow = 0.05f;
+            bulletSlowInc = 0.015f;
+            damageLimit = 50f;
+            distDamage = 0.05f;
+        }};
+
         laserTurret = new ExpPowerTurret("laser-turret"){{
             requirements(Category.turret, ItemStack.with(Items.copper, 90, Items.silicon, 40, Items.titanium, 15));
             size = 2;
@@ -295,27 +400,37 @@ public class Z_Exp {
             coolantMultiplier = 2f;
             range = 140f;
 
-            shoot.firstShotDelay = 50f;
+            shoot.firstShotDelay = 50f;   // PU132 chargeTime
+            moveWhileCharging = false;
             recoil = 2f;
+            cooldownTime = 0.03f;         // PU132 cooldown
             targetAir = true;
             shake = 2f;
 
             powerUse = 7f;
 
-            shootEffect = mindustry.content.Fx.lancerLaserShoot;
+            shootEffect = UnityFx.laserChargeShoot;   // PU132 ShootFx.laserChargeShoot
             smokeEffect = mindustry.content.Fx.none;
+            chargeSound = Sounds.chargeLancer;        // PU132 Sounds.laser (v160 无同名音, 用 chargeLancer 近似)
             heatColor = mindustry.graphics.Pal.redderDust;
             shootSound = V7Sounds.laser;
 
-            shootType = new ExpLaserBulletType(140f, 35f){{
+            // PU132 UnityBullets.shardLaser: 激光 + 1 发激光碎片
+            shootType = new ExpLaserBulletType(150f, 30f){{
                 colors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser.cpy().a(0.4f), mindustry.graphics.Pal.lancerLaser, arc.graphics.Color.white};
                 hitEffect = mindustry.content.Fx.hitLancer;
                 hitSize = 4;
                 lifetime = 16f;
                 drawSize = 400f;
                 ammoMultiplier = 1f;
-                lengthInc = 1.3f;
+                status = StatusEffects.shocked;
+                statusDuration = 180f;
                 damageInc = 5f;
+                fromColor = Pal.lancerLaser;
+                toColor = Pal.sapBullet;
+                fragBullet = shardLaserFrag;
+                // v160 蓄力由 TurretBuild.shoot() 驱动: 开始蓄力时播放一次 chargeEffect
+                chargeEffect = new MultiEffect(UnityFx.laserCharge, UnityFx.laserChargeBegin);
             }};
 
             maxLevel = 30;
@@ -324,21 +439,44 @@ public class Z_Exp {
                 new ELinear(v -> range = v, 140f, 1.3f, mindustry.world.meta.Stat.shootRange, v -> arc.util.Strings.autoFixed(v / tilesize, 2) + " " + mindustry.world.meta.StatUnit.blocks.localized())
             };
             pregrade = laserTurret;
-            effectColors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser};
+            effectColors = new arc.graphics.Color[]{Pal.lancerLaser, zzw.content.exp.UnityPal.lancerSap1, zzw.content.exp.UnityPal.lancerSap2, zzw.content.exp.UnityPal.lancerSap3, zzw.content.exp.UnityPal.lancerSap4, zzw.content.exp.UnityPal.lancerSap5, Pal.sapBullet};
         }};
 
         frostLaserTurret = new ExpLiquidTurret("frost-laser-turret"){{
-            ammo(mindustry.content.Liquids.cryofluid, new ExpLaserBulletType(160f, 20f){{
-                colors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser.cpy().a(0.4f), mindustry.graphics.Pal.lancerLaser, arc.graphics.Color.white};
-                hitEffect = mindustry.content.Fx.hitLancer;
-                // PU132: 冻结圈产生时播 laserFreeze (freezePos 机制未移植, 用命中音近似)
-                hitSound = Z_Sounds.laserFreeze;
-                hitSize = 4;
-                lifetime = 16f;
-                drawSize = 400f;
-                ammoMultiplier = 1f;
-                damageInc = 2.5f;
-            }});
+            // PU132 UnityBullets.frostLaser: 命中后生成冻结圈 (freezePos)
+            ammo(mindustry.content.Liquids.cryofluid, new ExpLaserBulletType(170f, 130f){
+                {
+                    colors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser.cpy().a(0.4f), mindustry.graphics.Pal.lancerLaser, arc.graphics.Color.white};
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                    hitSize = 4;
+                    lifetime = 16f;
+                    drawSize = 400f;
+                    ammoMultiplier = 1f;
+                    status = StatusEffects.freezing;
+                    statusDuration = 180f;
+                    shootEffect = UnityFx.shootFlake;
+                    damageInc = 2.5f;
+                    fromColor = Liquids.cryofluid.color;
+                    toColor = Color.cyan;
+                    // PU132 blip = true: v160 无该字段, 已省略
+                }
+
+                @Override
+                public void onHit(Bullet b, float x, float y){
+                    int lvl = getLevel(b);
+                    float rad = 3.5f;
+                    // ★ PU132 攻击方式补齐: frostLaser.expGain = 2
+                    //   原版 ExpLaserBulletType.init 命中后调用 handleExp(b, x, y, expGain) 给炮台加经验,
+                    //   这是该炮台唯一的升级途径 (它没有碎片弹), 此前移植漏掉了 → 炮台永远无法升级.
+                    if(b.owner instanceof ExpTurret.ExpTurretBuild exp) exp.handleExp(2);
+                    // PU132 freezePos: 冻结爆裂特效 + 冻结音效 + 范围冻结/瘫痪
+                    UnityFx.freezeEffect.at(x, y, lvl / rad + 10f, getColor(b));
+                    Z_Sounds.laserFreeze.at(x, y);
+
+                    Damage.status(b.team, x, y, 10f + lvl / rad, status, 60f + lvl * 6f, true, true);
+                    Damage.status(b.team, x, y, 10f + lvl / rad, Z_StatusEffects.disabled, 2f * lvl, true, true);
+                }
+            });
             requirements(Category.turret, ItemStack.with(Z_Items.denseAlloy, 60, Items.metaglass, 15));
             size = 2;
             health = 1000;
@@ -361,52 +499,84 @@ public class Z_Exp {
             size = 3;
             health = 2000;
 
-            reload = 60f;
+            reload = distFieldBullet.lifetime / 3f;   // PU132: UnityBullets.distField.lifetime / 3f
             coolantMultiplier = 2f;
             range = 140f;
 
-            shoot.firstShotDelay = 80f;
+            shoot.firstShotDelay = 80f;   // PU132 chargeTime
+            moveWhileCharging = false;
             recoil = 4f;
+            cooldownTime = 0.03f;         // PU132 cooldown
 
             targetAir = true;
             shake = 5f;
             powerUse = 13f;
 
-            shootEffect = mindustry.content.Fx.lancerLaserShoot;
+            shootEffect = UnityFx.laserFractalShoot;  // PU132 ShootFx.laserFractalShoot
             smokeEffect = mindustry.content.Fx.none;
+            chargeSound = Sounds.chargeLancer;        // PU132 Sounds.laser (v160 无同名音, 用 chargeLancer 近似)
             shootSound = V7Sounds.laser;
 
             heatColor = mindustry.graphics.Pal.redderDust;
-            fromColor = mindustry.graphics.Pal.lancerLaser;
-            toColor = mindustry.graphics.Pal.place;
+            fromColor = zzw.content.exp.UnityPal.lancerSap3;
+            toColor = Pal.place;
 
-            shootType = new ExpLaserBulletType(160f, 90f){{
-                colors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser.cpy().a(0.4f), mindustry.graphics.Pal.lancerLaser, arc.graphics.Color.white};
+            // PU132 UnityBullets.fractalLaser: 裂缝激光 + 命中生成扭曲力场
+            shootType = new ExpLaserFieldBulletType(170f, 130f){{
+                colors = new arc.graphics.Color[]{Pal.lancerLaser.cpy().lerp(Pal.place, 0.5f).a(0.4f), Pal.lancerLaser.cpy().lerp(Pal.place, 0.5f), arc.graphics.Color.white};
                 hitEffect = mindustry.content.Fx.hitLaserBlast;
                 hitSize = 6;
                 lifetime = 20f;
                 drawSize = 400f;
                 ammoMultiplier = 1f;
-                pierceCap = 4;
+                width = 2f;
                 lengthInc = 2f;
                 damageInc = 6f;
+                fields = 2;
+                fieldInc = 0.15f;
+                maxRange = 150f + 2f * 30f;   // PU132: 计入射程增长
+                fromColor = Pal.lancerLaser.cpy().lerp(Pal.place, 0.5f);
+                toColor = Pal.place;
+                distField = distFieldBullet;
+                smallDistField = smallDistFieldBullet;
+                // v160 蓄力由 TurretBuild.shoot() 驱动: 开始蓄力时播放一次 chargeEffect
+                chargeEffect = new MultiEffect(UnityFx.laserFractalCharge, UnityFx.laserFractalChargeBegin);
             }};
 
             maxLevel = 30;
             expFields = new EField[]{
-                new LinearReloadTime(v -> reload = v, 60f, -2f),
+                new LinearReloadTime(v -> reload = v, distFieldBullet.lifetime / 3f, -2f),
                 new ELinear(v -> range = v, 140f, 0.25f * tilesize, mindustry.world.meta.Stat.shootRange, v -> arc.util.Strings.autoFixed(v / tilesize, 2) + " " + mindustry.world.meta.StatUnit.blocks.localized())
             };
 
             pregrade = chargeLaserTurret;
             pregradeLevel = 15;
-        }};
+            effectColors = new arc.graphics.Color[]{fromColor, Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.75f), Pal.sapBullet};
+        }
 
-        // ===== swarmLaserTurret (PU_V8 L1890-1935, BurstChargePowerTurret → 简化为 ExpPowerTurret)
-        // PU_V8: chargeTime=50, chargeMaxDelay=30, chargeEffects=4, shots=4, burstSpacing=20
-        // ★ v158 完整移植: firstShotDelay=50 (chargeTime), shotDelay=20 (burstSpacing), shots=4
-        // shootSound: PU_V8 Sounds.plasmaboom → v158 无该音效, 用 Z_Sounds.singularityShoot 替代
-        swarmLaserTurret = new ExpPowerTurret("swarm-laser-turret"){{
+            /**
+             * 隐藏贴图: PU132 原版该炮台没有炮台贴图 (frost-laser-turret 才是有贴图的那个),
+             * 但保留 assets 下的 png 文件.
+             * <p>把本体与 DrawTurret 各层替换为空区域, 避免渲染时显示错误图形。</p>
+             */
+            @Override
+            public void load(){
+                super.load();
+                var clear = arc.Core.atlas.find("clear");
+                region = clear;
+
+                var dt = (mindustry.world.draw.DrawTurret)drawer;
+                dt.base = clear;
+                dt.top = clear;
+                dt.liquid = clear;
+                dt.heat = clear;
+            }
+        };
+
+        // ===== swarmLaserTurret (PU132 UnityBlocks L1915-1960, BurstChargePowerTurret)
+        // 连发蓄力: 一次装填按 burstSpacing 依次蓄力发射 shots 发, 每发独立播放蓄力特效
+        // shootSound: PU132 Sounds.plasmaboom → v160 无该音效, 用 Z_Sounds.singularityShoot 替代
+        swarmLaserTurret = new BurstChargePowerTurret("swarm-laser-turret"){{
             requirements(Category.turret, ItemStack.with(Z_Items.steel, 50, Items.silicon, 90, Items.thorium, 95));
             size = 3;
             health = 2400;
@@ -417,26 +587,22 @@ public class Z_Exp {
             targetAir = true;
             range = 150f;
 
-            // ★ PU_V8 完整移植: ShootPattern + shotDelay 实现间隔发射 (每发间隔20tick)
-            shoot = new mindustry.entities.pattern.ShootPattern();
-            shoot.shots = 4;
-            shoot.firstShotDelay = 50f;  // 充能时间
-            shoot.shotDelay = 20f;  // ★ burstSpacing: 4发依次间隔20tick发射
-            inaccuracy = 1f;
-
+            chargeTime = 50f;
+            chargeMaxDelay = 30f;
+            chargeEffects = 4;
             recoil = 2f;
-            cooldownTime = 0.03f;  // v158 用 cooldownTime 替代 cooldown
+            cooldownTime = 0.03f;  // v158/v160 用 cooldownTime 替代 PU132 cooldown
             shake = 2f;
-            shootEffect = mindustry.content.Fx.lancerLaserShoot;
+            shootEffect = UnityFx.laserChargeShootShort;  // PU132 ShootFx.laserChargeShootShort
             smokeEffect = mindustry.content.Fx.none;
+            chargeEffect = UnityFx.laserChargeShort;      // PU132 UnityFx.laserChargeShort
+            chargeBeginEffect = UnityFx.laserChargeBegin; // PU132 UnityFx.laserChargeBegin
             heatColor = Color.red;
+            fromColor = zzw.content.exp.UnityPal.lancerSap3;
             shootSound = zzw.content.Z_Sounds.singularityShoot;
 
-            // branchLaser 子弹: 激光 + 3 发 frag (branchLaserFrag)
-            // PU_V8: ExpLaserBulletType(140, 20) + fragBullet=branchLaserFrag + fragBullets=3
-            // ★ 用户调整: 伤害 20 → 120 (注意 ExpLaserBulletType 参数为 (length, damage),
-            //   长度保持 150f 不变, 仅提升第二参数 damage)
-            shootType = new ExpLaserBulletType(150f, 120f){{
+            // PU132 UnityBullets.branchLaser: 激光 + 3 发分裂碎片
+            shootType = new ExpLaserBulletType(140f, 20f){{
                 colors = new Color[]{
                         Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.5f).a(0.4f),
                         Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.5f),
@@ -446,53 +612,38 @@ public class Z_Exp {
                 hitSize = 4;
                 lifetime = 16f;
                 drawSize = 400f;
-                collidesAir = false;
                 ammoMultiplier = 1f;
-                pierceCap = 10;
-                lengthInc = 2f;
-                damageInc = 6f;
                 status = StatusEffects.shocked;
-                statusDuration = 3 * 60f;
-
-                // frag: branchLaserFrag (BasicBulletType 简化版)
+                statusDuration = 180f;
                 fragBullets = 3;
-                fragBullet = new BasicBulletType(3.5f, 15f){{
-                    width = 4f;
-                    height = 4f;
-                    lifetime = 30f;
-                    shootEffect = mindustry.content.Fx.hitLancer;
-                    hitEffect = mindustry.content.Fx.hitLancer;
-                    despawnEffect = mindustry.content.Fx.none;
-                    pierceCap = 10;
-                    pierceBuilding = true;
-                    splashDamageRadius = 4f;
-                    splashDamage = 4f;
-                    status = StatusEffects.burning;  // PU_V8 UnityStatusEffects.plasmaed → v158 burning
-                    statusDuration = 180f;
-                    trailLength = 6;
-                    trailColor = Color.white;
-                    weaveScale = 0.6f;
-                    weaveMag = 0.5f;
-                    homingPower = 0.4f;
-                    frontColor = Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.5f);
-                    backColor = Pal.sapBullet;
-                    hitColor = Pal.sapBullet;
-                }};
+                fragBullet = branchLaserFrag;
+                maxRange = 150f + 2f * 30f;   // PU132: 计入射程增长
+                damageInc = 6f;
+                lengthInc = 2f;
+                fromColor = Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.5f);
+                toColor = Pal.sapBullet;
             }};
+
+            shootLength = size * tilesize / 2.7f;
+            shots = 4;
+            burstSpacing = 20f;
+            inaccuracy = 1f;
+            spread = 0f;
+            xRand = 6f;
 
             maxLevel = 30;
             expFields = new EField[]{
-                    // v158: shots 通过 ShootSpread 设置, 这里 EField 只能修改 inaccuracy/range
-                    // shots 字段简化为通过 maxLevel 增加伤害而非数量 (因 ShootSpread 在 init 时已固定)
+                    new ELinearCap(v -> shots = (int)v, 2, 0.35f, 15, mindustry.world.meta.Stat.shots),
                     new ELinearCap(v -> inaccuracy = v, 1f, 0.25f, 10, mindustry.world.meta.Stat.inaccuracy, v -> arc.util.Strings.autoFixed(v, 1) + " degrees"),
+                    new ELinear(v -> burstSpacing = v, 20f, -0.5f, null),
                     new ELinear(v -> range = v, 150f, 2f, mindustry.world.meta.Stat.shootRange, v -> arc.util.Strings.autoFixed(v / tilesize, 2) + " " + mindustry.world.meta.StatUnit.blocks.localized())
             };
             pregrade = chargeLaserTurret;
             pregradeLevel = 15;
             effectColors = new Color[]{
-                    Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.3f),
-                    Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.6f),
-                    Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.8f),
+                    zzw.content.exp.UnityPal.lancerSap3,
+                    zzw.content.exp.UnityPal.lancerSap4,
+                    zzw.content.exp.UnityPal.lancerSap5,
                     Pal.sapBullet
             };
         }};
@@ -582,8 +733,8 @@ public class Z_Exp {
 
         infernoTurret = new ExpItemTurret("inferno"){{
             // ★完整移植 PU_V8: 3 种弹药 (scrap/slagShot, coal/coalBlaze, pyratite/pyraBlaze)
-            // shootSmallBlaze/shootPyraBlaze: 火焰色粒子向射击方向喷射 (PU_V8 自定义)
-            // ★ v158 简化: 用 BulletType 替代 ExpBulletType, 用自定义 Effect 替代 ShootFx
+            // shootSmallBlaze/shootPyraBlaze: 火焰色粒子向射击方向喷射 (PU_V8 自定义 ShootFx)
+            // coal/pyratite 使用 ExpBulletType (命中给炮台加经验), 与 PU 原版 UnityBullets.coalBlaze/pyraBlaze 一致
             ammo(
                 mindustry.content.Items.scrap, new SlagFanBulletType(mindustry.content.Liquids.slag) {{
                     // ★ PU_V8 Bullets.slagShot 等效 (来自 PU特供v132版): damage=4.0f, drag=0.01f
@@ -592,12 +743,11 @@ public class Z_Exp {
                     // ★ 用户需求: 废料弹一次发射 3 发扇形分叉 (左右各偏 12°)
                     fanSpread = 12f;
                 }},
-                mindustry.content.Items.coal, new mindustry.entities.bullet.BulletType(3.35f, 32f) {{
+                mindustry.content.Items.coal, new ExpBulletType(3.35f, 32f) {{
                     ammoMultiplier = 3;
                     hitSize = 7f;
                     lifetime = 24f;
                     pierce = true;
-                    collidesAir = false;
                     statusDuration = 60f * 4;
                     // ★ PU_V8 shootSmallBlaze: 火焰色 (lightFlame/darkFlame/gray) 16粒子向射击方向喷射
                     shootEffect = new mindustry.entities.Effect(22f, e -> {
@@ -610,13 +760,15 @@ public class Z_Exp {
                     status = mindustry.content.StatusEffects.burning;
                     keepVelocity = true;
                     hittable = false;
+                    // ★ PU_V8 coalBlaze: 命中 50% 概率给炮台 1 点经验
+                    expOnHit = true;
+                    expChance = 0.5f;
                 }},
-                mindustry.content.Items.pyratite, new mindustry.entities.bullet.BulletType(3.35f, 46f) {{
+                mindustry.content.Items.pyratite, new ExpBulletType(3.35f, 46f) {{
                     ammoMultiplier = 3;
                     hitSize = 7f;
                     lifetime = 24f;
                     pierce = true;
-                    collidesAir = false;
                     statusDuration = 60f * 4;
                     // ★ PU_V8 shootPyraBlaze: pyra 火焰色粒子
                     shootEffect = new mindustry.entities.Effect(32f, e -> {
@@ -629,6 +781,9 @@ public class Z_Exp {
                     status = mindustry.content.StatusEffects.burning;
                     keepVelocity = false;
                     hittable = false;
+                    // ★ PU_V8 pyraBlaze: 命中 60% 概率给炮台 1 点经验
+                    expOnHit = true;
+                    expChance = 0.6f;
                 }}
             );
             requirements(Category.turret, ItemStack.with(Z_Items.stone, 150, Z_Items.denseAlloy, 65, Items.graphite, 60));
