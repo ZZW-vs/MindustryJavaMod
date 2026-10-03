@@ -39,9 +39,12 @@ import static mindustry.Vars.*;
  * <br>3. 激光贴图使用全局 laser / laser-end (原版要求方块专属 @-laser)。</p>
  *
  * <p>★ v160 适配说明 (对照 PU132 v132 API):
- * <br>- 原版构造里的 consumes.powerCond(powerUse, b -&gt; b.target != null) 在 v160 不存在,
- *   改为 consumePower(powerUse) + 重写 shouldConsume() (只有存在目标时才耗电);
- * <br>- efiiciency()/edelta() 方法改为 v160 的 efficiency 字段与 delta();
+ * <br>- 原版构造里的 consumes.powerCond(powerUse, b -&gt; b.target != null) 在 v160 无对应 API。
+ *   ★ 实测/项目约定: 本类方块均为 outputsPower=true 的电力源, 一旦再添加 consumePower 会让
+ *   outputsPower 失效 (参见 SoulAbsorberTurret 的同类注释), 导致方块既不发电又拿不到电、整台不工作。
+ *   因此这里<b>不添加任何耗电消费者</b>, 与 PU132 方块定义里的 consumesPower = false 本意一致;
+ *   该类方块的电只"产"不"耗";
+ * <br>- efficiency()/edelta() 方法改为 v160 的 efficiency 字段与 delta();
  * <br>- updateClipRadius 取代原版直接改 clipSize。</p>
  *
  * @param <T> 目标类型 (Teamc 子类)
@@ -61,7 +64,7 @@ public abstract class GenericTractorBeamTurret<T extends Teamc> extends BaseTurr
     /** 激光起点距方块中心的距离 (小于 0 时取 size*tilesize/2) */
     public float shootLength = -1f;
 
-    /** 电力消耗 (有目标时) */
+    /** ★ 保留 PU132 的同名字段 (原版用于 powerCond); 本类为纯电力源, 不实际消耗电力 */
     public float powerUse = 1f;
     /** 可开火的效率下限 */
     public float powerUseThreshold = 0f;
@@ -86,9 +89,9 @@ public abstract class GenericTractorBeamTurret<T extends Teamc> extends BaseTurr
         rotateSpeed = 20f;
         hasItems = hasLiquids = false;
         hasPower = true;
-        // ★ v160 无 acceptCoolant 字段, 不添加 ConsumeCoolant 即等价于不接受冷却液
-        // PU132: consumes.powerCond(powerUse, build -> build.target != null)
-        consumePower(powerUse);
+        // ★ 不添加任何耗电消费者: 本类是 outputsPower=true 的电力源, 加了 consumePower 会让
+        //   outputsPower 失效 (方块既不发电也不供电, 整台失效)。对应 PU132 定义的 consumesPower = false。
+        outputsPower = true;
     }
 
     @Override
@@ -262,12 +265,6 @@ public abstract class GenericTractorBeamTurret<T extends Teamc> extends BaseTurr
 
         public boolean canShoot(){
             return efficiency > powerUseThreshold;
-        }
-
-        /** 只有存在目标时才消耗电力 (对应 PU132 consumes.powerCond(powerUse, 有目标)) */
-        @Override
-        public boolean shouldConsume(){
-            return super.shouldConsume() && target != null;
         }
 
         protected abstract void findTarget();

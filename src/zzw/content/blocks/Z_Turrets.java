@@ -1666,6 +1666,9 @@ public class Z_Turrets {
             range = 50f;
 
             targetUnits = true;
+            // ★ 偏离 PU132 原版: 原版 absorber 只吸收单位 (吸弹留给 monolith 的 absorber-aura),
+            //   此处按需求开启吸收敌方子弹, 使"吸收者"名副其实
+            targetBullets = true;
             status = mindustry.content.StatusEffects.slow;
 
             rotateSpeed = 1.2f;
