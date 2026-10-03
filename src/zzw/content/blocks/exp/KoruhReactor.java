@@ -7,6 +7,8 @@ import arc.util.Time;
 import arc.util.io.Reads;
 import arc.util.io.Writes;
 import mindustry.Vars;
+import mindustry.content.Fx;
+import mindustry.entities.Effect;
 import mindustry.ui.Bar;
 import mindustry.world.blocks.power.ImpactReactor;
 import mindustry.world.meta.Stat;
@@ -21,13 +23,18 @@ import zzw.content.graphics.UnityPal;
  * <p>继承 ImpactReactor。消耗经验 (exp) 维持反应。</p>
  *
  * <p>★ 机制对齐 PU132 原版 (updateTile):
- * 只要"工作时(必要消耗满足)"就检查经验 —— 经验充足则高效运转时随机外喷经验球;
- * 经验不足则每 tick 扣 1 点血持续掉血, 生命归零的同一刻喷出全部经验球。</p>
+ * 只有"正在工作时"才检查经验 —— 这里的"工作"= 必要消耗 (铀/水/电) 全部满足,
+ * 即与 ImpactReactor 自身升温条件一致的 {@code efficiency >= 0.9999f && power.status >= 0.99f}。
+ * 经验充足则高效运转时随机外喷经验球; 经验不足则每 tick 扣 1 点血持续掉血,
+ * 同时周期性播放爆炸特效, 生命归零的同一刻喷出全部经验球。</p>
  *
  * <p>适配说明:
  * <ul>
  *   <li>PU132 原版用 {@code consValid()} 判定工作时间; v160 已移除该方法,
- *       按项目惯例用等价的 {@code shouldConsume()} (必要消耗满足) 替代</li>
+ *       改为与父类 ImpactReactor 升温判定完全相同的
+ *       {@code efficiency >= 0.9999f && power.status >= 0.99f}
+ *       (v160 的 {@code shouldConsume()} 只等价于 {@code enabled}, 恒为真,
+ *        绝不能拿来当"工作中"用, 否则待机时也会掉血)</li>
  *   <li>经验球喷出只在"经验不足致死"时内联执行 (与 PU132 一致), onDestroyed 为空</li>
  *   <li>bundle key "explib.expAmount" 不存在主 bundle, 用硬编码字符串兜底</li>
  * </ul></p>
@@ -37,6 +44,11 @@ public class KoruhReactor extends ImpactReactor{
     public int expUse = 2;
     /** 经验容量 */
     public int expCapacity = 24;
+    /** 经验不足时播放的爆炸特效 (对齐 KoruhCrafter.craftDamageEffect) */
+    public Effect damageEffect = Fx.explosion;
+    /** 经验不足时爆炸特效的播放间隔 (tick), 避免每帧刷屏 */
+    public final int timerDamageEffect = timers++;
+    public float damageEffectInterval = 30f;
 
     public KoruhReactor(String name){
         super(name);
@@ -109,9 +121,12 @@ public class KoruhReactor extends ImpactReactor{
         @Override
         public void updateTile(){
             super.updateTile();
-            // ★ 对齐 PU132 原版 (consValid() 在 v160 已移除, 按项目惯例用 shouldConsume() 等价替代):
-            //   只要"工作时(必要消耗满足)"就检查经验:
-            if(shouldConsume()){
+            // ★ 对齐 PU132 原版的 consValid() 判定 (v160 已移除该方法):
+            //   这里必须用"必要消耗全部满足"作为"工作中"的条件, 也就是父类 ImpactReactor
+            //   自己用来决定是否升温的同一个条件。绝不能使用 shouldConsume() ——
+            //   它在 v160 只等价于 enabled (放置后恒为 true), 会导致方块一放下、
+            //   还没通电通水通铀就开始掉血 (此前的 bug)。
+            if(efficiency >= 0.9999f && power.status >= 0.99f){
                 if(exp >= expUse){
                     // 经验充足: 高效运转时随机外喷经验球
                     if(productionEfficiency >= 0.8f && Mathf.randomBoolean(0.001f)){
@@ -120,6 +135,11 @@ public class KoruhReactor extends ImpactReactor{
                 }else{
                     // ★ 经验不足: 每 tick 扣 1 点血, 持续掉血直至生命归零
                     damage(1);
+                    // ★ 爆炸: 经验不足时周期性播放爆炸特效 (对齐 KoruhCrafter 的 craftDamageEffect),
+                    //   按间隔节流, 避免每 tick 刷屏
+                    if(timer(timerDamageEffect, damageEffectInterval)){
+                        damageEffect.at(x, y);
+                    }
                     // ★ 生命归零的同一刻喷出全部经验球 (PU132 原版在 damage 后判 health<=0 内联执行)
                     if(health <= 0f){
                         for(int i = 0, m = Mathf.ceilPositive(exp * 1.5f); i < m; i++){

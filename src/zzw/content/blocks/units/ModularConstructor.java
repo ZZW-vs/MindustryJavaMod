@@ -26,6 +26,7 @@ import mindustry.world.consumers.*;
 import mindustry.world.meta.Stat;
 import zzw.content.blocks.units.ModularConstructorModule.ModularConstructorModuleInterface;
 import zzw.content.blocks.units.ModularConstructorPart.ModularConstructorPartBuild;
+import zzw.content.type.WorldUnitType;
 import zzw.content.units.entities.WorldUnitEntity;
 // 适配: 以下 unity.* import 已移除 (UnityPal 用 Color.valueOf 替代, 其余同包)
 // import unity.graphics.*;
@@ -387,9 +388,37 @@ public class ModularConstructor extends Block{
                         float sx = x, sy = y;
                         boolean spawnable = true;
 
+                        // ★ 子世界内产出的单位直接出生到主世界: 平台上的构造器把单位"送到"
+                        //   平台之外的主世界地面, 而不是生成在平台内部与世界单位重叠.
+                        //   (子世界建筑更新时 x/y 已被投影到主世界坐标, 但仍落在平台碰撞箱内)
+                        WorldUnitEntity owner = WorldUnitType.findSubOwner(this);
+                        if(owner != null){
+                            // 由平台中心指向建筑投影点, 沿该方向把落点推到平台包围盒之外
+                            float dx = x - owner.x, dy = y - owner.y;
+                            float len = Mathf.len(dx, dy);
+                            if(len < 0.001f){
+                                // 建筑恰在平台正中: 沿单位朝向向外推
+                                dx = Mathf.cosDeg(owner.rotation);
+                                dy = Mathf.sinDeg(owner.rotation);
+                                len = 1f;
+                            }
+                            float nx = dx / len, ny = dy / len;
+                            // 平台旋转后的轴对齐包围盒半径 (与 WorldUnitEntity.hitbox 公式一致)
+                            float rad = (owner.rotation - 90f) * Mathf.degRad;
+                            float c = Math.abs(Mathf.cos(rad)), s = Math.abs(Mathf.sin(rad));
+                            float halfW = (owner.platW() * c + owner.platH() * s) / 2f;
+                            float halfH = (owner.platW() * s + owner.platH() * c) / 2f;
+                            // 沿 (nx,ny) 到包围盒边界的距离 (取两轴较小值 = 射线先碰到的边)
+                            float ex = Math.abs(nx) < 1e-5f ? Float.MAX_VALUE : halfW / Math.abs(nx);
+                            float ey = Math.abs(ny) < 1e-5f ? Float.MAX_VALUE : halfH / Math.abs(ny);
+                            float dist = Math.min(ex, ey) + plan.unit.hitSize / 2f + 4f;
+                            sx = owner.x + nx * dist;
+                            sy = owner.y + ny * dist;
+                        }
+
                         // 海军单位必须生成在水域: 落在陆地上的海军无法移动 (表现为"无法生成")
                         if(plan.unit.naval){
-                            Tile water = findNavalSpawn();
+                            Tile water = findNavalSpawn(sx, sy);
                             if(water != null){
                                 sx = water.worldx();
                                 sy = water.worldy();
@@ -417,16 +446,20 @@ public class ModularConstructor extends Block{
         }
 
         /**
-         * 为海军单位在主世界中寻找最近的可生成水域.
+         * 为主世界坐标处生产的海军单位寻找最近的可生成水域.
          *
          * <p>子世界内更新时 {@code Vars.world} 指向子世界, 需通过
-         * {@link WorldUnitEntity#mainWorld} 访问主世界地形.</p>
+         * {@link WorldUnitEntity#mainWorld} 访问主世界地形.
+         * 传入坐标 {@code wx/wy} 已是主世界坐标 (子世界建筑由
+         * {@link WorldUnitEntity} 投影得到), 因此主世界 / 子世界两种情况均适用.</p>
          *
+         * @param wx 主世界落点 X
+         * @param wy 主世界落点 Y
          * @return 最近的水面方块, 未找到返回 null
          */
-        private Tile findNavalSpawn(){
+        private Tile findNavalSpawn(float wx, float wy){
             World world = WorldUnitEntity.mainWorld != null ? WorldUnitEntity.mainWorld : Vars.world;
-            int cx = tileX(), cy = tileY();
+            int cx = World.toTile(wx), cy = World.toTile(wy);
             Tile best = null;
             int bestDst = Integer.MAX_VALUE;
             // 由近及远搜索 (半径 24 格), 取最近的可通行水面

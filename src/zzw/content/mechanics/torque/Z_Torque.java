@@ -1,10 +1,10 @@
 package zzw.content.mechanics.torque;
 
+import mindustry.content.Fx;
 import mindustry.content.Items;
 import mindustry.content.Liquids;
 import mindustry.type.Category;
 import mindustry.type.ItemStack;
-import mindustry.type.LiquidStack;
 import mindustry.world.meta.Attribute;
 import mindustry.world.meta.BuildVisibility;
 import arc.math.geom.Point2;
@@ -177,23 +177,30 @@ public class Z_Torque{
             addGraph(new GraphTorqueConsume(45f, 8f, 1.0f, 0.06f, 0.3f).setAccept(0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
         }};
 
-        // oil-derrick (螺旋石油钻井): 扭矩驱动的石油合成器
-        // 配方: 消耗 水 10/秒 + 沙子 2/秒, 产出 石油 10/秒
-        //   GenericCrafter 的量纲: consumeLiquid / outputLiquid 按 tick (×60 = 每秒),
-        //   consumeItem 按次 (60 / craftTime 次每秒, craftTime = 60 → 1 次/秒)
+        // oil-derrick (螺旋石油钻井): 扭矩驱动的抽油机 (对齐原版 oil-extractor / Fracker)
+        //   result + attribute=oil + baseEfficiency=0 → 必须建在油田上, 产量随油田品质变化
+        //   水: consumeLiquid 按 tick (10/60 ≈ 10/秒)
+        //   沙: consumeItem 按次, 频率由 itemUseTime 决定 (30 tick 1 个 ≈ 2/秒)
         //   整体速度 = 扭矩转速效率的平方 (见 OilDerrickBuild.updateTile)
         oilDerrick = new OilDerrick("oil-derrick"){{
             requirements(Category.production, with(Items.lead, 150, Items.copper, 100, Items.titanium, 60, Items.metaglass, 30));
             hasPower = false;
             size = 3;
             health = 1500;
-            craftTime = 60f;
             liquidCapacity = 60f;
-            outputLiquid = new LiquidStack(Liquids.oil, 10f / 60f);
 
-            // 每秒消耗 10 单位水 + 2 个沙子
+            // 抽油机核心: 从脚下的油田抽石油, 非油田不出油且无法放置
+            result = Liquids.oil;
+            attribute = Attribute.oil;
+            baseEfficiency = 0f;
+            pumpAmount = 10f / 60f;   // 满效率 ≈ 10 石油/秒
+            itemUseTime = 30f;        // 每 30 tick 消耗 1 个沙子 ≈ 2 沙/秒
+            updateEffect = Fx.pulverize;
+            updateEffectChance = 0.05f;
+
+            // 每秒消耗 10 单位水
             consumeLiquid(Liquids.water, 10f / 60f);
-            consumeItem(Items.sand, 2);
+            consumeItem(Items.sand);
 
             addGraph(new GraphTorqueConsume(45f, 8f, 1.0f, 0.06f, 0.3f).setAccept(0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
         }};

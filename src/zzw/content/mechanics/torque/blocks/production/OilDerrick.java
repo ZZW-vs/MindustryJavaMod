@@ -16,16 +16,19 @@ import static arc.Core.*;
 /**
  * 螺旋石油钻井 (OilDerrick)
  *
- * <p>扭矩驱动的石油合成器: 本质是 {@link GenericCrafter} + 图网络管线,
- * 消耗"水 + 沙子"合成石油, 整体工作速度由扭矩转速决定 (效率 = 转速效率的平方)。</p>
+ * <p>扭矩驱动的<b>抽油机</b>: 本质是 {@link Fracker} (原版 oil-extractor 的基类) + 图网络管线。
+ * 它<b>不是</b>"工厂"——不靠配方把水和沙合成石油, 而是像原版抽油机那样从脚下的油田抽取石油,
+ * 产量由 油田品质 ({@code Attribute.oil}) × 扭矩转速 共同决定。</p>
  *
- * <p>注册时通过 {@code outputLiquid = oil; consumeLiquid(water); consumeItem(sand);} 指定配方,
- * 与普通工厂一致: 水按 tick 连续抽走、沙子按次消耗、石油按进度连续产出,
- * 三者都随 {@code efficiency} 同步缩放, 因此停机(缺料/无扭矩/油满)时不会空耗。</p>
+ * <p>消耗: 水按 tick 连续抽走, 沙子每 {@code itemUseTime} tick 消耗 1 个;
+ * 两者任一不足时 efficiency = 0, 停止出油但仍然转动 (摩擦/阻力只看 enabled)。</p>
+ *
+ * <p>放置: 与原版一致, {@code attribute = oil} + {@code baseEfficiency = 0},
+ * 因此必须建在油田上, 非油田既放不下也抽不出油。</p>
  *
  * <p>绘制上做成"螺旋钻杆"样式: 底座 + 随扭矩旋转的螺旋钻杆 + 顶部井架 + 石油液位。</p>
  */
-public class OilDerrick extends GenericCrafter implements GraphBlockBase{
+public class OilDerrick extends Fracker implements GraphBlockBase{
     protected final Graphs graphs = new Graphs();
 
     public final TextureRegion[] bottomRegions = new TextureRegion[2], topRegions = new TextureRegion[2], liquidRegions = new TextureRegion[2];
@@ -81,7 +84,7 @@ public class OilDerrick extends GenericCrafter implements GraphBlockBase{
         return graphs;
     }
 
-    public class OilDerrickBuild extends GenericCrafterBuild implements GraphBuildBase{
+    public class OilDerrickBuild extends FrackerBuild implements GraphBuildBase{
         protected GraphModules gms;
 
         @Override

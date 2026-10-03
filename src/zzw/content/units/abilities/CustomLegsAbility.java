@@ -9,11 +9,15 @@ import arc.math.Mathf;
 import arc.math.geom.Vec2;
 import arc.struct.Seq;
 import arc.util.Tmp;
+import mindustry.Vars;
+import mindustry.content.Fx;
+import mindustry.entities.Effect;
 import mindustry.entities.abilities.Ability;
 import mindustry.gen.Unit;
 import mindustry.graphics.Drawf;
 import mindustry.graphics.Pal;
 import mindustry.type.UnitType;
+import mindustry.world.blocks.environment.Floor;
 
 /**
  * 自定义腿系统 Ability (完整移植 PU132 CLegComp + CLegGroup + BasicLeg)
@@ -23,9 +27,13 @@ import mindustry.type.UnitType;
  * - 每条腿独立配置 (baseLength/endLength/targetX/targetY/legTrns)
  * - PU132 原版 IK (用真实 baseLength/endLength, 支持不等长)
  * - PU132 原版渲染 (Lines.line + 两段不同贴图 + 膝关节/脚)
+ * - PU132 原版落地效果 (CLeg.step): 脚部扬尘/水波/震屏, 与腿贴图落点一致
+ *
+ * ★ 使用本 Ability 的单位必须 legCount = 0 (不使用原生腿).
+ *   若保留原生腿, 其落地效果会先于本 Ability 在"原生腿几何位置"播放, 与贴图错位.
  *
  * toxoswarmer 配置:
- *   小腿组: 3条定义×2镜像=6条, baseLength=endLength=32, total=64, legTrns=0.8
+ *   小腿组: 2条定义×2镜像=4条, baseLength=endLength=32, total=64, legTrns=0.8
  *   大腿组: 2条定义×2镜像=4条, baseLength=55, endLength=71, total=126, legTrns=0.7
  */
 public class CustomLegsAbility extends Ability {
@@ -62,23 +70,12 @@ public class CustomLegsAbility extends Ability {
             gd.update(unit, unit.type.legSpeed);
         }
 
-        // ★ 同步 CustomLegsAbility 腿位置到原生腿系统 (unit.legs())
-        // 这样脚步声/碰撞/水波纹基于 CustomLegsAbility 的位置, 而非原生腿系统
-        if (unit instanceof mindustry.gen.Legsc legUnit) {
-            mindustry.entities.Leg[] nativeLegs = legUnit.legs();
-            int nativeIdx = 0;
-            for (LegGroupData gd : groupData) {
-                for (LegData leg : gd.legs) {
-                    if (nativeIdx < nativeLegs.length) {
-                        nativeLegs[nativeIdx].base.set(leg.foot);
-                        nativeLegs[nativeIdx].joint.set(leg.jointX, leg.jointY);
-                        nativeLegs[nativeIdx].moving = leg.moving;
-                        nativeLegs[nativeIdx].stage = leg.stage;
-                        nativeIdx++;
-                    }
-                }
-            }
-        }
+        // ★ 不依赖原生腿系统: 挂载本 Ability 的单位 legCount 必须为 0 (原生腿为空).
+        //   原因: v160 的合并 update() 中 LegsComp 的落地效果代码先于 Ability 执行,
+        //   原生腿会按自己的几何 (defaultLegAngle + legLength) 在"错误位置"播放扬尘/水波,
+        //   之后本 Ability 才把位置同步过去 —— 贴图与效果必然错位.
+        //   PU132 原版同样不使用原生腿, 落地效果由本 Ability 的 LegData.step() 在
+        //   真实脚部坐标 (foot) 播放 (见 LegData.update 中的 group 切换判定).
     }
 
     /** Ability.draw 为空操作, 腿渲染由 UnitType.drawLegs() 调用 drawLegs() 完成 (确保在 body 之前) */
@@ -277,6 +274,39 @@ public class CustomLegsAbility extends Ability {
             v2.trns(g.baseRotation - 90f, (type.x + type.targetX) * side, type.y + type.targetY + trns).add(unit);
 
             updateLeg(unit, g, moving, v1.x, v1.y, v2.x, v2.y, legSpeed);
+
+            // ★ 落地效果: 该腿刚由"摆动"落到"站稳"时, 在真实脚部坐标播放扬尘/水波
+            //   (移植 PU132 CLeg.update 的 group 切换判定; 坐标用 foot 保证与贴图一致)
+            Floor floor = Vars.world.floorWorld(foot.x, foot.y);
+            if (this.group != grp) {
+                if (!moving && id % div == this.group) {
+                    step(unit, floor);
+                }
+                this.group = grp;
+            }
+        }
+
+        /**
+         * 腿落地效果 (移植 PU132 CLeg.step).
+         * <p>坐标一律使用真实脚部 {@link #foot}, 因此扬尘/水波与腿贴图的落点完全一致.</p>
+         */
+        private void step(Unit unit, Floor floor) {
+            if (Vars.headless) return;
+
+            if (floor.isLiquid) {
+                floor.walkEffect.at(foot.x, foot.y, unit.type.rippleScale, floor.mapColor);
+                floor.walkSound.at(foot.x, foot.y, 1f, floor.walkSoundVolume);
+            } else {
+                Fx.unitLandSmall.at(foot.x, foot.y, unit.type.rippleScale, floor.mapColor);
+                unit.type.stepSound.at(foot.x, foot.y,
+                        unit.type.stepSoundPitch + Mathf.range(unit.type.stepSoundPitchRange),
+                        unit.type.stepSoundVolume);
+            }
+
+            // 脚掌触地时的轻微震屏
+            if (unit.type.stepShake > 0f) {
+                Effect.shake(unit.type.stepShake, unit.type.stepShake, foot);
+            }
         }
 
         private void updateLeg(Unit unit, LegGroupData g, boolean moving, float baseX, float baseY, float targetX, float targetY, float legSpeed) {
