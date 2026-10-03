@@ -1799,17 +1799,21 @@ public class Z_Units {
 
         // ═══════════════════════════════════════════════════════════
         //  Exowalker (PU132 exowalker, Plague 阵营地面单位)
-        //  - 8腿 (完整移植 PU132 TriJointLegsComp 三节腿系统), 6000 血, 速度 0.7
+        //  - 8腿 (完整移植 PU132 TriJointLegsComp 三节腿系统)
         //  - 5武器: 4×plagueSmallMount (瘟疫导弹) + 1×drain-laser (碎片激光)
         //  - ★ PU132 用 TriJointLegsc 自定义腿组件, v158 用 TriJointLegsAbility 移植
-        //  - ★ PU132 原版不设 armor (即 0), 位移速度/武器数值全部照抄
+        //  - ★ 数值基线 1:1 还原 PU132 (6000 血 / 速度 0.7 / 护甲 0 / 导弹 9+17溅射 /
+        //    激光 43×3), 但实战过弱。应要求主动偏离加强为 T3 主力:
+        //    血 10000 / 护甲 12 / 速度 1.2, 导弹与激光的伤害、射程同步上调
+        //    (各处见 "★ 加强" 注释)
         // ═══════════════════════════════════════════════════════════
         exowalker = new zzw.content.units.types.MixedLegUnitType("exowalker") {{
-            health = 6000f;
-            speed = 0.7f;
+            health = 10000f;    // ★ 加强 (原 6000): T3 主力血量
+            armor = 12f;        // ★ 加强 (原 0): 补齐最大短板
+            speed = 1.2f;       // ★ 加强 (原 0.7)
             drag = 0.1f;
             hitSize = 33f;
-            rotateSpeed = 2f;
+            rotateSpeed = 3.5f; // ★ 加强 (原 2)
 
             // ===== 腿配置 (PU132 原值, 由 TriJointLegsAbility 接管三节腿渲染/IK) =====
             // 原生腿 (LegsUnit) 仍保留用于碰撞和地面交互, 但不参与渲染
@@ -1846,24 +1850,24 @@ public class Z_Units {
                 y = 8f;
                 otherSide = 2;  // ★ PU132 原值: 与第3门配对 (后坐力/交替)
                 shootY = 4.75f;
-                reload = 1.5f * 60f;
+                reload = 1.0f * 60f;  // ★ 加强 (原 1.5s)
                 shoot.shots = 4;
-                inaccuracy = 15f;
+                inaccuracy = 10f;     // ★ 加强 (原 15): 更集中
                 mirror = false;
                 alternate = true;
                 rotate = true;
                 // ★ PU132 原版 plagueSmallMount 未设 rotateSpeed / shootCone, 此处保持引擎默认
                 shootSound = zzw.content.Z_Sounds.endMissile;  // ★ v158 无 Sounds.missile, 用自定义 endMissile
-                bullet = new mindustry.entities.bullet.MissileBulletType(3.8f, 9f) {{
+                bullet = new mindustry.entities.bullet.MissileBulletType(3.8f, 16f) {{
                     width = 8f;
                     height = 8f;
-                    lifetime = 45f;
+                    lifetime = 65f;   // ★ 加强 (原 45): 射程更远
                     backColor = hitColor = lightColor = trailColor = Color.valueOf("54de3b");  // plagueDark
                     frontColor = Color.valueOf("a3f080");  // plague
                     shrinkY = 0f;
                     drag = -0.01f;
-                    splashDamage = 17f;
-                    splashDamageRadius = 30f;
+                    splashDamage = 30f;        // ★ 加强 (原 17)
+                    splashDamageRadius = 42f;  // ★ 加强 (原 30)
                     weaveScale = 8f;
                     weaveMag = 2f;
                     hitEffect = mindustry.content.Fx.blastExplosion;
@@ -1876,9 +1880,9 @@ public class Z_Units {
                 y = 8f;
                 otherSide = 0;  // ★ PU132 原值: 与第1门配对
                 shootY = 4.75f;
-                reload = 1.5f * 60f;
+                reload = 1.0f * 60f;  // ★ 加强 (原 1.5s)
                 shoot.shots = 4;
-                inaccuracy = 15f;
+                inaccuracy = 10f;     // ★ 加强 (原 15): 更集中
                 mirror = false;
                 alternate = true;
                 rotate = true;
@@ -1907,9 +1911,9 @@ public class Z_Units {
                 y = -12.25f;
                 otherSide = 3;  // ★ PU132 原值: 与第4门配对
                 shootY = 4.75f;
-                reload = 1.5f * 60f;
+                reload = 1.0f * 60f;  // ★ 加强 (原 1.5s)
                 shoot.shots = 4;
-                inaccuracy = 15f;
+                inaccuracy = 10f;     // ★ 加强 (原 15): 更集中
                 mirror = false;
                 alternate = true;
                 rotate = true;
@@ -1937,9 +1941,9 @@ public class Z_Units {
                 y = -12.25f;
                 otherSide = 1;  // ★ PU132 原值: 与第2门配对
                 shootY = 4.75f;
-                reload = 1.5f * 60f;
+                reload = 1.0f * 60f;  // ★ 加强 (原 1.5s)
                 shoot.shots = 4;
-                inaccuracy = 15f;
+                inaccuracy = 10f;     // ★ 加强 (原 15): 更集中
                 mirror = false;
                 alternate = true;
                 rotate = true;
@@ -1974,11 +1978,11 @@ public class Z_Units {
                 rotate = true;
                 shoot.shots = 3;
                 shoot.shotDelay = 17.5f;  // ★ v158 用 shotDelay 替代 PU132 的 burstSpacing(spacing)
-                reload = 1.5f * 60f;
+                reload = 1.0f * 60f;      // ★ 加强 (原 1.5s)
                 shootSound = zzw.content.Z_Sounds.devourerMainLaser;  // ★ v158 无 Sounds.laser, 用自定义 devourerMainLaser
                 bullet = new mindustry.entities.bullet.ShrapnelBulletType() {{
-                    damage = 43f;
-                    length = 80f;
+                    damage = 85f;    // ★ 加强 (原 43)
+                    length = 130f;   // ★ 加强 (原 80): 射程更远
                     toColor = Color.valueOf("a3f080");  // PU132 UnityPal.plague
                 }};
             }});
@@ -1986,7 +1990,7 @@ public class Z_Units {
 
         // ═══════════════════════════════════════════════════════════
         //  Toxoswarmer (PU132 toxoswarmer, Plague 阵营地面单位)
-        //  - 腿: 2 组 CLegType (小腿 3 条×镜像 / 大腿 2 条×镜像), 共 5 条×镜像
+        //  - 腿: 2 组 CLegType (小腿 2 条×镜像 / 大腿 2 条×镜像), 共 4 条×镜像
         //  - 7000 血, 速度 1.1
         //  - 1武器: toxo-launcher (8连发巡航射手弹, 持续发射火焰弹)
         //  - ★ PU132 原版不设 armor (即 0), 武器数值全部照抄
@@ -1998,20 +2002,22 @@ public class Z_Units {
             hitSize = 22.25f;
             rotateSpeed = 3f;
 
-            // ===== 腿配置 (原生腿用于碰撞/移动, CustomLegsAbility 用于渲染) =====
-            // PU132 原版: 2组 CLegType.createGroup (CLegComp 系统)
-            //   小腿组: 3条×2镜像=6条, baseLength=endLength=32, legTrns=0.8
+            // ===== 腿配置 (由 CustomLegsAbility 全权接管, 不用原生腿) =====
+            //   小腿组: 2条×2镜像=4条, baseLength=endLength=32, legTrns=0.8
+            //     (PU132 原版小腿组为 3条×2=6条; 此处按需求删去侧向 y=0 那一对, 保留前/后各一对)
             //   大腿组: 2条×2镜像=4条, baseLength=55, endLength=71, legTrns=0.7
-            // v158: 保留原生腿 (legCount=10) 用于碰撞, drawLegs 委托 CustomLegsAbility
-            legCount = 10;
-            legGroupSize = 2;
-            legLength = 95f;  // 原生腿长度 (仅碰撞, 不渲染)
+            // ★ legCount = 0: 关闭原生腿. 原生腿会先于 Ability 按自己的几何播放落地效果,
+            //   与本 Ability 渲染的腿贴图落点错位; 落地效果改由 CustomLegsAbility.step() 在
+            //   真实脚部坐标播放. (碰撞走 allowLegStep → legsSolid, 与 legCount 无关)
+            legCount = 0;
+            legSpeed = 0.1f;  // 自定义腿关节平滑速度 (CustomLegsAbility 使用)
+            // 以下原生腿参数在 legCount=0 时不参与腿系统, 仅保留供 death 半径等通用逻辑使用
+            legLength = 95f;
             legBaseOffset = 11.25f;
             legMoveSpace = 0.85f;
             legPairOffset = 1f;
             legMaxLength = 1.1f;
             legMinLength = 0.9f;
-            legSpeed = 0.1f;
 
             hovering = true;
             allowLegStep = true;
@@ -2024,17 +2030,11 @@ public class Z_Units {
 
             // ===== CustomLegsAbility: PU132 CLegGroup 完整移植 =====
             abilities.add(new zzw.content.units.abilities.CustomLegsAbility() {{
-                // 小腿组 (PU132: 3条×2镜像=6条)
+                // 小腿组 (2条×2镜像=4条; 删去 PU132 的侧向 y=0 那一对)
                 legGroups.add(new CustomLegsAbility.LegGroupType("create-toxoswarmer-base",
                     new CustomLegsAbility.LegType("create-toxoswarmer-leg-small") {{
                         x = 6.25f; y = 10.75f;
                         targetX = 31f; targetY = 53.5f;
-                        baseLength = endLength = 32f;
-                        legTrns = 0.8f;
-                    }},
-                    new CustomLegsAbility.LegType("create-toxoswarmer-leg-small") {{
-                        x = 12.5f; y = 0f;
-                        targetX = 61.75f; targetY = 0f;
                         baseLength = endLength = 32f;
                         legTrns = 0.8f;
                     }},
