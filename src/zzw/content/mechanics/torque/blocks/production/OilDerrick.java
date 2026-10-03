@@ -1,10 +1,12 @@
 package zzw.content.mechanics.torque.blocks.production;
 
 import arc.graphics.g2d.*;
+import arc.math.geom.*;
 import arc.scene.ui.layout.*;
 import arc.util.io.*;
 import mindustry.graphics.*;
 import mindustry.world.blocks.production.*;
+import zzw.content.mechanics.torque.UnityDrawf;
 import zzw.content.mechanics.torque.blocks.*;
 import zzw.content.mechanics.torque.graphs.*;
 import zzw.content.mechanics.torque.modules.*;
@@ -26,14 +28,8 @@ import static arc.Core.*;
 public class OilDerrick extends GenericCrafter implements GraphBlockBase{
     protected final Graphs graphs = new Graphs();
 
-    /** 底座 (3x3) */
-    public TextureRegion bottomRegion;
-    /** 随扭矩旋转的螺旋钻杆 */
-    public TextureRegion rotorRegion;
-    /** 顶部井架 (不旋转) */
-    public TextureRegion topRegion;
-    /** 石油液位覆盖 */
-    public TextureRegion liquidRegion;
+    public final TextureRegion[] bottomRegions = new TextureRegion[2], topRegions = new TextureRegion[2], liquidRegions = new TextureRegion[2];
+    public TextureRegion rotorRegion, mbaseRegion, wormDrive, gearRegion, rotateRegion, overlayRegion;
 
     public OilDerrick(String name){
         super(name);
@@ -45,16 +41,19 @@ public class OilDerrick extends GenericCrafter implements GraphBlockBase{
     public void load(){
         super.load();
 
-        bottomRegion = fallback(name + "-bottom");
-        rotorRegion = fallback(name + "-rotor");
-        topRegion = fallback(name + "-top");
-        liquidRegion = fallback(name + "-liquid");
-    }
+        rotorRegion = atlas.find(name + "-rotor");
+        mbaseRegion = atlas.find(name + "-mbase");
+        gearRegion = atlas.find(name + "-gear");
 
-    /** 贴图缺失时回退到 error 贴图, 避免绘制/图标因 null 崩溃 (贴图补齐后自动使用真实贴图) */
-    protected TextureRegion fallback(String regionName){
-        TextureRegion r = atlas.find(regionName);
-        return r == null ? atlas.find("error") : r;
+        overlayRegion = atlas.find(name + "-overlay");
+        rotateRegion = atlas.find(name + "-moving");
+        wormDrive = atlas.find(name + "-rotate");
+
+        for(int i = 0; i < 2; i++){
+            bottomRegions[i] = atlas.find(name + "-bottom" + (i + 1));
+            topRegions[i] = atlas.find(name + "-top" + (i + 1));
+            liquidRegions[i] = atlas.find(name + "-liquid" + (i + 1));
+        }
     }
 
     @Override
@@ -90,6 +89,24 @@ public class OilDerrick extends GenericCrafter implements GraphBlockBase{
             gms = new GraphModules(this);
             graphs.injectGraphConnector(gms);
             gms.created();
+        }
+
+        /**
+         * 强制本方块即使在沙盒 / 无限资源规则下, 也必须真实消耗"水 + 沙子"才能产出石油.
+         *
+         * <p>{@code BuildingComp.updateConsumption()} 里有一条捷径:
+         * 当 {@code !block.hasConsumers || cheating()} 成立时, 直接把 efficiency 置为 1,
+         * 完全跳过 ConsumeItems / ConsumeLiquid 的检查. 沙盒(无限资源)模式下
+         * {@code cheating()} 恒为 true, 于是钻井不加水、不加沙子照样出油.</p>
+         *
+         * <p>这里返回 false, 让效率计算走正常消耗分支: 水按 tick 连续抽走、沙子按次消耗,
+         * 两者任一不足时 efficiency = 0 停止产出. 注意这<b>不影响</b>扭矩网络 ——
+         * 摩擦/阻力只看 {@code enabled} (见 GraphTorqueConsumeModule.updateExtension),
+         * 所以缺料时钻杆依旧转动, 只是"转而不工作".</p>
+         */
+        @Override
+        public boolean cheating(){
+            return false;
         }
 
         // v155.4: efficiency 是字段而非方法, 不能用 @Override 重写方法
@@ -173,22 +190,45 @@ public class OilDerrick extends GenericCrafter implements GraphBlockBase{
 
         @Override
         public void draw(){
-            // 扭矩网络的累计转角 (决定钻杆旋转)
-            float rot = torque().getRotation();
+            // 扭矩网络的累计转角 (决定传动杆/齿轮旋转)
+            float rot = torque() == null ? 0f : torque().getRotation();
+            // 防呆: 扭矩图异常时可能算出 NaN/Inf, 会让 Draw.rect 的旋转顶点失效, 导致整层贴图不渲染
+            if(!Float.isFinite(rot)) rot = 0f;
 
-            Draw.rect(bottomRegion, x, y, rotdeg());
+            float fixedRot = (rotdeg() + 90f) % 180f - 90f;
+
+            int variant = rotation % 2;
+
+            float deg = rotation == 0 || rotation == 3 ? rot : -rot;
+            float rev = rotation == 0 || rotation == 3 ? 24 : -24;
+
+            Point2 offset = Geometry.d4(rotation + 1);
+
+            Draw.rect(bottomRegions[variant], x, y);
 
             // 石油液位
             if(liquids.currentAmount() > 0.001f){
-                Drawf.liquid(liquidRegion, x, y, liquids.currentAmount() / liquidCapacity, liquids.current().color);
+                Drawf.liquid(liquidRegions[variant], x, y, liquids.currentAmount() / liquidCapacity, liquids.current().color);
             }
 
-            // 螺旋钻杆: 随扭矩旋转
-            Draw.rect(rotorRegion, x, y, rot);
+            // 底部转子
+            Draw.rect(rotorRegion, x + offset.x * 4f, y + offset.y * 4f, rev, 24, -deg / 2);
+            Draw.rect(rotorRegion, x - offset.x * 4f, y - offset.y * 4f, -rev, 24, deg / 2 + 90);
 
-            // 顶部井架: 随放置朝向
-            Draw.rect(topRegion, x, y, rotdeg());
+            // 主轴
+            Draw.rect(mbaseRegion, x, y, fixedRot);
 
+            UnityDrawf.drawRotRect(wormDrive, x, y, 24f, 3.5f, 3.5f, fixedRot, rot, rot + 180f);
+            UnityDrawf.drawRotRect(wormDrive, x, y, 24f, 3.5f, 3.5f, fixedRot, rot + 180f, rot + 360f);
+            UnityDrawf.drawRotRect(rotateRegion, x, y, 24f, 3.5f, 3.5f, fixedRot, rot, rot + 180f);
+
+            Draw.rect(overlayRegion, x, y, fixedRot);
+
+            // 齿轮
+            Draw.rect(gearRegion, x + offset.x * 4f, y + offset.y * 4f, -deg / 2);
+            Draw.rect(gearRegion, x - offset.x * 4f, y - offset.y * 4f, deg / 2);
+
+            Draw.rect(topRegions[variant], x, y);
             drawTeamTop();
         }
     }

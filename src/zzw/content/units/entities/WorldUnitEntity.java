@@ -112,6 +112,9 @@ public class WorldUnitEntity extends UnitEntity {
     /** 建造模式: 点击主核心按钮激活, 激活后才能对子世界建造/拆除 (边缘虚线框提示) */
     public transient boolean buildMode = false;
 
+    /** 当前正被子世界单位更新的主世界 (供子世界内建筑查询主世界地形, 如海军找水域生成; 无子世界更新时为 null) */
+    public static World mainWorld = null;
+
     /** 子世界平台宽 (世界像素, 渲染虚线框用) */
     public float platW() {
         return platW;
@@ -162,6 +165,8 @@ public class WorldUnitEntity extends UnitEntity {
         // ★ TimeReflect: 把 Time.runs 替换为单位自己的队列, 建筑物 Time.run 进入单位队列而非主世界
         TimeReflect.swapRuns(runs);
         World ow = Vars.world;
+        // 记录主世界引用 (子世界内建筑可通过 WorldUnitEntity.mainWorld 查询主世界地形)
+        mainWorld = ow;
         Vars.world = unitWorld;
 
         if (isPlayer()) {
@@ -219,6 +224,7 @@ public class WorldUnitEntity extends UnitEntity {
         // ★ TimeReflect: 恢复 Time.runs 为原始主世界队列
         TimeReflect.resetRuns();
         Vars.world = ow;
+        mainWorld = null;
     }
 
     // ===== setup / absorb (召唤初始化 + 吸收建筑到子世界) =====

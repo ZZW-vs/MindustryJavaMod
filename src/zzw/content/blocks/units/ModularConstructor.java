@@ -13,6 +13,7 @@ import arc.struct.*;
 import arc.util.*;
 import arc.util.io.*;
 import mindustry.*;
+import mindustry.core.World;
 import mindustry.entities.*;
 import mindustry.gen.*;
 import mindustry.graphics.*;
@@ -25,6 +26,7 @@ import mindustry.world.consumers.*;
 import mindustry.world.meta.Stat;
 import zzw.content.blocks.units.ModularConstructorModule.ModularConstructorModuleInterface;
 import zzw.content.blocks.units.ModularConstructorPart.ModularConstructorPartBuild;
+import zzw.content.units.entities.WorldUnitEntity;
 // 适配: 以下 unity.* import 已移除 (UnityPal 用 Color.valueOf 替代, 其余同包)
 // import unity.graphics.*;
 // import unity.world.blocks.units.ModularConstructorPart.*;
@@ -382,11 +384,28 @@ public class ModularConstructor extends Block{
                 float time = progressTime(plan);
                 if(progress >= time){
                     if(Units.canCreate(team, plan.unit) && consValid()){
-                        Unit unit = plan.unit.spawn(team, x, y);
-                        unit.rotation = 90f;
-                        // 适配 v155.4: cons.trigger() → consume()
-                        consume();
-                        progress = 0f;
+                        float sx = x, sy = y;
+                        boolean spawnable = true;
+
+                        // 海军单位必须生成在水域: 落在陆地上的海军无法移动 (表现为"无法生成")
+                        if(plan.unit.naval){
+                            Tile water = findNavalSpawn();
+                            if(water != null){
+                                sx = water.worldx();
+                                sy = water.worldy();
+                            }else{
+                                // 附近暂无可用水域, 暂缓生产, 待水域出现后再产出
+                                spawnable = false;
+                            }
+                        }
+
+                        if(spawnable){
+                            Unit unit = plan.unit.spawn(team, sx, sy);
+                            unit.rotation = 90f;
+                            // 适配 v155.4: cons.trigger() → consume()
+                            consume();
+                            progress = 0f;
+                        }
                     }
                 }else if(consValid()){
                     progress += Time.delta;
@@ -395,6 +414,34 @@ public class ModularConstructor extends Block{
             }else{
                 topOffset = Mathf.lerpDelta(topOffset, 0f, 0.1f);
             }
+        }
+
+        /**
+         * 为海军单位在主世界中寻找最近的可生成水域.
+         *
+         * <p>子世界内更新时 {@code Vars.world} 指向子世界, 需通过
+         * {@link WorldUnitEntity#mainWorld} 访问主世界地形.</p>
+         *
+         * @return 最近的水面方块, 未找到返回 null
+         */
+        private Tile findNavalSpawn(){
+            World world = WorldUnitEntity.mainWorld != null ? WorldUnitEntity.mainWorld : Vars.world;
+            int cx = tileX(), cy = tileY();
+            Tile best = null;
+            int bestDst = Integer.MAX_VALUE;
+            // 由近及远搜索 (半径 24 格), 取最近的可通行水面
+            for(int dx = -24; dx <= 24; dx++){
+                for(int dy = -24; dy <= 24; dy++){
+                    Tile t = world.tile(cx + dx, cy + dy);
+                    if(t == null || !t.floor().isLiquid) continue;
+                    int d = dx * dx + dy * dy;
+                    if(d < bestDst){
+                        bestDst = d;
+                        best = t;
+                    }
+                }
+            }
+            return best;
         }
 
         // 适配 v155.4: consValid() 不再是 Building 的方法 (已移除), 改为本地方法

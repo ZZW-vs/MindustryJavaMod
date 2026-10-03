@@ -33,6 +33,9 @@ public class TorqueGraph<T extends GraphTorque> extends BaseGraph<GraphTorqueMod
         float acceleration = lastInertia == 0f ? 0f : netForce / lastInertia;
         lastVelocity += acceleration * Time.delta;
         lastVelocity = Math.max(0f, lastVelocity);
+        // 防呆: 图合并瞬间可能产生 0/0 导致 NaN, 一旦 NaN 会永久污染转速
+        // (Math.max(0f, NaN) 仍是 NaN), 进而让传动杆等绘制整层失效
+        if(Float.isNaN(lastVelocity) || Float.isInfinite(lastVelocity)) lastVelocity = 0f;
     }
 
     @Override
@@ -57,7 +60,9 @@ public class TorqueGraph<T extends GraphTorque> extends BaseGraph<GraphTorqueMod
     void mergeStats(TorqueGraph<T> graph){
         float momentumA = lastVelocity * lastInertia;
         float mementumB = graph.lastVelocity * graph.lastInertia;
-        lastVelocity = (momentumA + mementumB) / (lastInertia + graph.lastInertia);
+        // 防呆: 两边转动惯量都为 0 时 0/0 会得到 NaN, 需要兜底为 0
+        float inertiaSum = lastInertia + graph.lastInertia;
+        lastVelocity = inertiaSum == 0f ? 0f : (momentumA + mementumB) / inertiaSum;
     }
 
     public void injectInertia(float iner){

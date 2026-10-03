@@ -32,6 +32,8 @@ public class GraphTorqueModule<T extends GraphTorque> extends GraphModule<T, Gra
         float rot = rots.get(index, 0f);
         rot += graph.lastVelocity;
         rot %= (360f * 24f);
+        // 防呆: 累计转角一旦被 NaN 污染就再也回不来, 这里兜底为 0
+        if(!Float.isFinite(rot)) rot = 0f;
         rots.put(index, rot);
     }
 

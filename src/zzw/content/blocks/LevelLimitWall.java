@@ -49,6 +49,17 @@ public class LevelLimitWall extends ExpLimitWall {
         damageReduction = new EField.EExpoZero(f -> {}, 0.1f, Mathf.pow(8f, 1f / maxLevel), true, null,
             v -> Strings.autoFixed(Mathf.roundPositive(v * 10000) / 100f, 2) + "%");
         super.init();
+
+        // ★ v159/160 渲染适配 (修复"升级后外观不变"):
+        // Wall 基类的 init() 会启用缓存绘制 (drawCached = true), 并且由于本类
+        // flashHit 默认 false, 它还会把 drawDynamic 置为 false。
+        // 这样渲染器只会走 WallBuild.drawCached() → super.draw() (即 Building.draw()),
+        // 只画一张基础贴图 region; 本类重写的 draw() (分级贴图/边缘/特效/护盾)
+        // 永远不会被调用 —— 于是等级涨了但样子一直不变。
+        // 这里关闭缓存绘制、开启动态绘制, 让每帧都调用 draw()。
+        // (ShieldWall 继承本类, 一并修复护盾墙的护盾与分级贴图显示)
+        drawCached = false;
+        drawDynamic = true;
     }
 
     @Override

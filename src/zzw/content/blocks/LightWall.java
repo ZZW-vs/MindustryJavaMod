@@ -35,6 +35,10 @@ public class LightWall extends Wall {
     @Override
     public void init() {
         super.init();
+        // ★ v159/160 渲染适配: Wall 基类 init() 在 flashHit=false 时会关闭动态绘制
+        // (drawDynamic = false), 使本类重写的 draw() (叠加光照槽) 永远不被调用。
+        // 这里重新打开动态绘制即可; 基础贴图仍由缓存绘制 (drawCached) 提供。
+        drawDynamic = true;
         // 整块受光槽, required=-1 (不需要光, 仅用于光穿过)
         acceptors.add(new LightAcceptorType() {{
             x = 0;
