@@ -1085,6 +1085,8 @@ public class Z_MonolithUnits{
                 }), 4.5f, 2.5f, 0.44f, UnityPal.monolithLight)
             );
             trailLength = 24;
+            // ★ 拖尾钉色兜底: 与 liminality 一致的浅蓝, 防止原版 drawTrail/死亡渐隐回退到队伍色 (黄色)
+            trailColor = UnityPal.monolithLight;
 
             // 步骤 3: 能量环武器 (内环 4 刺 + 内 2 段弧) + 环绕散射追踪弹
             weapons.add(new EnergyRingWeapon(){{
@@ -1174,13 +1176,14 @@ public class Z_MonolithUnits{
             outlineColor = UnityPal.darkOutline;
             // ★ v158 已移除单位弹药系统, PU132 ammoType = PowerAmmoType(1000) 删除
 
+            // ★ 引擎色统一为 liminality 的浅蓝 monolithLight (原为 monolith, 比基准更深)
             engine = new Engine.MultiEngine(
-                new Engine.MultiEngine.EngineHold(ringEngine(2.5f, 10f, 0f, UnityPal.monolith), -5f),
-                new Engine.MultiEngine.EngineHold(ringEngine(2.5f, 10f, 0f, UnityPal.monolith), 5f)
+                new Engine.MultiEngine.EngineHold(ringEngine(2.5f, 10f, 0f, UnityPal.monolithLight), -5f),
+                new Engine.MultiEngine.EngineHold(ringEngine(2.5f, 10f, 0f, UnityPal.monolithLight), 5f)
             ){{
                 offset = 10f;
                 size = 2.5f;
-                color = UnityPal.monolith;
+                color = UnityPal.monolithLight;
             }}.apply(this);
 
             trailType = unit -> new MultiTrail(MultiTrail.rot(unit),
@@ -1188,6 +1191,8 @@ public class Z_MonolithUnits{
                 new TrailHold(Trails.soul(MultiTrail.rot(unit), 24, unit.type.speed), 5f, 0f, 1f, UnityPal.monolithLight)
             );
             trailLength = 24;
+            // ★ 拖尾钉色兜底: 与 liminality 一致的浅蓝, 防止原版 drawTrail/死亡渐隐回退到队伍色 (黄色)
+            trailColor = UnityPal.monolithLight;
 
             // 顶部装饰贴图 (身体上方, 子弹层之下)
             decorations.add(new UnitDecalType(name + "-top", 0f, 0f, 0f, Layer.bullet - 0.02f, Color.white));
