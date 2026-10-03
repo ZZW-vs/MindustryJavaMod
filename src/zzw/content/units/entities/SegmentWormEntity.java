@@ -12,6 +12,8 @@ import arc.util.Time;
 import arc.util.Log;
 import arc.util.io.Reads;
 import arc.util.io.Writes;
+import mindustry.ai.UnitStance;
+import mindustry.ai.types.CommandAI;
 import mindustry.gen.Unit;
 import mindustry.gen.UnitEntity;
 import mindustry.entities.Effect;
@@ -385,6 +387,10 @@ public class SegmentWormEntity extends UnitEntity {
     /** 上上帧速度 (PU132 lastVelocityD, 用于 3 帧平均) */
     protected final Vec2 lastVelocityD = new Vec2();
 
+    /** ★ 已开启"追击目标"姿态的那个 CommandAI 实例
+     *  (记录实例而非 boolean: 玩家接管/退出单位时 CommandAI 会被换成新实例, 需要对新实例重新开启) */
+    protected mindustry.ai.types.CommandAI pursuitStanceApplied = null;
+
     @Override
     public void update() {
         // ★ 大招期间减速移动 (PU132 OppressionComp: speedMultiplier *= 0.075f)
@@ -412,6 +418,20 @@ public class SegmentWormEntity extends UnitEntity {
         invTime += Time.delta;
         immunity = Math.max(1f, immunity - (Time.delta / 2f));
         rogueDamageResist = Math.max(1f, rogueDamageResist - Time.delta);
+
+        // ★ 玩家队伍自动追击 (修复"索敌后只在原地面对目标却不动"):
+        //   v159 中 playerControllable + 玩家队伍 的单位用的是 CommandAI (不是 aiController 的 WormAI),
+        //   而 CommandAI 在"无命令但有索敌目标"时只走 faceTarget() 分支 → 只转向不移动。
+        //   vanilla 用 UnitStance.pursueTarget 姿态解决: 开了它, CommandAI 每帧都会
+        //   commandTarget(target) 把索敌目标设为命令坐标, 单位就会主动飞过去并攻击。
+        //   只设置一次, 之后交给玩家/游戏逻辑, 避免每帧覆盖玩家手动取消的姿态。
+        if (controller() instanceof CommandAI cmd && cmd != pursuitStanceApplied) {
+            if (!cmd.hasStance(UnitStance.pursueTarget)) {
+                cmd.setStance(UnitStance.pursueTarget);
+            }
+            // 记录实例: 之后交给玩家/游戏逻辑, 不再每帧覆盖玩家手动切换的姿态
+            pursuitStanceApplied = cmd;
+        }
 
         // ★ 待机静止: super.update() 后检查
         // ★ 关键修复: super.update() 前不清零 vel, 否则会抵消 AI 上一帧设置的速度

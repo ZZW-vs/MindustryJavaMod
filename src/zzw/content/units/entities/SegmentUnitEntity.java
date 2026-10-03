@@ -99,11 +99,25 @@ public class SegmentUnitEntity extends UnitEntity {
                         mount.shoot = true;
                         mount.rotate = true;
                     } else {
-                        // ★ 自动索敌: 搜索自己射程内的目标 (单位 + 建筑)
-                        // 之前只搜 Units.closestEnemy (只找单位), 导致段身不打建筑
-                        // 改用 Units.closestTarget (返回 Teamc, 包含单位+建筑)
-                        mindustry.gen.Teamc tgt = Units.closestTarget(team, x, y, weapon.range(),
-                            u -> !u.dead,
+                        // ★ 自动索敌: 以"头部"为中心搜索目标 (单位 + 建筑)
+                        //
+                        // ★ 修复 "每节上的武器经常不攻击" (核心原因):
+                        //   旧代码用 Units.closestTarget(team, x, y, weapon.range(), ...) —— 以段身
+                        //   自己为圆心、半径 = weapon.range()。但 arcnelidia 段身武器是炸弹
+                        //   (BombBulletType), 其 range 由 bullet.speed(=0.7) × lifetime(=30) 决定,
+                        //   再算上 drag 只有 ~11px (约 0.3 格)。也就是说段身必须"贴脸"才锁得到目标,
+                        //   于是几乎永远 mount.shoot=false → 不开火。
+                        //
+                        //   改为以头部位置为圆心、用头部索敌半径 (type.maxRange ≈ 210), 这样整条虫子
+                        //   的所有段身都能锁到"头部正在打的那个目标"并一起开火 (PU132 弹幕同步的泛化)。
+                        //
+                        //   ★ 目标过滤匹配武器的对空/对地能力: arcnelidia 炸弹只打地面 (collidesAir=false),
+                        //     若不过滤会朝空中目标空放炸弹 (炸弹对空无伤害)。
+                        boolean wAir = weapon.bullet != null && weapon.bullet.collidesAir;
+                        boolean wGround = weapon.bullet == null || weapon.bullet.collidesGround;
+                        float engageRange = Math.max(head.range(), weapon.range()) + hitSize;
+                        mindustry.gen.Teamc tgt = Units.closestTarget(team, head.x, head.y, engageRange,
+                            u -> !u.dead && u.checkTarget(wAir, wGround),
                             t -> true);
                         if (tgt != null) {
                             mount.aimX = tgt.getX();

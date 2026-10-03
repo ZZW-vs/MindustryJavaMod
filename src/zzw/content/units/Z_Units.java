@@ -252,7 +252,18 @@ public class Z_Units {
                     hitEffect = mindustry.content.Fx.flakExplosion;
                     shootEffect = mindustry.content.Fx.none;
                     smokeEffect = mindustry.content.Fx.none;
-                    collidesAir = false;
+                    // ★ 修复 "段身投弹打不到人":
+                    //   BombBulletType 默认 speed=0.7 / lifetime=30 / drag=0.05 (原版 Horizon 投弹),
+                    //   实际飞行距离仅 ~11px —— 段身等于"在自己身上引爆", 敌人根本吃不到伤害。
+                    //   这里给它真实的飞行距离 (4 × 60 ≈ 240px, 配合头部 210 的索敌半径),
+                    //   并开启与敌方单位的碰撞 (命中即爆), 让它成为真正的"投弹"而不是原地自爆。
+                    //   注: 保持 collidesTiles=false (炸弹越过地形飞行), 只撞地面敌人 (collidesAir=false)。
+                    speed = 4f;
+                    lifetime = 60f;
+                    drag = 0f;
+                    collides = true;         // 命中敌方单位即触发爆炸 (原 BombBulletType 为 false)
+                    collidesTiles = false;   // 不撞地形
+                    collidesAir = false;     // 只打地面
                     collidesGround = true;
                     splashDamage = 250f;  // 25 + 225
                     splashDamageRadius = 25f;
@@ -5328,6 +5339,11 @@ public class Z_Units {
             // 低空飞行单位
             hovering = true;
             lowAltitude = true;
+            // ★ 关闭单位物理碰撞 (MindustryX 160 的 PhysicsProcess):
+            //   terra 是贴地平台, isGrounded()=true → 碰撞层 layerGround, 与陆地单位同层;
+            //   子世界工厂产出的陆地单位正好生成在平台上 → 两个碰撞箱互相挤开导致 terra 乱窜。
+            //   平台本就不该被单位挤动, 关掉物理体后不再参与任何单位碰撞 (空军/海军本就不同层, 无影响)。
+            physics = false;
             // ★ 影子偏移修复: 影子偏移量 = shadowTX * clamp(elevation, shadowElevation, 1f),
             //   8f 会导致 clamp 结果为 8 → 影子偏移 -96/-104 像素飞离本体;
             //   低空单位用 0.1f 让影子贴近本体
