@@ -4,7 +4,10 @@ import arc.math.Mathf;
 import arc.util.Time;
 import mindustry.content.StatusEffects;
 import mindustry.entities.Damage;
+import mindustry.world.meta.Stat;
 import zzw.content.mechanics.torque.blocks.GraphBlock;
+
+import static arc.Core.bundle;
 
 /**
  * 铜镍合金墙/热墙 (PU132 unity.world.blocks.defense.HeatWall 移植)
@@ -35,13 +38,56 @@ public class HeatWall extends GraphBlock {
     /** 伤害强度上限 (0=不造成伤害, 仅状态) */
     protected float maxDamage;
 
+    // ===== 温度限伤机制 (铜镍合金墙专属) =====
+    /** 常温下的单次承受伤害上限 (<=0 表示不启用该机制) */
+    protected float damageLimitBase = 0f;
+    /** 常温 (K) */
+    protected float ambientTemp = 293.15f;
+    /** 高于常温: 每升高 hotLimitSpan 摄氏度, 限伤下降 hotLimitStep */
+    protected float hotLimitSpan = 100f, hotLimitStep = 5f;
+    /** 低于常温: 每降低 coldLimitSpan 摄氏度, 限伤上升 coldLimitStep */
+    protected float coldLimitSpan = 50f, coldLimitStep = 5f;
+
     public HeatWall(String name) {
         super(name);
         update = true;
         solid = true;
     }
 
+    @Override
+    public void setStats() {
+        super.setStats();
+        // 温度限伤: 显示常温基准限伤与随温度变化的规则
+        if (damageLimitBase > 0f) {
+            stats.add(Stat.abilities, "@", bundle.format("stat.unity.tempdamagelimit", damageLimitBase));
+            stats.add(Stat.abilities, "@", bundle.format("stat.unity.tempdamagelimit.rule", hotLimitSpan, hotLimitStep, coldLimitSpan, coldLimitStep));
+        }
+    }
+
     public class HeatWallBuild extends GraphBuild {
+        /** 按当前温度换算的限伤值 (常温 damageLimitBase, 越高越低, 越低越高) */
+        public float damageLimit() {
+            var h = heat();
+            float tC = (h == null ? ambientTemp : h.getTemp()) - 273.15f;
+            float delta = tC - (ambientTemp - 273.15f);
+            float cap = damageLimitBase;
+            if (delta > 0f) {
+                cap -= hotLimitStep * (delta / hotLimitSpan);
+            } else if (delta < 0f) {
+                cap += coldLimitStep * (-delta / coldLimitSpan);
+            }
+            return Math.max(cap, 0f);
+        }
+
+        @Override
+        public float handleDamage(float amount) {
+            // 温度限伤: 单次伤害超过当前上限则截断 (温度越高上限越低)
+            if (damageLimitBase > 0f) {
+                return super.handleDamage(Math.min(amount, damageLimit()));
+            }
+            return super.handleDamage(amount);
+        }
+
         @Override
         public void updatePost() {
             // 按间隔判定 (timerDump = 计时器槽位索引, statusTime = 间隔; v160 语义一致)

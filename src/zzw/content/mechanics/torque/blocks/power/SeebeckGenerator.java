@@ -29,10 +29,10 @@ import static arc.Core.*;
  * 参数取自 参考/PU160反编译/.../YoungchaBlocks.java L540-551。
  */
 public class SeebeckGenerator extends GraphBlock{
-    /** 最大输出功率 */
-    public float maxPower = 10f;
+    /** 最大输出功率 (每 tick) */
+    public float maxPower = 30f;
     /** 塞贝克强度 (每单位温差的发电量) */
-    public float seebeckStrength = 2f;
+    public float seebeckStrength = 5f;
 
     final TextureRegion[] rotations = new TextureRegion[4];
     TextureRegion heatLeft, heatRight, heatCenter;
@@ -65,7 +65,8 @@ public class SeebeckGenerator extends GraphBlock{
     public void setStats(){
         super.setStats();
 
-        // ★ 对齐原版: 额外显示"塞贝克强度"(每单位温差发电量 * 60 换算为每秒)
+        // ★ 信息面板写清楚发电量: 最大发电量 (每 tick * 60 = 每秒) 与 每单位温差发电量
+        stats.add(Stat.basePowerGeneration, "@", bundle.format("stat.unity.maxpoweroutput", maxPower * 60f));
         stats.add(Stat.basePowerGeneration, bundle.get("stat.unity-seebeckStrength"), seebeckStrength * 60f);
     }
 

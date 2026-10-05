@@ -290,6 +290,13 @@
 
 ## 更新日志
 
+- 平衡与功能调整（本轮批量）：
+  - 传送带吞吐：steel/dirium/mechanical 传送带速度分别调整为 15 / 24 / 15 物品每秒（面板同步显示），mechanical 血量 320
+  - 反应堆与发电：uranium-reactor 电力输出 120000/秒、耗电 1800/秒、启动 18 秒；seebeck-generator 发电量提高并在信息面板写明具体发电量；absorber 范围 +5 格（90）、最高 82/秒；solar-collector 升温加快
+  - 加热/制冷：infi-heater 升温更快；infi-torque 支持点击输入目标转速（留空则持续加速）；新增制冷机 cooling-heater（消耗冷冻液制冷，最低 -200℃）
+  - 墙体：补齐 ustone/dense/steel/dirium/shielded/metaglass/electrophobic 系列血量；铜镍合金墙（cupronickel-wall / -large）新增温度限伤机制——常温限伤 100，每高于常温 100℃ 降 5，每低于常温 50℃ 加 5
+  - 容器汉化：exp-tank 为「exp.容器」，exp-chest 为「exp.储罐」
+  - 模块化构造器配方重排：原版 T3 单位归入 1 级，项目 T3 单位保留 2 级并新增 Scar 系列 T1 hovos，arcnelidia / toxobyte 移入 3 级；补全 Scar 单位升级链（hovos→ryzer→zena→sundown→rex 依次接入原版四重构器，rex→excelsus 接入 recursive-reconstructor 的 T6 档）
 - 螺旋石油钻井 (oil-derrick) 对齐原版 oil-extractor（`Fracker`），回归"抽油机"形态：
   - `result=Liquids.oil`、`attribute=Attribute.oil`、`baseEfficiency=0`：**必须建在油田上**，产量由"油田品质 × 扭矩转速"决定（转速为平方关系）
   - 消耗 10 水/秒 + 2 沙/秒（水由 `consumeLiquid` 连续抽走；沙由 `itemUseTime=30` 每 0.5 秒消耗 1 个）；缺料时依旧转动，只是不出油

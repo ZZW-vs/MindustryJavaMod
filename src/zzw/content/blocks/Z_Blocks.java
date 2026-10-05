@@ -33,6 +33,7 @@ import zzw.content.exp.UnityFx;
 import zzw.content.mechanics.torque.graphs.GraphHeat;
 import zzw.content.units.Z_KoruhUnits;
 import zzw.content.units.Z_MonolithUnits;
+import zzw.content.units.Z_ScarUnits;
 import zzw.content.units.Z_Units;
 
 import arc.Events;
@@ -246,14 +247,14 @@ public class Z_Blocks {
         stoneWall = new LimitWall("ustone-wall") {{
             requirements(Category.defense, ItemStack.with(Z_Items.stone, 6));
             maxDamage = 40f;
-            health = 200;
+            health = 220;
         }};
 
         // dense-wall: 致密合金墙 (LimitWall maxDamage=32)
         denseWall = new LimitWall("dense-wall") {{
             requirements(Category.defense, ItemStack.with(Z_Items.denseAlloy, 6));
             maxDamage = 32f;
-            health = 560;
+            health = 660;
         }};
 
         // steel-wall: 钢墙 (LevelLimitWall 经验等级墙)
@@ -261,7 +262,7 @@ public class Z_Blocks {
         steelWall = new LevelLimitWall("steel-wall") {{
             requirements(Category.defense, ItemStack.with(Z_Items.steel, 6));
             maxDamage = 24f;
-            health = 810;
+            health = 1210;
             maxLevel = 6;
             expFields = new EField[]{
                 new EField.ERational(v -> maxDamage = v, 48f, 24f, -3f, Stat.abilities, v -> arc.Core.bundle.format("stat.unity.maxdamage", v)).formatAll(false)
@@ -270,7 +271,7 @@ public class Z_Blocks {
         steelWallLarge = new LevelLimitWall("steel-wall-large") {{
             requirements(Category.defense, ItemStack.with(Z_Items.steel, 24));
             maxDamage = 48f;
-            health = 3240;
+            health = 4840;
             size = 2;
             maxLevel = 12;
             expFields = new EField[]{
@@ -284,7 +285,7 @@ public class Z_Blocks {
             requirements(Category.defense, ItemStack.with(Z_Items.dirium, 6));
             maxDamage = 76f;
             blinkFrame = 30f;
-            health = 760;
+            health = 1360;
             updateEffect = UnityFx.sparkle;
             maxLevel = 6;
             expFields = new EField[]{
@@ -296,7 +297,7 @@ public class Z_Blocks {
             requirements(Category.defense, ItemStack.with(Z_Items.dirium, 24));
             maxDamage = 152f;
             blinkFrame = 30f;
-            health = 3040;
+            health = 5440;
             size = 2;
             updateEffect = UnityFx.sparkle;
             maxLevel = 12;
@@ -311,7 +312,7 @@ public class Z_Blocks {
         // 贴图: shielded-wall.png + shielded-wall-top.png (PU132/PU_V8 原版)
         shieldedWall = new ShieldWall("shielded-wall") {{
             requirements(Category.defense, ItemStack.with(Z_Items.dirium, 8, Z_Items.steel, 6, Items.silicon, 4));
-            health = 500;
+            health = 750;
             shieldHealth = 500;
             maxDamage = 50f;
             maxLevel = 10;
@@ -338,18 +339,18 @@ public class Z_Blocks {
         // metaglass-wall: 玻璃墙 (LightWall, 光可穿透并按 suppression 衰减)
         metaglassWall = new LightWall("metaglass-wall") {{
             requirements(Category.defense, ItemStack.with(Items.lead, 6, Items.metaglass, 6));
-            health = 350;
+            health = 470;
         }};
         metaglassWallLarge = new LightWall("metaglass-wall-large") {{
             requirements(Category.defense, ItemStack.with(Items.lead, 24, Items.metaglass, 24));
-            health = 1400;
+            health = 1880;
             size = 2;
         }};
 
         // electrophobic-wall: 单极子墙 (PowerWall, 吸收能量弹转化为电力, 过载扣血)
         electrophobicWall = new PowerWall("electrophobic-wall") {{
             requirements(Category.defense, ItemStack.with(Z_Items.monolite, 4, Items.silicon, 2));
-            health = 400;
+            health = 600;
 
             energyMultiplier.put(LightningBulletType.class, 15f);
             energyMultiplier.put(LaserBulletType.class, 9f);
@@ -358,7 +359,7 @@ public class Z_Blocks {
         }};
         electrophobicWallLarge = new PowerWall("electrophobic-wall-large") {{
             requirements(Category.defense, ItemStack.with(Z_Items.monolite, 16, Items.silicon, 8));
-            health = 1600;
+            health = 2400;
             size = 2;
             powerProduction = 4f;
             damageThreshold = 300f;
@@ -373,12 +374,16 @@ public class Z_Blocks {
         cupronickelWall = new HeatWall("cupronickel-wall") {{
             requirements(Category.defense, ItemStack.with(Z_Items.cupronickel, 8, Z_Items.nickel, 5));
             health = 500;
+            // 温度限伤: 常温 100, 高于常温每 +100℃ 上限 -5, 低于常温每 -50℃ 上限 +5
+            damageLimitBase = 100f;
             addGraph(new GraphHeat(50f, 0.5f, 0.03f).setAccept(1, 1, 1, 1));
         }};
         cupronickelWallLarge = new HeatWall("cupronickel-wall-large") {{
             requirements(Category.defense, ItemStack.with(Z_Items.cupronickel, 36, Z_Items.nickel, 20));
             size = 2;
             health = 2000;
+            // 温度限伤 (同 cupronickel-wall)
+            damageLimitBase = 100f;
             minStatusRadius = 8f;
             statusRadiusMul = 40f;
             minStatusDuration = 5f;
@@ -466,10 +471,7 @@ public class Z_Blocks {
             moduleBlock = advanceConstructorModule;
 
             plans.addAll(
-                // 1级: 2分钟建造时间
-                new ModularConstructorPlan(Z_Units.arcnelidia, 120f, 0,
-                    ItemStack.with(Items.copper, 180, Items.lead, 120, Items.silicon, 100, Items.surgeAlloy, 20)),
-                
+                // 1级: 2分钟建造时间 (★ 原版 T3 单位全部归入等级 1)
                 new ModularConstructorPlan(UnitTypes.fortress, 120f, 0,
                     ItemStack.with(Items.copper, 200, Items.lead, 100, Items.silicon, 250, Items.metaglass, 50, Items.graphite, 100)),
                 
@@ -479,7 +481,7 @@ public class Z_Blocks {
                 new ModularConstructorPlan(UnitTypes.spiroct, 120f, 0,
                     ItemStack.with(Items.copper, 200, Items.lead, 100, Items.silicon, 250, Items.metaglass, 50, Items.graphite, 100)),
 
-                // 2级: 5分钟建造时间
+                // 2级: 5分钟建造时间 (★ 项目 T3 单位保留在此级; 新增 Scar 系列 T1 hovos)
                 new ModularConstructorPlan(UnitTypes.zenith, 300f, 1,
                     ItemStack.with(Items.copper, 180, Items.lead, 80, Items.silicon, 240, Items.metaglass, 60, Items.graphite, 50)),
                 
@@ -495,8 +497,14 @@ public class Z_Blocks {
                 new ModularConstructorPlan(Z_MonolithUnits.pilaster, 300f, 1,
                     ItemStack.with(Items.copper, 100, Items.silicon, 280, Items.titanium, 200, Items.metaglass, 80, Items.graphite, 120)),
 
+                // Scar 系列 T1 (hovos): 构造器生产起点, 后续在重构器链上升级
+                new ModularConstructorPlan(Z_ScarUnits.hovos, 300f, 1,
+                    ItemStack.with(Items.copper, 100, Items.lead, 80, Items.silicon, 120, Items.graphite, 60, Items.titanium, 40)),
 
-                // 3级: 8分钟建造时间
+                // 3级: 8分钟建造时间 (★ arcnelidia / toxobyte 移入此级)
+                new ModularConstructorPlan(Z_Units.arcnelidia, 480f, 2,
+                    ItemStack.with(Items.copper, 180, Items.lead, 120, Items.silicon, 100, Items.surgeAlloy, 20)),
+
                 new ModularConstructorPlan(Z_Units.toxoswarmer, 480f, 2,
                     ItemStack.with(Items.copper, 350, Items.silicon, 500, Items.metaglass, 110, Z_Items.uranium, 80, Items.plastanium, 80, Items.phaseFabric, 20, Items.thorium, 120)),
                 
@@ -552,7 +560,10 @@ public class Z_Blocks {
 
                 new mindustry.type.UnitType[]{mindustry.content.UnitTypes.eclipse, Z_Units.mantle},
 
-                new mindustry.type.UnitType[]{mindustry.content.UnitTypes.oct, Z_Units.sedec}
+                new mindustry.type.UnitType[]{mindustry.content.UnitTypes.oct, Z_Units.sedec},
+
+                // ★ Scar 系列 T5 → T6: rex 升华为 excelsus
+                new mindustry.type.UnitType[]{Z_ScarUnits.rex, Z_ScarUnits.excelsus}
             );
             // T6 → T7 (PU132 原版: citadel→empire, araneidae→theraphosidae, colossus→bastion;
             //   rex/excelsus 等未移植的单位暂缺, 已移植的 T6→T7 全部写入)

@@ -54,6 +54,8 @@ public class RicochetBulletType extends BasicBulletType{
 
     @Override
     public void hitEntity(Bullet b, Hitboxc other, float initialHealth){
+        // ★ 修复: 先调用父类结算伤害/击退/状态, 否则本类接管后弹射弹对单位不造成任何伤害.
+        super.hitEntity(b, other, initialHealth);
         ricochet(b, (Position)other);
     }
 

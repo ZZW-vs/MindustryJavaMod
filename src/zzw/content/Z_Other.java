@@ -28,7 +28,7 @@ public class Z_Other {
             // 基础属性
             reload = 48f ; // 重装时间
             shake = 3f ; // 屏幕震动
-            range = 95f ; // 射程 (与雷光相近)
+            range = 104f ; // 射程 (与雷光相近)
             recoil = 3f ; // 后坐力
             shootCone = 30 ; // 射击锥角
             size = 4 ; // 占用格子大小
@@ -102,7 +102,7 @@ public class Z_Other {
             // 基础属性
             reload = 52f ; // 重装时间
             shake = 8f ; // 屏幕震动
-            range = 145f ; // 射程 (比雷光远)
+            range = 144f ; // 射程 (比雷光远)
             recoil = 9f ; // 后坐力
             shootCone = 30 ; // 射击锥角
             size = 5 ; // 占用格子大小
@@ -176,7 +176,7 @@ public class Z_Other {
             // 基础属性
             reload = 52f ; // 重装时间
             shake = 4f ; // 屏幕震动
-            range = 120f ; // 射程
+            range = 128f ; // 射程
             recoil = 4f ; // 后坐力
             shootCone = 30 ; // 射击锥角
             size = 5 ; // 占用格子大小
@@ -250,7 +250,7 @@ public class Z_Other {
             // 基础属性
             reload = 55f ; // 重装时间
             shake = 7f ; // 屏幕震动
-            range = 138f ; // 射程 (比破空更远)
+            range = 156f ; // 射程
             recoil = 7f ; // 后坐力
             shootCone = 30 ; // 射击锥角
             size = 6 ; // 占用格子大小

@@ -4,7 +4,6 @@ import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
-import arc.math.geom.Vec2;
 import arc.util.Tmp;
 import mindustry.entities.bullet.BulletType;
 import mindustry.gen.Bullet;
@@ -61,14 +60,30 @@ public class GeyserLaserBulletType extends ExpLaserBulletType {
         // 调用 ExpLaserBulletType.init 使用动态长度 + 伤害增量
         super.init(b);
 
-        // ★ 激光末端位置 = b + trns(rotation, 实际长度)
-        // 使用 b.fdata (collideLaser 设置的实际碰撞长度)
-        float actualLength = b.fdata > 0 ? b.fdata : getLength(b);
-        Vec2 dest = new Vec2().trns(b.rotation(), actualLength).add(b.x, b.y);
+        // ★ 修复"激光只能射到射程最远处": 原先直接用 b.fdata 作为激光末端,
+        //   但本类 pierceCap = -1, Damage.collideLaser 会把 fdata 设为完整激光长度,
+        //   导致喷泉 geyser 永远生成在射程最远处, 射程内的目标打不到.
+        //   这里优先使用炮台传入的瞄准点 (b.aimX / b.aimY, 由 OmniLiquidTurret 设置),
+        //   没有瞄准点时回退到碰撞长度.
+        float destX, destY;
+        if (b.aimX != -1f || b.aimY != -1f) {
+            destX = b.aimX;
+            destY = b.aimY;
+        } else {
+            float actualLength = b.fdata > 0 ? b.fdata : getLength(b);
+            destX = b.x + arc.math.Angles.trnsx(b.rotation(), actualLength);
+            destY = b.y + arc.math.Angles.trnsy(b.rotation(), actualLength);
+        }
+
+        // 让激光朝向并延伸到目标点 (长度不超过最大长度)
+        if (destX != b.x || destY != b.y) {
+            b.rotation(b.angleTo(destX, destY));
+            b.fdata = Math.min(b.dst(destX, destY), getLength(b));
+        }
 
         // 在目标点生成 geyser 子弹 (传入液体作为 Bullet.data)
         if (geyser != null) {
-            geyser.create(b.owner, b.team, dest.x, dest.y, b.rotation(), -1f, 1f, 1f, l);
+            geyser.create(b.owner, b.team, destX, destY, b.rotation(), -1f, 1f, 1f, l);
         }
     }
 

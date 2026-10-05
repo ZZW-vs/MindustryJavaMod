@@ -14,6 +14,7 @@ import zzw.content.blocks.modular.PartStat;
 import zzw.content.blocks.modular.PartStatType;
 import zzw.content.blocks.modular.PartType;
 import zzw.content.blocks.power.CombustionHeater;
+import zzw.content.blocks.power.CoolingHeater;
 import zzw.content.blocks.power.HeatPipe;
 import zzw.content.blocks.power.HeatSource;
 import zzw.content.blocks.power.SolarCollector;
@@ -35,6 +36,7 @@ import zzw.content.mechanics.torque.blocks.power.ElectricMotor;
 import zzw.content.mechanics.torque.blocks.power.FlyWheel;
 import zzw.content.mechanics.torque.blocks.power.HandCrank;
 import zzw.content.mechanics.torque.blocks.power.HeatRadiator;
+import zzw.content.mechanics.torque.blocks.power.InfiTorque;
 import zzw.content.mechanics.torque.blocks.power.SeebeckGenerator;
 import zzw.content.mechanics.torque.blocks.power.SteamPiston;
 import zzw.content.mechanics.torque.blocks.power.TorqueGenerator;
@@ -79,7 +81,7 @@ public class Z_Torque{
     public static WindTurbine windTurbine;
     public static WaterTurbine waterTurbine;
     public static ElectricMotor electricMotor;
-    public static TorqueGenerator infiTorque;
+    public static InfiTorque infiTorque;
 
     // ===== PU160 蒸汽动力 (蒸汽活塞 ↔ 飞轮) =====
     /** 飞轮: 高惯量扭矩节点, 由蒸汽活塞推动 */
@@ -104,6 +106,8 @@ public class Z_Torque{
     public static ThermalHeater thermalHeater;
     /** 燃烧加热器: 焚烧可燃物产热 */
     public static CombustionHeater combustionHeater;
+    /** 制冷机: 消耗冷冻液主动降温 (最低 -200℃) */
+    public static CoolingHeater coolingHeater;
     /** 太阳能集热器: 配合反射镜聚焦产热 */
     public static SolarCollector solarCollector;
     /** 太阳反射镜: 为集热器聚焦光线 */
@@ -326,6 +330,8 @@ public class Z_Torque{
         infiHeater = new HeatSource("infi-heater"){{
             requirements(Category.power, BuildVisibility.sandboxOnly, with());
             health = 200;
+            // 升温更快: mulCoeff 0.5 → 5
+            mulCoeff = 5f;
             addGraph(new GraphHeat(1000f, 1f, 0f).setAccept(1, 1, 1, 1));
         }};
 
@@ -338,7 +344,7 @@ public class Z_Torque{
         }};
 
         // infi-torque (PU_V8 L3148): sandbox, GraphTorqueGenerate(0.001f, 1f, 999999f, 9999f) accept(1,1,1,1)
-        infiTorque = new TorqueGenerator("infi-torque"){{
+        infiTorque = new InfiTorque("infi-torque"){{
             requirements(Category.power, BuildVisibility.sandboxOnly, with());
             health = 200;
             preserveDraw = true;
@@ -387,15 +393,23 @@ public class Z_Torque{
             addGraph(new GraphHeat(40f, 0.6f, 0.004f).setAccept(1, 1, 0, 0, 0, 0, 0, 0));
         }};
 
+        // cooling-heater: 制冷机 (照抄燃烧加热器, 消耗冷冻液把热网降到 -200℃)
+        coolingHeater = new CoolingHeater("cooling-heater"){{
+            requirements(Category.power, with(Items.copper, 100, Z_Items.nickel, 70, Items.graphite, 40, Items.titanium, 80));
+            size = 2;
+            health = 550;
+            liquidCapacity = 30f;
+            addGraph(new GraphHeat(40f, 0.6f, 0.004f).setAccept(1, 1, 0, 0, 0, 0, 0, 0));
+        }};
+
         // solar-collector: 太阳能集热器, GraphHeat(60f, 1f, 0.02f) accept(8向仅上)
         solarCollector = new SolarCollector("solar-collector"){{
             requirements(Category.power, with(Z_Items.nickel, 80, Items.titanium, 50, Items.lead, 30));
             size = 3;
             health = 1500;
             maxTemp = 800f;
-            // ★ 0.03 → 0.1: PU132 原版升温过慢 (几面反射镜对准仍需数秒升几度),
-            //   同等反射镜数量下升温速度提升约 3 倍
-            mulCoeff = 0.1f;
+            // ★ 0.03 → 0.1 → 0.15: PU132 原版升温过慢, 再次调快集热器升温速度
+            mulCoeff = 0.15f;
             addGraph(new GraphHeat(60f, 1f, 0.02f).setAccept(0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0));
         }};
 

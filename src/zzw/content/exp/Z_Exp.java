@@ -179,18 +179,22 @@ public class Z_Exp {
         }};
 
         // 经验反应冲击堆发电机 (PU132 UnityBlocks L1766-1781, KoruhReactor)
-        // 消耗铀x2 + 水 + 电20 启动, 产电150; 维持反应持续消耗经验(expUse=2/次)
-        // 经验不足时受损伤, 摧毁时大量喷出经验球 (KoruhReactorBuild 内置逻辑)
-        uraniumReactor = new KoruhReactor("uranium-reactor"){{
-            requirements(Category.power, ItemStack.with(Items.plastanium, 80, Items.surgeAlloy, 100, Items.lead, 150, Z_Items.steel, 200));
-            size = 3;
-            itemDuration = 200f;
-            consumeItem(Z_Items.uranium, 2);
-            consumeLiquid(mindustry.content.Liquids.water, 0.7f);
-            consumePower(20f);
-            itemCapacity = 20;
-            powerProduction = 150f;
-            health = 1000;
+            // 基础电力输出 120000/秒 (面板), 消耗电力 1800/秒, 启动时间 18 秒
+            // 维持反应持续消耗经验(expUse=2/次), 经验不足时受损伤, 摧毁时大量喷出经验球
+            uraniumReactor = new KoruhReactor("uranium-reactor"){{
+                requirements(Category.power, ItemStack.with(Items.plastanium, 80, Items.surgeAlloy, 100, Items.lead, 150, Z_Items.steel, 200));
+                size = 3;
+                itemDuration = 200f;
+                consumeItem(Z_Items.uranium, 2);
+                consumeLiquid(mindustry.content.Liquids.water, 0.7f);
+                // 消耗 1800 电力/秒 = 30/tick
+                consumePower(30f);
+                itemCapacity = 20;
+                // 面板显示 120000 电力/秒 = 内部 2000/tick
+                powerProduction = 2000f;
+                // 启动 (升温) 时间 18 秒: warmupSpeed = -ln(0.001)/(18*60) ≈ 0.0064
+                warmupSpeed = 0.0064f;
+                health = 1000;
             // PU132 plasma1/plasma2 (v132 ImpactReactor 字段) → v155.4 移入 DrawPlasma drawer
             drawer = new mindustry.world.draw.DrawMulti(
                 new mindustry.world.draw.DrawRegion("-bottom"),
@@ -371,7 +375,7 @@ public class Z_Exp {
             shootSound = V7Sounds.laser;
 
             powerUse = 7f;
-            shootType = new ExpLaserBulletType(140f, 20f){{
+            shootType = new ExpLaserBulletType(140f, 32f){{
                 colors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser.cpy().a(0.4f), mindustry.graphics.Pal.lancerLaser, arc.graphics.Color.white};
                 hitEffect = mindustry.content.Fx.hitLancer;
                 hitSize = 4;
@@ -416,7 +420,7 @@ public class Z_Exp {
             shootSound = V7Sounds.laser;
 
             // PU132 UnityBullets.shardLaser: 激光 + 1 发激光碎片
-            shootType = new ExpLaserBulletType(150f, 30f){{
+            shootType = new ExpLaserBulletType(150f, 40f){{
                 colors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser.cpy().a(0.4f), mindustry.graphics.Pal.lancerLaser, arc.graphics.Color.white};
                 hitEffect = mindustry.content.Fx.hitLancer;
                 hitSize = 4;
@@ -444,7 +448,7 @@ public class Z_Exp {
 
         frostLaserTurret = new ExpLiquidTurret("frost-laser-turret"){{
             // PU132 UnityBullets.frostLaser: 命中后生成冻结圈 (freezePos)
-            ammo(mindustry.content.Liquids.cryofluid, new ExpLaserBulletType(170f, 130f){
+            ammo(mindustry.content.Liquids.cryofluid, new ExpLaserBulletType(170f, 130){
                 {
                     colors = new arc.graphics.Color[]{mindustry.graphics.Pal.lancerLaser.cpy().a(0.4f), mindustry.graphics.Pal.lancerLaser, arc.graphics.Color.white};
                     hitEffect = mindustry.content.Fx.hitLancer;
@@ -522,7 +526,7 @@ public class Z_Exp {
             toColor = Pal.place;
 
             // PU132 UnityBullets.fractalLaser: 裂缝激光 + 命中生成扭曲力场
-            shootType = new ExpLaserFieldBulletType(170f, 130f){{
+            shootType = new ExpLaserFieldBulletType(170f, 164f){{
                 colors = new arc.graphics.Color[]{Pal.lancerLaser.cpy().lerp(Pal.place, 0.5f).a(0.4f), Pal.lancerLaser.cpy().lerp(Pal.place, 0.5f), arc.graphics.Color.white};
                 hitEffect = mindustry.content.Fx.hitLaserBlast;
                 hitSize = 6;
@@ -583,7 +587,7 @@ public class Z_Exp {
             shootSound = zzw.content.Z_Sounds.singularityShoot;
 
             // PU132 UnityBullets.branchLaser: 激光 + 3 发分裂碎片
-            shootType = new ExpLaserBulletType(140f, 20f){{
+            shootType = new ExpLaserBulletType(140f, 76f){{
                 colors = new Color[]{
                         Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.5f).a(0.4f),
                         Pal.lancerLaser.cpy().lerp(Pal.sapBullet, 0.5f),

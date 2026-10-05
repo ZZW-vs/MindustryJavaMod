@@ -46,8 +46,9 @@ public class Z_Distribution {
                 Z_Items.stone, 1, Z_Items.denseAlloy, 1, Z_Items.steel, 1
             ));
             health = 140;
-            speed = 0.1f;
-            displayedSpeed = 12.5f;
+            // 实际运输速度 = speed * 60 / itemSpace(0.4) = speed * 150 物品/秒
+            speed = 0.1f;          // 0.1 * 150 = 15 物品/秒
+            displayedSpeed = 15f;
             drawMultiplier = 1.9f;
         }};
 
@@ -57,9 +58,10 @@ public class Z_Distribution {
             requirements(Category.distribution, ItemStack.with(
                 Items.copper, 3, Z_Items.nickel, 2
             ));
-            health = 250;
-            speed = 0.1f;
-            displayedSpeed = 10f;
+            health = 320;
+            // 实际运输速度 = speed * 150 物品/秒
+            speed = 0.1f;          // 0.1 * 150 = 15 物品/秒
+            displayedSpeed = 15f;
         }};
 
         // ===== dirium-conveyor 迪里姆合金传送带 (PU_V8 L1694-1702) =====
@@ -71,8 +73,9 @@ public class Z_Distribution {
                 Z_Items.steel, 1, Items.phaseFabric, 1, Z_Items.dirium, 1
             ));
             health = 150;
-            speed = 0.16f;
-            displayedSpeed = 20f;
+            // 实际运输速度 = speed * 150 物品/秒
+            speed = 0.16f;         // 0.16 * 150 = 24 物品/秒
+            displayedSpeed = 24f;
             drawMultiplier = 1.3f;
 
             draw = new DrawOver();

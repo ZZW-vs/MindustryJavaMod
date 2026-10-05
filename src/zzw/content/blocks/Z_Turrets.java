@@ -323,7 +323,7 @@ public class Z_Turrets {
             coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);  // 145%
             // ★ Massive 子弹 (基于 v155.4 Spectre 内联 standardDenseBig 等的属性 + PU_V8 Massive 倍率)
             // ★ 已恢复 PU 原版伤害 (去掉之前额外加的 +40 偏移)
-            ammo(Items.graphite, new BasicBulletType(7.5f * 1.3f, 50f * 1.8f) {{
+            ammo(Items.graphite, new BasicBulletType(7.5f * 1.3f, 116) {{
                 // standardDenseMassive (石墨弹)
                 lifetime = 40f * 1.1f;
                 // ★ 用户调整: 子弹整体尺寸稍微加大 (×1.15)
@@ -337,7 +337,7 @@ public class Z_Turrets {
                 hitEffect = despawnEffect = Fx.hitBulletColor;
                 hitColor = backColor = trailColor = Pal.graphiteAmmoBack;
                 frontColor = Pal.graphiteAmmoFront;
-            }}, Items.silicon, new BasicBulletType(7.5f * 1.3f, 50f * 1.6f) {{
+            }}, Items.silicon, new BasicBulletType(7.5f * 1.3f, 100) {{
                 // standardHomingMassive (硅弹, 追踪型)
                 lifetime = 40f * 1.1f;
                 width = 15f * 1.21f * 1.15f;
@@ -351,7 +351,7 @@ public class Z_Turrets {
                 hitEffect = despawnEffect = Fx.hitBulletColor;
                 hitColor = backColor = trailColor = Pal.graphiteAmmoBack;
                 frontColor = Pal.graphiteAmmoFront;
-            }}, Items.pyratite, new BasicBulletType(7f * 1.3f, 70f * 1.8f) {{
+            }}, Items.pyratite, new BasicBulletType(7f * 1.3f, 154) {{
                 // standardIncendiaryMassive (火成岩弹, 燃烧型)
                 lifetime = 40f * 1.1f;
                 width = 16f * 1.34f * 1.15f;
@@ -369,7 +369,7 @@ public class Z_Turrets {
                 ammoMultiplier = 3;
                 splashDamage = 20f;
                 splashDamageRadius = 25f;
-            }}, Items.thorium, new BasicBulletType(8f * 1.3f, 80f * 1.8f) {{
+            }}, Items.thorium, new BasicBulletType(8f * 1.3f, 170) {{
                 // standardThoriumMassive (钍弹, 穿透型)
                 lifetime = 40f * 1.1f;
                 width = 16f * 1.34f * 1.15f;
@@ -578,7 +578,7 @@ public class Z_Turrets {
             consumePower(5.75f);
             heatColor = Pal.turretHeat;
             loopSound = Z_Sounds.xenoBeam;  // ★ 原版 UnitySounds.xenoBeam (advance/xeno-beam.ogg)
-            shootType = new GravitonLaserBulletType(0.8f) {{
+            shootType = new GravitonLaserBulletType(8f) {{
                 length = 260f;
                 knockback = -5f;  // ★ 重力吸引: 负值拉向炮台
                 incendChance = -1f;
@@ -649,10 +649,10 @@ public class Z_Turrets {
             consumePower(4.9f);
             targetAir = false;
             shootEffect = ShootEffect.blueTriangleShoot;
-            shootType = new ArtilleryBulletType(8f, 44f) {{
+            shootType = new ArtilleryBulletType(8f, 65f) {{
                 lifetime = 35f;
                 width = 18f;
-                splashDamage = 23f;
+                splashDamage = 92f;
                 splashDamageRadius = 45f;
                 height = 27f;
                 shrinkX = 0f;
@@ -695,7 +695,7 @@ public class Z_Turrets {
             consumePower(4.9f);
             inaccuracy = 3.4f;
             shootEffect = ShootEffect.blueTriangleShoot;
-            shootType = new FlakBulletType(8.7f, 7f) {{
+            shootType = new FlakBulletType(8.7f, 18f) {{
                 lifetime = 30f;
                 width = 8f;
                 height = 14f;
@@ -899,7 +899,7 @@ public class Z_Turrets {
             coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 1f));
             coolantBoost.put(mindustry.content.Liquids.water, 0.35f);      // 135%
             coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.85f);  // 185%
-            shootType = new RoundLaserBulletType(85f) {{
+            shootType = new RoundLaserBulletType(120f) {{
                 length = 270f;
                 width = 5.8f;
                 hitSize = 13f;
@@ -1347,7 +1347,11 @@ public class Z_Turrets {
                 despawnEffect = ParticleFx.surgeSplash;
                 hitEffect = Fx.massiveExplosion;
                 keepVelocity = false;
-                collides = false;
+                // ★ 修复"炮弹只能射到射程最远处": 原先 collides=false 使炮弹不与任何目标碰撞,
+                //   只能飞到寿命尽头 (≈射程最远处) 才引爆, 射程内的单位/建筑全部穿过不受伤.
+                //   改为允许碰撞: 与地面单位/建筑碰撞即在命中点爆炸; collidesTiles=false 避免半路被地形挡下.
+                collides = true;
+                collidesTiles = false;
                 splashDamage = 680f;
                 splashDamageRadius = 120f;
                 lightning = 10;
@@ -1458,7 +1462,7 @@ public class Z_Turrets {
             consumePower(13.9f);
             targetAir = true;
             shootSound = Sounds.shootFlame;
-            shootType = new SmokeBulletType(4.7f, 32f) {{
+            shootType = new SmokeBulletType(4.7f, 26f) {{
                 drag = 0.034f;
                 lifetime = 18f;
                 hitSize = 4f;
@@ -1492,7 +1496,7 @@ public class Z_Turrets {
             consumePower(13.9f);
             targetAir = true;
             shootSound = Sounds.shootFlame;
-            shootType = new SmokeBulletType(4.7f, 16f) {{
+            shootType = new SmokeBulletType(4.7f, 30f) {{
                 drag = 0.016f;
                 lifetime = 32f;
                 hitSize = 4f;
@@ -1638,7 +1642,7 @@ public class Z_Turrets {
             rotateSpeed = 2f;
             // ★ 预先强化配方: 冷冻液 120/秒 → 145%, 水 120/秒 → 125%
             coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 2.1f));
-            shootType = new ChangeTeamLaserBulletType(60f) {{
+            shootType = new ChangeTeamLaserBulletType(120f) {{
                 length = 300f;
                 lifetime = 18f;
                 shootEffect = Fx.none;
@@ -1662,8 +1666,10 @@ public class Z_Turrets {
 
             consumesPower = false;
 
-            powerProduction = 1.2f;
-            range = 50f;
+            // 最高 82 电力/秒 (内部按 tick: 82/60)
+            powerProduction = 82f / 60f;
+            // 范围 +5 格 (1 格 = 8 单位), 50 + 40 = 90
+            range = 90f;
 
             targetUnits = true;
             // ★ 偏离 PU132 原版: 原版 absorber 只吸收单位 (吸弹留给 monolith 的 absorber-aura),
@@ -1671,7 +1677,7 @@ public class Z_Turrets {
             targetBullets = true;
             status = mindustry.content.StatusEffects.slow;
 
-            rotateSpeed = 1.2f;
+            rotateSpeed = 2f;
             shootCone = 2f;
             damage = 0.6f;
         }};

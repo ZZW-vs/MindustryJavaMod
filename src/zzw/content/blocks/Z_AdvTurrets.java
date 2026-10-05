@@ -143,7 +143,7 @@ public class Z_AdvTurrets {
             health = 320;
             consumePower(1f);
             // ★ 伤害平衡: 基础每秒伤害 105 (原 damage=120 每 tick, 面板显示过高, 现统一下调)
-            baseDamage = 105f;
+            baseDamage = 165f;
             range = 120f;
             shootCone = 6f;
             rotateSpeed = 10f;
@@ -227,7 +227,7 @@ public class Z_AdvTurrets {
             range = 150f;
             // ★ SoulAbsorberTurret 自身 outputsPower=true, 不调用 consumePower
             // ★ 伤害平衡: 基础每秒伤害 80 → 70 (面板显示过高, 统一下调)
-            baseDamage = 70f;
+            baseDamage = 200f;
             shootCone = 6f;
             rotateSpeed = 10f;
             force = 0.3f;
@@ -262,7 +262,7 @@ public class Z_AdvTurrets {
             range = 120f;
             consumePower(2f);
             // ★ 伤害平衡: 基础每秒伤害 240 → 210 (面板显示过高, 统一下调)
-            baseDamage = 210f;
+            baseDamage = 340f;
             shootCone = 6f;
             rotateSpeed = 10f;
             force = 0f;
@@ -352,7 +352,7 @@ public class Z_AdvTurrets {
             range = 180f;
             consumePower(4f);
             // ★ 伤害平衡: 基础每秒伤害 480 → 419 (面板显示过高, 统一下调)
-            baseDamage = 419f;
+            baseDamage = 520f;
             shootCone = 6f;
             rotateSpeed = 10f;
             force = 0f;
@@ -453,6 +453,8 @@ public class Z_AdvTurrets {
             maxSouls = 12;
             efficiencyFrom = 0.7f;
             efficiencyTo = 1.8f;
+            // ★ 加强: 蓄力期间吸取(吸引)范围内单位的持续伤害翻倍 (原版 60 → 120)
+            attractionDamage = 120f;
             // ★ supernovaLaser: 持续激光, 3200 伤害, 长度 280, 多色叠加 + 闪电
             shootType = new ContinuousLaserBulletType(3200f) {
                 // PU132 supernovaLaser: 光束沿途随机闪电 + 等离子粒子拖尾 (内联特效)

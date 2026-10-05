@@ -14,6 +14,7 @@ import static mindustry.content.Blocks.multiplicativeReconstructor;
 import static mindustry.content.Blocks.tetrativeReconstructor;
 import static zzw.content.units.Z_Units.*;
 import static zzw.content.units.Z_MonolithUnits.*;
+import static zzw.content.units.Z_ScarUnits.*;
 
 /**
  * 原版方块覆盖器 (PU132 unity.content.Overwriter 手动移植)
@@ -60,28 +61,36 @@ public class Z_Overwriter{
         ((Reconstructor)additiveReconstructor).upgrades.add(
             new UnitType[]{caelifera,schistocerca},
             new UnitType[]{stele, pedestal},
-            new UnitType[]{discharge, pulse}
+            new UnitType[]{discharge, pulse},
+            // Scar 系列 T1→T2: hovos → ryzer
+            new UnitType[]{hovos, ryzer}
         );
 
         // 乘法重构器 (T2→T3): PU132 原版: schistocerca→anthophila, pedestal→pilaster
         ((Reconstructor)multiplicativeReconstructor).upgrades.add(
             new UnitType[]{schistocerca, anthophila},
             new UnitType[]{pedestal, pilaster},
-            new UnitType[]{pulse, emission}
+            new UnitType[]{pulse, emission},
+            // Scar 系列 T2→T3: ryzer → zena
+            new UnitType[]{ryzer, zena}
         );
 
         // 指数重构器 (T3→T4): PU132 原版: anthophila→vespula, pilaster→pylon
         ((Reconstructor)exponentialReconstructor).upgrades.add(
             new UnitType[]{anthophila, vespula},
             new UnitType[]{pilaster, pylon},
-            new UnitType[]{emission, waveform}
+            new UnitType[]{emission, waveform},
+            // Scar 系列 T3→T4: zena → sundown
+            new UnitType[]{zena, sundown}
         );
 
         // 四次重构器 (T4→T5): PU132 原版: vespula→lepidoptera, pylon→monument
         ((Reconstructor)tetrativeReconstructor).upgrades.add(
             new UnitType[]{vespula, lepidoptera},
             new UnitType[]{pylon, monument},
-            new UnitType[]{waveform, ultraviolet}
+            new UnitType[]{waveform, ultraviolet},
+            // Scar 系列 T4→T5: sundown → rex (后续在 recursive-reconstructor T6 档升至 excelsus)
+            new UnitType[]{sundown, rex}
         );
     }
 }

@@ -42,6 +42,10 @@ public class RicochetBulletType extends BasicBulletType {
 
     @Override
     public void hitEntity(Bullet b, Hitboxc other, float initialHealth) {
+        // ★ 修复"弹跳子弹没有伤害": 必须调用父类实现先结算伤害/击退/状态.
+        //   原先完全接管 hitEntity 而不调用 super, 导致子弹只弹跳、对单位永远不扣血
+        //   (建筑伤害走 hitTile 的 super 调用所以正常, 只有单位受伤丢失).
+        super.hitEntity(b, other, initialHealth);
         ricochet(b, (mindustry.gen.Posc) other);
     }
 
