@@ -2120,9 +2120,9 @@ public class Z_Units {
         //  - 8腿, 307300 血, 速度 0.7, 护甲 35, 全状态免疫
         //  - 主炮: EnergyChargeWeapon (DesolationBulletType, 蓄力+三防作弊模块)
         //  - 副武器: end-mount (3连发, fragBullet VoidFracture), end-mount-2 (2连发, 闪电+穿透)
-        //  - 点防: end-point-defence (2座, 多目标防御激光)
-        //  - ★ 简化: PU132 4个触手 TentacleType, v158 简化为 4 个独立武器 (无触手动画)
-        //  - ★ 简化: PU132 clnW 克隆16个武器, v158 直接列出 (前8后8对称)
+        //  - 点防: end-point-defence (4座, mirror 补左, 多目标防御激光)
+        //  - ★ 触手: PU132 4个触手 TentacleType, 用 TentacleAbility 完整还原 (含待机甩动/两阶段IK)
+        //  - ★ 武器总数对齐 PU132 21 门 (主炮1 + 点防4 + end-mount8 + end-mount-2 8)
         //  - 防作弊: EndLegsUnit (简化版, invincibilityArray=4)
         // ═══════════════════════════════════════════════════════════
         desolation = new zzw.content.units.types.DesolationUnitType("desolation") {{
@@ -2425,7 +2425,7 @@ public class Z_Units {
                 shootCone = 20f;
                 rotate = true;
                 rotateSpeed = 15f;
-                mirror = false;
+                mirror = true;
                 alternate = false;
                 shootSound = zzw.content.Z_Sounds.endBasicSmall;
                 bullet = new EndBasicBulletType(0f, 220f) {{
@@ -2448,7 +2448,7 @@ public class Z_Units {
                 shootCone = 20f;
                 rotate = true;
                 rotateSpeed = 15f;
-                mirror = false;
+                mirror = true;
                 alternate = false;
                 shootSound = zzw.content.Z_Sounds.endBasicSmall;
                 bullet = new EndBasicBulletType(0f, 220f) {{
@@ -2645,8 +2645,8 @@ public class Z_Units {
             }});
 
             // ===== 副武器 w2: end-mount-2 (2连发, 闪电+穿透) =====
-            // PU132 4个 clnW(w2) 武器 (前2后2对称), v158 简化为 2 个 (前2个, 镜像对称)
-            // 位置: (100.75, -13), (79, -23.5) + 镜像
+            // PU132 8个 clnW(w2) 武器 (前2对+后2对对称), v158 用 4 个 + mirror (=8 门) 还原
+            // 位置: (100.75, -13), (79, -23.5), (85, -48.25), (68.75, -65.75) + 镜像
             weapons.add(new Weapon("create-end-mount-2") {{
                 x = 100.75f; y = -13f;
                 mirror = true;
@@ -2681,6 +2681,73 @@ public class Z_Units {
 
             weapons.add(new Weapon("create-end-mount-2") {{
                 x = 79f; y = -23.5f;
+                mirror = true;
+                flipSprite = true;
+                shootY = 12f;
+                reload = 100f;
+                rotate = true;
+                rotateSpeed = 5f;
+                alternate = true;
+                shootCone = 30f;
+                shoot.shots = 2;
+                shoot.shotDelay = 5f;
+                shootSound = zzw.content.Z_Sounds.endBasicLarge;
+                bullet = new EndBasicBulletType(7f, 380f, "shell") {{
+                    lifetime = 95f;
+                    pierceShields = pierce = pierceBuilding = true;
+                    pierceCap = 3;
+                    shrinkY = 0f;
+                    backColor = lightningColor = lightColor = Color.valueOf("f53036");
+                    frontColor = Color.valueOf("ff786e");
+                    lightning = 3;
+                    lightningLength = 8;
+                    lightningLengthRand = 4;
+                    lightningDamage = 80f;
+                    splashDamage = 220f;
+                    splashDamageRadius = 80f;
+                    width = 15f;
+                    height = 21f;
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                    shootEffect = mindustry.content.Fx.shootBig;
+                }};
+            }});
+
+            // ★ PU132 原版 w2 共克隆 8 门 (编号 13-20): 前 2 对 + 后 2 对, 对称
+            //   此前只移植了前排一对 (100.75,-13)/(79,-23.5), 漏了后排一对, 这里补齐
+            weapons.add(new Weapon("create-end-mount-2") {{
+                x = 85f; y = -48.25f;
+                mirror = true;
+                shootY = 12f;
+                reload = 100f;
+                rotate = true;
+                rotateSpeed = 5f;
+                alternate = true;
+                shootCone = 30f;
+                shoot.shots = 2;
+                shoot.shotDelay = 5f;
+                shootSound = zzw.content.Z_Sounds.endBasicLarge;
+                bullet = new EndBasicBulletType(7f, 380f, "shell") {{
+                    lifetime = 95f;
+                    pierceShields = pierce = pierceBuilding = true;
+                    pierceCap = 3;
+                    shrinkY = 0f;
+                    backColor = lightningColor = lightColor = Color.valueOf("f53036");
+                    frontColor = Color.valueOf("ff786e");
+                    lightning = 3;
+                    lightningLength = 8;
+                    lightningLengthRand = 4;
+                    lightningDamage = 80f;
+                    splashDamage = 220f;
+                    splashDamageRadius = 80f;
+                    width = 15f;
+                    height = 21f;
+                    hitEffect = mindustry.content.Fx.hitLancer;
+                    shootEffect = mindustry.content.Fx.shootBig;
+                }};
+            }});
+
+            weapons.add(new Weapon("create-end-mount-2") {{
+                x = 68.75f; y = -65.75f;
                 mirror = true;
                 flipSprite = true;
                 shootY = 12f;

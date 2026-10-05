@@ -234,12 +234,12 @@
 #### 荒芜者 (desolation)
 - End 阵营终极地面单位（8 腿），307300 血，速度 0.7，护甲 35（PU132 移植）
 - **武器1：蓄力主炮**（EnergyChargeWeapon / DesolationBulletType，2500 伤害 + 三防作弊模块，15 秒冷却 + 8 秒持续，蓄力 4 阶段红色特效）
-- **武器2,3：点防激光**（end-point-defence，7 连发 / 5 连发，220 伤害，15tick 冷却）
-- **武器4-7：四门副炮**（end-mount，3 连发，260 伤害，fragBullet 虚空碎裂弹）
-- **武器8,9：两门闪电炮**（end-mount-2，2 连发，380 伤害 + 220 范围 + 80 闪电伤害，穿透 3 目标）
-- **武器10：触手1**（desolation-tentacle，15 段 44.5 长，EndPointBlastLaserBulletType 250 伤害 + 1000 范围伤害，3 秒冷却，点射模式）
-- **武器11-13：触手2-4**（apocalypse-tentacle，17/14/9 段 37.25 长，EndContinuousLaserBulletType 85 伤害，4 秒冷却，连续激光 1.5 秒持续）
-- ★ 4 条触手×mirror=8 条，完整移植 PU132 NewTentacle（含两阶段 IK + 角度限制 + stab 伤害），角度限制从 65° 减至 30° 让鞭子更直
+- **点防激光 ×4**（end-point-defence，镜像补左，220 伤害，单发瞬时命中）
+- **副炮 ×8**（end-mount，3 连发，260 伤害，fragBullet 虚空碎裂弹；4 门 + mirror 补左）
+- **闪电炮 ×8**（end-mount-2，2 连发，380 伤害 + 220 范围 + 80 闪电伤害，穿透 3 目标；4 门 + mirror 补左）
+- **触手 ×4**（desolation-tentacle 15 段 44.5 长，EndPointBlastLaserBulletType 250 伤害 + 1000 范围伤害，3 秒冷却，点射；apocalypse-tentacle 17/14/9 段 37.25 长，EndContinuousLaserBulletType 85 伤害，4 秒冷却，连续激光 1.5 秒）
+- ★ 4 条触手×mirror=8 条，完整移植 PU132 NewTentacle（含待机甩动 + 两阶段 IK + 角度限制 + stab 伤害）
+- ★ 武器总数 21 门（主炮1 + 点防4 + end-mount8 + end-mount-2 8），对齐 PU132
 - 8 腿行走，每腿落地造成 1700 范围伤害
 - 免疫所有状态效果
 - ★ constructor 改用 `EndGroundUnit::create`（extends LegsUnit），同时具备防作弊系统和正常显示腿
@@ -289,6 +289,10 @@
 - 合并时有烟雾效果和延迟检查
 
 ## 更新日志
+- End 系列 desolation / apocalypse 触手动画与武器数量还原 PU132 原版：
+  - **触手待机动画**：移除此前"无目标不摆动"的优化，恢复 PU132 原版——待机时触手持续甩动（`TentacleAbility` 默认 `swayMag` 0.08→0.6），攻击时停止摆动并追踪目标
+  - **desolation 武器数量**：补齐后排 4 门 end-mount-2 副炮（此前漏了 (85,-48.25)/(68.75,-65.75) 及镜像）；点防 end-point-defence 恢复镜像（2→4 座）；武器总数对齐 PU132 的 21 门
+  - **apocalypse**：武器数量（8 小炮 + 3 激光 + 4 导弹巢 + quetzalcoatl = 16）与 4 条触手本已与原版一致，未改动
 - 着色器系统重构为统一注册中心 `ShaderLib`（借鉴 Vanilla-Expansion 的注册中心模式）：
   - 全模组着色器集中登记：黑洞 / 碎裂消散 / 汽化消散 / 切割模板 / 3D 模型直通着色器，原先散落在 `UnityShaders`、`BlackHoleShader` 与 `WavefrontObject` 内联的着色器全部迁入
   - 统一生命周期 `load()` / `dispose()`（重复调用安全、headless 自动跳过），并由 `BlackHoleSFX` 在应用退出时统一释放 GL 资源；此前 `UnityShaders.load()` 从未被调用，碎裂/汽化着色器实例实际为 null 的隐患一并修复

@@ -45,8 +45,8 @@ public class TentacleAbility extends Ability {
     public float speed = 8f;
     public float accel = 0.2f;
     public float drag = 0.06f;
-    // ★ 减小摆动幅度 (默认0.6太大导致波浪线, 0.08让鞭子更硬更稳定)
-    public float swayScl = 110f, swayMag = 0.08f, swayOffset = 0f, swaySegmentOffset = 1.5f;
+    // PU132 TentacleType 默认: swayScl=110, swayMag=0.6, swaySegmentOffset=1.5
+    public float swayScl = 110f, swayMag = 0.6f, swayOffset = 0f, swaySegmentOffset = 1.5f;
     public boolean mirror = true;
     public boolean top = true;
     public boolean flipSprite = false;
@@ -135,11 +135,10 @@ public class TentacleAbility extends Ability {
                 seg.vx *= 1f - (drag * Time.delta);
                 seg.vy *= 1f - (drag * Time.delta);
 
-                // ★ 仅在攻击状态下摆动: 无目标时保持静止
-                // <p>原版待机时 swayScl→1 会持续摆动, 而多条触手的 swayOffset 相位各不相同
-                // (0/90/120/70), 叠在一起看起来像"无目标也在乱戳"。这里额外要求 attacking,
-                // 没有目标时完全不摆动; 攻击时 swayScl→0, 行为与原版一致。</p>
-                if (attacking[t] && swayScls[t] >= 0.0001f) {
+                // PU132 原版: 只要 swayScl 未衰减到 0 就摆动。
+                // <p>待机时 swayScl→1 → 触手持续甩动; 攻击时 swayScl→0 → 停止摆动并追踪目标。
+                // 多条触手 swayOffset 相位不同 (0/45/90/120), 叠加后形成原版的群蛇乱舞感。</p>
+                if (swayScls[t] >= 0.0001f) {
                     int swayIdx = segs.length - 1 - s;
                     float sin = swayScls[t] * Mathf.sin(Time.time + swayOffset + (swayIdx * swaySegmentOffset), swayScl, swayMag) * Mathf.sign(flipSprite != flip);
                     seg.rotation += sin;
