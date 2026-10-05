@@ -70,26 +70,9 @@ public class EndCutterLaserBulletType extends AntiCheatBulletTypeBase {
     });
 
     /**
-     * ★ 分割割痕特效 (FlameOut 风格: 沿切割面双向高亮割痕 + 火花)。
-     *
-     * <p>在 {@link zzw.content.units.effects.UnitCutEffect#createCut} 触发处额外播放,
-     * 让"一刀切两半"的瞬间有明确的视觉反馈, 提升原版激光分割单位的观感。</p>
+     * ★ 分割割痕特效由 {@link zzw.content.units.effects.UnitCutEffect} 统一处理
+     * (PU132 原版风格: stencil 切割 + 切口灼烧高光), 此处不再单列。
      */
-    public Effect cutScarEffect = new Effect(24f, e -> {
-        // 双向割痕 (垂直于激光方向)
-        Draw.color(Color.valueOf("f53036"), Color.white, e.fout());
-        Lines.stroke(2.5f * e.fout());
-        for (int s : Mathf.signs) {
-            Lines.lineAngleCenter(e.x, e.y, e.rotation + 90f * s, e.fin() * 80f);
-        }
-        // 割痕周围火花
-        randLenVectors(e.id, 8, 70f * e.fin(), e.rotation + 90f, 60f, (x, y) -> {
-            Draw.color(Color.valueOf("ff786e"), Color.white, e.fout());
-            Lines.stroke(1.8f * e.fout());
-            Lines.lineAngleCenter(e.x + x, e.y + y, Mathf.angle(x, y), e.fslope() * 10f);
-        });
-        Draw.reset();
-    });
 
     // 激光数据 (PU132 LaserData)
     private static class LaserData {
@@ -296,38 +279,22 @@ public class EndCutterLaserBulletType extends AntiCheatBulletTypeBase {
                     tipHitEffect.at(Tmp.v2.x + Mathf.range(4f), Tmp.v2.y + Mathf.range(4f), b.rotation() + 180f);
                 }
             }
-            // 对所有命中单位造成伤害 (tenmeikiri 真伤, 不使用秒杀机制)
+            // 对所有命中单位造成伤害 (tenmeikiri 真伤)
             for (Unit u : units) {
                 hitUnitAntiCheat(b, u);
-                // ★ PU_V8 切割效果: 大单位被击杀时触发切割动画
-                // 原版条件: (unit.dead || unit.health >= Float.MAX_VALUE) && (hitSize >= 30 || health >= MAX_VALUE)
-                // ★ 修复: unit.damage() → kill() → remove() 后 isValid() 返回 false, 但 dead=true 或 health<=0 仍可判断
-                // ★ 修复: 移除 createCut 中的 isValid() 检查, 改用 unit.type != null
-                if ((u.dead || u.health <= 0f) && u.hitSize >= 30f) {
-                    // ★ 去重: 同一单位只触发一次切割 (避免重复创建切割动画导致画面混乱)
+                // ★ PU132 切割效果: 单位被击杀 (或血量溢出) 且体型够大时, 切成两半
+                // 原版条件: (unit.dead || unit.health >= Float.MAX_VALUE) && (hitSize >= 30f || unit.health >= Float.MAX_VALUE)
+                if ((u.dead || u.health >= Float.MAX_VALUE) && (u.hitSize >= 30f || u.health >= Float.MAX_VALUE)) {
+                    // 去重: 同一单位只切割一次 (单位被剥离实体组后本身不会再被检索到)
                     LaserData data = (b.data instanceof LaserData ld) ? ld : null;
                     if (data != null) {
                         if (data.cutUnits.contains(u.id)) continue;
                         data.cutUnits.add(u.id);
                     }
-                    // 激光延伸方向 (用于切割方向计算)
+                    // 先把单位从实体组剥离 (对象保留, 供切割特效继续绘制), 再创建切割
+                    zzw.util.AntiCheat.annihilateEntity(u, true);
                     Tmp.v2.trns(b.rotation(), maxLength * 1.5f).add(b);
                     UnitCutEffect.createCut(u, b.x, b.y, Tmp.v2.x, Tmp.v2.y);
-                    // ★ 额外割痕特效: 强化"分割单位"瞬间的视觉反馈
-                    UnitCutEffect.cutScarEffect.at(u.x, u.y, 0f, u.hitSize);
-                    // ★ 增强分割效果：添加更多视觉特效
-                    for (int i = 0; i < 3; i++) {
-                        mindustry.content.Fx.blastExplosion.at(u.x + Mathf.range(20f), u.y + Mathf.range(20f));
-                    }
-                    // ★ 延迟 remove, 让切割特效有时间渲染 unit
-                    // PU_V8 用 AntiCheat.annihilateEntity(unit, true) 仅移除 groups 但不调用 unit.remove()
-                    // 此处标记 dead 并用 Time.run 延迟 remove (特效持续时间内保持可绘制)
-                    // createCut 已将 unit 从 Groups.draw 移除, 防止引擎自动绘制与特效重叠
-                    u.health = 0f;
-                    u.dead = true;
-                    Time.run(UnitCutEffect.CUT_DURATION, () -> {
-                        if (u != null && u.isAdded()) u.remove();
-                    });
                 }
             }
         }

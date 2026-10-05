@@ -31,6 +31,9 @@ public class EndInvisibleUnit extends UnitEntity {
     protected float aggression = 0f;
     protected float aggressionTime = 0f;
 
+    /** 所属阵营 (PU132 trueTeam): 被作弊改队后, 台账充足时强制恢复原阵营 */
+    private mindustry.game.Team trueTeam = null;
+
     @Override
     public void setType(mindustry.type.UnitType type) {
         super.setType(type);
@@ -42,12 +45,21 @@ public class EndInvisibleUnit extends UnitEntity {
         if (added) return;
         super.add();
         antiCheat.lastHealth = health;
+        // 所属阵营 (PU132 trueTeam): 被作弊改队后, 台账充足时强制恢复
+        trueTeam = team;
+        // 登记进全局防作弊管理器 (PU132 Unity.antiCheat.addUnit)
+        zzw.util.AntiCheat.addUnit(this);
     }
 
     @Override
     public void update() {
         // ★ 血量双轨 (修正): 台账(antiCheat.lastHealth)按防作弊上限独立扣减,
         //   不回充 health — 回充会抵消原始伤害使血量永远到不了 0, 死亡拒绝无法触发
+
+        // ★ 阵营恢复 (PU132): 被作弊改队后, 只要台账仍充足就强制恢复原阵营
+        if (trueTeam != null && team() != trueTeam && antiCheat.lastHealth >= Math.max(type.health / 100f, 150f)) {
+            team = trueTeam;
+        }
 
         super.update();
 
@@ -154,6 +166,8 @@ public class EndInvisibleUnit extends UnitEntity {
     @Override
     public void remove() {
         if (antiCheat.lastHealth > 0f && health > 0f) return;
+        // 真实死亡: 从全局防作弊登记表注销 (PU132 EndComp.remove)
+        zzw.util.AntiCheat.removeUnit(this);
         super.remove();
     }
 

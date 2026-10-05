@@ -40,6 +40,10 @@ public class TestMod extends Mod{
         // 实际 .obj 文件加载在 FileTreeInitEvent 时触发
         ZObjs.init();
 
+        // ★ 启动 End 阵营全局防作弊管理器 (PU132 Unity.antiCheat 移植):
+        //   挂 Trigger.update / ResetEvent / BlockBuildBeginEvent, 幂等, 只生效一次
+        zzw.util.AntiCheat.setup();
+
 
         Events.on(EventType.ClientLoadEvent.class, e -> {
             // ★ 阻断游戏联网拉取"在线模组列表" (国内网络会超时, 表现为"导入报错")

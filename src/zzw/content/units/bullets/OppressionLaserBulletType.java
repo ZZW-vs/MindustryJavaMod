@@ -169,6 +169,8 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
                     if (hv != null) {
                         hitUnitAntiCheat(b, unit);
                         if (hitCount[0] < 8) hit(b, hv.x, hv.y);
+                        // ★ PU132 原版: 命中时按目标体积播放 endDeathLaserHit
+                        HitEffect.endDeathLaserHit.at(hv.x, hv.y, b.angleTo(unit), unit.hitSize);
                         hitCount[0]++;
                         if (b.owner instanceof mindustry.gen.Healthc h) {
                             h.heal(damage * 0.1f);
@@ -190,6 +192,8 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
                             if (hv != null) {
                                 hitBuildingAntiCheat(b, build);
                                 if (hitCount[0] < 8) hit(b, hv.x, hv.y);
+                                // ★ PU132 原版: 建筑命中同样播放 endDeathLaserHit (按方块尺寸)
+                                HitEffect.endDeathLaserHit.at(hv.x, hv.y, b.angleTo(build), build.block.size * Vars.tilesize);
                                 hitCount[0]++;
                             }
                         }
@@ -225,8 +229,8 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
         float inout = fw * fow;
         float width = this.width * inout + Mathf.absin(Time.time, 5f, 2f * inout);
         float sin = Mathf.absin(Time.time, 3f, 0.35f);
-        // ★ 红白闪烁: 颜色在红色和白色之间切换, 产生闪烁感
-        Color col = Tmp.c1.set(SCAR_COLOR).lerp(Color.white, sin);
+        // ★ PU132 原版: scarColor 亮度随 sin 脉冲 (mul), 产生红色明暗闪烁
+        Color col = Tmp.c1.set(SCAR_COLOR).mul(1f + sin);
 
         // ===== 层1: 纺锤主体 (24梯形) =====
         Draw.color(col);
@@ -258,12 +262,12 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
             seed += rand.nextInt();
         }
 
-        // ===== 层3: 散落粒子 (减到22个, 线段+方块) =====
+        // ===== 层3: 散落粒子 (45个, 线段+方块; 还原 PU132 原版数量) =====
         rand.setSeed(b.id * 9999L + 8957324);
         float time = Time.time;
 
         Lines.stroke(3f);
-        for (int i = 0; i < 22; i++) {
+        for (int i = 0; i < 45; i++) {
             float d = rand.random(14f, 22f);
             float timeOffset = rand.random(d);
             int timeSeed = Mathf.floor((time + timeOffset) / d) + rand.nextInt();
@@ -282,9 +286,9 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
             }
         }
 
-        // ===== 层4: 白色闪光线段 (减到9个) =====
-        for (int i = 0; i < 9; i++) {
-            boolean alt = i < 4;
+        // ===== 层4: 白色闪光线段 (18个; 还原 PU132 原版数量) =====
+        for (int i = 0; i < 18; i++) {
+            boolean alt = i < 8;
             float as = alt ? 1f : 3f;
             float wid2 = alt ? width : width / 1.5f;
             float d = alt ? rand.random(12f, 22f) : rand.random(22f, 60f);
@@ -307,9 +311,9 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
             drawLine(b, Interp.pow2In.apply(f1) * trns + l, Interp.pow2In.apply(f2) * trns + l, pos2);
         }
 
-        // ===== 层5: 黑/红菱形粒子 (减到20个) =====
-        for (int i = 0; i < 20; i++) {
-            boolean alt = i < 8;
+        // ===== 层5: 黑/红菱形粒子 (40个; 还原 PU132 原版数量) =====
+        for (int i = 0; i < 40; i++) {
+            boolean alt = i < 17;
             float as = alt ? 1f : 2.25f;
             float wid2 = alt ? width : width / 1.5f;
             float d = alt ? rand.random(16f, 27f) : rand.random(34f, 65f);
@@ -331,9 +335,9 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
             diamond(Tmp.v1.x + Mathf.range(6f) * fin, Tmp.v1.y + Mathf.range(6f) * fin, w, l, b.rotation());
         }
 
-        // ===== 层6: 内部线段 (减到10个, 黑/红交替) =====
-        for (int i = 0; i < 10; i++) {
-            boolean alt = i < 6;
+        // ===== 层6: 内部线段 (20个, 黑/红交替; 还原 PU132 原版数量) =====
+        for (int i = 0; i < 20; i++) {
+            boolean alt = i < 12;
             float as = alt ? 1f : 3f;
             float wid2 = alt ? width : width / 2f;
             float d = alt ? rand.random(12f, 22f) : rand.random(22f, 60f);
@@ -356,9 +360,9 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
             drawLine(b, Interp.pow2In.apply(f1) * trns + l, Interp.pow2In.apply(f2) * trns + l, pos2);
         }
 
-        // ===== 层7: 闪电 (减到2条, 25节点) =====
+        // ===== 层7: 闪电 (5条, 25节点; 还原 PU132 原版数量) =====
         rand.setSeed(b.id * 999L + 7452);
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < 5; i++) {
             float d = rand.random(30f, 50f);
             float timeOffset = rand.random(d);
             int timeSeed = (int)((time + timeOffset) / d) + rand.nextInt();
@@ -420,7 +424,7 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
         float time = Time.time * timeMul;
         rand.setSeed(b.id * 9999L + seed);
         Drawf.tri(x, y, stroke * 1.22f, Math.abs(width) / 4f, b.rotation());
-        for (int i = 0; i < 7; i++) {
+        for (int i = 0; i < 14; i++) {
             float d = rand.random(30f, 60 * 2f);
             float timeOffset = rand.random(d);
             int timeSeed = Mathf.floor((time + timeOffset) / d) + rand.nextInt();
@@ -449,7 +453,7 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
 
         rand.setSeed(b.id * 9999L + 1411);
         float time = Time.time * timeMul;
-        for (int i = 0; i < 11; i++) {
+        for (int i = 0; i < 22; i++) {
             float d = rand.random(40f, 60 * 3f);
             float timeOffset = rand.random(d);
             int timeSeed = Mathf.floor((time + timeOffset) / d) + rand.nextInt();

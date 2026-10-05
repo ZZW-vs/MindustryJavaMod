@@ -98,12 +98,12 @@ public abstract class AntiCheatBulletTypeBase extends BulletType {
      */
     public void hitUnitAntiCheat(Bullet b, Unit unit, float extraDamage) {
         float health = unit.health * unit.healthMultiplier;
-        // 数值溢出检测: NaN/Infinity/MAX_VALUE 直接强制清除
+        // 数值溢出检测: NaN/Infinity/MAX_VALUE 直接强制抹除 (PU132 annihilateEntity)
         if (health >= Float.MAX_VALUE || Float.isNaN(health) || health >= Float.POSITIVE_INFINITY) {
-            unit.health = 0;
-            unit.dead = true;
+            zzw.util.AntiCheat.annihilateEntity(unit, true);
             return;
         }
+        float lh = unit.health, ls = unit.shield;
         float score = health + unit.type.dpsEstimate;
         // 超量伤害: 目标越强, 指数追加伤害越大
         float pow = score > overDamage ? Mathf.pow((score - overDamage) / overDamageScl, overDamagePower) : 0f;
@@ -111,6 +111,11 @@ public abstract class AntiCheatBulletTypeBase extends BulletType {
         float ratio = health > ratioStart ? ratioDamage * Math.max(unit.maxHealth, unit.health) : 0f;
         // 最终伤害 = max(比例伤害, 弹丸伤害 + 超量伤害)
         float damage = Math.max(ratio, ((b.damage + extraDamage) * b.damageMultiplier()) + pow);
+
+        // 流血状态: 持续时间内禁止目标回血 (PU132 applyStatus)
+        if (bleedDuration > 0) {
+            zzw.util.AntiCheat.applyStatus(unit, bleedDuration);
+        }
 
         // 模块: 削甲/削盾/破力场
         if (modules != null) {
@@ -133,6 +138,11 @@ public abstract class AntiCheatBulletTypeBase extends BulletType {
         } else {
             unit.damage(damage);
         }
+
+        // 血量采样: 若本次伤害完全没生效 (血量没降), 记一次作弊嫌疑
+        float hd = unit.health - lh, sd = unit.shield - ls;
+        zzw.util.AntiCheat.notifyDamage(unit.id, hd);
+        zzw.util.AntiCheat.samplerAdd(unit, (hd + sd) < 0.00001f && damage < Float.MAX_VALUE);
 
         // 击退
         Tmp.v3.set(unit).sub(b).nor().scl(knockback * 80f);
@@ -157,7 +167,7 @@ public abstract class AntiCheatBulletTypeBase extends BulletType {
      */
     public void hitBuildingAntiCheat(Bullet b, Building building, float extraDamage) {
         if (building.health >= Float.MAX_VALUE || Float.isNaN(building.health) || building.health >= Float.POSITIVE_INFINITY) {
-            building.health = 0;
+            zzw.util.AntiCheat.annihilateEntity(building, true);
             return;
         }
         boolean col = !(collidesTiles && collides);
@@ -165,7 +175,12 @@ public abstract class AntiCheatBulletTypeBase extends BulletType {
         if (col || pow > 0f || ratioDamage > 0f) {
             float ratio = building.health > ratioStart ? ratioDamage * Math.max(building.maxHealth, building.health) : 0f;
             float damage = Math.max(ratio, (col ? (b.damage + extraDamage) * b.damageMultiplier() * buildingDamageMultiplier : 0f) + pow);
+            float lh = building.health;
             building.damage(damage);
+            // 伤害未生效且为溢出量 → 判定为作弊建筑, 直接抹除
+            if (building.health >= lh && damage >= Float.MAX_VALUE) {
+                zzw.util.AntiCheat.annihilateEntity(building, true);
+            }
         }
     }
 

@@ -48,6 +48,8 @@ public class EndGroundUnit extends LegsUnit {
     private int invIndex = 0;
     private float invTimer = 0f;
     private float resist, resistMax, resistTime;
+    /** 所属阵营 (PU132 trueTeam): 被作弊改队后, 台账充足时强制恢复原阵营 */
+    private mindustry.game.Team trueTeam = null;
     /** 单位配置的防作弊参数集 (add() 时从 UnitType.antiCheatType 读取) */
     private zzw.content.units.anticheat.EndCheatVars ac;
 
@@ -70,15 +72,22 @@ public class EndGroundUnit extends LegsUnit {
         if (type instanceof zzw.content.type.UnityUnitType u && u.antiCheatType != null) {
             ac = u.antiCheatType;
         }
-        // 初始化防作弊数据
+        // 初始化防作弊数据 (无敌帧槽位数按参数配置, 无配置回退 4, 与 PU132 EndComp.add 一致)
         trueHealth = type.health;
         trueMaxHealth = type.health;
-        invFrames = new float[4];
+        trueTeam = team;
+        invFrames = new float[ac != null ? ac.invincibilityArray : 4];
+        // 登记进全局防作弊管理器 (PU132 Unity.antiCheat.addUnit)
+        zzw.util.AntiCheat.addUnit(this);
     }
 
     @Override
     public void update() {
         // ★ 防作弊更新 (PU132 EndComp.update L141-178, 在 super.update() 之前)
+        // ★ 阵营恢复 (PU132): 被作弊改队后, 只要台账仍充足就强制恢复原阵营
+        if (trueTeam != null && team != trueTeam && trueHealth >= Math.max(trueMaxHealth / 100f, 150f)) {
+            team = trueTeam;
+        }
         // ★ 血量双轨 (修正): 台账(trueHealth)只按防作弊上限独立扣减, 不再每帧回充 health —
         //   旧逻辑 health = trueHealth 每帧把原始伤害回满, 导致 health 永远到不了 0,
         //   死亡拒绝永远不触发 (PU132 的 health 由原版 rawDamage 扣减, 与此不同步)
@@ -86,9 +95,10 @@ public class EndGroundUnit extends LegsUnit {
         trueMaxHealth = maxHealth;
         if (trueHealth > 0f) dead = false;
 
-        // 抗性衰减 (按 PU132 配置: resistDuration=6*60, resistTime=3*60)
+        // 抗性衰减 (按单位配置参数 resistDuration, 无配置回退 6*60)
+        float resistDuration = ac != null ? ac.resistDuration : 6f * 60f;
         if (resistTime <= 0f) {
-            resist -= resistMax / (6f * 60f);
+            resist -= resistMax / resistDuration;
             resist = Math.max(resist, 0f);
         } else {
             resistTime -= Time.delta;
@@ -247,6 +257,44 @@ public class EndGroundUnit extends LegsUnit {
     @Override
     public void remove() {
         if (trueHealth > 0f && health > 0f) return;
+        // 真实死亡: 从全局防作弊登记表注销 (PU132 EndComp.remove)
+        zzw.util.AntiCheat.removeUnit(this);
         super.remove();
+    }
+
+    /**
+     * 穿甲伤害转普通伤害 (PU132 EndComp.damagePierce L195-208):
+     * 让"无视无敌帧"的穿甲弹也走本单位的防作弊无敌帧/上限判定,
+     * 避免被穿甲弹绕过保护。
+     */
+    @Override
+    public void damagePierce(float amount, boolean withEffect) {
+        float pre = hitTime;
+        damage(amount);
+        if (!withEffect) {
+            hitTime = pre;
+        }
+    }
+
+    /**
+     * 击退免疫 + 反噬 (PU132 EndComp.impulse L100-127):
+     * End 单位不承受击退 (PU132 的 impulse 重写未回接原版击退),
+     * 仅在击退力度超过 mass*8 时累积抗性并播放红色蓄力特效 (反"击退刷图"作弊)。
+     */
+    @Override
+    public void impulse(float ix, float iy) {
+        float mass = mass();
+        float len = arc.util.Tmp.v1.set(ix, iy).len();
+        float resistScl = ac != null ? ac.resistScl : 0.2f;
+        float resistTimeMax = ac != null ? ac.resistTime : 3f * 60f;
+        // 超过 mass*8 的击退力度 → 累积抗性 + 蓄力特效
+        if (len > mass * 8f) {
+            float l = (len - (mass * 8f)) / (mass / 2f);
+            resist += l;
+            resistMax = Math.max(resistMax, resist);
+            resistTime = Math.max(resistTime, resistTimeMax / 2f);
+            zzw.content.units.effects.SpecialFx.endDeny.at(x, y, rotation, arc.util.Tmp.c1.a(Mathf.clamp(l / (mass * 15f))), this);
+        }
+        // PU132 未回接原版击退 → 击退免疫 (不调用 super.impulse)
     }
 }

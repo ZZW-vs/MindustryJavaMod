@@ -47,6 +47,10 @@ public class EndLegsUnit extends UnitEntity {
     private int invIndex = 0;
     private float invTimer = 0f;
     private float resist, resistMax, resistTime;
+    /** 所属阵营 (PU132 trueTeam): 被作弊改队后, 台账充足时强制恢复原阵营 */
+    private mindustry.game.Team trueTeam = null;
+    /** 单位配置的防作弊参数集 (add() 时从 UnitType.antiCheatType 读取, 无配置回退默认值) */
+    private zzw.content.units.anticheat.EndCheatVars ac;
 
     public static EndLegsUnit create() {
         return new EndLegsUnit();
@@ -56,24 +60,36 @@ public class EndLegsUnit extends UnitEntity {
     public void add() {
         if (added) return;
         super.add();
-        // 初始化防作弊数据 (按 PU132 voidVessel/chronos 配置: invincibilityArray=4)
+        // 读取单位配置的防作弊参数 (无配置时回退 PU132 voidVessel/chronos 默认值)
+        if (type instanceof zzw.content.type.UnityUnitType u && u.antiCheatType != null) {
+            ac = u.antiCheatType;
+        }
+        // 初始化防作弊数据 (无敌帧槽位数按参数配置, 无配置回退 4, 与 PU132 EndComp.add 一致)
         trueHealth = type.health;
         trueMaxHealth = type.health;
-        invFrames = new float[4];
+        trueTeam = team;
+        invFrames = new float[ac != null ? ac.invincibilityArray : 4];
+        // 登记进全局防作弊管理器 (PU132 Unity.antiCheat.addUnit)
+        zzw.util.AntiCheat.addUnit(this);
     }
 
     @Override
     public void update() {
         // ★ 防作弊更新 (PU132 EndComp.update L141-178, 在 super.update() 之前)
+        // ★ 阵营恢复 (PU132): 被作弊改队后, 只要台账仍充足就强制恢复原阵营
+        if (trueTeam != null && team != trueTeam && trueHealth >= Math.max(trueMaxHealth / 100f, 150f)) {
+            team = trueTeam;
+        }
         // 血量防回退 (防作弊)
         // ★ 血量双轨 (修正): 台账独立扣减, 不回充 health (同 EndGroundUnit)
         if (maxHealth < trueMaxHealth || Float.isNaN(maxHealth)) maxHealth = trueMaxHealth;
         trueMaxHealth = maxHealth;
         if (trueHealth > 0f) dead = false;
 
-        // 抗性衰减 (按 PU132 配置: resistDuration=6*60, resistTime=3*60)
+        // 抗性衰减 (按单位配置参数 resistDuration, 无配置回退 6*60)
+        float resistDuration = ac != null ? ac.resistDuration : 6f * 60f;
         if (resistTime <= 0f) {
-            resist -= resistMax / (6f * 60f);
+            resist -= resistMax / resistDuration;
             resist = Math.max(resist, 0f);
         } else {
             resistTime -= Time.delta;
@@ -116,13 +132,15 @@ public class EndLegsUnit extends UnitEntity {
     public void damage(float amount) {
         // ★ 防作弊伤害处理 (完全复刻 PU132 EndComp.damage L210-257)
         if (invFrames[invIndex] <= 0f) {
-            // 按单位 health 比例计算参数 (PU132 voidVessel/chronos 配置)
-            float damageThreshold = trueMaxHealth / 20f;
-            float maxDamageThreshold = trueMaxHealth / 1.25f;
-            float maxDamageTaken = trueMaxHealth / 15f;
-            float resistStart = trueMaxHealth / 25f;
-            float resistScl = 0.2f;
-            float invincibilityDuration = 15f;
+            // 优先按单位配置参数, 无配置回退 PU132 voidVessel/chronos 默认比例
+            float damageThreshold = ac != null ? ac.damageThreshold : trueMaxHealth / 20f;
+            float maxDamageThreshold = ac != null ? ac.maxDamageThreshold : trueMaxHealth / 1.25f;
+            float maxDamageTaken = ac != null ? ac.maxDamageTaken : trueMaxHealth / 15f;
+            float resistStart = ac != null ? ac.resistStart : trueMaxHealth / 25f;
+            float resistScl = ac != null ? ac.resistScl : 0.2f;
+            float invincibilityDuration = ac != null ? ac.invincibilityDuration : 15f;
+            float resistTimeMax = ac != null ? ac.resistTime : 3f * 60f;
+            Interp curve = ac != null ? ac.curveType : curveType;
 
             float nextAmount = Math.min(amount, maxDamageTaken);
 
@@ -132,15 +150,15 @@ public class EndLegsUnit extends UnitEntity {
                 resist += a;
                 if (Float.isInfinite(resist)) resist = Float.MAX_VALUE;
                 resistMax = Math.max(resistMax, resist);
-                resistTime = 3f * 60f;  // PU132: resistTime=3*60
+                resistTime = resistTimeMax;
                 aggression += Math.min(a / (trueMaxHealth / 5f), 1.5f);
                 aggression = Math.min(aggression, 4f);
                 aggressionTime = 5f * 60f;
             }
 
-            // 伤害曲线衰减 (Pow(2))
+            // 伤害曲线衰减 (PU132 curveType, 默认 Pow(2))
             if (amount > damageThreshold) {
-                float in = 1f - curveType.apply(Mathf.clamp((amount - damageThreshold) / (maxDamageThreshold - damageThreshold)));
+                float in = 1f - curve.apply(Mathf.clamp((amount - damageThreshold) / (maxDamageThreshold - damageThreshold)));
                 nextAmount *= in;
             }
 
@@ -217,6 +235,37 @@ public class EndLegsUnit extends UnitEntity {
     @Override
     public void remove() {
         if (trueHealth > 0f && health > 0f) return;
+        // 真实死亡: 从全局防作弊登记表注销 (PU132 EndComp.remove)
+        zzw.util.AntiCheat.removeUnit(this);
         super.remove();
+    }
+
+    /** 穿甲伤害转普通伤害 (PU132 EndComp.damagePierce): 防止穿甲弹绕过防作弊判定。 */
+    @Override
+    public void damagePierce(float amount, boolean withEffect) {
+        float pre = hitTime;
+        damage(amount);
+        if (!withEffect) {
+            hitTime = pre;
+        }
+    }
+
+    /**
+     * 击退免疫 + 反噬 (PU132 EndComp.impulse):
+     * End 单位不承受击退, 仅在击退力度超过 mass*8 时累积抗性并播放红色蓄力特效。
+     */
+    @Override
+    public void impulse(float ix, float iy) {
+        float mass = mass();
+        float len = arc.util.Tmp.v1.set(ix, iy).len();
+        float resistTimeMax = ac != null ? ac.resistTime : 3f * 60f;
+        if (len > mass * 8f) {
+            float l = (len - (mass * 8f)) / (mass / 2f);
+            resist += l;
+            resistMax = Math.max(resistMax, resist);
+            resistTime = Math.max(resistTime, resistTimeMax / 2f);
+            zzw.content.units.effects.SpecialFx.endDeny.at(x, y, rotation, arc.util.Tmp.c1.a(Mathf.clamp(l / (mass * 15f))), this);
+        }
+        // PU132 未回接原版击退 → 击退免疫 (不调用 super.impulse)
     }
 }

@@ -39,6 +39,8 @@ public class UnityShaders{
     public static VapourizeShader vapourizeShader;
     /** 碎裂消散着色器 (End 系列 "单位碎裂剥离")。 */
     public static FragmentationShader fragmentShader;
+    /** 切割模板着色器 (tenmeikiri 单位切割, 绿色 quad 擦除 + 割口灼烧高光)。 */
+    public static StencilShader stencilShader;
 
     /** 公用帧缓冲: 仅当 begin() 与 end() 在同一函数内时使用。 */
     public static FrameBuffer bufferAlt;
@@ -54,6 +56,7 @@ public class UnityShaders{
 
         vapourizeShader = new VapourizeShader();
         fragmentShader = new FragmentationShader();
+        stencilShader = new StencilShader();
     }
 
     /** 释放已创建的着色器与帧缓冲。 */
@@ -66,10 +69,24 @@ public class UnityShaders{
             fragmentShader.dispose();
             fragmentShader = null;
         }
+        if(stencilShader != null){
+            stencilShader.dispose();
+            stencilShader = null;
+        }
         if(bufferAlt != null){
             bufferAlt.dispose();
             bufferAlt = null;
         }
+    }
+
+    /**
+     * 惰性获取切割模板着色器 (无论 {@link #load()} 是否被调用都能拿到实例)。
+     *
+     * <p>切割特效绘制前调用; headless 下不会被触发 (只画不跑)。</p>
+     */
+    public static StencilShader stencilShader(){
+        if(stencilShader == null) stencilShader = new StencilShader();
+        return stencilShader;
     }
 
     /**
@@ -189,6 +206,42 @@ public class UnityShaders{
             setUniformf("u_offset",
                 Core.camera.position.x - Core.camera.width / 2,
                 Core.camera.position.y - Core.camera.height / 2);
+        }
+    }
+
+    /**
+     * 切割模板着色器 (PU132 UnityShaders.StencilShader 移植)。
+     *
+     * <p>配合 {@code shaders/unitystencil.frag} 使用: 帧缓冲里用指定颜色
+     * ({@link #stencilColor}, 通常纯绿) 画出"要切掉的那一半"区域, 片元着色器
+     * 把这些像素的 alpha 归零 (擦除), 并给紧贴擦除边界的像素叠加
+     * {@link #heatColor} —— 形成"一刀切开 + 切口灼烧发亮"的观感。</p>
+     *
+     * <p>uniform 含义:</p>
+     * <ul>
+     *   <li>stencilcolor: 模板色 (被擦除区域的标记色);</li>
+     *   <li>heatcolor: 切口高光色 (lightFlame → darkFlame 随进度变化);</li>
+     *   <li>u_invsize: 屏幕单位尺寸的倒数 (用于采样相邻像素判定边界)。</li>
+     * </ul>
+     */
+    public static class StencilShader extends Shader{
+        /** 模板色 (被擦除区域的标记色)。 */
+        public Color stencilColor = new Color();
+        /** 切口高光色。 */
+        public Color heatColor = new Color();
+
+        public StencilShader(){
+            super(
+                Core.files.internal("shaders/screenspace.vert"),
+                tree.get("shaders/unitystencil.frag")
+            );
+        }
+
+        @Override
+        public void apply(){
+            setUniformf("stencilcolor", stencilColor);
+            setUniformf("heatcolor", heatColor);
+            setUniformf("u_invsize", 1f / Core.camera.width, 1f / Core.camera.height);
         }
     }
 }

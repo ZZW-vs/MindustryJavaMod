@@ -7,6 +7,9 @@ import arc.graphics.g2d.Lines;
 import arc.math.Angles;
 import arc.math.Interp;
 import arc.math.Mathf;
+import arc.math.Rand;
+import arc.math.geom.Vec2;
+import arc.util.Tmp;
 import mindustry.entities.Effect;
 import zzw.content.graphics.UnityPal;
 
@@ -20,6 +23,9 @@ public class HitEffect {
     // PU132 颜色常量
     private static final Color SCAR_COLOR = Color.valueOf("f53036");
     private static final Color END_COLOR = Color.valueOf("ff786e");
+
+    /** 命中特效共用的随机源 (PU132 Utils.seedr) */
+    private static final Rand hr = new Rand();
 
     /**
      * 红色大爆炸命中特效 (15tick)
@@ -38,6 +44,77 @@ public class HitEffect {
         Draw.color();
     });
 
+
+    /**
+     * 死亡激光命中特效 (35tick) — PU132 HitFx.endDeathLaserHit (L328-366)。
+     * <p>oppression 主激光命中时按目标体积 (hitSize, 经 data 传入) 播放:
+     * 烟尘 (scarColor→darkGray→gray 圆粒) + 前 15tick 的白色火花线。</p>
+     */
+    public static final Effect endDeathLaserHit = new Effect(35f, e -> {
+        if(!(e.data instanceof Float)) return;
+        float rad = Math.max(20f, (Float)e.data);
+        float maxOffset = 5f / 35f;
+        float maxOffset2 = 5f / 15f;
+        int smokeAmount = 9 + (int)(rad / 8);
+        int sparkAmount = 2 + (int)(rad / 25);
+
+        hr.setSeed(e.id * 9999L);
+        for(int i = 0; i < smokeAmount; i++){
+            float cf = (i / (smokeAmount - 1f)) * maxOffset;
+            float nf = Mathf.curve(e.fin(), cf, (1f + cf) - maxOffset);
+
+            Draw.color(SCAR_COLOR, Color.darkGray, Color.gray, nf);
+            float rot = e.rotation + hr.range(4f);
+            float f = Interp.pow3In.apply(nf);
+            float w = hr.range(rad) * Interp.circleOut.apply(f);
+            float l = (rad * hr.random(1.5f, 3.25f) * f);
+            Vec2 v = Tmp.v1.trns(rot, l, w).add(e.x, e.y);
+            Fill.circle(v.x, v.y, (9f + rad / 7f) * (1f - nf));
+        }
+        e.scaled(15f, s -> {
+            Draw.color(SCAR_COLOR, Color.white, s.fin());
+            Lines.stroke(2f);
+            for(int i = 0; i < sparkAmount; i++){
+                float cf = (i / (sparkAmount - 1f)) * maxOffset2;
+                float nf = Mathf.curve(s.fin(), cf, (1f + cf) - maxOffset2);
+                float f = Interp.pow2Out.apply(nf);
+
+                float range = Mathf.sign(hr.chance(0.5f)) * hr.random(60f, 93f);
+                float rot = e.rotation + range;
+                Vec2 v = Tmp.v1.trns(rot, (f * (rad / 2f) * hr.random(0.5f, 1.2f)) + 0.001f);
+                Lines.lineAngle(v.x + e.x, v.y + e.y, v.angle(), (7f + rad / 12f) * (1f - f), false);
+            }
+        });
+        Draw.color();
+    });
+
+    /**
+     * 磁轨命中特效 (25tick) — PU132 HitFx.endHitRail (L368-389)。
+     * soul-destroyer 磁轨炮命中: 15tick 扩散射线 + 3~5 个尖刺三角。
+     */
+    public static final Effect endHitRail = new Effect(25f, e -> {
+        e.scaled(15f, s -> {
+            Draw.color(END_COLOR, SCAR_COLOR, e.fin());
+            Angles.randLenVectors(e.id, 7, s.fin(Interp.pow3Out) * 45f, e.rotation, 47f, (x, y) -> {
+                float ang = Mathf.angle(x, y);
+                Lines.stroke(s.fout() * 2f);
+                Lines.lineAngle(e.x + x, e.y + y, ang, s.fout(Interp.pow3In) * 24f);
+            });
+        });
+
+        float scl = 0.3f;
+        int spikes = Mathf.randomSeed(e.id * 13L, 3, 5);
+        Draw.color(SCAR_COLOR);
+        for(int i = 0; i < spikes; i++){
+            float fin = Mathf.curve(e.fin(), (i / (float)spikes) * scl, (((i + 1f) / spikes) * scl) + (1f - scl));
+            float fin2 = Mathf.curve(fin, 0f, 0.3f);
+            float fout = 1f - fin;
+            float angle = Mathf.randomSeed(e.id * 53L + i * 31L, -25f, 25f) + e.rotation;
+            mindustry.graphics.Drawf.tri(e.x, e.y, fout * 20f, fin2 * (80f + Mathf.randomSeed((e.id + i) * 73L, 40f)), angle);
+            mindustry.graphics.Drawf.tri(e.x, e.y, fout * 20f, fin2 * 20f, angle + 180f);
+        }
+        Draw.color();
+    });
 
     /**
      * lightHitLarge (15f) — PU132 HitFx.lightHitLarge。
