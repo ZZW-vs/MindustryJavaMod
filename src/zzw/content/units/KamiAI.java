@@ -64,32 +64,26 @@ public class KamiAI implements UnitController {
     @Override
     public void updateUnit() {
         // 更新目标 — ★ PU132 原版: 从所有玩家中选最近的, 不依赖敌方单位
-        // ★ 目标玩家死亡(invalidate)时直接自杀
+        // ★ 目标失效(死亡/离开)时只清空目标, 下一帧重新索敌 (PU132: target = null, 不自杀)
         if (target != null && Units.invalidateTarget(target, unit.team, unit.x, unit.y)) {
-            // 目标失效 (死亡/离开), kami 自杀
-            unit.kill();
-            return;
+            target = null;
         }
         if (target == null) {
             // ★ 原版逻辑: 遍历 Groups.player 找最近玩家单位
             Player bestPlayer = null;
             float bestDst = Float.MAX_VALUE;
             for (Player p : Groups.player) {
-                if (p.unit() != null && p.unit().isValid()) {
-                    float dst = unit.dst(p.unit());
+                Unit pu = p.unit();
+                if (pu != null && pu.isValid()) {
+                    float dst = unit.dst(pu);
                     if (dst < bestDst) {
                         bestDst = dst;
                         bestPlayer = p;
                     }
                 }
             }
-            if (bestPlayer != null) {
-                target = bestPlayer.unit();
-            } else {
-                // 没有玩家目标, 自杀
-                unit.kill();
-                return;
-            }
+            // ★ 原版直接取 player.unit(); 这里做空值保护 — 没有可用玩家时不自毁, 仅待机等待
+            target = bestPlayer != null ? bestPlayer.unit() : null;
         }
 
         // 更新位置 (保持在目标附近 minRange 距离)

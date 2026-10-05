@@ -299,6 +299,8 @@
   - **新增「星球模板.java」**：系统讲解 `Planet` 注册（构造即注册）、恒星光焰（`SunMesh`）、行星表面（`NoiseMesh`/`MultiMesh`）、云层（`HexSkyMesh`）、轨道/光照/大气/战役限制等完整字段，并附带一个最小可用的 `PlanetGenerator`（`getColor` 定色 + `genTile` 生成地形 + `pass` 撒矿），对应 VE 的 `VEPlanets`/`ProximaPlanetGenerator`
   - **重写「科技树模板.java」**：补上 VE 核心写法 `planet.techTree = nodeRoot(...)`（自定义星球整棵树），并移植本项目 `Z_TechTree` 的 `attach`/`node`/`nodeProduce` 辅助方法（160 无 `TechTree.get(parent)`，改用 `content.techNode` 字段）；补充 `Objectives` 清单与 VE 倒金字塔布局 `InvertedPyramidTreeLayout` 说明
   - 更新「Mod主类模板.java」加载顺序为 `物品 → 液体 → 状态 → 子弹 → 方块 → 单位 → 星球 → 科技树`，并在 `loadContent()` 方法体补上星球加载步骤
+## 更新日志
+- 修复 kami（神）出生即自毁：目标失效或场内暂无可追踪玩家时不再 `unit.kill()`，改为对齐 PU132 原版——清空目标 (`target = null`) 并在下一帧重新索敌，无玩家时仅待机等待
 - End 系列 desolation / apocalypse 触手动画与武器数量还原 PU132 原版：
   - **触手待机动画**：移除此前"无目标不摆动"的优化，恢复 PU132 原版——待机时触手持续甩动（`TentacleAbility` 默认 `swayMag` 0.08→0.6），攻击时停止摆动并追踪目标
   - **desolation 武器数量**：补齐后排 4 门 end-mount-2 副炮（此前漏了 (85,-48.25)/(68.75,-65.75) 及镜像）；点防 end-point-defence 恢复镜像（2→4 座）；武器总数对齐 PU132 的 21 门
