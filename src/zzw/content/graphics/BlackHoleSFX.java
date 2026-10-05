@@ -18,6 +18,9 @@ public class BlackHoleSFX implements ApplicationListener {
     public FrameBuffer buffer;
     public FloatSeq blackHoleQueue = new FloatSeq();
 
+    /** 上一次 resize 时的屏幕宽高, 用于避免每帧重复 resize 帧缓冲。 */
+    private int lastWidth = -1, lastHeight = -1;
+
     public BlackHoleSFX() {
         if(Vars.platform instanceof ApplicationCore core){
             core.add(this);
@@ -50,7 +53,14 @@ public class BlackHoleSFX implements ApplicationListener {
         if(buffer == null || ShaderLib.blackHole == null) return;
         if(blackHoleQueue.isEmpty()) return;
 
-        buffer.resize(graphics.getWidth(), graphics.getHeight());
+        // ★ 性能: 仅在窗口尺寸变化时重建帧缓冲 (原实现每帧 resize,
+        //   会反复触发 GL 纹理重建); 尺寸不变时直接复用。
+        int w = graphics.getWidth(), h = graphics.getHeight();
+        if(w != lastWidth || h != lastHeight){
+            buffer.resize(w, h);
+            lastWidth = w;
+            lastHeight = h;
+        }
 
         ShaderLib.blackHole.holes.addAll(blackHoleQueue);
 

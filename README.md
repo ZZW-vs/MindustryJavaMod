@@ -289,6 +289,11 @@
 - 合并时有烟雾效果和延迟检查
 
 ## 更新日志
+- 借鉴 VE 强化绘制工具与渲染设施（**不移植 VE 代码**，仅借鉴其思路在本项目自研实现）：
+  - **新增 `SegmentedRegion`（分段弯曲贴图）**：把一张贴图沿长边切成若干段逐段变形，可绘制弯曲光束 / 能量弧 / 波浪带；顶点格式对齐游戏内 `Draw.vert` 的 6 float 布局，且整条带子<b>一次提交</b>（VE 原版每段提交一次，绘制调用数从 `subDiv` 降到 1）
+  - **新增 `PointTrail`（批量折线拖尾 / 光带）**：由中心点列表生成可变宽连续光带，相邻分段共享边点（法线取前后差分）故拐弯不出缝，整条一次 `Draw.vert` 提交；比 `TexturedTrail` 更轻量，可直接当普通字段用
+  - **新增 `ImpactBatch`（换批机制 / 冲击帧）**：`beginSwap()` 临时把 `Core.batch` 换成本类实例，其间重写的 `setShader`/`setBlending` 为空操作，使 `Draw.shader()`/`Draw.blend()` 失效——从而给一段绘制<b>强制套上统一着色器与混合模式</b>（`beginSwap`/`endSwap` 须成对，建议 `try/finally`）
+  - **性能**：`BlackHoleSFX` 帧缓冲仅在窗口尺寸变化时才 `resize`，不再每帧重建 GL 纹理
 - 开发模板（`参考/模板`）升级至 Mindustry 1.60 并对齐 VE 高级写法：
   - 全部模板 API 版本标注 `158.1` → `160.1`，示例 `mod.hjson` 最低游戏版本 `154` → `160`
   - **新增「星球模板.java」**：系统讲解 `Planet` 注册（构造即注册）、恒星光焰（`SunMesh`）、行星表面（`NoiseMesh`/`MultiMesh`）、云层（`HexSkyMesh`）、轨道/光照/大气/战役限制等完整字段，并附带一个最小可用的 `PlanetGenerator`（`getColor` 定色 + `genTile` 生成地形 + `pass` 撒矿），对应 VE 的 `VEPlanets`/`ProximaPlanetGenerator`
