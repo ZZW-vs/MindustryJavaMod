@@ -1421,10 +1421,14 @@ public class Z_MonolithUnits{
      * @param color 引擎颜色
      */
     private static Engine ringEngine(float size, float offsetBase, float offsetY, Color color){
-        return new Engine(){{
-            this.color = color;
-            this.size = size;
-            this.offset = offsetBase - offsetY;
-        }};
+        // ★ 不能写成 new Engine(){{ this.size = size; this.color = color; }}:
+        //   Engine 自身有 size/color 字段, 会在匿名类作用域内遮蔽同名方法参数,
+        //   导致 this.size = size 变成自赋值 (参数被忽略, color 保持 null → 火焰回退队伍色/黄色)。
+        //   这里改为显式对象赋值, 确保参数真正生效。
+        Engine engine = new Engine();
+        engine.size = size;
+        engine.offset = offsetBase - offsetY;
+        engine.color = color;
+        return engine;
     }
 }
