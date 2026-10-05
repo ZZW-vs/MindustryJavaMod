@@ -29,10 +29,8 @@ import mindustry.graphics.Pal;
  */
 public class SlowLightningType {
     private static int seed = 1;
-    /** ★ 优化：减少节点上限，从60降到30，降低渲染开销 (改为实例字段以支持按实例配置) */
-    public int maxNodes = 30;
-    /** ★ 优化：最大递归层数，防止闪电过度延伸 (改为实例字段以支持按实例配置) */
-    public int maxLayers = 8;
+    /** 节点上限 (PU132 SlowLightningType.maxNodes = 60) */
+    public int maxNodes = 60;
     public static final arc.util.pooling.Pool<SlowLightningNode> nodes =
         new arc.util.pooling.Pool<SlowLightningNode>(8, 300) {
             @Override
@@ -44,20 +42,15 @@ public class SlowLightningType {
     public Color colorFrom = Color.white, colorTo = Pal.lancerLaser;
     public float damage = 12;
     public float colorTime = 32f, fadeTime = 20f;
-    /** ★ 优化：降低分裂概率，从0.035降到0.02，减少节点指数增长 */
-    public float splitChance = 0.02f;
+    public float splitChance = 0.035f;
     public float nodeLength = 50f, nodeTime = 3f, range = 150f;
     public float randSpacing = 20f, splitRandSpacing = 60f;
     public float lineWidth = 2f, lifetime = 120f;
     public float maxRotationSpeed = 22f, minRotationSpeed = 1.5f, rotationDistance = 600f;
     public boolean continuous = false;
-    /** ★ 优化：碰撞检测间隔，从5tick增加到10tick */
+    /** ★ 优化：碰撞检测间隔，从5tick增加到10tick (仅影响伤害频率, 不影响视觉) */
     public float collideInterval = 10f;
     public Effect hitEffect = mindustry.content.Fx.hitLancer;
-    /** ★ 锯齿渲染：每段中间插入的锯齿点数 (0=禁用, 2-3=闪电感) */
-    public int jaggedPoints = 0;
-    /** ★ 锯齿幅度：占线段长度的比例 (0.12 = 12%) */
-    public float jaggedness = 0.12f;
 
     public SlowLightningEntity create(Team team, float x, float y, float rotation, Floatp liveDamage, Posc parent, Position target) {
         return create(team, null, x, y, rotation, liveDamage, parent, target);
@@ -79,11 +72,6 @@ public class SlowLightningType {
         return s;
     }
 
-    /** ★ 返回带有随机变化的节点长度 (60%~140%), 让每条闪电/每段长度不同 */
-    public float randomNodeLength() {
-        return nodeLength * (0.6f + Mathf.random(0.8f));
-    }
-
     public void damageUnit(SlowLightningNode s, Unit unit) {
         Floatp l = s.main.liveDamage;
         unit.damage(l != null ? l.get() : damage);
@@ -99,9 +87,6 @@ public class SlowLightningType {
     }
 
     public static class SlowLightningNode implements Position, arc.util.pooling.Pool.Poolable {
-        /** ★ 性能优化：锯齿顶点静态缓冲区，避免每帧 new float[] */
-        private static final float[] jaggedVerts = new float[20];
-
         public float x, y, colorProgress, time, rotation, rotRand, dist;
         public int layer = 0;
         public SlowLightningEntity main;
@@ -129,56 +114,12 @@ public class SlowLightningType {
             SlowLightningType type = main.type;
             Draw.color(type.colorFrom, type.colorTo, colorProgress);
             Position p = getLast();
-            float sx = p.getX(), sy = p.getY();
-            float ex, ey;
             if (time >= 1f) {
-                ex = x;
-                ey = y;
+                Lines.line(p.getX(), p.getY(), x, y);
             } else {
                 Vec2 v = Tmp.v1.set(this).sub(p).scl(time).add(p);
-                ex = v.x;
-                ey = v.y;
+                Lines.line(p.getX(), p.getY(), v.x, v.y);
             }
-
-            int jp = type.jaggedPoints;
-            // 无锯齿或线段过短：直接画直线
-            if (jp <= 0) {
-                Lines.line(sx, sy, ex, ey);
-                return;
-            }
-
-            float dx = ex - sx, dy = ey - sy;
-            float len = (float)Math.sqrt(dx * dx + dy * dy);
-            if (len < 0.001f) {
-                Lines.line(sx, sy, ex, ey);
-                return;
-            }
-
-            // ★ 锯齿渲染：起点 + jp 中间点 + 终点，使用 polyline 一次性绘制
-            int count = jp + 2;
-            float[] verts = jaggedVerts;
-            verts[0] = sx;
-            verts[1] = sy;
-            verts[count * 2 - 2] = ex;
-            verts[count * 2 - 1] = ey;
-
-            // 垂直方向（归一化）
-            float inv = 1f / len;
-            float nx = -dy * inv, ny = dx * inv;
-
-            // 插入中间点：基于位置生成稳定 hash 偏移，避免每帧抖动
-            for (int i = 1; i <= jp; i++) {
-                float t = (float)i / (count - 1);
-                float cx = sx + dx * t, cy = sy + dy * t;
-                // 稳定伪随机：基于线段端点位置 + 索引
-                float h = sx * 127.1f + sy * 311.7f + ex * 74.7f + ey * 93.3f + i * 53.7f;
-                float frac = h - Mathf.floor(h);
-                float offset = (frac * 2f - 1f) * len * type.jaggedness;
-                verts[i * 2] = cx + nx * offset;
-                verts[i * 2 + 1] = cy + ny * offset;
-            }
-
-            Lines.polyline(verts, count * 2, false);
         }
 
         void line(float x, float y, float x2, float y2) {
@@ -199,8 +140,7 @@ public class SlowLightningType {
                 Position p = getLast();
                 line(p.getX(), p.getY(), x, y);
             }
-            /** ★ 优化：增加层数限制，防止闪电过度延伸 */
-            if (!ended && main.distance < type.range && main.nodes.size < type.maxNodes && layer < type.maxLayers) {
+            if (!ended && main.distance < type.range && main.nodes.size < type.maxNodes) {
                 main.end(this);
             }
         }

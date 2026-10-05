@@ -78,9 +78,9 @@ public class ShootEffect {
             Lines.lineAngleCenter(v.x, v.y, e.rotation + 90f, w * 2f, false);
         }
 
-        // 阶段3: 35个粒子 (scarColor → darkGray 渐变, 减少数量保持视觉效果)
+        // 阶段3: 75个粒子 (scarColor → darkGray 渐变, PU132 原版数量)
         rand.setSeed(e.id * 9999L);
-        for (int i = 0; i < 35; i++) {
+        for (int i = 0; i < 75; i++) {
             float maxOff = 0.2f + rand.random(0.1f);
             float off = rand.nextFloat() * maxOff;
             float fin = Mathf.curve(e.fin(), off, (1f - maxOff) + off);

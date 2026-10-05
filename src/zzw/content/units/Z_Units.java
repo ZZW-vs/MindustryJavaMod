@@ -1041,9 +1041,9 @@ public class Z_Units {
                 }};
             }});
 
-            // destroyer-4: 快闪电 (PU132 SlowLightningBulletType 移植, 高伤害短持续)
-            // PU132 第4272-4289行: damage=120, 5发, inaccuracy=15, range=870
-            // ★ 快闪电优化: 伤害×6.67, 持续时间大幅缩短, 节点间距增大, 分裂减少
+            // destroyer-4: 快闪电 (PU132 SlowLightningBulletType 移植)
+            // PU132 第4272-4289行: 5发, inaccuracy=15, range=870
+            // ★ 视觉已还原 PU132 (节点间距/动画/分裂/持续), 仅伤害保留平衡调整
             weapons.add(new Weapon("create-oppression-destroyer-4") {{
                 shootSound = Z_Sounds.oppressionLightning;  // PU132 UnitySounds.oppressionLightning
                 x = 98f;

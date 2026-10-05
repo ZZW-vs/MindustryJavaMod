@@ -18,21 +18,21 @@ import mindustry.gen.Unit;
  * - 不绘制子弹本身 (由 SlowLightningEntity.draw 绘制闪电)
  * 参考: PU132 unity.entities.bullet.anticheat.SlowLightningBulletType
  *
- * ★ 快闪电参数:
- *   - damage: 800 (高伤害)
- *   - nodeLength: 300f (节点间距大, 延伸快)
- *   - nodeTime: 1f (节点更新快, 动画流畅)
- *   - lifetime: 90f (持续约1.5秒)
- *   - splitChance: 0.01f (低分裂, 主干清晰)
+ * ★ 快闪电参数 (视觉还原 PU132, 仅伤害保留平衡调整):
+ *   - damage: 800 (平衡调整, PU132 原版 120)
+ *   - nodeLength: 80f (PU132 原版节点间距)
+ *   - nodeTime: 7f (PU132 原版节点动画时长)
+ *   - lifetime: 160f (PU132 原版持续)
+ *   - splitChance: 0.06f (PU132 原版分裂概率)
  *   - maxActive: 5 (场上最多5个闪电)
  */
 public class SlowLightningBulletType extends AntiCheatBulletTypeBase {
-    protected float slRange = 870f, nodeLength = 300f, nodeTime = 1f, splitChance = 0.01f;
+    protected float slRange = 870f, nodeLength = 80f, nodeTime = 7f, splitChance = 0.06f;
     protected SlowLightningType type;
 
     public SlowLightningBulletType(float damage) {
         super(0f, damage);
-        lifetime = 90f;
+        lifetime = 160f;
         collides = false;
         hittable = absorbable = reflectable = false;
         keepVelocity = false;
@@ -59,8 +59,6 @@ public class SlowLightningBulletType extends AntiCheatBulletTypeBase {
             splitChance = b.splitChance;
             continuous = true;
             lineWidth = 3f;
-            jaggedPoints = 2; // ★ 锯齿渲染：每段2个中间点，更像真实闪电
-            jaggedness = 0.12f;
         }
 
         @Override

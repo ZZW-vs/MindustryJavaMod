@@ -289,7 +289,11 @@
 - 合并时有烟雾效果和延迟检查
 
 ## 更新日志
-
+- End 系列单位攻击特效还原 PU132 原版视觉（保留此前调过的节奏/平衡参数）：
+  - **oppression 主激光**：颜色公式改回 scarColor 脉冲明暗（`mul(1+sin)`，原为泛白 `lerp(white)`）；散落粒子 22→45、白色闪线 9→18、黑红菱形 20→40、内部线段 10→20、闪电 2→5，`drawEndEdge`/`drawEndVoid` 粒子 7→14 / 11→22；并补回此前完全缺失的命中特效 `endDeathLaserHit`（按目标体积 `hitSize` 播放烟尘+火花）与 `endHitRail`
+  - **oppression 充能特效**：补回 PU132 缺失的两段爆发动画——主线爆发 9 组×9 菱形（`t>0`）与主线前 30 方块粒子；13 个尖刺菱形由静止简化为随时间旋转/伸缩的动画版；改用 PU132 的 `Utils.seedr/seedr2/seedr3` 随机序列
+  - **oppression 发射特效**：粒子数 35→75（PU132 原版）
+  - **oppression 快闪电 (destroyer-4)**：视觉还原 PU132——节点间距 300→80、节点动画 7f、分裂概率 0.06、持续 160f，并移除自创锯齿渲染；仅保留伤害平衡调整
 - 平衡与功能调整（本轮批量）：
   - 传送带吞吐：steel/dirium/mechanical 传送带速度分别调整为 15 / 24 / 15 物品每秒（面板同步显示），mechanical 血量 320
   - 反应堆与发电：uranium-reactor 电力输出 120000/秒、耗电 1800/秒、启动 18 秒；seebeck-generator 发电量提高并在信息面板写明具体发电量；absorber 范围 +5 格（90）、最高 82/秒；solar-collector 升温加快
