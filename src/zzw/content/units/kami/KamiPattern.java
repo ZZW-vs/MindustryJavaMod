@@ -26,6 +26,8 @@ public class KamiPattern {
     /** 所有已注册模式 */
     public static final Seq<KamiPattern> all = new Seq<>();
     public int id;
+    /** 模式显示名 (调试 HUD 用) */
+    public String name = "?";
 
     /** 模式总时长 (tick) */
     public float time;

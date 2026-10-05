@@ -9,6 +9,7 @@ import arc.math.Mathf;
 import arc.math.Rand;
 import arc.math.geom.Vec2;
 import arc.struct.Seq;
+import arc.util.Align;
 import arc.util.Time;
 import arc.util.Tmp;
 import mindustry.entities.Units;
@@ -18,6 +19,7 @@ import mindustry.gen.Groups;
 import mindustry.gen.Player;
 import mindustry.gen.Unit;
 import mindustry.graphics.Layer;
+import mindustry.ui.Fonts;
 import zzw.content.units.kami.KamiPattern;
 import zzw.content.units.kami.KamiPattern.PatternData;
 import zzw.content.units.kami.KamiPatterns;
@@ -84,6 +86,13 @@ public class KamiAI implements UnitController {
         Draw.blend();
         Draw.reset();
         Draw.z(z);
+
+        // ★ 调试 HUD: 在 Boss 上方显示当前波次与正在进行的弹幕模式, 便于确认模式轮换
+        if(unit != null){
+            String label = "第 " + stages + " 波  |  "
+                + (pattern != null && waitTime <= 0f ? pattern.name : "准备中");
+            Fonts.outline.draw(label, x, y + unit.hitSize + 18f, Align.center);
+        }
     }
 
     /** 只跟随目标 (不发射): hyperSpeedPattern 的跑道等待阶段使用 */
@@ -154,6 +163,7 @@ public class KamiAI implements UnitController {
 
                 patternTime -= Time.delta;
                 if(patternTime <= 0f){
+                    String doneName = pattern.name;
                     waitTime = pattern.waitTime;
                     pattern.end(this);
                     pattern = null;
@@ -166,7 +176,7 @@ public class KamiAI implements UnitController {
                         Core.settings.put("kami-highest-wave", highestWave);
                         Core.settings.forceSave();
                     }
-                    Call.announce("第 " + stages + " 波已通过！\n最高记录: " + highestWave);
+                    Call.announce("第 " + stages + " 波已通过！(" + doneName + ")\n最高记录: " + highestWave);
                 }
             }
         }
@@ -202,6 +212,9 @@ public class KamiAI implements UnitController {
         patternTime = pattern.time;
 
         stages++;
+
+        // ★ 提示本波使用的弹幕模式 (便于确认模式轮换)
+        Call.announce("第 " + stages + " 波开始: " + pattern.name + "  (优先级 " + pattern.type.priority + ")");
     }
 
     /** 把离开屏障范围的玩家拉回边界 (原版 updateBarrier) */

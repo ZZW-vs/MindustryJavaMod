@@ -406,6 +406,14 @@ public class KamiPatterns {
                 }
             }
         };
+
+        // 模式显示名 (调试 HUD 用, 便于确认模式轮换)
+        basicPattern1.name = "basicPattern1";
+        basicPattern2.name = "basicPattern2";
+        expandPattern.name = "expandPattern";
+        flowerPattern.name = "flowerPattern";
+        flowerPattern2.name = "flowerPattern2";
+        hyperSpeedPattern.name = "hyperSpeedPattern";
     }
 
     /** hyperSpeedPattern 私有运行时数据 (跑道点集与游标) */
