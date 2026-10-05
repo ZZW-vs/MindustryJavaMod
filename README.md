@@ -289,6 +289,16 @@
 - 合并时有烟雾效果和延迟检查
 
 ## 更新日志
+- kami（神）弹幕 Boss 弹幕 AI 完整对齐 PU132 原版（"完美移植"，此前为简化版）：
+  - **补齐全部 6 个弹幕模式**：此前简化版只有 basicPattern1 / basicPattern2 / expandPattern / flowerPattern 四个，现补回 `flowerPattern2`（35 秒长时花瓣，用 `petal` 双向连发 + `stopChangeDirection` 行为）与 `hyperSpeedPattern`（advance 类，120 秒高速冲刺，带跑道视觉绘制与冲刺逻辑）
+  - **模式选取系统**：新增 `KamiPattern.PatternType`（permanent / basic / bossBasic / advance），含 `able` / `limit` / `priority`；`KamiAI.reset()` 按"洗牌 + 优先级排序 + 限额抽取"从池中选题，与原版一致
+  - **延迟回调队列**：新增 `KamiAI.delays`（`KamiDelay`），支持在模式运行中延迟若干帧回调，用于连发 / 分段弹幕
+  - **连发 (burst)**：新增 `KamiAI.burst(...)`，一次发射多颗并支持首发/后续不同的角度与速度
+  - **多阶段图案**：新增 `KamiPattern.StagePattern`（含 `Stage` / `StageData`），负 `time` 时按各阶段时长自动累加总时长，用于 expandPattern / flowerPattern 的分阶段弹幕
+  - **图案绘制**：`bossBasic` 类型模式走 `KamiPattern.draw`，用 `RainbowUnitType.trailRegion` 绘制 3 个旋转矩形轨迹特效
+  - **自定义激光**：新增 `KamiLaserBulletType`（两端点激光，线段/椭圆碰撞，`hyperSpeedLaser1` 行为）与 `Z_Bullets.kamiLaser2`
+  - **数据层**：新增 `KamiBulletData` / `KamiLaserData`，承载宽/长/转向/行为等字段（等价替代 PU132 的注解自定义实体，v160 不引入实体注册）
+  - **说明与取舍**：`difficulty` 忠实保持恒为 0（PU132 原版从不递增）；`Angles.shotgun` 用确定性均匀散布实现替代（原 arc 实现不确定）；kami `rotateSpeed=0` 导致 `lookAt` 失效，改用直接设置 `unit.rotation`（视觉与原版一致）
 - 借鉴 VE 强化绘制工具与渲染设施（**不移植 VE 代码**，仅借鉴其思路在本项目自研实现）：
   - **新增 `SegmentedRegion`（分段弯曲贴图）**：把一张贴图沿长边切成若干段逐段变形，可绘制弯曲光束 / 能量弧 / 波浪带；顶点格式对齐游戏内 `Draw.vert` 的 6 float 布局，且整条带子<b>一次提交</b>（VE 原版每段提交一次，绘制调用数从 `subDiv` 降到 1）
   - **新增 `PointTrail`（批量折线拖尾 / 光带）**：由中心点列表生成可变宽连续光带，相邻分段共享边点（法线取前后差分）故拐弯不出缝，整条一次 `Draw.vert` 提交；比 `TexturedTrail` 更轻量，可直接当普通字段用

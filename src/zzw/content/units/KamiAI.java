@@ -8,138 +8,166 @@ import arc.graphics.g2d.Lines;
 import arc.math.Mathf;
 import arc.math.Rand;
 import arc.math.geom.Vec2;
-import arc.util.Tmp;
+import arc.struct.Seq;
 import arc.util.Time;
+import arc.util.Tmp;
 import mindustry.entities.Units;
 import mindustry.entities.units.UnitController;
-import mindustry.gen.Bullet;
 import mindustry.gen.Call;
 import mindustry.gen.Groups;
 import mindustry.gen.Player;
-import mindustry.gen.Teamc;
 import mindustry.gen.Unit;
 import mindustry.graphics.Layer;
+import zzw.content.units.kami.KamiPattern;
+import zzw.content.units.kami.KamiPattern.PatternData;
+import zzw.content.units.kami.KamiPatterns;
 
-import static zzw.content.Z_Bullets.kamiBullet2;
-import static zzw.content.Z_Bullets.kamiBullet3;
+import java.util.Arrays;
 
 /**
- * kami 弹幕 AI 控制器 (PU132 移植版)
+ * kami 弹幕 AI 控制器 (PU132 {@code unity/ai/kami/KamiAI.java} 的 1:1 移植)。
  *
- * 还原 PU132 的 kami 弹幕模式:
- * - basicPattern1: 双层旋转弹环 (6-12 + 16-32 子弹)
- * - basicPattern2: 交替方向弹环 (8+ 子弹)
- * - expandPattern: 散弹 → 环形扩张 (两阶段)
- * - flowerPattern: 花瓣形弹幕 (3-8 瓣, 双向射击)
- * - barrier: 800 半径屏障, 阻止玩家逃离
+ * <p>核心机制:
+ * <ul>
+ *   <li>一次性把所有模式 {@link KamiPattern#all} 洗牌并按 priority 排序, 每次进入新
+ *       模式时顺序抽取 ({@link #reset()});</li>
+ *   <li>模式生命周期 update / init / end, 期间 {@link #shoot} 计时发射,
+ *       {@link #burst} 连发, {@link #run} 延迟回调;</li>
+ *   <li>按 {@code pattern.followTarget} 决定是否跟随目标 (默认只维持 minRange 距离);</li>
+ *   <li>{@link #updateBarrier()} 把越界玩家拉回 800 半径屏障内。</li>
+ * </ul>
  *
- * 简化:
- * - 使用标准 UnitController (不需要自定义 Entity)
- * - 移除 hyperSpeedPattern (需要自定义 laser entity, 过于复杂)
- * - 弹幕用 b.data (float[]) 存储 width/length/turn
+ * <p>v160 差异 (与 PU132 原版的取舍):</p>
+ * <ul>
+ *   <li>使用标准 {@link UnitController}, 不引入注解实体系统 (KamiComp/KamiBulletComp 等);</li>
+ *   <li>kami 单位 {@code rotateSpeed=0}, 原版 {@code unit.lookAt()} 会失效, 因此这里
+ *       直接设置 {@code unit.rotation = unit.angleTo(target)}, 视觉效果与原版一致;</li>
+ *   <li>{@link #difficulty} 与原版一致恒为 0 (原版未做难度递增)。</li>
+ * </ul>
  *
- * 参考: PU132 unity/ai/kami/KamiAI.java + KamiPatterns.java
+ * <p>参考: PU132 {@code unity/ai/kami/KamiAI.java}。</p>
  */
 public class KamiAI implements UnitController {
-    public static final float minRange = 350f;
-    public static final float barrierRange = 800f;
-
+    public static final float minRange = 350f, barrierRange = 800f;
+    protected static boolean allPatterns = true;
     private static final Vec2 vec = new Vec2();
+    private static final int[] limit = new int[KamiPattern.PatternType.values().length];
 
     public Unit unit;
-    public Teamc target;
-    public int currentPattern = 0;
+    public Unit target;
+    public KamiPattern pattern;
+    public PatternData patternData;
     public float[] reloads = new float[16];
-    public int difficulty = 2;  // 难度等级 (0-5)
-    public int stages = 0;
+    public int difficulty = 0, stages = 0;
     public float x, y;
     public float patternTime, waitTime = 2f * 60f;
-    public float patternDuration = 20f * 60f;  // 每个模式持续 20 秒
-    public float stateTimer = 0f;
     public Rand rand = new Rand();
 
-    // 模式列表 (4 个核心模式循环)
-    private static final int PATTERN_COUNT = 4;
+    protected Seq<KamiDelay> delays = new Seq<>();
+    protected Seq<KamiPattern> patterns = new Seq<>();
+
+    static {
+        KamiPatterns.load();
+    }
+
+    /** 绘制屏障圆环并交由当前模式绘制特效 (由单位 Ability 每帧调用) */
+    public void draw(){
+        float z = Draw.z();
+        Draw.z(Layer.flyingUnit);
+        Lines.stroke(3f + Mathf.absin(12f, 1f));
+        Draw.color(Tmp.c1.set(Color.red).shiftHue(Time.time));
+        Draw.blend(Blending.additive);
+        Lines.circle(x, y, barrierRange);
+        if(pattern != null && waitTime <= 0f){
+            pattern.draw(this);
+        }
+        Draw.blend();
+        Draw.reset();
+        Draw.z(z);
+    }
+
+    /** 只跟随目标 (不发射): hyperSpeedPattern 的跑道等待阶段使用 */
+    public void updateFollowing(){
+        float range = pattern != null && pattern.followTarget ? pattern.followRange : minRange;
+        vec.trns(target.angleTo(unit), range).add(target).sub(unit).scl(0.05f * Time.delta);
+        unit.move(vec);
+        unit.rotation = unit.angleTo(target);
+    }
 
     @Override
-    public void updateUnit() {
-        // 更新目标 — ★ PU132 原版: 从所有玩家中选最近的, 不依赖敌方单位
-        // ★ 目标失效(死亡/离开)时只清空目标, 下一帧重新索敌 (PU132: target = null, 不自杀)
-        if (target != null && Units.invalidateTarget(target, unit.team, unit.x, unit.y)) {
+    public void updateUnit(){
+        // ★ 目标失效 (死亡/离开) 时只清空目标, 下一帧重新索敌, 不自杀
+        if(target != null && Units.invalidateTarget(target, unit.team, unit.x, unit.y)){
             target = null;
         }
-        if (target == null) {
-            // ★ 原版逻辑: 遍历 Groups.player 找最近玩家单位
-            Player bestPlayer = null;
+        if(target == null){
+            // ★ 从所有玩家中选最近的 (原版 Utils.bestEntity(Groups.player, ...))
+            Player best = null;
             float bestDst = Float.MAX_VALUE;
-            for (Player p : Groups.player) {
+            for(Player p : Groups.player){
                 Unit pu = p.unit();
-                if (pu != null && pu.isValid()) {
+                if(pu != null && pu.isValid()){
                     float dst = unit.dst(pu);
-                    if (dst < bestDst) {
+                    if(dst < bestDst){
                         bestDst = dst;
-                        bestPlayer = p;
+                        best = p;
                     }
                 }
             }
-            // ★ 原版直接取 player.unit(); 这里做空值保护 — 没有可用玩家时不自毁, 仅待机等待
-            target = bestPlayer != null ? bestPlayer.unit() : null;
+            target = best != null ? best.unit() : null;
         }
 
-        // 更新位置 (保持在目标附近 minRange 距离)
-        if (target != null) {
+        // ★ 移动 (原版: waitTime>0 或 followTarget 时贴近目标)
+        if((waitTime > 0f || (pattern != null && pattern.followTarget)) && target != null){
             float speed = patternTime <= 0f ? Mathf.clamp(waitTime / 40f) : 1f;
-            float range = minRange;
+            float range = pattern != null && pattern.followTarget ? pattern.followRange : minRange;
             vec.trns(target.angleTo(unit), range).add(target).sub(unit).scl(0.05f * speed * Time.delta);
             unit.move(vec);
-            // ★ 直接设置 rotation, 不用 lookAt — v158 lookAt 用 rotateSpeed 步进,
-            // 而 kami rotateSpeed=0f 导致 lookAt 完全失效, 单位永远朝东不旋转
             unit.rotation = unit.angleTo(target);
-            if (patternTime <= 0f) {
-                vec.set(x, y).lerpDelta(target.x(), target.y(), 0.1f * speed);
+            if(patternTime <= 0f){
+                vec.set(x, y).lerpDelta(target.x, target.y, 0.1f * speed);
                 x = vec.x;
                 y = vec.y;
             }
         }
 
-        // 模式执行
-        if (target != null && waitTime <= 0f) {
-            // ★ 初始化新模式 (patternTime=0 时设置持续时间)
-            if (patternTime <= 0f) {
-                patternTime = patternDuration;
-                // 重置 reloads 用于新模式
-                reloads[0] = 1f;
-                reloads[4] = 1f;
-                reloads[2] = 0f;
-                reloads[3] = 0f;
-                stateTimer = 0f;
+        // ★ 模式运行 (原版: 有目标且等待结束时)
+        if(target != null && waitTime <= 0f){
+            if(pattern == null){
+                reset();
             }
-
-            stateTimer += Time.delta;
-
-            switch (currentPattern) {
-                case 0: updateBasicPattern1(); break;
-                case 1: updateBasicPattern2(); break;
-                case 2: updateExpandPattern(); break;
-                case 3: updateFlowerPattern(); break;
-            }
-
-            patternTime -= Time.delta;
-            if (patternTime <= 0f) {
-                waitTime = 3f * 60f;  // 3 秒间隔
-                stages++;
-                currentPattern = (currentPattern + 1) % PATTERN_COUNT;
-                // 难度随阶段提升
-                if (difficulty < 5 && stages % 3 == 0) difficulty++;
-                // ★ 波次完成提示: 玩家成功抗过一轮, 屏幕中间显示2秒
-                // 最高记录存储在 Core.settings (跨会话全局持久化)
-                int highestWave = Core.settings.getInt("kami-highest-wave", 0);
-                if(stages > highestWave){
-                    highestWave = stages;
-                    Core.settings.put("kami-highest-wave", highestWave);
-                    Core.settings.forceSave();
+            if(pattern != null){
+                if(pattern.lootAtTarget){
+                    unit.rotation = unit.angleTo(target);
                 }
-                Call.announce("第 " + stages + " 波已通过！\n最高记录: " + highestWave);
+                pattern.update(this);
+
+                // 延迟回调队列 (原版 delays)
+                delays.removeAll(k -> {
+                    k.delay -= Time.delta;
+                    boolean done = k.delay <= 0f;
+                    if(done){
+                        k.run.run();
+                    }
+                    return done;
+                });
+
+                patternTime -= Time.delta;
+                if(patternTime <= 0f){
+                    waitTime = pattern.waitTime;
+                    pattern.end(this);
+                    pattern = null;
+                    patternData = null;
+
+                    // ★ 波次通过提示 (项目既有功能, 全局持久化最高记录)
+                    int highestWave = Core.settings.getInt("kami-highest-wave", 0);
+                    if(stages > highestWave){
+                        highestWave = stages;
+                        Core.settings.put("kami-highest-wave", highestWave);
+                        Core.settings.forceSave();
+                    }
+                    Call.announce("第 " + stages + " 波已通过！\n最高记录: " + highestWave);
+                }
             }
         }
 
@@ -147,167 +175,115 @@ public class KamiAI implements UnitController {
         updateBarrier();
     }
 
-    /** 模式1: 双层旋转弹环 */
-    private void updateBasicPattern1() {
-        Unit u = unit;
-        int diff = 6 + Mathf.clamp(difficulty / 2, 0, 6);
-        int diff2 = 16 + Mathf.clamp(difficulty * 2, 0, 16);
-        float turn = Mathf.sin(patternTime, 90f, 0.75f);
-
-        // 内层弹环: 6-12 子弹, 旋转
-        if (shoot(0, 15f)) {
-            for (int i = 0; i < diff; i++) {
-                float ang = (i * (360f / diff)) + reloads[1];
-                Bullet b = kamiBullet2.create(u, u.team, u.x, u.y, ang);
-                setBulletData(b, 4f, 4f, turn);
-                b.lifetime = 5f * 60f;
-                b.vel.scl(4f);
-            }
-            reloads[1] += 180f / diff;
-        }
-
-        // 外层弹环: 16-32 子弹
-        if (shoot(2, 40f)) {
-            for (int i = 0; i < diff2; i++) {
-                float ang = (i * (360f / diff2)) + reloads[3];
-                Bullet b = kamiBullet2.create(u, u.team, u.x, u.y, ang);
-                setBulletData(b, 10f, 10f, 0f);
-                b.lifetime = 5f * 60f;
-                b.vel.scl(5f);
-            }
-            reloads[3] += 180f / diff2;
-        }
+    /** 自模式开始经过的时长 */
+    public float pTime(){
+        return pattern == null ? 0f : pattern.time - patternTime;
     }
 
-    /** 模式2: 交替方向弹环 */
-    private void updateBasicPattern2() {
-        Unit u = unit;
-        int diff = 8 + difficulty / 2;
+    /** 抽取下一个模式: 洗牌 + 按 priority 排序, 并初始化其运行时数据 */
+    void reset(){
+        Arrays.fill(reloads, 0f);
+        delays.clear();
 
-        if (reloads[3] < 2f * 60f && shoot(1, 5f)) {
-            for (int i = 0; i < diff; i++) {
-                float ang = (i * (360f / diff)) + reloads[2];
-                Bullet b = kamiBullet3.create(u, u.team, u.x, u.y, ang);
-                setBulletData(b, 6f, 6f, 0.25f * reloads[0]);
-                b.lifetime = 6f * 60f;
-                b.vel.scl(4f);
+        if(patterns.isEmpty()){
+            Arrays.fill(limit, 0);
+            for(KamiPattern p : KamiPattern.all){
+                if(allPatterns || p.type.able.get(this)) patterns.add(p);
             }
-            reloads[0] *= -1f;
-            reloads[2] += (40f / diff) * reloads[4];
+            patterns.shuffle();
+            if(!allPatterns) patterns.removeAll(p -> limit[p.type.ordinal()]++ >= p.type.limit);
+            patterns.sort((a, b) -> Integer.compare(a.type.priority, b.type.priority));
         }
 
-        reloads[3] += Time.delta;
-        if (reloads[3] > 3.5f * 60f) {
-            reloads[2] = 0f;
-            reloads[3] -= 3.5f * 60f;
-            reloads[4] *= -1f;
-        }
+        pattern = patterns.first();
+        patterns.remove(0);
+        if(pattern.data != null) patternData = pattern.data.get();
+        pattern.init(this);
+        patternTime = pattern.time;
+
+        stages++;
     }
 
-    /** 模式3: 散弹 → 环形扩张 (两阶段) */
-    private void updateExpandPattern() {
-        Unit u = unit;
-        // 阶段1: 朝目标散弹 (前 8 秒)
-        if (stateTimer < 8f * 60f) {
-            if (shoot(0, 10f)) {
-                int shots = 5 + difficulty;
-                float baseAng = u.angleTo(target);
-                for (int i = 0; i < shots; i++) {
-                    float ang = baseAng + (i - shots / 2f) * 12f;
-                    Bullet b = kamiBullet2.create(u, u.team, u.x, u.y, ang);
-                    setBulletData(b, 5f, 5f, 0f);
-                    b.lifetime = 5f * 60f;
-                    b.vel.scl(6f);
-                }
-            }
-        }
-        // 阶段2: 环形扩张弹幕 (8 秒后)
-        else {
-            if (shoot(1, 25f)) {
-                int ringCount = 12 + difficulty * 2;
-                for (int i = 0; i < ringCount; i++) {
-                    float ang = (i * (360f / ringCount)) + reloads[2];
-                    Bullet b = kamiBullet3.create(u, u.team, u.x, u.y, ang);
-                    setBulletData(b, 8f, 8f, 0.08f);
-                    b.lifetime = 6f * 60f;
-                    b.vel.scl(3f);
-                }
-                reloads[2] += 15f;
-            }
-        }
-    }
-
-    /** 模式4: 花瓣形弹幕 (3-8 瓣, 双向旋转射击) */
-    private void updateFlowerPattern() {
-        Unit u = unit;
-        int petals = 3 + Mathf.clamp(difficulty, 0, 5);
-
-        if (shoot(0, 14f)) {
-            for (int i = 0; i < petals; i++) {
-                float baseAng = (i * (360f / petals)) + reloads[1];
-                // 双向射击: 正向 + 反向
-                for (int dir : Mathf.signs) {
-                    float ang = baseAng + dir * reloads[2];
-                    Bullet b = kamiBullet2.create(u, u.team, u.x, u.y, ang);
-                    setBulletData(b, 6f, 6f, dir * 0.12f);
-                    b.lifetime = 5f * 60f;
-                    b.vel.scl(4f);
-                }
-            }
-            reloads[1] += 8f;
-            reloads[2] += 6f;
-        }
-    }
-
-    /** 设置弹幕子弹的 width/length/turn 数据 */
-    private void setBulletData(Bullet b, float width, float length, float turn) {
-        b.data = new float[]{width, length, turn};
-    }
-
-    /** 屏障: 将离开范围的玩家拉回 */
-    private void updateBarrier() {
-        for (Player p : Groups.player) {
+    /** 把离开屏障范围的玩家拉回边界 (原版 updateBarrier) */
+    void updateBarrier(){
+        for(Player p : Groups.player){
             Unit u = p.unit();
-            if (u != null && u.isValid() && !Mathf.within(x, y, u.x, u.y, barrierRange)) {
+            if(u != null && u.isValid() && !Mathf.within(x, y, u.x, u.y, barrierRange)){
                 vec.set(u.x - x, u.y - y).setLength(barrierRange).add(x, y);
-                u.set(vec.x, vec.y);
+                u.set(vec);
             }
         }
     }
 
-    /** 射击计时器 (返回 true 表示可以射击) */
-    public boolean shoot(int i, float time) {
+    /** 连发: 每隔 burstSpacing 发一轮, 共 bursts 轮; 一轮开始时先执行 begin */
+    public boolean burst(int i, float time, int bursts, float burstSpacing, Runnable begin){
+        boolean s = shoot(i, burstSpacing);
+        if(s){
+            if(reloads[i + 1] <= 0f){
+                begin.run();
+            }
+            reloads[i + 1] += 1f;
+            if(reloads[i + 1] >= bursts){
+                reloads[i] += time;
+                reloads[i + 1] = 0f;
+            }
+        }
+        return s;
+    }
+
+    /** 连发 (无 begin 回调) */
+    public boolean burst(int i, float time, int bursts, float burstSpacing){
+        boolean s = shoot(i, burstSpacing);
+        if(s){
+            reloads[i + 1] += 1f;
+            if(reloads[i + 1] >= bursts){
+                reloads[i] += time;
+            }
+        }
+        return s;
+    }
+
+    /** 射击计时器: 冷却结束时返回 true 并开始计时 */
+    public boolean shoot(int i, float time){
         boolean s = reloads[i] <= 0f;
-        if (s) reloads[i] += time;
+        if(s) reloads[i] += time;
         reloads[i] -= Time.delta;
         return s;
     }
 
-    /** 绘制屏障和特效 */
-    public void draw() {
-        float z = Draw.z();
-        Draw.z(Layer.flyingUnit);
-        // ★ 屏障: 加法混合 + 红色 hue-shift + 脉动线宽 + 半径 800 圆环
-        Lines.stroke(3f + Mathf.absin(12f, 1f));
-        Draw.color(Tmp.c1.set(Color.red).shiftHue(Time.time));
-        Draw.blend(Blending.additive);
-        Lines.circle(x, y, barrierRange);
-        Draw.blend();
-        Draw.reset();
-        Draw.z(z);
+    /** 单位到目标的朝向角 */
+    public float targetAngle(){
+        return unit.angleTo(target);
+    }
+
+    /** 延迟执行 (对应原版 run(delay, run)) */
+    public void run(float delay, Runnable run){
+        if(delay <= 0f){
+            run.run();
+            return;
+        }
+        KamiDelay k = new KamiDelay();
+        k.delay = delay;
+        k.run = run;
+        delays.add(k);
     }
 
     @Override
-    public void unit(Unit unit) {
+    public void unit(Unit unit){
         this.unit = unit;
         x = unit.x;
         y = unit.y;
-        // ★ 原版: rand.setSeed(unit.id * 9999L)
         rand.setSeed(unit.id * 9999L);
     }
 
     @Override
-    public Unit unit() {
+    public Unit unit(){
         return unit;
+    }
+
+    /** 延迟回调条目 */
+    static class KamiDelay {
+        Runnable run;
+        float delay;
     }
 }

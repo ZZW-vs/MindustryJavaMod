@@ -5306,13 +5306,14 @@ public class Z_Units {
         }};
 
         // ═══════════════════════════════════════════════════════════
-        //  PU132 kami 弹幕 Boss (装饰性单位, 4种弹幕模式+屏障)
+        //  PU132 kami 弹幕 Boss (装饰性单位, 6种弹幕模式+屏障)
         //  - 飞行 Boss, RainbowUnitType 渲染主体+6层彩虹
-        //  - KamiAI 控制器实现弹幕 AI
+        //  - KamiAI 控制器完整移植 PU132 弹幕 AI (模式洗牌+优先级选取+延迟回调+连发)
         //  - 无武器, 所有子弹由 AI 生成
         //  - 屏障: 800 半径, 阻止玩家逃离 (原版行为: 传送玩家回圆内)
         //  - 弹幕: basicPattern1 (双层旋转弹环) + basicPattern2 (交替方向弹环)
         //         + expandPattern (散弹→环形扩张) + flowerPattern (花瓣形双向射击)
+        //         + flowerPattern2 (bossBasic 长时花瓣) + hyperSpeedPattern (高速冲刺激光轨道)
         // ═══════════════════════════════════════════════════════════
         kami = new RainbowUnitType("kami") {{
             flying = true;

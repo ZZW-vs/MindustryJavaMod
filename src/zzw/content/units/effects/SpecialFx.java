@@ -26,6 +26,7 @@ import zzw.content.graphics.UnityBlending;
 import zzw.content.graphics.UnityPal;
 import zzw.content.units.bullets.KamiBulletType;
 import zzw.content.units.bullets.VoidFractureBulletType;
+import zzw.content.units.kami.KamiBulletData;
 
 import static arc.graphics.g2d.Draw.color;
 
@@ -39,7 +40,7 @@ import static arc.graphics.g2d.Draw.color;
  * <p>★ v132 → v155 适配要点:</p>
  * <ul>
  *   <li>kami 弹幕: PU132 的 KamiBullet 自定义实体未随本项目移植,
- *       本项目 kami 为普通 {@link Bullet} + {@code float[]{宽, 长, 转向}}
+ *       本项目 kami 为普通 {@link Bullet} + {@link KamiBulletData}
  *       数据 (见 {@link KamiBulletType}), kamiBulletSpawn 相应改读
  *       bullet.data; 出场延迟 {@code delay} 字段已在
  *       {@link KamiBulletType} 补齐 (默认 -1 = 立即出场);</li>
@@ -86,19 +87,19 @@ public class SpecialFx{
      * 特效寿命重设为 delay, 期间绘制 "外层色相循环光晕 (放大 1+5×fout)
      * + 内层白色核心 (按 fin 展开)" 双层弹体。</p>
      *
-     * <p>★ 本项目适配: 宽 / 长从 bullet.data (float[]) 读取,
+     * <p>★ 本项目适配: 宽 / 长从 bullet.data ({@link KamiBulletData}) 读取,
      * 弹体贴图取 "circle" (与 {@link KamiBulletType#draw} 一致)。</p>
      */
     kamiBulletSpawn = new Effect(30f, 300f, e -> {
         if(!(e.data instanceof Bullet kb)) return;
         if(!(kb.type() instanceof KamiBulletType type)) return;
-        if(!(kb.data instanceof float[] dims)) return;
+        if(!(kb.data instanceof KamiBulletData dims)) return;
 
         TextureRegion r = Core.atlas.find("circle");
         // delay<=0 (立即出场) 时按默认寿命 30f 播放, 避免负寿命
         float delay = type.delay > 0f ? type.delay : e.lifetime;
         e.lifetime = delay;
-        float width = dims[0], length = dims[1];
+        float width = dims.width, length = dims.length;
         float time = (Time.time / 2f) + (e.time - delay) * 2f;
         float scl = 1f + (e.fout() * 5f);
         // 弹体描边厚度: 按弹体尺寸钳制 + 呼吸脉动

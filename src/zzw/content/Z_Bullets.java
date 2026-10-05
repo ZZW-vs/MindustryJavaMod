@@ -35,6 +35,7 @@ import mindustry.graphics.Pal;
 
 import zzw.content.graphics.UnityPal;
 import zzw.content.units.bullets.KamiBulletType;
+import zzw.content.units.bullets.KamiLaserBulletType;
 
 import static mindustry.Vars.tilesize;
 
@@ -56,6 +57,8 @@ public class Z_Bullets {
     // ===== kami 弹幕子弹 (PU132 移植) =====
     public static BulletType kamiBullet2 = new KamiBulletType();
     public static BulletType kamiBullet3 = new KamiBulletType();
+    /** kami 两端点激光 (hyperSpeed 冲刺用), 见 {@link KamiLaserBulletType} */
+    public static KamiLaserBulletType kamiLaser2 = new KamiLaserBulletType();
 
     /**
      * Scar 方向护盾爆炸反射破片弹 (PU132 UnityBullets.scarShrapnel)。
@@ -94,7 +97,7 @@ public class Z_Bullets {
 
     static {
         // kamiBullet2 有拖尾 (PU132 trailLength=12), kamiBullet3 无拖尾
-        ((KamiBulletType) kamiBullet2).hasTrail = true;
+        ((KamiBulletType) kamiBullet2).trailLength = 12;
     }
 
     /** ===== SmokeBulletType (PU_V8 celsius/kelvin) ===== */
