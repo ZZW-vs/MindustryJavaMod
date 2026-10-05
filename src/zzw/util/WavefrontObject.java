@@ -882,28 +882,12 @@ public class WavefrontObject{
 
     // ===== GPU Mesh 渲染方法 =====
 
-    /** 获取/创建 GPU Shader (GLES 2.0 兼容, 不用 #version, arc 自动处理) */
+    /** 获取/创建 GPU Shader (GLES 2.0 兼容, 不用 #version, arc 自动处理)
+     *  <p>着色器源码统一收纳在 {@link zzw.content.graphics.ShaderLib.PassThroughShader},
+     *  这里只做惰性创建 (所有实例共享一个)。</p> */
     protected static Shader getGpuShader(){
         if(gpuShader == null){
-            gpuShader = new Shader(
-                "attribute vec2 a_position;\n" +
-                "attribute vec4 a_color;\n" +
-                "attribute vec2 a_texCoord0;\n" +
-                "uniform mat4 u_projTrans;\n" +
-                "varying vec4 v_color;\n" +
-                "varying vec2 v_texCoord0;\n" +
-                "void main(){\n" +
-                "  v_color = a_color;\n" +
-                "  v_texCoord0 = a_texCoord0;\n" +
-                "  gl_Position = u_projTrans * vec4(a_position, 0.0, 1.0);\n" +
-                "}",
-                "uniform sampler2D u_texture;\n" +
-                "varying vec4 v_color;\n" +
-                "varying vec2 v_texCoord0;\n" +
-                "void main(){\n" +
-                "  gl_FragColor = v_color * texture2D(u_texture, v_texCoord0);\n" +
-                "}"
-            );
+            gpuShader = new zzw.content.graphics.ShaderLib.PassThroughShader();
         }
         return gpuShader;
     }

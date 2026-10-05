@@ -45,7 +45,7 @@ import static arc.graphics.g2d.Draw.color;
  *       {@link KamiBulletType} 补齐 (默认 -1 = 立即出场);</li>
  *   <li>fragmentation / endgameVapourize 依赖的
  *       {@link FragmentationShaderEffect} / {@link VapourizeShaderEffect}
- *       与 {@link UnityShaders} 已随本包移植;</li>
+ *       与 {@link zzw.content.graphics.ShaderLib} 已统一登记并移植;</li>
  *   <li>timeStop: PU132 依赖全局 {@code unity.mod.TimeStop} 实体注册
  *       (时停期间冻结特效), 本项目时停为简化按能力实现
  *       (见 zzw.content.units.abilities.TimeStopAbility), 无全局注册表,

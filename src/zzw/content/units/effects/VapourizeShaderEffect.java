@@ -20,6 +20,7 @@ import mindustry.gen.Unit;
 import mindustry.gen.Velc;
 import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
+import zzw.content.graphics.ShaderLib;
 
 import static arc.graphics.g2d.Draw.alpha;
 import static arc.graphics.g2d.Draw.blend;
@@ -32,7 +33,7 @@ import static arc.graphics.g2d.Draw.z;
  *
  * <p>目标实体 ({@link Drawc}) 先以 "红色加色" 叠绘一遍 (肉眼可见的
  * 汽化轮廓), 再在护盾动画开启时重绘到离屏帧缓冲, 用
- * {@link UnityShaders.VapourizeShader} 做碎片剥离后处理 ——
+ * {@link ShaderLib.VapourizeShader} 做碎片剥离后处理 ——
  * 用于 End 系列的大范围处决演出。</p>
  *
  * <p>data 支持两种形态:</p>
@@ -48,7 +49,8 @@ import static arc.graphics.g2d.Draw.z;
  * <p>★ v132 → v155 适配要点:</p>
  * <ul>
  *   <li>{@code unity.assets.list.UnityShaders.vapourizeShader / bufferAlt} →
- *       {@link UnityShaders} (本包内精简版);</li>
+ *       {@link ShaderLib#vapourize} / {@link ShaderLib#bufferAlt}
+ *       (迁入统一着色器注册中心 {@link ShaderLib});</li>
  *   <li>PU132 在 {@code reset()} 中清理池化字段, v155 生成类的 reset
  *       挂钩不可靠, 改为在 at() 创建时显式清零 (语义等价);</li>
  *   <li>{@code Draw.rect(region, Position, rotation)} 重载 v155 存在。</li>
@@ -175,12 +177,12 @@ public class VapourizeShaderEffect extends Effect{
                 blend();
 
                 // 步骤 2: 护盾动画开启时, 重绘目标到帧缓冲并套用汽化着色器
-                if(Vars.renderer.animateShields && UnityShaders.bufferAlt != null){
+                if(Vars.renderer.animateShields && ShaderLib.bufferAlt != null){
                     Draw.draw(z() + 0.001f, () -> {
                         float in = Mathf.clamp(fin() * 2f);
 
-                        UnityShaders.VapourizeShader s = UnityShaders.vapourizeShader;
-                        FrameBuffer buffer = UnityShaders.bufferAlt;
+                        ShaderLib.VapourizeShader s = ShaderLib.vapourize;
+                        FrameBuffer buffer = ShaderLib.bufferAlt;
                         buffer.resize(Core.graphics.getWidth(), Core.graphics.getHeight());
                         s.toColor.set(Pal.rubble);
                         s.colorProgress = Interp.pow2In.apply(Mathf.clamp(in * 1.25f));
@@ -191,16 +193,16 @@ public class VapourizeShaderEffect extends Effect{
                         buffer.begin(Color.clear);
                         draw.draw();
                         buffer.end();
-                        buffer.blit(UnityShaders.vapourizeShader);
+                        buffer.blit(ShaderLib.vapourize);
                     });
                 }
-            }else if(Vars.renderer.animateShields && UnityShaders.bufferAlt != null && data instanceof Building[] drwA && datab != null){
+            }else if(Vars.renderer.animateShields && ShaderLib.bufferAlt != null && data instanceof Building[] drwA && datab != null){
                 // 步骤 3: 批量建筑汽化 —— 逐个视锥剔除后重绘进帧缓冲
                 Draw.draw(Layer.block + 0.001f, () -> {
                     float in = fin();
 
-                    UnityShaders.VapourizeShader s = UnityShaders.vapourizeShader;
-                    FrameBuffer buffer = UnityShaders.bufferAlt;
+                    ShaderLib.VapourizeShader s = ShaderLib.vapourize;
+                    FrameBuffer buffer = ShaderLib.bufferAlt;
                     s.toColor.set(Pal.rubble);
                     s.colorProgress = Interp.pow2In.apply(Mathf.clamp(in * 1.25f));
                     s.progress = Interp.pow2In.apply(in);
@@ -216,7 +218,7 @@ public class VapourizeShaderEffect extends Effect{
                     }
 
                     buffer.end();
-                    buffer.blit(UnityShaders.vapourizeShader);
+                    buffer.blit(ShaderLib.vapourize);
                 });
             }
             Draw.reset();

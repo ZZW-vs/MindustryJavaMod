@@ -17,6 +17,7 @@ import mindustry.gen.LegsUnit;
 import mindustry.gen.Unit;
 import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
+import zzw.content.graphics.ShaderLib;
 
 /**
  * 单位被切割效果 —— PU132 {@code unity.entities.effects.UnitCutEffect} 的完整移植版。
@@ -31,7 +32,7 @@ import mindustry.graphics.Pal;
  *   <li>绘制时把整个单位 (真实贴图/腿/武器) 用摄像机偏移渲染进
  *       {@code Vars.renderer.effectBuffer};</li>
  *   <li>再在缓冲里铺一块 <b>纯绿色 quad</b> 盖住"要切掉的那一半";</li>
- *   <li>用 {@link UnityShaders.StencilShader} 把缓冲 blit 回屏幕 —— 着色器把绿色像素
+ *   <li>用 {@link ShaderLib.StencilShader} 把缓冲 blit 回屏幕 —— 着色器把绿色像素
  *       变成透明 (擦除), 并给紧贴擦除边界的像素叠加灼烧高光, 于是一半单位被干净地
  *       "切掉"且切口发亮;</li>
  *   <li>持续期间冒烟, 到期后爆炸 + 焦痕 + 死亡音效。</li>
@@ -206,7 +207,7 @@ public class UnitCutEffect {
             Draw.proj(Core.camera);
 
             // 2. 准备模板着色器: 绿色标记被擦除区域, 灼烧色随进度 lightFlame → darkFlame
-            UnityShaders.StencilShader shader = UnityShaders.stencilShader();
+            ShaderLib.StencilShader shader = ShaderLib.stencilShader();
             shader.stencilColor.set(Color.green);
             shader.heatColor.set(Pal.lightFlame).lerp(Pal.darkFlame, e.fin());
 

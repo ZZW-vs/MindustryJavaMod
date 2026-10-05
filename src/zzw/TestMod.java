@@ -11,7 +11,7 @@ import zzw.content.blocks.Z_Blocks;
 import zzw.content.blocks.Z_Turrets;
 import zzw.content.blocks.distribution.Z_Distribution;
 import zzw.content.exp.Z_Exp;
-import zzw.content.graphics.BlackHoleShader;
+import zzw.content.graphics.ShaderLib;
 import zzw.content.mechanics.Z_Mechanics;
 import zzw.content.mechanics.torque.Z_Torque;
 import zzw.content.units.Z_Units;
@@ -229,6 +229,10 @@ public class TestMod extends Mod{
 
         // 天气 (timeStorm/debrisStorm)
         Z_Weathers.load();
+
+        // ★ 统一加载模组着色器 (黑洞 / 碎裂 / 汽化 / 切割模板等, 见 ShaderLib)
+        //   必须在任何特效绘制之前完成; headless 下 ShaderLib 内部自动跳过
+        ShaderLib.load();
 
         // ★ 加载黑洞后处理系统 (必须在所有内容加载之后, 确保纹理已加载)
         blackHoleSFX.load();

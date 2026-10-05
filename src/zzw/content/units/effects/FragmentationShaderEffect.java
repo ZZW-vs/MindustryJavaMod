@@ -14,19 +14,20 @@ import mindustry.gen.Unit;
 import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
 import mindustry.type.UnitType;
+import zzw.content.graphics.ShaderLib;
 
 /**
  * 碎裂消散特效 (PU132 unity.entities.effects.FragmentationShaderEffect 移植)。
  *
  * <p>把目标实体 ({@link Drawc}, 通常是单位) 先绘制到离屏帧缓冲,
- * 再用 {@link UnityShaders.FragmentationShader} 以噪声纹理做
+ * 再用 {@link ShaderLib.FragmentationShader} 以噪声纹理做
  * "碎片剥离 + 灼烧变色" 的屏幕空间后处理 —— 用于 End 系列处决演出。</p>
  *
  * <p>★ v132 → v155 适配要点:</p>
  * <ul>
  *   <li>{@code unity.assets.list.UnityShaders.fragmentShader} →
- *       {@link UnityShaders#fragmentShader} / {@link UnityShaders#bufferAlt}
- *       (本包内精简版);</li>
+ *       {@link ShaderLib#fragmentation} / {@link ShaderLib#bufferAlt}
+ *       (迁入统一着色器注册中心 {@link ShaderLib});</li>
  *   <li>{@link EffectState} 组件化后 x / y / rotation / lifetime / data
  *       仍为 public 字段, {@code add()} 加入世界的方式不变;</li>
  *   <li>{@code Draw.blit(buffer, shader)} 在 v155 仍存在。</li>
@@ -91,7 +92,7 @@ public class FragmentationShaderEffect extends Effect{
 
                 // 步骤 2: 在目标图层做屏幕空间后处理
                 Draw.draw(z, () -> {
-                    UnityShaders.FragmentationShader s = UnityShaders.fragmentShader;
+                    ShaderLib.FragmentationShader s = ShaderLib.fragmentation;
                     if(unit != null){
                         unit.hitTime = 0f;
                         s.direction.trns(rotation, type.windPower >= 0f ? type.windPower : unit.hitSize / 14f);
@@ -110,7 +111,7 @@ public class FragmentationShaderEffect extends Effect{
                     s.heatProgress = heat;
 
                     // 步骤 4: 重绘目标到帧缓冲, 再把缓冲以碎裂着色器回投到屏幕
-                    FrameBuffer buffer = UnityShaders.bufferAlt;
+                    FrameBuffer buffer = ShaderLib.bufferAlt;
                     buffer.resize(Core.graphics.getWidth(), Core.graphics.getHeight());
                     buffer.begin(Color.clear);
                     draw.draw();

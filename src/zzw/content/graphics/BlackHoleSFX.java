@@ -16,7 +16,6 @@ public class BlackHoleSFX implements ApplicationListener {
     public static BlackHoleSFX inst;
 
     public FrameBuffer buffer;
-    public BlackHoleShader blackholeShader;
     public FloatSeq blackHoleQueue = new FloatSeq();
 
     public BlackHoleSFX() {
@@ -27,8 +26,8 @@ public class BlackHoleSFX implements ApplicationListener {
     }
 
     public void load() {
+        // 着色器由 ShaderLib 统一创建, 这里只负责本系统自己的帧缓冲
         buffer = new FrameBuffer(2, 2);
-        blackholeShader = new BlackHoleShader();
     }
 
     public void blackHole(float x, float y, float intensity, float swirl) {
@@ -40,19 +39,26 @@ public class BlackHoleSFX implements ApplicationListener {
         // 每帧调用，但真正的绘制在 draw 事件里
     }
 
+    @Override
+    public void dispose() {
+        // 本类已注册为 ApplicationListener, 在此释放自身帧缓冲与 ShaderLib 的 GL 资源
+        if(buffer != null){ buffer.dispose(); buffer = null; }
+        ShaderLib.dispose();
+    }
+
     public void render() {
-        if(buffer == null || blackholeShader == null) return;
+        if(buffer == null || ShaderLib.blackHole == null) return;
         if(blackHoleQueue.isEmpty()) return;
 
         buffer.resize(graphics.getWidth(), graphics.getHeight());
 
-        blackholeShader.holes.addAll(blackHoleQueue);
+        ShaderLib.blackHole.holes.addAll(blackHoleQueue);
 
         draw(Layer.floor - 1f, () -> buffer.begin(Color.clear));
         draw(Layer.blockOver + 0.1f, () -> {
             buffer.end();
-            buffer.blit(blackholeShader);
-            blackholeShader.holes.clear();
+            buffer.blit(ShaderLib.blackHole);
+            ShaderLib.blackHole.holes.clear();
         });
 
         blackHoleQueue.clear();

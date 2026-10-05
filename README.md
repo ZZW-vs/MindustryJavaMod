@@ -289,6 +289,11 @@
 - 合并时有烟雾效果和延迟检查
 
 ## 更新日志
+- 着色器系统重构为统一注册中心 `ShaderLib`（借鉴 Vanilla-Expansion 的注册中心模式）：
+  - 全模组着色器集中登记：黑洞 / 碎裂消散 / 汽化消散 / 切割模板 / 3D 模型直通着色器，原先散落在 `UnityShaders`、`BlackHoleShader` 与 `WavefrontObject` 内联的着色器全部迁入
+  - 统一生命周期 `load()` / `dispose()`（重复调用安全、headless 自动跳过），并由 `BlackHoleSFX` 在应用退出时统一释放 GL 资源；此前 `UnityShaders.load()` 从未被调用，碎裂/汽化着色器实例实际为 null 的隐患一并修复
+  - 统一资源访问：全部走 mod 自身 `shaders/` 目录（`tree.get`），不再用 `Core.files.internal("shaders/…")` 误指游戏内置 assets；并为所有着色器提供共享的内联顶点着色器，摆脱对游戏内置 `.vert` 的跨版本依赖
+  - 所有 uniform 名称与 `apply()` 计算逻辑保持不变，视觉表现无变化
 - End 系列单位攻击特效还原 PU132 原版视觉（保留此前调过的节奏/平衡参数）：
   - **oppression 主激光**：颜色公式改回 scarColor 脉冲明暗（`mul(1+sin)`，原为泛白 `lerp(white)`）；散落粒子 22→45、白色闪线 9→18、黑红菱形 20→40、内部线段 10→20、闪电 2→5，`drawEndEdge`/`drawEndVoid` 粒子 7→14 / 11→22；并补回此前完全缺失的命中特效 `endDeathLaserHit`（按目标体积 `hitSize` 播放烟尘+火花）与 `endHitRail`
   - **oppression 充能特效**：补回 PU132 缺失的两段爆发动画——主线爆发 9 组×9 菱形（`t>0`）与主线前 30 方块粒子；13 个尖刺菱形由静止简化为随时间旋转/伸缩的动画版；改用 PU132 的 `Utils.seedr/seedr2/seedr3` 随机序列
