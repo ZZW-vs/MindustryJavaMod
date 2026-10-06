@@ -156,54 +156,43 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
             Tmp.v1.trns(b.rotation(), length + endLength).add(b);
             float ex = Tmp.v1.x, ey = Tmp.v1.y;
 
-            // ★ 对齐原版 Utils.collideLineLarge: nearestSegmentPoint + within + raycastRect
-            Rect rect = Tmp.r1;
-            rect.set(b.x, b.y, 0, 0).merge(ex, ey).grow(w * 2f + 100f);
-
-            // ★ 性能优化: 限制每次更新产生的特效数量, 只对前几个命中创建hit效果
+            // ★ 性能优化 + 还原 PU132 Utils.collideLineLarge:
+            //   沿光束逐格 raycast 扫描 (LineCollide), 取代原先的
+            //   "Units.nearbyEnemies(巨大包围盒) + Vars.indexer.eachBlock(半径 length+endLength 的圆)"
+            //   —— 后者在大地图 / 大规模战斗时每次碰撞都要扫过数千单位与建筑, 造成严重卡顿。
             int[] hitCount = {0};
 
-            // 单位检测
-            Units.nearbyEnemies(b.team, rect, unit -> {
-                if (!unit.hittable() || !unit.checkTarget(collidesAir, collidesGround)) return;
-                Vec2 nearest = arc.math.geom.Intersector.nearestSegmentPoint(b.x, b.y, ex, ey, unit.x, unit.y, Tmp.v2);
-                float dst = b.dst(nearest);
-                float cw = getWidthCollision(dst, w);
-                if (cw > 0f && unit.within(nearest.x, nearest.y, cw + unit.hitSize / 2f)) {
-                    Tmp.r2.setCentered(unit.x, unit.y, unit.hitSize()).grow(w * 2f);
-                    Vec2 hv = arc.math.geom.Geometry.raycastRect(b.x, b.y, ex, ey, Tmp.r2);
-                    if (hv != null) {
-                        hitUnitAntiCheat(b, unit);
-                        if (hitCount[0] < 8) hit(b, hv.x, hv.y);
-                        // ★ PU132 原版: 命中时按目标体积播放 endDeathLaserHit
-                        HitEffect.endDeathLaserHit.at(hv.x, hv.y, b.angleTo(unit), unit.hitSize);
-                        hitCount[0]++;
-                        if (b.owner instanceof mindustry.gen.Healthc h) {
-                            h.heal(damage * 0.1f);
-                        }
-                    }
-                }
-            });
+            zzw.util.LineCollide.collideLineRawNew(
+                b.x, b.y, ex, ey,
+                w, w,
+                build -> build.team != b.team && build.health > 0f,
+                unit -> unit.team != b.team && unit.hittable() && unit.checkTarget(collidesAir, collidesGround),
+                true, true, null,
+                (hx, hy, ent, direct) -> {
+                    if (!direct) return false;
 
-            // 建筑检测
-            Vars.indexer.eachBlock(null, b.x, b.y, length + endLength,
-                    build -> build.team != b.team && build.health > 0,
-                    build -> {
-                        Vec2 nearest = arc.math.geom.Intersector.nearestSegmentPoint(b.x, b.y, ex, ey, build.x, build.y, Tmp.v2);
-                        float dst = b.dst(nearest);
-                        float cw = getWidthCollision(dst, w);
-                        if (cw > 0f && build.within(nearest.x, nearest.y, cw)) {
-                            Tmp.r2.setCentered(build.x, build.y, build.block.size * Vars.tilesize).grow(w * 2f);
-                            Vec2 hv = arc.math.geom.Geometry.raycastRect(b.x, b.y, ex, ey, Tmp.r2);
-                            if (hv != null) {
-                                hitBuildingAntiCheat(b, build);
-                                if (hitCount[0] < 8) hit(b, hv.x, hv.y);
-                                // ★ PU132 原版: 建筑命中同样播放 endDeathLaserHit (按方块尺寸)
-                                HitEffect.endDeathLaserHit.at(hv.x, hv.y, b.angleTo(build), build.block.size * Vars.tilesize);
-                                hitCount[0]++;
-                            }
-                        }
-                    });
+                    // 锥形收口 + 末端衰减: 按光束在命中点处的局部宽度判定
+                    float cw = getWidthCollision(b.dst(hx, hy), w);
+                    if (cw <= 0f) return false;
+
+                    if (ent instanceof Unit u) {
+                        hitUnitAntiCheat(b, u);
+                        if (hitCount[0] < 8) hit(b, hx, hy);
+                        // ★ PU132 原版: 命中时按目标体积播放 endDeathLaserHit
+                        HitEffect.endDeathLaserHit.at(hx, hy, b.angleTo(u), u.hitSize);
+                        if (b.owner instanceof mindustry.gen.Healthc h) h.heal(damage * 0.1f);
+                        hitCount[0]++;
+                    } else if (ent instanceof mindustry.gen.Building build) {
+                        hitBuildingAntiCheat(b, build);
+                        if (hitCount[0] < 8) hit(b, hx, hy);
+                        // ★ PU132 原版: 建筑命中同样播放 endDeathLaserHit (按方块尺寸)
+                        HitEffect.endDeathLaserHit.at(hx, hy, b.angleTo(build), build.block.size * Vars.tilesize);
+                        hitCount[0]++;
+                    }
+                    return false;   // 不截断光束: 压迫者激光贯穿全长
+                },
+                false
+            );
         }
     }
 

@@ -24,11 +24,13 @@ import mindustry.graphics.Drawf;
  * 简化: 用 v154.3 的 Units.nearbyEnemies + Intersector 替代 Utils.collideLineRawEnemy
  */
 public class EndRailBulletType extends AntiCheatBulletTypeBase {
+    // ★ 光束核心用实心亮红 (原版为 black 核心, 在深色/星空背景下看起来像中空透明,
+    //   用户要求内部不透明以增强压迫感; 核心取亮红使内部比外圈更亮, 避免出现"空心管"观感)
     public Color[] colors = new Color[]{
         Color.valueOf("f5303690"),
         Color.valueOf("f53036"),
         Color.valueOf("ff786e"),
-        Color.black
+        Color.valueOf("ff786e")
     };
     public float length = 340f;
     public float collisionWidth = 4f;

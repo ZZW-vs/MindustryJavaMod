@@ -96,11 +96,16 @@ public class ContinuousSingularityLaserBulletType extends AntiCheatBulletTypeBas
     }
 
     /**
-     * 射程 (PU132 range(): maxRange 与 maxLength/1.5 取值)。
-     * 注: v155.4 BulletType 无 range() 方法 (protected calculateRange), 此为自定义方法。
+     * 射程 (PU132 range(): maxRange > 0 ? maxRange : maxLength / 1.5f)。
+     *
+     * <p>★ v160 适配: BulletType 已无 range() 方法, 引擎在 init()/afterPatch() 里
+     * 调用 {@code calculateRange()} 把结果写入 {@code range} 字段。若只写一个自定义
+     * {@code range()} 方法, 引擎根本不会调用 → speed=0 的激光射程被算成 0 →
+     * thalassophobia 主炮永远不开火 (大激光与其引力场都看不到)。故必须覆写此钩子。</p>
      */
-    public float range() {
-        return maxRange > 0 ? maxRange : maxLength / 1.5f;
+    @Override
+    protected float calculateRange() {
+        return maxRange > 0f ? maxRange : maxLength / 1.5f;
     }
 
     @Override

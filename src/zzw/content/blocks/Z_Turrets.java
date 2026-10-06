@@ -323,7 +323,7 @@ public class Z_Turrets {
             coolantBoost.put(mindustry.content.Liquids.cryofluid, 0.45f);  // 145%
             // ★ Massive 子弹 (基于 v155.4 Spectre 内联 standardDenseBig 等的属性 + PU_V8 Massive 倍率)
             // ★ 已恢复 PU 原版伤害 (去掉之前额外加的 +40 偏移)
-            ammo(Items.graphite, new BasicBulletType(7.5f * 1.3f, 116) {{
+            ammo(Items.graphite, new BasicBulletType(7.5f * 1.3f, 145) {{
                 // standardDenseMassive (石墨弹)
                 lifetime = 40f * 1.1f;
                 // ★ 用户调整: 子弹整体尺寸稍微加大 (×1.15)
@@ -337,7 +337,7 @@ public class Z_Turrets {
                 hitEffect = despawnEffect = Fx.hitBulletColor;
                 hitColor = backColor = trailColor = Pal.graphiteAmmoBack;
                 frontColor = Pal.graphiteAmmoFront;
-            }}, Items.silicon, new BasicBulletType(7.5f * 1.3f, 100) {{
+            }}, Items.silicon, new BasicBulletType(7.5f * 1.3f, 125) {{
                 // standardHomingMassive (硅弹, 追踪型)
                 lifetime = 40f * 1.1f;
                 width = 15f * 1.21f * 1.15f;
@@ -351,7 +351,7 @@ public class Z_Turrets {
                 hitEffect = despawnEffect = Fx.hitBulletColor;
                 hitColor = backColor = trailColor = Pal.graphiteAmmoBack;
                 frontColor = Pal.graphiteAmmoFront;
-            }}, Items.pyratite, new BasicBulletType(7f * 1.3f, 154) {{
+            }}, Items.pyratite, new BasicBulletType(7f * 1.3f, 193) {{
                 // standardIncendiaryMassive (火成岩弹, 燃烧型)
                 lifetime = 40f * 1.1f;
                 width = 16f * 1.34f * 1.15f;
@@ -369,7 +369,7 @@ public class Z_Turrets {
                 ammoMultiplier = 3;
                 splashDamage = 20f;
                 splashDamageRadius = 25f;
-            }}, Items.thorium, new BasicBulletType(8f * 1.3f, 170) {{
+            }}, Items.thorium, new BasicBulletType(8f * 1.3f, 213) {{
                 // standardThoriumMassive (钍弹, 穿透型)
                 lifetime = 40f * 1.1f;
                 width = 16f * 1.34f * 1.15f;
@@ -405,7 +405,7 @@ public class Z_Turrets {
             loopSound = Sounds.beamPlasma;
             loopSoundVolume = 2.1f;
             requirements(Category.turret, ItemStack.with(Items.copper, 450, Items.lead, 350, Items.graphite, 390, Items.silicon, 360, Items.titanium, 250, Z_Items.umbrium, 370, Items.surgeAlloy, 360));
-            shootType = new SparkingContinuousLaserBulletType(95f) {{
+            shootType = new SparkingContinuousLaserBulletType(125f) {{
                 length = 230f;
                 width = 8f;  // ★ 激光粗细分级: fallout 最细 (默认 9f → 8f)
                 fromBlockChance = 0.12f;
@@ -443,7 +443,7 @@ public class Z_Turrets {
             // ★ 使用游戏内置液体强化系统: 水 60/秒 → 120%, 冷冻液 60/秒 → 145%
             coolantMultiplier = 2.5f;
             coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 1f));
-            shootType = new SparkingContinuousLaserBulletType(240f) {{
+            shootType = new SparkingContinuousLaserBulletType(310f) {{
                 length = 340f;
                 width = 14f;  // ★ 激光粗细分级: catastrophe (fallout 8 < calamity 11 < catastrophe 14 < extinction 18)
                 // TODO PU132: strokes = 默认值 ×1.4 (光束四层粗细) — v158 原生
@@ -476,7 +476,7 @@ public class Z_Turrets {
             // ★ 使用游戏内置液体强化系统: 水 60/秒 → 120%, 冷冻液 60/秒 → 145%
             coolantMultiplier = 2.5f;
             coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 1f));
-            shootType = new SparkingContinuousLaserBulletType(580f) {{
+            shootType = new SparkingContinuousLaserBulletType(750f) {{
                 length = 450f;
                 width = 11f;  // ★ 激光粗细分级: calamity (fallout 8 < calamity 11 < catastrophe 14 < extinction 18)
                 // PU132: strokes ×1.7 + spaceMag=70 (TODO: v158 原生类无 strokes/spaceMag 字段)
@@ -517,7 +517,7 @@ public class Z_Turrets {
             // ★ 使用游戏内置液体强化系统: 水 60/秒 → 120%, 冷冻液 60/秒 → 145%
             coolantMultiplier = 2.5f;
             coolant = consume(new ConsumeLiquidFilter(l -> l == mindustry.content.Liquids.water || l == mindustry.content.Liquids.cryofluid, 1f));
-            shootType = new SparkingContinuousLaserBulletType(770f) {{
+            shootType = new SparkingContinuousLaserBulletType(1000f) {{
                 length = 560f;
                 // PU132: strokes ×2.2 + spaceMag=70 (TODO: v158 原生类无 strokes/spaceMag 字段)
                 lightStroke = 90f;
@@ -1349,9 +1349,12 @@ public class Z_Turrets {
                 keepVelocity = false;
                 // ★ 修复"炮弹只能射到射程最远处": 原先 collides=false 使炮弹不与任何目标碰撞,
                 //   只能飞到寿命尽头 (≈射程最远处) 才引爆, 射程内的单位/建筑全部穿过不受伤.
-                //   改为允许碰撞: 与地面单位/建筑碰撞即在命中点爆炸; collidesTiles=false 避免半路被地形挡下.
+                //   改为允许碰撞: 与地面单位/建筑碰撞即在命中点爆炸.
+                //   collidesTiles 必须为 true —— 它同时开启"建筑碰撞检测"(tileRaycast),
+                //   设为 false 会让炮弹直接穿过敌方建筑, 只在射程末端爆炸 (表现为"只打到最远处").
+                //   地形不会被挡下: 地形阻挡由 collideTerrain/collideFloor 控制 (默认 false).
                 collides = true;
-                collidesTiles = false;
+                collidesTiles = true;
                 splashDamage = 680f;
                 splashDamageRadius = 120f;
                 lightning = 10;
@@ -1496,7 +1499,7 @@ public class Z_Turrets {
             consumePower(13.9f);
             targetAir = true;
             shootSound = Sounds.shootFlame;
-            shootType = new SmokeBulletType(4.7f, 30f) {{
+            shootType = new SmokeBulletType(4.7f, 36f) {{
                 drag = 0.016f;
                 lifetime = 32f;
                 hitSize = 4f;

@@ -462,7 +462,11 @@ public class Z_Exp {
                     damageInc = 2.5f;
                     fromColor = Liquids.cryofluid.color;
                     toColor = Color.cyan;
-                    // PU132 blip = true: v160 无该字段, 已省略
+                    // ★ PU132 原版还原: 细三层描线激光 + 命中点扩散光圈 (blip),
+                    //   且激光束止于首个命中目标 (不再永远画到最大长度 → 不再"只打到最远处")
+                    width = 1f;
+                    puLaser = true;
+                    blip = true;
                 }
 
                 @Override

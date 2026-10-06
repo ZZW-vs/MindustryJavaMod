@@ -1,6 +1,8 @@
 package zzw.content.units.bullets;
 
 import arc.graphics.Color;
+import arc.graphics.g2d.Draw;
+import arc.graphics.g2d.Lines;
 import arc.math.Angles;
 import arc.math.Mathf;
 import arc.util.Tmp;
@@ -10,6 +12,7 @@ import mindustry.entities.Lightning;
 import mindustry.entities.bullet.LaserBulletType;
 import mindustry.gen.Bullet;
 import mindustry.gen.Healthc;
+import mindustry.graphics.Drawf;
 import mindustry.graphics.Pal;
 import zzw.content.exp.ExpTurret;
 import zzw.content.exp.UnityPal;
@@ -37,6 +40,15 @@ public class ExpLaserBulletType extends LaserBulletType {
     public Color fromColor = Pal.lancerLaser;
     /** Color at max level */
     public Color toColor = UnityPal.expLaser;
+    /** PU_V8 原版三层描线的各层线宽系数 (实际线宽 = width × strokes[i]) */
+    public float[] strokes = {2.9f, 1.8f, 1f};
+    /** PU_V8 blip: 命中点处绘制扩散光圈 (仅 puLaser 模式下生效) */
+    public boolean blip = false;
+    /**
+     * 是否使用 PU_V8 原版渲染与命中行为 {@link ExpLaserBulletType}
+     * (细三层描线 + 命中点扩散光圈; 激光束止于首个命中目标, 而不是永远画到最大长度).
+     */
+    public boolean puLaser = false;
 
     public ExpLaserBulletType(float length, float damage){
         super(damage);
@@ -100,6 +112,11 @@ public class ExpLaserBulletType extends LaserBulletType {
         // 命中检测: 沿射线找到第一个可命中目标后触发 onHit (不施加额外伤害, 仅作为回调)
         Healthc target = Damage.linecast(b, b.x, b.y, rot, getLength(b));
         if(target != null){
+            // ★ PU_V8 还原: 激光束止于首个命中目标 (而不是永远画到最大长度)
+            if(puLaser){
+                float dist = Mathf.dst(b.x, b.y, target.getX(), target.getY());
+                if(dist > 0f) b.fdata = Math.min(resultLength, dist);
+            }
             onHit(b, target.getX(), target.getY());
         }
 
@@ -125,5 +142,42 @@ public class ExpLaserBulletType extends LaserBulletType {
                 }
             }
         }
+    }
+
+    /**
+     * PU_V8 原版渲染: 细三层描线激光 + 命中点扩散光圈 (blip)。
+     *
+     * <p>非 {@link #puLaser} 模式退回 v158 原生 {@link LaserBulletType} 渲染, 不影响其他经验激光炮台。</p>
+     */
+    @Override
+    public void draw(Bullet b){
+        if(!puLaser){
+            super.draw(b);
+            return;
+        }
+
+        float len = Math.max(b.fdata, 0f);
+        Tmp.v1.trns(b.rotation(), len).add(b.x, b.y);
+
+        Draw.color(getColor(b));
+        Draw.alpha(0.4f);
+        Lines.stroke(b.fout() * width * strokes[0]);
+        Lines.line(b.x, b.y, Tmp.v1.x, Tmp.v1.y);
+
+        Draw.alpha(1f);
+        Lines.stroke(b.fout() * width * strokes[1]);
+        Lines.line(b.x, b.y, Tmp.v1.x, Tmp.v1.y);
+
+        Draw.color(Color.white);
+        Lines.stroke(b.fout() * width * strokes[2]);
+        Lines.line(b.x, b.y, Tmp.v1.x, Tmp.v1.y);
+
+        if(blip){
+            Draw.color(Color.white, getColor(b), b.fin());
+            Lines.circle(Tmp.v1.x, Tmp.v1.y, b.fin() * width * 5f);
+        }
+        Draw.reset();
+
+        Drawf.light(b.x, b.y, Tmp.v1.x, Tmp.v1.y, width * 10f * b.fout(), Color.white, 0.6f);
     }
 }

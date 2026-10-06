@@ -400,7 +400,7 @@ public class Z_AdvTurrets {
             maxSouls = 7;
             efficiencyFrom = 0.7f;
             efficiencyTo = 1.67f;
-            shootType = new BulletType(0.0001f, 320f) {{  // 原版 speed=0.0001f 模拟即时命中
+            shootType = new BulletType(0.0001f, 460f) {{  // 原版 speed=0.0001f 模拟即时命中
                 lifetime = 50f;
                 pierce = true;
                 pierceBuilding = true;
