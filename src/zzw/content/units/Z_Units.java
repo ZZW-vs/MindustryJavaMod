@@ -2857,7 +2857,7 @@ public class Z_Units {
         // ===== citadel (T6 Mech, 磁轨炮+火焰喷射) =====
         citadel = new UnitType("citadel") {{
             health = 60000f;
-            armor = 20f;  // ★ 按用户设定: 16f → 20f
+            armor = 24f;  // ★ 加强: 16f → 24f
             speed = 0.3f;
             hitSize = 49f;
             rotateSpeed = 1.5f;
@@ -2930,7 +2930,7 @@ public class Z_Units {
         // PU_V8 原版: UnityUnitTypes.java 第1129-1248行
         empire = new UnitType("empire") {{
             health = 140000f;
-            armor = 22f;  // ★ 按用户设定: 20f → 22f
+            armor = 30f;  // ★ 加强: 20f → 30f
             speed = 0.2f;
             hitSize = 49f;
             rotateSpeed = 1.25f;
@@ -3066,7 +3066,7 @@ public class Z_Units {
         // PU_V8 原版: UnityUnitTypes.java 第1250-1328行
         cygnus = new UnitType("cygnus") {{
             health = 45000f;
-            armor = 10f;
+            armor = 18f;  // ★ 加强 (原 10f)
             speed = 0.26f;
             hitSize = 37f;
             rotateSpeed = 1.3f;
@@ -3157,7 +3157,7 @@ public class Z_Units {
         // ===== sagittarius (T7 Legs, 蓄力激光+加速箭弹, 力场护盾) =====
         sagittarius = new UnitType("sagittarius") {{
             health = 102500f;
-            armor = 12f;
+            armor = 26f;  // ★ 加强 (原 12f)
             speed = 0.25f;
             hitSize = 55f;
             rotateSpeed = 0.8f;
@@ -3246,7 +3246,7 @@ public class Z_Units {
         // PU_V8 原版: UnityUnitTypes.java 第1415-1508行
         araneidae = new UnitType("araneidae") {{
             health = 52000f;
-            armor = 15f;  // ★ 按用户设定: 13f → 15f
+            armor = 20f;  // ★ 加强: 13f → 20f
             speed = 0.42f;
             hitSize = 35.5f;
             rotateSpeed = 1.3f;
@@ -3382,7 +3382,7 @@ public class Z_Units {
         // PU_V8 原版: UnityUnitTypes.java 第1510-1635行
         theraphosidae = new UnitType("theraphosidae") {{
             health = 125000f;
-            armor = 17f;  // ★ 按用户设定: 16f → 17f
+            armor = 28f;  // ★ 加强: 16f → 28f
             speed = 0.4f;
             drag = 0.12f;
             hitSize = 49f;
@@ -3549,7 +3549,7 @@ public class Z_Units {
         // PU_V8 原版: UnityUnitTypes.java 第1637-1710行
         mantle = new UnitType("mantle") {{
             health = 54000f;
-            armor = 15f;  // ★ 按用户设定: 17f → 15f
+            armor = 20f;  // ★ 加强: 17f → 20f
             speed = 0.45f;
             accel = 0.04f;
             drag = 0.04f;
@@ -3636,7 +3636,7 @@ public class Z_Units {
         // PU_V8 原版: UnityUnitTypes.java 第1712-1805行
         aphelion = new UnitType("aphelion") {{
             health = 130000f;
-            armor = 17f;  // ★ 按用户设定: 16f → 17f
+            armor = 28f;  // ★ 加强: 16f → 28f
             speed = 0.44f;
             accel = 0.04f;
             drag = 0.03f;
@@ -3747,7 +3747,7 @@ public class Z_Units {
             // PU_V8: defaultController = HealingDefenderAI::new (v158 用 aiController 等效)
             aiController = () -> new zzw.content.units.ai.HealingDefenderAI();
             health = 45000f;
-            armor = 20f;
+            armor = 24f;  // ★ 加强 (原 20f)
             speed = 0.7f;
             rotateSpeed = 1f;
             accel = 0.04f;
@@ -3806,7 +3806,7 @@ public class Z_Units {
             // PU_V8: defaultController = HealingDefenderAI::new (v158 用 aiController 等效)
             aiController = () -> new zzw.content.units.ai.HealingDefenderAI();
             health = 52500f;
-            armor = 22f;
+            armor = 30f;  // ★ 加强 (原 22f)
             speed = 0.6f;
             rotateSpeed = 1f;
             accel = 0.04f;
@@ -4075,7 +4075,7 @@ public class Z_Units {
             engineSize = 0f;
             flying = true;
             hitSize = 13f;
-            armor = 2f;  // ★ 按用户设定 (原缺失)
+            armor = 4f;  // ★ 加强: 2f → 4f
             range = 165f;
             rotateSpeed = 4.6f;
             outlineColor = Color.valueOf("2e3142");
@@ -4153,7 +4153,7 @@ public class Z_Units {
             engineSize = 0f;
             flying = true;
             hitSize = 15f;
-            armor = 3f;  // ★ 按用户设定 (原缺失)
+            armor = 6f;  // ★ 加强: 3f → 6f
             range = 165f;
             rotateSpeed = 3.8f;
             outlineColor = Color.valueOf("2e3142");
@@ -4220,7 +4220,7 @@ public class Z_Units {
             engineSize = 0f;
             flying = true;
             hitSize = 30f;
-            armor = 4f;  // ★ 按用户设定 (原缺失)
+            armor = 9f;  // ★ 加强: 4f → 9f
             range = 165f;
             lowAltitude = true;
             rotateSpeed = 3.5f;
@@ -4300,7 +4300,7 @@ public class Z_Units {
             engineSize = 0f;
             flying = true;
             hitSize = 45f;
-            armor = 5f;  // ★ 按用户设定 (原缺失)
+            armor = 14f;  // ★ 加强: 5f → 14f
             range = 300f;
             rotateSpeed = 2.7f;
             lowAltitude = true;
@@ -4409,7 +4409,7 @@ public class Z_Units {
             engineSize = 0f;
             flying = true;
             hitSize = 45f;
-            armor = 6f;  // ★ 按用户设定 (原缺失)
+            armor = 20f;  // ★ 加强: 6f → 20f
             lowAltitude = true;
             rotateSpeed = 2.3f;
             outlineColor = Color.valueOf("2e3142");
@@ -4500,7 +4500,7 @@ public class Z_Units {
             speed = 0.5f;
             drag = 0.18f;
             hitSize = 77.5f;
-            armor = 17f;
+            armor = 18f;  // ★ 加强 (原 17f)
             accel = 0.19f;
             rotateSpeed = 0.86f;
             faceTarget = false;   // PU_V8: 海军单位朝行进方向, 不盯着目标
@@ -4614,7 +4614,7 @@ public class Z_Units {
             speed = 0.4f;
             drag = 0.18f;
             hitSize = 80f;
-            armor = 18f;
+            armor = 20f;  // ★ 加强 (原 18f)
             accel = 0.19f;
             rotateSpeed = 0.78f;
             faceTarget = false;   // PU_V8: 海军单位朝行进方向, 不盯着目标
@@ -4968,7 +4968,7 @@ public class Z_Units {
             accel = 0.1f;
             drag = 0.07f;
             hitSize = 24.5f;
-            armor = 6f;  // ★ 按用户设定 (EMP 系列每级 +2, 原缺失)
+            armor = 7f;  // ★ 加强: 6f → 7f
             engineOffset = 3.75f;
             outlineColor = Color.valueOf("2e3142");
             constructor = mindustry.gen.UnitEntity::create;
@@ -5047,7 +5047,7 @@ public class Z_Units {
             accel = 0.09f;
             drag = 0.07f;
             hitSize = 41.5f;
-            armor = 8f;  // ★ 按用户设定 (EMP 系列每级 +2, 原缺失)
+            armor = 10f;  // ★ 加强: 8f → 10f
             engineOffset = 24.25f;
             outlineColor = Color.valueOf("2e3142");
             constructor = mindustry.gen.UnitEntity::create;
@@ -5159,7 +5159,7 @@ public class Z_Units {
             accel = 0.06f;
             drag = 0.07f;
             hitSize = 57.5f;
-            armor = 10f;  // ★ 按用户设定 (EMP 系列每级 +2, 原缺失)
+            armor = 14f;  // ★ 加强: 10f → 14f
             engineOffset = 33.75f;
             engineSize = 3.5f;
             outlineColor = Color.valueOf("2e3142");

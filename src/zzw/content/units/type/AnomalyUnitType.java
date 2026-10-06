@@ -55,7 +55,7 @@ public class AnomalyUnitType extends UnityUnitType{
         accel = 0.08f;
         drag = 0.07f;
         hitSize = 137.5f;
-        armor = 18f;  // ★ 按用户设定 (原缺失)
+        armor = 26f;  // ★ 加强: 18f → 26f
         engineSize = -1f;
         flying = true;
         lowAltitude = true;

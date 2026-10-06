@@ -39,6 +39,7 @@ public class Z_KoruhUnits{
             boostMultiplier = 1.5f;
             itemCapacity = 15;
             health = 150;
+            armor = 4f;  // ★ 加强 (原缺失)
             buildSpeed = 0.9f;
             engineColor = Color.valueOf("d3ddff");
             canBoost = true;
@@ -81,6 +82,7 @@ public class Z_KoruhUnits{
             boostMultiplier = 0.6f;
             engineColor = Color.valueOf("feb380");
             health = 350f;
+            armor = 6f;  // ★ 加强 (原缺失)
             buildSpeed = 1.5f;
             rotateSpeed = 3f;
 
@@ -136,7 +138,7 @@ public class Z_KoruhUnits{
             health = 560;
             engineColor = Color.valueOf("d3ddff");
             flying = true;
-            armor = 6f;
+            armor = 8f;  // ★ 加强 (原 6f)
             accel = 0.02f;
 
             weapons.add(new BlankWeapon() {{

@@ -289,6 +289,16 @@
 - 合并时有烟雾效果和延迟检查
 
 ## 更新日志
+- 全系列（End 除外）单位护甲加强：对照原版 v160 护甲曲线，T3 以上单位全部补齐/提升护甲，护甲为 0 的单位一律补上，**无任何削弱**（血量 / 速度 / 武器均未改动）：
+  - **T6/T7 扩展单位**：citadel 20→24、empire 22→30、cygnus 10→18、sagittarius 12→26、araneidae 15→20、theraphosidae 17→28、mantle 15→20、aphelion 17→28、sedec 20→24、trigintaduo 22→30、deviation 12→20、anomaly 18→26
+  - **直升机 T1-T6**：caelifera 1（不变）、schistocerca 2→4、anthophila 3→6、vespula 4→9、lepidoptera 5→14、mantodea 6→20
+  - **EMP T1-T5**：discharge 2（不变）、pulse 4（不变）、emission 6→7、waveform 8→10、ultraviolet 10→14
+  - **Scar 多足 T1-T6**：hovos 0→1、ryzer 0→2、zena 0→4、sundown 4→8、rex 12→16、excelsus 18→32
+  - **Scar 飞行 T1-T3**：whirlwind 1→2、jetstream 2→4、vortex 3→6
+  - **koruh**：buffer 0→4、omega 0→6、cache 6→8
+  - **灵魂(巨石) T1-T7**：stele 5→6、pedestal 10→11、pilaster 15→16、pylon 23→25、monument 32→34、colossus 45→47、bastion 100→104
+  - **巨石辅助 / 能量环**：adsect 0→2、comitate 0→4、stray 0→2、tendence 0→4、liminality 0→6
+  - **海军**：fin 17→18、blue 18→20
 - 加强 End 阵营大激光与整体数值：
   - **共享大激光** (`OppressionLaserBulletType`) 伤害 9000 → 15000、建筑伤害倍率 0.4 → 0.6（压迫者主激光与虚空容器大激光共用此弹体）
   - **虚空容器 (void-vessel)**：发射大激光期间（充能中 + 激光跟随中）锁定移动与转向，表现与压迫者大招一致；血量 10000 → 13000，小碎裂弹伤害 600 → 800

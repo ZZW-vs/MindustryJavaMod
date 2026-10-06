@@ -39,7 +39,7 @@ public class DeviationUnitType extends UnityUnitType{
         accel = 0.07f;
         drag = 0.05f;
         hitSize = 96f;
-        armor = 12f;  // ★ 按用户设定 (原缺失)
+        armor = 20f;  // ★ 加强: 12f → 20f
         engineOffset = 38f;
         engineSize = 4.75f;
         flying = true;

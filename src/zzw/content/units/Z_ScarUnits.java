@@ -86,6 +86,7 @@ public class Z_ScarUnits {
             aiController = DistanceGroundAI::new;
             speed = 0.8f;
             health = 340;
+            armor = 1f;  // ★ 加强 (原缺失)
             hitSize = 7.75f * 1.7f;
             range = 350f;
             allowLegStep = true;
@@ -125,6 +126,7 @@ public class Z_ScarUnits {
             aiController = DistanceGroundAI::new;
             speed = 0.7f;
             health = 640;
+            armor = 2f;  // ★ 加强 (原缺失)
             hitSize = 9.5f * 1.7f;
             range = 350f;
             allowLegStep = true;
@@ -181,6 +183,7 @@ public class Z_ScarUnits {
             aiController = DistanceGroundAI::new;
             speed = 0.7f;
             health = 1220;
+            armor = 4f;  // ★ 加强 (原缺失)
             hitSize = 17.85f;
             range = 350f;
             allowLegStep = true;
@@ -260,7 +263,7 @@ public class Z_ScarUnits {
             allowLegStep = true;
             legMoveSpace = 0.53f;
             rotateSpeed = 2.5f;
-            armor = 4f;
+            armor = 8f;  // ★ 加强 (原 4f)
             legCount = 4;
             // legTrns = 0.4f; // v158.1 已移除该字段
             legLength = 44f;
@@ -325,7 +328,7 @@ public class Z_ScarUnits {
             range = 390f;
             allowLegStep = true;
             rotateSpeed = 2f;
-            armor = 12f;
+            armor = 16f;  // ★ 加强 (原 12f)
 
             hovering = true;
             groundLayer = Layer.legUnit + 0.01f;
@@ -435,7 +438,7 @@ public class Z_ScarUnits {
             range = 370f;
             allowLegStep = true;
             rotateSpeed = 1.4f;
-            armor = 18f;
+            armor = 32f;  // ★ 加强 (原 18f)
             // customBackLegs = true; // TODO: PU132 的 boolean customBackLegs 后腿翻转渲染
             //   依赖 drawLegs 覆盖 + leg-back/leg-base-back/foot-back 三张贴图,
             //   项目 UnityUnitType 的 customBackLegs 字段目前是 TextureRegion 语义,
@@ -560,7 +563,7 @@ public class Z_ScarUnits {
             drag = 0.019f;
             accel = 0.028f;
             hitSize = 8f;
-            armor = 1f;  // ★ 按用户设定 (原缺失)
+            armor = 2f;  // ★ 加强 (原 1f)
             engineOffset = 8f;
 
             weapons.add(new BlankWeapon() {{
@@ -619,7 +622,7 @@ public class Z_ScarUnits {
             drag = 0.019f;
             accel = 0.028f;
             hitSize = 11f;
-            armor = 2f;  // ★ 按用户设定 (原缺失)
+            armor = 4f;  // ★ 加强 (原 2f)
             engineOffset = 11f;
 
             weapons.add(new BlankWeapon() {{
@@ -680,7 +683,7 @@ public class Z_ScarUnits {
             drag = 0.019f;
             accel = 0.028f;
             hitSize = 11f;
-            armor = 3f;  // ★ 按用户设定 (原缺失)
+            armor = 6f;  // ★ 加强 (原 3f)
             engineOffset = 14f;
 
             weapons.add(new BlankWeapon() {{

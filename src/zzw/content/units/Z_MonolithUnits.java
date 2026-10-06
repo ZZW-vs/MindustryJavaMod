@@ -128,7 +128,7 @@ public class Z_MonolithUnits{
             health = 300f;
             speed = 0.6f;
             hitSize = 8f;
-            armor = 5f;
+            armor = 6f;  // ★ 加强 (原 5f)
 
             canBoost = true;
             boostMultiplier = 2.5f;
@@ -183,6 +183,7 @@ public class Z_MonolithUnits{
         adsect = new UnityUnitType("adsect"){{
             // TODO: PU132 defaultController = AssistantAI.create(mendCore, mine, build)
             health = 180f;
+            armor = 2f;  // ★ 加强 (原缺失)
             speed = 4f;
             accel = 0.4f;
             drag = 0.2f;
@@ -223,6 +224,7 @@ public class Z_MonolithUnits{
         comitate = new UnityUnitType("comitate"){{
             // TODO: PU132 defaultController = AssistantAI.create(mendCore, mine, build, heal)
             health = 420f;
+            armor = 4f;  // ★ 加强 (原缺失)
             speed = 4.5f;
             accel = 0.5f;
             drag = 0.15f;
@@ -302,7 +304,7 @@ public class Z_MonolithUnits{
             speed = 0.5f;
             rotateSpeed = 2.6f;
             hitSize = 11f;
-            armor = 10f;
+            armor = 11f;  // ★ 加强 (原 10f)
             singleTarget = true;
             maxSouls = 4; // TODO: 灵魂机制未移植, 数据占位
 
@@ -433,7 +435,7 @@ public class Z_MonolithUnits{
             speed = 0.4f;
             rotateSpeed = 2.2f;
             hitSize = 26.5f;
-            armor = 15f;
+            armor = 16f;  // ★ 加强 (原 15f)
             mechFrontSway = 0.55f;
             maxSouls = 5; // TODO: 灵魂机制未移植, 数据占位
 
@@ -680,7 +682,7 @@ public class Z_MonolithUnits{
             speed = 0.43f;
             rotateSpeed = 1.48f;
             hitSize = 36f;
-            armor = 23f;
+            armor = 25f;  // ★ 加强 (原 23f)
             // TODO: PU132 commandLimit = 8 (指挥半径系统) — v155.4 无该字段
             maxSouls = 7; // TODO: 灵魂机制未移植, 数据占位
 
@@ -747,7 +749,7 @@ public class Z_MonolithUnits{
             speed = 0.42f;
             rotateSpeed = 1.4f;
             hitSize = 48f;
-            armor = 32f;
+            armor = 34f;  // ★ 加强 (原 32f)
             // TODO: PU132 commandLimit = 8 — v155.4 无该字段
             maxSouls = 9; // TODO: 灵魂机制未移植, 数据占位
 
@@ -838,7 +840,7 @@ public class Z_MonolithUnits{
             speed = 0.4f;
             rotateSpeed = 1.2f;
             hitSize = 64f;
-            armor = 45f;
+            armor = 47f;  // ★ 加强 (原 45f)
             // TODO: PU132 commandLimit = 8 — v155.4 无该字段
             maxSouls = 12; // TODO: 灵魂机制未移植, 数据占位
 
@@ -901,7 +903,7 @@ public class Z_MonolithUnits{
             speed = 0.4f;
             rotateSpeed = 1.2f;
             hitSize = 67f;
-            armor = 100f;
+            armor = 104f;  // ★ 加强 (原 100f)
             // TODO: PU132 commandLimit = 8 — v155.4 无该字段
             maxSouls = 15; // TODO: 灵魂机制未移植, 数据占位
 
@@ -1049,6 +1051,7 @@ public class Z_MonolithUnits{
             constructor = DecorationUnitEntity::create;
 
             health = 300f;
+            armor = 2f;  // ★ 加强 (原缺失)
             speed = 5f;
             accel = 0.08f;
             drag = 0.045f;
@@ -1162,6 +1165,7 @@ public class Z_MonolithUnits{
             constructor = DecorationUnitEntity::create;
 
             health = 1200f;
+            armor = 4f;  // ★ 加强 (原缺失)
             // rotateShooting = false; // v158 无该字段
             lowAltitude = true;
             flying = true;
@@ -1324,6 +1328,7 @@ public class Z_MonolithUnits{
             constructor = DecorationUnitEntity::create;
 
             health = 2000f;
+            armor = 6f;  // ★ 加强 (原缺失)
             // rotateShooting = false; // v158 无该字段
             lowAltitude = true;
             flying = true;
