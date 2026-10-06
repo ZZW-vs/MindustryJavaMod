@@ -263,7 +263,7 @@ public class Z_EndUnits {
                 shootCone = 1f;
                 reload = 6f * 60f;
                 shootSound = Z_Sounds.continuousLaserB;
-                bullet = new EndCutterLaserBulletType(3100f){{
+                bullet = new EndCutterLaserBulletType(3600f){{
                     maxLength = 1200f;
                     lifetime = 3f * 60f;
                     width = 17f;
@@ -563,7 +563,7 @@ public class Z_EndUnits {
                     shootSound = Z_Sounds.thalassophobiaLaser;
                     drawRegion = false;
 
-                    bullet = new ContinuousSingularityLaserBulletType(3500f){{
+                    bullet = new ContinuousSingularityLaserBulletType(4500f){{
                         lifetime = 5f * 60f;
                         width = 40f;
                         widthReduction = 6f;

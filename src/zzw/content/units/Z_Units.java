@@ -765,7 +765,7 @@ public class Z_Units {
                 rotate = false;
                 shootCone = 360f;
 
-                bullet = new EndContinuousLaserBulletType(2650f) {{  // 2400 + 250
+                bullet = new EndContinuousLaserBulletType(3000f) {{  // ★ 加强: 2400 + 250 → 3000
                     length = 340f;
                     lifetime = 5f * 60f;
                     // PU132 原版颜色: scarColorAlpha(#f5303690), scarColor(#f53036), endColor(#ff786e), white
@@ -1138,7 +1138,7 @@ public class Z_Units {
                 shoot.shots = 5;
                 shoot.shotDelay = 6f;
 
-                bullet = new EndBasicBulletType(7f, 410f, "shell") {{
+                bullet = new EndBasicBulletType(7f, 520f, "shell") {{
                     lifetime = 95f;
                     splashDamage = 125f;
                     splashDamageRadius = 70f;
@@ -1216,7 +1216,7 @@ public class Z_Units {
                     Draw.color();
                 };
 
-                bullet = new VoidFractureBulletType(40f, 800f) {{
+                bullet = new VoidFractureBulletType(40f, 1000f) {{
                     speed = 5f;
                     delay = 50f;
                     lifetime = 60f;
@@ -1258,8 +1258,8 @@ public class Z_Units {
         SegmentWormEntity.configs.get(oppression.name).healPerSecond = 500f;
         // 压迫者: 受到伤害 × 0.7 (减伤30%)
         SegmentWormEntity.configs.get(oppression.name).damageMultiplier = 0.7f;
-        // 压迫者: 大招期间速度倍率 0.12 (只剩12%)
-        SegmentWormEntity.configs.get(oppression.name).ultSpeedMultiplier = 0.12f;
+        // 压迫者: 大招期间速度倍率 0.05 (只剩5%, 几乎转不动)
+        SegmentWormEntity.configs.get(oppression.name).ultSpeedMultiplier = 0.05f;
 
         // ★ 初始化 oppression 液压装饰 (WormDecal) ★
         // PU132 UnityUnitTypes 第4064-4073行:
@@ -1355,7 +1355,7 @@ public class Z_Units {
                 rotate = true;
                 reload = 4f;
                 rotateSpeed = 5f;
-                bullet = new VoidPelletBulletType(5.5f, 200f) {{
+                bullet = new VoidPelletBulletType(5.5f, 260f) {{
                     ratioDamage = 1f / 60f;
                     ratioStart = damage * 30f;
                 }};
@@ -1369,7 +1369,7 @@ public class Z_Units {
         //  - 防作弊: 简化版
         // ═══════════════════════════════════════════════════════════
         voidVessel = new zzw.content.type.UnityUnitType("void-vessel") {{
-            health = 10000f;
+            health = 13000f;
             // PU132: antiCheatType = (h/20, h/1.25, h/15, h/25, 0.2, 6m, 3m, 15, 4)
             antiCheatType = new zzw.content.units.anticheat.EndCheatVars(
                 health / 20f, health / 1.25f, health / 15f, health / 25f, 0.2f, 6f * 60f, 3f * 60f, 15f, 4);
@@ -1428,7 +1428,7 @@ public class Z_Units {
                 rotateSpeed = 5f;
                 shootCone = 30f;
                 shootSound = zzw.content.Z_Sounds.spaceFracture;
-                bullet = new VoidFractureBulletType(32f, 600f) {{
+                bullet = new VoidFractureBulletType(32f, 800f) {{
                     ratioDamage = 1f / 50f;
                     ratioStart = damage * 20f;
                     activeSound = zzw.content.Z_Sounds.fractureShoot;
@@ -1480,7 +1480,7 @@ public class Z_Units {
                 reload = 12f;
                 rotate = true;
                 rotateSpeed = 5f;
-                bullet = new TimeStopBulletType(6f, 510f);
+                bullet = new TimeStopBulletType(6f, 650f);
             }});
         }};
 
@@ -1525,7 +1525,7 @@ public class Z_Units {
                 reload = 4f * 60f;
                 shootSound = zzw.content.Z_Sounds.devourerMainLaser;
 
-                bullet = new mindustry.entities.bullet.LaserBulletType(1400f) {{
+                bullet = new mindustry.entities.bullet.LaserBulletType(1700f) {{
                     colors = new Color[]{Color.valueOf("f5303690"), Color.valueOf("f53036"), Color.valueOf("ff786e"), Color.white};
                     hitColor = Color.valueOf("f53036");
                     width = 30f;
@@ -1626,7 +1626,7 @@ public class Z_Units {
                 shootCone = 360f;
                 top = false;
                 shootSound = zzw.content.Z_Sounds.ravagerNightmareShoot;
-                bullet = new EndPointBlastLaserBulletType(1210f) {{
+                bullet = new EndPointBlastLaserBulletType(1500f) {{
                     length = 460f;
                     width = 26.1f;
                     lifetime = 25f;
@@ -2363,7 +2363,7 @@ public class Z_Units {
                 rotate = false;
                 shootSound = zzw.content.Z_Sounds.ravagerNightmareShoot;
 
-                bullet = new DesolationBulletType(1.75f, 2500f) {{
+                bullet = new DesolationBulletType(1.75f, 3000f) {{
                     lifetime = 8f * 60f;
                     overDamage = 900000f;
                     overDamagePower = 3f;

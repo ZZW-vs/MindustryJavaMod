@@ -52,6 +52,18 @@ public class EndLegsUnit extends UnitEntity {
     /** 单位配置的防作弊参数集 (add() 时从 UnitType.antiCheatType 读取, 无配置回退默认值) */
     private zzw.content.units.anticheat.EndCheatVars ac;
 
+    /**
+     * ★ 大激光锁定剩余时间 (秒)。
+     *
+     * <p>发射大激光 (OppressionLaserBulletType) 期间, 由充能状态或激光子弹每帧刷新;
+     * 大于 0 时本帧禁止移动和转向, 表现与压迫者大招一致 (虚空容器使用)。</p>
+     */
+    public float laserLock = 0f;
+    /** 锁定开始时的朝向 (锁定期间固定不变, 使激光方向保持不变) */
+    private float lockRotation = 0f;
+    /** 是否正处于大激光锁定状态 (用于记录进入锁定瞬间的朝向) */
+    private boolean lockActive = false;
+
     public static EndLegsUnit create() {
         return new EndLegsUnit();
     }
@@ -116,7 +128,37 @@ public class EndLegsUnit extends UnitEntity {
             }
         }
 
+        // ★ 大激光充能期间锁定 (与压迫者大招一致): 充能中时刷新锁定, 禁止移动/转向
+        if (mounts != null) {
+            for (WeaponMount mount : mounts) {
+                if (mount.charging && mount.weapon != null
+                    && mount.weapon.bullet instanceof zzw.content.units.bullets.OppressionLaserBulletType) {
+                    laserLock = 5f;
+                    break;
+                }
+            }
+        }
+        boolean laserLocked = laserLock > 0f;
+        if (laserLocked) {
+            // 进入锁定瞬间记录朝向, 锁定期间保持不变 (激光方向固定)
+            if (!lockActive) {
+                lockRotation = rotation;
+                lockActive = true;
+            }
+            vel.setZero();
+            laserLock = Math.max(0f, laserLock - Time.delta);
+        }
+
         super.update();
+
+        // ★ super.update() 后再次锁定 (控制器可能在本帧改了速度/朝向)
+        if (laserLocked) {
+            vel.setZero();
+            rotation = lockRotation;
+        }
+        if (laserLock <= 0f && lockActive) {
+            lockActive = false;
+        }
 
         // super.update() 后再次同步 (super 可能改了 health)
         if (trueHealth > 0f) {

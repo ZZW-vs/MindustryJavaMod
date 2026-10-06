@@ -70,8 +70,9 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
 
     public OppressionLaserBulletType() {
         speed = 0f;
-        damage = 9000f;
-        buildingDamageMultiplier = 0.4f;
+        // ★ 整体加强 End 大激光伤害 (原 9000): 压迫者与虚空容器共用此弹体
+        damage = 15000f;
+        buildingDamageMultiplier = 0.6f;
         despawnEffect = mindustry.content.Fx.none;
         // PU132: hitEffect = HitFx.endHitRedBig (红色大爆炸)
         // 用简化红色爆炸特效替代 (原版依赖 HitFx 自定义特效)
@@ -140,6 +141,11 @@ public class OppressionLaserBulletType extends AntiCheatBulletTypeBase {
             Unit u = (Unit) b.owner;
             b.set(u.x, u.y);
             b.rotation(u.rotation);
+            // ★ 虚空容器 (EndLegsUnit): 大激光跟随期间锁定移动/转向 (与压迫者大招一致)
+            //   压迫者走 SegmentWormEntity 的 isUltActive 机制, 此处只对 EndLegsUnit 生效
+            if (u instanceof zzw.content.units.entities.EndLegsUnit el) {
+                el.laserLock = 5f;
+            }
         }
 
         if (b.timer(1, 5f)) {

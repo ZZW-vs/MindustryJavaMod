@@ -289,6 +289,11 @@
 - 合并时有烟雾效果和延迟检查
 
 ## 更新日志
+- 加强 End 阵营大激光与整体数值：
+  - **共享大激光** (`OppressionLaserBulletType`) 伤害 9000 → 15000、建筑伤害倍率 0.4 → 0.6（压迫者主激光与虚空容器大激光共用此弹体）
+  - **虚空容器 (void-vessel)**：发射大激光期间（充能中 + 激光跟随中）锁定移动与转向，表现与压迫者大招一致；血量 10000 → 13000，小碎裂弹伤害 600 → 800
+  - **压迫者 (oppression)**：大招期间速度倍率 0.12 → 0.05（几乎转不动）；头部炮弹 410 → 520、虚空碎裂弹 800 → 1000
+  - **其余 End 单位小幅加强武器伤害**：谜团 200 → 260、克罗诺斯 510 → 650、盲视者 1400 → 1700、掠夺者 1210 → 1500、荒芜者 2500 → 3000、噬界虫主激光 2650 → 3000、深海恐惧奇异点激光 3500 → 4500、天启切割激光 3100 → 3600
 - kami（神）弹幕 Boss 弹幕 AI 完整对齐 PU132 原版（"完美移植"，此前为简化版）：
   - **补齐全部 6 个弹幕模式**：此前简化版只有 basicPattern1 / basicPattern2 / expandPattern / flowerPattern 四个，现补回 `flowerPattern2`（35 秒长时花瓣，用 `petal` 双向连发 + `stopChangeDirection` 行为）与 `hyperSpeedPattern`（advance 类，120 秒高速冲刺，带跑道视觉绘制与冲刺逻辑）
   - **模式选取系统**：新增 `KamiPattern.PatternType`（permanent / basic / bossBasic / advance），含 `able` / `limit` / `priority`；`KamiAI.reset()` 按"洗牌 + 优先级排序 + 限额抽取"从池中选题，与原版一致
