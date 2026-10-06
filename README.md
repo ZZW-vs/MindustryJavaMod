@@ -295,8 +295,23 @@
   - **保留平台特性**：`hovering`/`lowAltitude`、`hitSize=144` 整平台碰撞箱与悬停建筑信息面板等玩法不变；`WorldUnitType` 的空控制器继续保证未附身时平台不自行移动。
   - **子世界产出落点**：`ModularConstructor` 产出时先把单位落点推到平台包围盒外（避免与平台重叠），并临时 `popWorld()` 回到主世界再 `spawn()`，使新单位完全以主世界为基准生成。
 - 全系列（End 除外）单位护甲加强：对照原版 v160 护甲曲线，T3 以上单位全部补齐/提升护甲，护甲为 0 的单位一律补上，**无任何削弱**（血量 / 速度 / 武器均未改动）：
-  - **T6/T7 扩展单位**：citadel 20→24、empire 22→30、cygnus 10→18、sagittarius 12→26、araneidae 15→20、theraphosidae 17→28、mantle 15→20、aphelion 17→28、sedec 20→24、trigintaduo 22→30、deviation 12→20、anomaly 18→26
+  - **T6/T7 扩展单位**：citadel 20→32、empire 22→36、cygnus 10→24、sagittarius 12→26、araneidae 15→20、theraphosidae 17→28、mantle 15→20、aphelion 17→28、sedec 20→30、trigintaduo 22→34、deviation 12→20、anomaly 18→26
   - **直升机 T1-T6**：caelifera 1（不变）、schistocerca 2→4、anthophila 3→6、vespula 4→9、lepidoptera 5→14、mantodea 6→20
+- **全系列（End 除外）单位血量/伤害优化**：按定位对齐原版曲线，只加强、不削弱；高速冲刺单位保持薄血，重装/辅助单位补足血量：
+  - **血量调整**：
+    - **直升机系列**（冲刺定位）：caelifera 150（不变）、schistocerca 150→340（对齐飞行 T2）、anthophila 450→700（对齐飞行 T3）；vespula 4000（不变）、lepidoptera 9500（不变）、mantodea 25500（不变）
+    - **EMP 系列**（电磁脉冲定位）：discharge 60→120（对齐飞行 T1）、pulse 210→340（对齐飞行 T2）、emission 550→680（对齐飞行 T3）；waveform 4500（不变）、ultraviolet 12000（不变）
+    - **Scar 多足**（腿部定位）：hovos 340→260（T1 加强）、ryzer 640（不变）、zena 1220（不变）、sundown 9400（不变）、rex 23000（不变）、excelsus 38000→46000（对齐 T6 腿部）
+    - **Scar 飞行**（飞行定位）：whirlwind 280（不变）、jetstream 670→570（T2 加强）、vortex 1200→1050（T3 加强）
+    - **灵魂/巨石**（机甲/多足定位）：stele 300→300（T1 加强）、pedestal 1200→1000（T2 加强）、pilaster 2000→1800（T3 加强）；pylon 14400（不变）、monument 32000（不变）、colossus 60000（不变）、bastion 120000（不变）
+    - **辅助/能量环**（辅助定位）：adsect 180→280（对齐 T1 飞行）、comitate 420（不变）、stray 300（不变）、tendence 1200→600（对齐 T2 飞行）、liminality 2000→700（对齐 T3 飞行）
+    - **海军**（海军定位）：fin 36250→31000（T5 加强）、blue 42500（不变）
+    - **其他**：cache 560（不变）、anomaly 25000→35000（大型飞行单位）、excelsus 38000→46000（T6 腿部）
+  - **伤害加强**：
+    - **直升机系列**：机枪伤害 +40%~80%，燃烧弹/闪电/霰弹/火箭伤害 +30%~100%，霰弹枪 +28%，火箭炮 +38%，激光武器 +20%~40%
+    - **EMP 系列**：基础弹 +100%，EMP弹 +100%，激光武器 +33%~50%
+    - **Scar 系列**：磁轨炮 +20%~40%，导弹 +17%，连续激光 +18%~25%
+    - **其他**：T6/T7 磁轨炮 +20%~50%，大型火焰武器 +20%~30%，激光武器 +40%~50%
   - **EMP T1-T5**：discharge 2（不变）、pulse 4（不变）、emission 6→7、waveform 8→10、ultraviolet 10→14
   - **Scar 多足 T1-T6**：hovos 0→1、ryzer 0→2、zena 0→4、sundown 4→8、rex 12→16、excelsus 18→32
   - **Scar 飞行 T1-T3**：whirlwind 1→2、jetstream 2→4、vortex 3→6
@@ -304,6 +319,16 @@
   - **灵魂(巨石) T1-T7**：stele 5→6、pedestal 10→11、pilaster 15→16、pylon 23→25、monument 32→34、colossus 45→47、bastion 100→104
   - **巨石辅助 / 能量环**：adsect 0→2、comitate 0→4、stray 0→2、tendence 0→4、liminality 0→6
   - **海军**：fin 17→18、blue 18→20
+- **重点单位数值再加强**（citadel / empire / colossus / monument / pylon / cygnus / sagittarius / sedec / trigintaduo）：
+  - **citadel（君主）**：护甲 24→32；攻击范围 400→432（+4 格）；主磁轨炮射速 60→48，左右火焰喷射器射速 3→2.5 / 2→1.5，火焰子弹伤害 50→65
+  - **empire（帝国）**：护甲 30→36；火焰伤害 75→120；导弹伤害 22→52；炮弹伤害 15→38
+  - **colossus（巨像）**：护甲 47→60；主激光 1920→2500、伴随闪电 48→65；环绕闪电球伤害 200→260
+  - **monument（丰碑）**：护甲 34→40；激光 640→850；电磁炮弹 6000→7500
+  - **pylon（塔）**：护甲 25→26；主激光 2000→2500、伴随闪电 56→72、副激光 192→256
+  - **cygnus（天鹅座）**：护甲 18→24
+  - **sagittarius（人马座）**：护甲 26（保持不变）
+  - **sedec（壁垒）**：护甲 24→30
+  - **trigintaduo（天枢）**：护甲 30→34
 - 加强 End 阵营大激光与整体数值：
   - **共享大激光** (`OppressionLaserBulletType`) 伤害 9000 → 15000、建筑伤害倍率 0.4 → 0.6（压迫者主激光与虚空容器大激光共用此弹体）
   - **虚空容器 (void-vessel)**：发射大激光期间（充能中 + 激光跟随中）锁定移动与转向，表现与压迫者大招一致；血量 10000 → 13000，小碎裂弹伤害 600 → 800

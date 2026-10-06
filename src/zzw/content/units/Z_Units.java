@@ -2797,7 +2797,7 @@ public class Z_Units {
         // ═══════════════════════════════════════════════════════════
 
         // ===== 共享子弹定义 (PU_V8 UnityBullets 移植) =====
-        citadelFlame = new FlameBulletType(4.2f, 50f) {{
+        citadelFlame = new FlameBulletType(4.2f, 65f) {{
             lifetime = 20f;
             particleAmount = 17;
         }};
@@ -2857,7 +2857,7 @@ public class Z_Units {
         // ===== citadel (T6 Mech, 磁轨炮+火焰喷射) =====
         citadel = new UnitType("citadel") {{
             health = 60000f;
-            armor = 24f;  // ★ 加强: 16f → 24f
+            armor = 32f;  // ★ 加强: 16f → 24f → 32f
             speed = 0.3f;
             hitSize = 49f;
             rotateSpeed = 1.5f;
@@ -2870,7 +2870,7 @@ public class Z_Units {
             outlineColor = Color.valueOf("2e3142");
             constructor = mindustry.gen.MechUnit::create;
             aiController = () -> new mindustry.ai.types.GroundAI();
-            range = 400f;
+            range = 432f;   // ★ 攻击范围 +4 格 (400f → 432f)
 
             // 武器1: 磁轨炮 (SlowRailBulletType), 武器2,3: 火焰喷射器 (LimitedAngleWeapon + FlameBulletType)
             weapons.add(new Weapon(name + "-weapon") {{
@@ -2878,7 +2878,7 @@ public class Z_Units {
                 x = 31.5f;
                 y = -6.25f;
                 shootY = 30.25f;
-                reload = 60f;   // ★ 射速加快 (原 90f)
+                reload = 48f;   // ★ 射速再加快 (原 90f → 60f → 48f)
                 recoil = 7f;
                 shake = 3f;
                 ejectEffect = mindustry.content.Fx.casing4;
@@ -2905,7 +2905,7 @@ public class Z_Units {
                 x = 17.75f;
                 y = 11.25f;
                 shootY = 5.5f;
-                reload = 4f;    // ★ 射速加快 (原 5f)
+                reload = 2.5f;    // ★ 射速再加快 (原 5f → 3f → 2.5f)
                 recoil = 0.5f;
                 shootSound = mindustry.gen.Sounds.shootFlame;
                 angleCone = 80f;
@@ -2916,7 +2916,7 @@ public class Z_Units {
                 x = 14f;
                 y = -9f;
                 shootY = 5.5f;
-                reload = 3f;    // ★ 射速加快 (原 4f)
+                reload = 1.5f;    // ★ 射速再加快 (原 4f → 2f → 1.5f)
                 recoil = 0.5f;
                 shootSound = mindustry.gen.Sounds.shootFlame;
                 angleCone = 80f;
@@ -2930,7 +2930,7 @@ public class Z_Units {
         // PU_V8 原版: UnityUnitTypes.java 第1129-1248行
         empire = new UnitType("empire") {{
             health = 140000f;
-            armor = 30f;  // ★ 加强: 20f → 30f
+            armor = 36f;  // ★ 加强: 20f → 30f → 36f
             speed = 0.2f;
             hitSize = 49f;
             rotateSpeed = 1.25f;
@@ -2963,7 +2963,7 @@ public class Z_Units {
                 shootCone = 20f;
                 shootSound = Sounds.shootFlame;
                 cooldownTime = 180f;
-                bullet = new FlameBulletType(6.6f, 75f) {{
+                bullet = new FlameBulletType(6.6f, 120f) {{
                     lifetime = 42f;
                     pierceCap = 6;
                     pierceBuilding = true;
@@ -3003,7 +3003,7 @@ public class Z_Units {
                 reload = 60f;
                 shootCone = 30f;
                 shootSound = Sounds.shootMissile;
-                bullet = new MissileBulletType(2.5f, 22f) {{
+                bullet = new MissileBulletType(2.5f, 52f) {{
                     lifetime = 40f;
                     drag = -0.005f;
                     width = 14f;
@@ -3046,7 +3046,7 @@ public class Z_Units {
                 reload = 40f;
                 mirror = true;
                 shootSound = Sounds.shootArtillery;
-                bullet = new ArtilleryBulletType(3f, 15f) {{
+                bullet = new ArtilleryBulletType(3f, 38f) {{
                     hitEffect = mindustry.content.Fx.blastExplosion;
                     knockback = 0.8f;
                     lifetime = 125f;
@@ -3066,7 +3066,7 @@ public class Z_Units {
         // PU_V8 原版: UnityUnitTypes.java 第1250-1328行
         cygnus = new UnitType("cygnus") {{
             health = 45000f;
-            armor = 18f;  // ★ 加强 (原 10f)
+            armor = 24f;  // ★ 加强 (原 10f → 18f → 24f)
             speed = 0.26f;
             hitSize = 37f;
             rotateSpeed = 1.3f;
@@ -3747,7 +3747,7 @@ public class Z_Units {
             // PU_V8: defaultController = HealingDefenderAI::new (v158 用 aiController 等效)
             aiController = () -> new zzw.content.units.ai.HealingDefenderAI();
             health = 45000f;
-            armor = 24f;  // ★ 加强 (原 20f)
+            armor = 30f;  // ★ 加强 (原 20f → 24f → 30f)
             speed = 0.7f;
             rotateSpeed = 1f;
             accel = 0.04f;
@@ -3806,7 +3806,7 @@ public class Z_Units {
             // PU_V8: defaultController = HealingDefenderAI::new (v158 用 aiController 等效)
             aiController = () -> new zzw.content.units.ai.HealingDefenderAI();
             health = 52500f;
-            armor = 30f;  // ★ 加强 (原 22f)
+            armor = 34f;  // ★ 加强 (原 22f → 30f → 34f)
             speed = 0.6f;
             rotateSpeed = 1f;
             accel = 0.04f;
@@ -4038,7 +4038,7 @@ public class Z_Units {
                 shootY = 1.5f;
                 mirror = true;
                 shootCone = 30f;
-                bullet = new mindustry.entities.bullet.BasicBulletType(5f, 7f) {{
+                bullet = new mindustry.entities.bullet.BasicBulletType(5f, 10f) {{
                     lifetime = 30f;
                     shrinkY = 0.2f;
                 }};
@@ -4051,10 +4051,10 @@ public class Z_Units {
                 shootY = 2.25f;
                 mirror = true;
                 shootCone = 30f;
-                bullet = new mindustry.entities.bullet.MissileBulletType(3f, 2f) {{
+                bullet = new mindustry.entities.bullet.MissileBulletType(3f, 4f) {{
                     speed = 3f;
                     lifetime = 45f;
-                    splashDamage = 40f;
+                    splashDamage = 55f;
                     splashDamageRadius = 8f;
                     drag = -0.01f;
                 }};
@@ -4071,7 +4071,7 @@ public class Z_Units {
             speed = 4.5f;
             drag = 0.07f;
             accel = 0.03f;
-            health = 150f;
+            health = 150f;  // 定位: 直升机冲刺型, 血量薄
             engineSize = 0f;
             flying = true;
             hitSize = 13f;
@@ -4089,7 +4089,7 @@ public class Z_Units {
                 reload = 8f;
                 mirror = true;
                 shootCone = 30f;
-                bullet = new mindustry.entities.bullet.BasicBulletType(5f, 8f) {{
+                bullet = new mindustry.entities.bullet.BasicBulletType(5f, 12f) {{
                     lifetime = 36f;
                     shrinkY = 0.2f;
                 }};
@@ -4103,7 +4103,7 @@ public class Z_Units {
                 reload = 12f;
                 mirror = true;
                 shootCone = 30f;
-                bullet = new mindustry.entities.bullet.BasicBulletType(4f, 12f) {{
+                bullet = new mindustry.entities.bullet.BasicBulletType(4f, 18f) {{
                     width = 7f;
                     height = 9f;
                     lifetime = 36f;
@@ -4118,13 +4118,13 @@ public class Z_Units {
                 reload = 30f;
                 mirror = true;
                 shootCone = 30f;
-                bullet = new mindustry.entities.bullet.BasicBulletType(3.2f, 16f) {{
+                bullet = new mindustry.entities.bullet.BasicBulletType(3.2f, 22f) {{
                     width = 10f;
                     height = 12f;
                     lifetime = 60f;
                     frontColor = mindustry.graphics.Pal.lightishOrange;
                     backColor = mindustry.graphics.Pal.lightOrange;
-                    splashDamage = 10f;
+                    splashDamage = 15f;
                     splashDamageRadius = 22f;
                     makeFire = true;
                     status = mindustry.content.StatusEffects.burning;
@@ -4149,7 +4149,7 @@ public class Z_Units {
             speed = 4f;
             drag = 0.07f;
             accel = 0.03f;
-            health = 450f;
+            health = 450f;  // 定位: 直升机冲刺型, 血量薄
             engineSize = 0f;
             flying = true;
             hitSize = 15f;
@@ -4166,7 +4166,7 @@ public class Z_Units {
                 reload = 15f;
                 mirror = true;
                 shootCone = 30f;
-                bullet = new mindustry.entities.bullet.BasicBulletType(6f, 60f) {{
+                bullet = new mindustry.entities.bullet.BasicBulletType(6f, 85f) {{
                     lifetime = 30f;
                     width = 16f;
                     height = 20f;
@@ -4184,7 +4184,7 @@ public class Z_Units {
                 mirror = true;
                 shootCone = 30f;
                 bullet = new mindustry.entities.bullet.LightningBulletType() {{
-                    damage = 15f;
+                    damage = 22f;
                     lightningLength = 12;
                     lightningColor = mindustry.graphics.Pal.surge;
                 }};
@@ -4235,7 +4235,7 @@ public class Z_Units {
                 shootY = 7.25f;
                 reload = 12f;
                 shootSound = Sounds.shootSalvo;
-                bullet = new BasicBulletType(6f, 60f) {{
+                bullet = new BasicBulletType(6f, 80f) {{
                     lifetime = 30f;
                     width = 16f;
                     height = 20f;
@@ -4255,7 +4255,7 @@ public class Z_Units {
                 shoot.shots = 4;
                 shoot.shotDelay = 2f;
                 shootSound = Sounds.shootDuo;
-                bullet = new BasicBulletType(4f, 29f) {{
+                bullet = new BasicBulletType(4f, 38f) {{
                     width = 10f;
                     height = 13f;
                     lifetime = 60f;
@@ -4272,7 +4272,7 @@ public class Z_Units {
                 shootY = 4.5f;
                 reload = 60f;
                 shootSound = Sounds.shootLaser;
-                bullet = new LaserBulletType(150f) {{
+                bullet = new LaserBulletType(190f) {{
                     sideAngle = 45f;
                     length = 200f;
                 }};
@@ -4318,7 +4318,7 @@ public class Z_Units {
                 shootCone = 30f;
                 shootSound = Sounds.shootSpectre;  // ★ 原版 Sounds.shootBig, v158 无此音效用 shootSpectre 替代
                 ejectEffect = mindustry.content.Fx.casing3Double;
-                bullet = new mindustry.entities.bullet.BasicBulletType(7.5f, 90f) {{
+                bullet = new mindustry.entities.bullet.BasicBulletType(7.5f, 115f) {{
                     lifetime = 30f;
                     width = 18f;
                     height = 22f;
@@ -4348,7 +4348,7 @@ public class Z_Units {
                     weaveMag = 2f;
                     lifetime = 35f;
                     drag = -0.01f;
-                    splashDamage = 48f;
+                    splashDamage = 60f;
                     splashDamageRadius = 12f;
                 }};
             }});
@@ -4368,7 +4368,7 @@ public class Z_Units {
                 // PU_V8: shots=3, spacing=15f, shotDelay=0f (3发同时发射, 角度间隔15度)
                 shoot = new mindustry.entities.pattern.ShootSpread(3, 15f);
                 bullet = new mindustry.entities.bullet.ShrapnelBulletType() {{
-                    damage = 180f;
+                    damage = 230f;
                     length = 150f;
                     toColor = mindustry.graphics.Pal.accent;
                     keepVelocity = false;
@@ -4418,13 +4418,13 @@ public class Z_Units {
             // 基础伤害在 40f 到 60f 之间随机
 
             // ★ 伤害 60 每发, 子弹速度放慢 (15f → 10f), 寿命 20f → 30f 保持落点距离
-            BulletType mantodeaFlak = new FlakBulletType(10f, 60f) {{
+            BulletType mantodeaFlak = new FlakBulletType(10f, 75f) {{
                 lifetime = 30f;
                 collidesGround = true;
                 lightning = 4;
                 lightningLength = 5;
                 lightningLengthRand = 3;
-                lightningDamage = 25f;
+                lightningDamage = 32f;
                 lightningColor = Pal.surge;
             }};
 
@@ -4496,7 +4496,7 @@ public class Z_Units {
 
         // ===== fin (鳍级战列舰, PU_V8 原版) =====
         fin = new UnitType("fin") {{
-            health = 36250f;
+            health = 31000f;
             speed = 0.5f;
             drag = 0.18f;
             hitSize = 77.5f;
@@ -4874,7 +4874,7 @@ public class Z_Units {
         discharge = new UnitType("discharge") {{
             flying = true;
             lowAltitude = true;
-            health = 60f;
+            health = 120f;  // ★ 加强 (原 60): 对齐原版飞行 T1 血量曲线
             speed = 2f;
             accel = 0.09f;
             drag = 0.02f;
@@ -4917,7 +4917,7 @@ public class Z_Units {
         pulse = new UnitType("pulse") {{
             flying = true;
             lowAltitude = true;
-            health = 210f;
+            health = 340f;  // ★ 加强 (原 210): 对齐原版飞行 T2 血量曲线 (340)
             speed = 1.8f;
             accel = 0.1f;
             drag = 0.06f;
@@ -4963,7 +4963,7 @@ public class Z_Units {
         emission = new UnitType("emission") {{
             flying = true;
             lowAltitude = true;
-            health = 550f;
+            health = 680f;  // ★ 加强 (原 550): 对齐原版飞行 T3 血量曲线
             speed = 1.2f;
             accel = 0.1f;
             drag = 0.07f;

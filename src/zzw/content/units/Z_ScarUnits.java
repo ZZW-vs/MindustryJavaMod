@@ -85,8 +85,8 @@ public class Z_ScarUnits {
         hovos = new UnityUnitType("hovos"){{
             aiController = DistanceGroundAI::new;
             speed = 0.8f;
-            health = 340;
-            armor = 1f;  // ★ 加强 (原缺失)
+            health = 260f;  // 定位: Scar T1 腿部单位，对齐原版 T1 腿部 (150)
+            armor = 1f;
             hitSize = 7.75f * 1.7f;
             range = 350f;
             allowLegStep = true;
@@ -106,7 +106,7 @@ public class Z_ScarUnits {
                 rotateSpeed = 2f;
 
                 bullet = new RailBulletType(){{
-                    damage = 500f;
+                    damage = 600f;
                     length = 59f * 6f;
                     // PU132: updateEffectSeg = 59f → v158.1 分段特效字段为 pointEffectSpace
                     pointEffectSpace = 59f;
@@ -145,7 +145,7 @@ public class Z_ScarUnits {
                 shake = 2.3f;
 
                 bullet = new RailBulletType(){{
-                    damage = 700f;
+                    damage = 750f;
                     length = 59f * 7f;
                     pointEffectSpace = 59f;
                     pointEffect = ScarFx.scarRailTrail;
@@ -204,7 +204,7 @@ public class Z_ScarUnits {
                     reload = 2.75f * 60f;
 
                     bullet = new RailBulletType(){{
-                        damage = 780f;
+                        damage = 820f;
                         length = 60f * 7f;
                         pointEffectSpace = 60f;
                         pointEffect = ScarFx.scarRailTrail;
@@ -242,7 +242,7 @@ public class Z_ScarUnits {
                         shrinkY = 0f;
                         backColor = trailColor = UnityPal.scarColor;
                         frontColor = UnityPal.endColor;
-                        splashDamage = 30f;
+                        splashDamage = 35f;
                         splashDamageRadius = 20f;
                         weaveMag = 3f;
                         weaveScale = 4f;
@@ -301,7 +301,7 @@ public class Z_ScarUnits {
                 shootSound = Sounds.shootArtillery;
 
                 bullet = new RailBulletType(){{
-                    damage = 880f;
+                        damage = 920f;
                     length = 61f * 7f;
                     pointEffectSpace = 61f;
                     pointEffect = ScarFx.scarRailTrail;
@@ -355,7 +355,7 @@ public class Z_ScarUnits {
                 shootSound = Sounds.shootArtillery;
 
                 bullet = new RailBulletType(){{
-                    damage = 3300f;
+                        damage = 3500f;
                     buildingDamageMultiplier = 0.5f;
                     length = 61f * 8f;
                     pointEffectSpace = 61f;
@@ -433,7 +433,7 @@ public class Z_ScarUnits {
         excelsus = new UnityUnitType("excelsus"){{
             aiController = DistanceGroundAI::new;
             speed = 0.6f;
-            health = 38000;
+            health = 46000;  // ★ 加强 (原 38000): 对齐原版腿部 T6 血量曲线 (约 2×T5=44000)
             hitSize = 66.5f;
             range = 370f;
             allowLegStep = true;
@@ -505,7 +505,7 @@ public class Z_ScarUnits {
                 alternate = false;
                 shootSound = Sounds.none;
 
-                bullet = new ContinuousLaserBulletType(40f){{
+                bullet = new ContinuousLaserBulletType(45f){{
                     length = 180f;
                     lifetime = 10f * 60f;
                     shake = 1.2f;
@@ -530,7 +530,7 @@ public class Z_ScarUnits {
                 alternate = false;
                 shootSound = Sounds.none;
 
-                bullet = new ContinuousLaserBulletType(210f){{
+                bullet = new ContinuousLaserBulletType(220f){{
                     length = 360f;
                     lifetime = 3f * 60f;
                     shake = 3f;
@@ -576,7 +576,7 @@ public class Z_ScarUnits {
                 shootStatus = reloadFatigue;
                 shootCone = 20f;
 
-                bullet = new SaberContinuousLaserBulletType(21f){{
+                bullet = new SaberContinuousLaserBulletType(25f){{
                     lightStroke = 40f;
                     largeHit = false;
                     lifetime = 10 * 60f;
@@ -615,7 +615,7 @@ public class Z_ScarUnits {
 
         // Jetstream (T2) - 进阶飞行单位, swipe saber 激光 + 导弹
         jetstream = new UnityUnitType("jetstream"){{
-            health = 670;
+            health = 570;
             rotateSpeed = 12.5f;
             flying = true;
             speed = 9.2f;
@@ -633,7 +633,7 @@ public class Z_ScarUnits {
                 shootStatus = reloadFatigue;
                 shootCone = 15f;
 
-                bullet = new SaberContinuousLaserBulletType(35f){{
+                bullet = new SaberContinuousLaserBulletType(45f){{
                     swipe = true;
                     lightStroke = 40f;
                     largeHit = false;
@@ -676,7 +676,7 @@ public class Z_ScarUnits {
 
         // Vortex (T3) - 高级飞行单位, swipe saber 激光
         vortex = new UnityUnitType("vortex"){{
-            health = 1200;
+            health = 1050;
             rotateSpeed = 12.5f;
             flying = true;
             speed = 9.1f;

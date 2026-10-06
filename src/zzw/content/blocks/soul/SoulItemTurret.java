@@ -61,6 +61,8 @@ public class SoulItemTurret extends ItemTurret implements ISoulTurret {
                 if (maxSouls > 0) {
                     bt.add(arc.Core.bundle.format("soul.max", maxSouls)).padLeft(6);
                 }
+                bt.row();
+                bt.add(arc.Core.bundle.format("soul.bonus", (int) (efficiencyFrom * 100f), (int) (efficiencyTo * 100f)));
             });
         });
     }
@@ -137,6 +139,15 @@ public class SoulItemTurret extends ItemTurret implements ISoulTurret {
         public void read(Reads read, byte revision) {
             super.read(read, revision);
             souls = read.i();
+        }
+
+        @Override
+        public void onDestroyed() {
+            // 灵魂炮台被摧毁时释放体内灵魂 (PU132 SoulComp.onRemoved -> Soul.spreadSouls)
+            if (mindustry.Vars.net.server() || !mindustry.Vars.net.active()) {
+                spreadSouls();
+            }
+            super.onDestroyed();
         }
     }
 }

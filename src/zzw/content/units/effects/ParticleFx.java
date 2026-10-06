@@ -285,6 +285,32 @@ public class ParticleFx{
     })),
 
     /**
+     * 灵魂粒子 (48f) —— ParticleFx.monolithSoul。
+     *
+     * <p>data 携带速度方向 {@link Vec2} (灵魂单位速度反向 × 0.3)。
+     * additive 蓝黑渐变, 粒子沿数据速度漂移, 收缩为光点 + 柔影。</p>
+     */
+    monolithSoul = new Effect(48f, e -> {
+        if(!(e.data instanceof Vec2 data)) return;
+
+        blend(Blending.additive);
+        color(UnityPal.monolith, UnityPal.monolithDark, Color.black, e.finpow());
+
+        float time = Time.time - e.rotation, vx = data.x * time, vy = data.y * time;
+        randLenVectors(e.id, 1, 5f + e.finpowdown() * 8f, (x, y) -> {
+            float fin = 1f - e.fin(Interp.pow2In);
+
+            alpha(1f);
+            circle(e.x + x + vx, e.y + y + vy, fin * 2f);
+
+            alpha(0.67f);
+            arc.graphics.g2d.Draw.rect("circle-shadow", e.x + x + vx, e.y + y + vy, fin * 8f, fin * 8f);
+        });
+
+        blend();
+    }).layer(Layer.flyingUnit - 0.01f),
+
+    /**
      * 雷电支点线 (36f): 3 条随机短线段, 分布半径随 foutpowdown 收缩,
      * 线段朝向指向粒子本身的方位角, 长度 fin×6 渐长。
      * 用作闪电类武器的中继 "支点" 视觉。

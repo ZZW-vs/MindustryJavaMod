@@ -56,6 +56,13 @@ public class Quat{
     }
 
     /**
+     * 从 arc.math.geom.Quat 构造 (跨包转换)。
+     */
+    public Quat setFromQuat(arc.math.geom.Quat other){
+        return set(other.x, other.y, other.z, other.w);
+    }
+
+    /**
      * 哈密顿积 this = this ⊗ q (组合旋转: 先应用 q 的旋转, 再应用 this 的旋转)。
      */
     public Quat mul(Quat q){

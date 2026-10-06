@@ -49,7 +49,7 @@ public class AnomalyUnitType extends UnityUnitType{
         // ★ 装饰实体: 持有 decors[] 驱动翅膀动画, 没有它翅膀不会显示!
         constructor = DecorationUnitEntity::create;
 
-        health = 25000f;
+        health = 35000f;  // ★ 加强 (原 25000): 大型飞行单位, 血量偏低
         speed = 2.1f;
         rotateSpeed = 1f;
         accel = 0.08f;

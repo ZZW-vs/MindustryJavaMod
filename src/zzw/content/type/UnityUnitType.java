@@ -67,8 +67,9 @@ public class UnityUnitType extends UnitType{
     /**
      * 最大容纳灵魂数 (PU132 UnitType.maxSouls)。
      *
-     * <p>TODO: 灵魂机制 (MonolithSoul 聚合形成单位 / 单位死亡拆解为灵魂)
-     * 未移植, 此字段仅作为数据占位保留, 与 PU132 数值一致。</p>
+     * <p>已生效: 灵魂承载实体 (SoulMechUnit / SoulLegsUnit / SoulDecorationUnit)
+     * 在 {@code setType} 时读取此值作为灵魂容量; 单位死亡时经
+     * {@code Soul.spreadSouls()} 拆解为灵魂单位。0 = 该单位不承载灵魂。</p>
      */
     public int maxSouls = 0;
 
@@ -249,5 +250,23 @@ public class UnityUnitType extends UnitType{
         Draw.color(engineColor != null ? engineColor : unit.team.color);
         super.drawTrail(unit);
         Draw.reset();
+    }
+
+    /**
+     * 数值面板 (覆盖): 可承载灵魂的单位额外显示灵魂容量与"无魂瘫痪"提示
+     * (PU132 MonolithComp 阵营机制 —— 巨石单位必须供魂)。
+     */
+    @Override
+    public void setStats(){
+        super.setStats();
+
+        if(maxSouls > 0){
+            stats.add(mindustry.world.meta.Stat.abilities, t -> t.table(bt -> {
+                bt.left().defaults().padRight(3).left();
+                bt.add(Core.bundle.format("soul.capacity", maxSouls));
+                bt.row();
+                bt.add(Core.bundle.get("soul.disabled"));
+            }));
+        }
     }
 }

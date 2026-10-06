@@ -42,10 +42,10 @@ public class UnityBullets{
         pylonLightning = new LightningBulletType(){{
             lightningLength = 32;
             lightningLengthRand = 12;
-            damage = 56f;
+            damage = 72f;
         }};
 
-        pylonLaser = new LaserBulletType(2000f){
+        pylonLaser = new LaserBulletType(2500f){
             {
                 length = 520f;
                 width = 60f;
@@ -73,7 +73,7 @@ public class UnityBullets{
             }
         };
 
-        pylonLaserSmall = new LaserBulletType(192f){{
+        pylonLaserSmall = new LaserBulletType(256f){{
             lifetime = 24f;
             length = 180f;
             width = 24f;
@@ -82,7 +82,7 @@ public class UnityBullets{
         }};
 
         monumentRailBullet = new PointBulletType(){{
-            damage = 6000f;
+            damage = 7500f;
             buildingDamageMultiplier = 0.8f;
             speed = maxRange = 540f;
             lifetime = 1f;

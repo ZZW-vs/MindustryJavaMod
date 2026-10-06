@@ -3,6 +3,7 @@ package zzw.content.units.effects;
 import arc.Core;
 import arc.graphics.Blending;
 import arc.graphics.Color;
+import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Fill;
 import arc.graphics.g2d.Lines;
 import arc.graphics.g2d.TextureRegion;
@@ -20,6 +21,7 @@ import mindustry.graphics.Layer;
 import mindustry.graphics.Pal;
 import mindustry.graphics.Trail;
 import zzw.content.graphics.UnityPal;
+import zzw.content.units.entities.MonolithSoulUnit;
 import zzw.content.units.graphics.TexturedTrail;
 import zzw.content.units.graphics.MultiTrail;
 import zzw.content.units.graphics.MultiTrail.TrailHold;
@@ -573,5 +575,91 @@ public class MonolithFx{
             Drawf.tri(e.x + Tmp.v1.x, e.y + Tmp.v1.y, Lines.getStroke() * 1.22f, 12f * scl, rot);
             Drawf.tri(e.x, e.y, Lines.getStroke() * 1.22f, 12f * scl, rot + 180f);
         }
-    });
+    }),
+
+    /**
+     * 灵魂单位死亡特效 (64f) —— DeathFx.monolithSoulDeath。
+     *
+     * <p>monolith → monolithDark 渐变色的 27 粒光尘向外飞散 +
+     * 后段 (scaled 48f) 一圈扩张光环 (半径到 32f) 与 4 枚旋转的厚三角。</p>
+     */
+    monolithSoulDeath = new Effect(64f, e -> {
+        color(UnityPal.monolith, UnityPal.monolithDark, e.fin());
+        randLenVectors(e.id, 27, e.finpow() * 56f, (x, y) ->
+            Fill.circle(e.x + x, e.y + y, 0.5f + e.fout() * 2.5f)
+        );
+
+        e.scaled(48f, i -> {
+            stroke(i.fout() * 2.5f, UnityPal.monolithLight);
+            Lines.circle(e.x, e.y, i.fin(Interp.pow10Out) * 32f);
+
+            float thick = i.foutpowdown() * 4f;
+
+            Fill.circle(e.x, e.y, thick / 2f);
+            for(int t = 0; t < 4; t++){
+                Drawf.tri(e.x, e.y, thick, thick * 14f,
+                    Mathf.randomSeed(e.id + 1, 360f) + 90f * t + i.finpow() * 60f * Mathf.sign(e.id % 2 == 0)
+                );
+            }
+        });
+    }),
+
+    /**
+     * 灵魂单位碎裂特效 (20f) —— DeathFx.monolithSoulCrack。
+     *
+     * <p>corporeal (实体化) 状态血量跌破一半时触发，把 soul 单位的三块
+     * wreck 残骸贴图沿圆周向外甩出 (对应单位 type.wreckRegions)。</p>
+     */
+    monolithSoulCrack = new Effect(20f, e -> {
+        // ★ 延迟取 type (在 lambda 体内引用 Z_SoulUnits.monolithSoul, 避免静态初始化循环依赖)
+        mindustry.type.UnitType type = zzw.content.units.Z_SoulUnits.monolithSoul;
+        if(type == null || type.wreckRegions == null) return;
+        for(int i = 0; i < type.wreckRegions.length; i++){
+            float off = (360f / type.wreckRegions.length) * i;
+
+            Tmp.v1.trns(e.rotation + off, e.finpow() * 24f).add(e.x, e.y);
+
+            alpha(e.foutpowdown());
+            Draw.rect(type.wreckRegions[i], Tmp.v1.x, Tmp.v1.y, e.rotation - 90f);
+        }
+    }).layer(Layer.flyingUnit),
+
+    /**
+     * 灵魂单位加入容器特效 (72f) —— DeathFx.monolithSoulJoin。
+     *
+     * <p>data 携带 {@link MonolithSoulUnit}。绘制一个 3D 倾斜链环
+     * (monolith-chain) 收缩旋转 + additive 辉光环 (line-shade)。</p>
+     *
+     * <p>★ v158 适配: PU132 的 Quat(Z 相位, X 75°) 由本项目
+     * {@link UnityUtils#q1}/{@link UnityUtils#q2} 组合四元数还原。</p>
+     */
+    monolithSoulJoin = new Effect(72f, e -> {
+        if(!(e.data instanceof MonolithSoulUnit soul)) return;
+
+        stroke(1.5f, UnityPal.monolith);
+
+        TextureRegion reg = Core.atlas.find("create-monolith-chain");
+        UnityUtils.q1.set(Vec3.Z, e.rotation + 90f).mul(UnityUtils.q2.set(Vec3.X, 75f));
+        float t = e.foutpowdown(), w = reg.width * Draw.scl * 0.5f * t, h = reg.height * Draw.scl * 0.5f * t,
+            rad = t * 25f, a = Mathf.curve(t, 0.25f);
+
+        alpha(a);
+        UnityDrawf.panningCircle(reg,
+            e.x, e.y, w, h,
+            rad, 360f, Time.time * 6f * Mathf.sign(soul.id % 2 == 0) + soul.id * 30f,
+            UnityUtils.q1, Layer.flyingUnitLow - 0.01f, Layer.flyingUnit
+        );
+
+        color(Color.black, UnityPal.monolithDark, 0.67f);
+        alpha(a);
+
+        blend(Blending.additive);
+        UnityDrawf.panningCircle(Core.atlas.find("create-line-shade"),
+            e.x, e.y, w + 6f, h + 6f,
+            rad, 360f, 0f,
+            UnityUtils.q1, true, Layer.flyingUnitLow - 0.01f, Layer.flyingUnit
+        );
+
+        blend();
+    }).layer(Layer.flyingUnit);
 }

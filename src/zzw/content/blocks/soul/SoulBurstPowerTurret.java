@@ -119,6 +119,34 @@ public class SoulBurstPowerTurret extends SoulTurretPowerTurret {
         public Vec2 tr = new Vec2();
         /** 是否正在充能 (PU_V8 v7 Build.charging 字段, v158 改为方法) */
         public boolean charging = false;
+        /** 副弹幕基础伤害缓存 (用于副弹幕灵魂加成) */
+        public float baseSubDamage = 0f;
+
+        /**
+         * 灵魂伤害加成同步: 主弹幕 (父类) + 副弹幕 (本类)。
+         *
+         * <p>PU132 的 {@code progression.linear} 只作用于 {@code shootType.damage},
+         * 副弹幕 (subShootType) 不会随灵魂增强。这里补上"副弹幕灵魂加成",
+         * 让 oracle 的副激光也按同一比例 (efficiencyFrom~efficiencyTo) 缩放伤害。</p>
+         */
+        @Override
+        public void updateSoulDamage() {
+            super.updateSoulDamage();
+            if (subShootType != null && baseSubDamage > 0f) {
+                float scale = efficiencyFrom() + soulf() * (efficiencyTo() - efficiencyFrom());
+                subShootType.damage = baseSubDamage * scale;
+            }
+        }
+
+        @Override
+        public void created() {
+            super.created();
+            // 缓存副弹幕基础伤害并应用一次灵魂加成
+            if (subShootType != null) {
+                baseSubDamage = subShootType.damage;
+                updateSoulDamage();
+            }
+        }
 
         @Override
         protected void shoot(BulletType type) {

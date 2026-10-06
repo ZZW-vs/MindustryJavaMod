@@ -17,6 +17,7 @@ import zzw.content.mechanics.torque.Z_Torque;
 import zzw.content.units.Z_Units;
 import zzw.content.units.Z_KoruhUnits;
 import zzw.content.units.Z_MonolithUnits;
+import zzw.content.units.Z_SoulUnits;
 import zzw.util.ZObjs;
 
 
@@ -148,6 +149,10 @@ public class TestMod extends Mod{
 
         // 加载自定义单位 (需要在方块之前, ModularConstructor/TerraCore 引用单位类型)
         Z_Units.load();
+
+        // PU132 灵魂系统单位与实体 (注册 Soul* 实体 + monolithSoul 单位 + monolithWorld 地块索引;
+        //   必须在 Z_MonolithUnits 之前调用, 保证灵魂承载实体的 classId 已分配)
+        Z_SoulUnits.load();
 
         // PU_V8 koruh 阵营单位 (Z_Blocks 的 MechPad 引用其单位类型, 必须在方块前;
         //   单位不占物品栏方块位, 放这里不影响方块排序)

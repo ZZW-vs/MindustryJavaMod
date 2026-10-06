@@ -51,6 +51,9 @@ import zzw.content.units.graphics.Trails;
 import zzw.content.units.types.Engine;
 import zzw.content.units.types.Engine.MultiEngine;
 import zzw.content.units.entities.DecorationUnitEntity;
+import zzw.content.units.soul.SoulDecorationUnit;
+import zzw.content.units.soul.SoulLegsUnit;
+import zzw.content.units.soul.SoulMechUnit;
 import zzw.content.units.type.decal.UnitDecalType;
 import zzw.content.units.weapons.ChargeShotgunWeapon;
 import zzw.content.units.weapons.ChargeShotgunWeapon.ChargeShotgunMount;
@@ -78,16 +81,19 @@ import static mindustry.Vars.headless;
  *   <li>scaleVelocity 字段 v155.4 不存在, 直接省略 (TODO 注释);</li>
  *   <li>commandLimit / visualElevation / rotateShooting / forceWreckRegion /
  *       miningRange 字段 v155.4 UnitType 不存在, 省略并留 TODO 注释;</li>
- *   <li>Mechc 单位 (stele/pedestal/pilaster) 需显式 constructor = MechUnit::create,
+ *   <li>Mechc 单位 (stele) 需显式 constructor = MechUnit::create,
  *       Legsc 单位 (pylon/monument/colossus/bastion) 需 constructor = LegsUnit::create
- *       (UnityUnitType 默认构造器为 UnitEntity)。</li>
+ *       (UnityUnitType 默认构造器为 UnitEntity);</li>
+ *   <li>★ 灵魂系统移植: 可承载灵魂的巨石单位改用 Soul* 实体 ——
+ *       pedestal/pilaster → SoulMechUnit, pylon/monument/colossus/bastion → SoulLegsUnit,
+ *       tendence/liminality → SoulDecorationUnit (保留装饰); 详见 Z_SoulUnits。</li>
  * </ul>
  *
  * @author GlennFolker (原作), 移植: zzw
  */
 public class Z_MonolithUnits{
-    // ★ monolithSoul (巨石灵魂) 已删除: 依赖 PU132 的 Soul/monolithWorld 系统
-    //   (单位死亡拆魂、灵魂加入容器增益) 未移植, 实际对局无用 (2026-09-05 用户决定删除)
+    // ★ monolithSoul (巨石灵魂单位) 现由 Z_SoulUnits 定义与注册
+    //   (灵魂系统已完整移植: 单位死亡拆魂 / 灵魂飞向容器或巨石地块)
 
     // 巨石机甲 (地面 Mechc)
     public static UnityUnitType stele, pedestal, pilaster;
@@ -182,7 +188,7 @@ public class Z_MonolithUnits{
         // ===== adsect (PU132 L887-922) =====
         adsect = new UnityUnitType("adsect"){{
             // TODO: PU132 defaultController = AssistantAI.create(mendCore, mine, build)
-            health = 180f;
+            health = 280f;
             armor = 2f;  // ★ 加强 (原缺失)
             speed = 4f;
             accel = 0.4f;
@@ -297,16 +303,16 @@ public class Z_MonolithUnits{
      */
     private static void loadPedestal(){
         pedestal = new UnityUnitType("pedestal"){{
-            // PU132: Mechc 实体
-            constructor = mindustry.gen.MechUnit::create;
+            // PU132: Mechc 实体 (携带灵魂 -> SoulMechUnit)
+            constructor = SoulMechUnit::create;
 
-            health = 1200f;
+            health = 600f;
             speed = 0.5f;
             rotateSpeed = 2.6f;
             hitSize = 11f;
             armor = 11f;  // ★ 加强 (原 10f)
             singleTarget = true;
-            maxSouls = 4; // TODO: 灵魂机制未移植, 数据占位
+            maxSouls = 4;
 
             canBoost = true;
             boostMultiplier = 2.5f;
@@ -428,16 +434,16 @@ public class Z_MonolithUnits{
      */
     private static void loadPilaster(){
         pilaster = new UnityUnitType("pilaster"){{
-            // PU132: Mechc 实体
-            constructor = mindustry.gen.MechUnit::create;
+            // PU132: Mechc 实体 (携带灵魂 -> SoulMechUnit)
+            constructor = SoulMechUnit::create;
 
-            health = 2000f;
+            health = 1000f;
             speed = 0.4f;
             rotateSpeed = 2.2f;
             hitSize = 26.5f;
             armor = 16f;  // ★ 加强 (原 15f)
             mechFrontSway = 0.55f;
-            maxSouls = 5; // TODO: 灵魂机制未移植, 数据占位
+            maxSouls = 5;
 
             canBoost = true;
             boostMultiplier = 2.5f;
@@ -675,16 +681,16 @@ public class Z_MonolithUnits{
     private static void loadLegUnits(){
         // ===== pylon (PU132 L571-626) =====
         pylon = new UnityUnitType("pylon"){{
-            // PU132: Legsc 实体 (多足)
-            constructor = mindustry.gen.LegsUnit::create;
+            // PU132: Legsc 实体 (多足, 携带灵魂 -> SoulLegsUnit)
+            constructor = SoulLegsUnit::create;
 
             health = 14400f;
             speed = 0.43f;
             rotateSpeed = 1.48f;
             hitSize = 36f;
-            armor = 25f;  // ★ 加强 (原 23f)
+            armor = 26f;  // ★ 加强 (原 23f → 25f → 26f)
             // TODO: PU132 commandLimit = 8 (指挥半径系统) — v155.4 无该字段
-            maxSouls = 7; // TODO: 灵魂机制未移植, 数据占位
+            maxSouls = 7;
 
             allowLegStep = hovering = true;
             // TODO: PU132 visualElevation = 0.2f — v155.4 无该字段
@@ -742,16 +748,16 @@ public class Z_MonolithUnits{
 
         // ===== monument (PU132 L628-696) =====
         monument = new UnityUnitType("monument"){{
-            // PU132: Legsc 实体 (多足)
-            constructor = mindustry.gen.LegsUnit::create;
+            // PU132: Legsc 实体 (多足, 携带灵魂 -> SoulLegsUnit)
+            constructor = SoulLegsUnit::create;
 
             health = 32000f;
             speed = 0.42f;
             rotateSpeed = 1.4f;
             hitSize = 48f;
-            armor = 34f;  // ★ 加强 (原 32f)
+            armor = 40f;  // ★ 加强 (原 32f → 34f → 40f)
             // TODO: PU132 commandLimit = 8 — v155.4 无该字段
-            maxSouls = 9; // TODO: 灵魂机制未移植, 数据占位
+            maxSouls = 9;
 
             // TODO: PU132 visualElevation = 0.3f — v155.4 无该字段
             allowLegStep = hovering = true;
@@ -770,7 +776,7 @@ public class Z_MonolithUnits{
             groundLayer = Layer.legUnit;
             outlineColor = UnityPal.darkOutline;
 
-            LaserBulletType laser = new LaserBulletType(640f);
+            LaserBulletType laser = new LaserBulletType(850f);
             weapons.add(new Weapon("create-monolith-large2-weapon-mount"){{
                 top = false;
                 x = 14f;
@@ -833,16 +839,16 @@ public class Z_MonolithUnits{
     private static void loadGiantUnits(){
         // ===== colossus (PU132 L698-754) =====
         colossus = new UnityUnitType("colossus"){{
-            // PU132: Legsc 实体 (多足)
-            constructor = mindustry.gen.LegsUnit::create;
+            // PU132: Legsc 实体 (多足, 携带灵魂 -> SoulLegsUnit)
+            constructor = SoulLegsUnit::create;
 
             health = 60000f;
             speed = 0.4f;
             rotateSpeed = 1.2f;
             hitSize = 64f;
-            armor = 47f;  // ★ 加强 (原 45f)
+            armor = 60f;  // ★ 加强 (原 45f → 47f → 60f)
             // TODO: PU132 commandLimit = 8 — v155.4 无该字段
-            maxSouls = 12; // TODO: 灵魂机制未移植, 数据占位
+            maxSouls = 12;
 
             // TODO: PU132 visualElevation = 0.5f — v155.4 无该字段
             allowLegStep = hovering = true;
@@ -861,7 +867,7 @@ public class Z_MonolithUnits{
             groundLayer = Layer.legUnit;
             outlineColor = UnityPal.darkOutline;
 
-            abilities.add(new LightningSpawnAbility(8, 32f, 2f, 0.05f, 180f, 56f, 200f));
+            abilities.add(new LightningSpawnAbility(8, 32f, 2f, 0.05f, 180f, 56f, 260f));
 
             weapons.add(new Weapon(name + "-weapon"){{
                 top = false;
@@ -878,7 +884,7 @@ public class Z_MonolithUnits{
                 // ★ v155.4: Sounds.laserblast → Sounds.beamMeltdown
                 shootSound = Sounds.beamMeltdown;
 
-                bullet = new LaserBulletType(1920f){{
+                bullet = new LaserBulletType(2500f){{
                     width = 45f;
                     length = 400f;
                     lifetime = 32f;
@@ -887,7 +893,7 @@ public class Z_MonolithUnits{
                     lightningLength = 4;
                     lightningDelay = 1.5f;
                     lightningLengthRand = 6;
-                    lightningDamage = 48f;
+                    lightningDamage = 65f;
                     lightningAngleRand = 30f;
                     lightningColor = Pal.lancerLaser;
                 }};
@@ -896,8 +902,8 @@ public class Z_MonolithUnits{
 
         // ===== bastion (PU132 L756-885) =====
         bastion = new UnityUnitType("bastion"){{
-            // PU132: Legsc 实体 (多足)
-            constructor = mindustry.gen.LegsUnit::create;
+            // PU132: Legsc 实体 (多足, 携带灵魂 -> SoulLegsUnit)
+            constructor = SoulLegsUnit::create;
 
             health = 120000f;
             speed = 0.4f;
@@ -905,7 +911,7 @@ public class Z_MonolithUnits{
             hitSize = 67f;
             armor = 104f;  // ★ 加强 (原 100f)
             // TODO: PU132 commandLimit = 8 — v155.4 无该字段
-            maxSouls = 15; // TODO: 灵魂机制未移植, 数据占位
+            maxSouls = 15;
 
             // TODO: PU132 visualElevation = 0.7f — v155.4 无该字段
             allowLegStep = hovering = true;
@@ -1162,9 +1168,10 @@ public class Z_MonolithUnits{
 
         // tendence — 趋势者 (T2 能量环单位, 充能追踪重弹 + 3D 透视旋转圆环弹体)
         tendence = new UnityUnitType("tendence"){{
-            constructor = DecorationUnitEntity::create;
+            // 携带灵魂 + 保留装饰 -> SoulDecorationUnit
+            constructor = SoulDecorationUnit::create;
 
-            health = 1200f;
+            health = 600f;
             armor = 4f;  // ★ 加强 (原缺失)
             // rotateShooting = false; // v158 无该字段
             lowAltitude = true;
@@ -1325,9 +1332,10 @@ public class Z_MonolithUnits{
 
         // liminality — 阈限者 (T3 能量环单位, 螺旋激光主炮 + 三层符环)
         liminality = new UnityUnitType("liminality"){{
-            constructor = DecorationUnitEntity::create;
+            // 携带灵魂 + 保留装饰 -> SoulDecorationUnit
+            constructor = SoulDecorationUnit::create;
 
-            health = 2000f;
+            health = 700f;
             armor = 6f;  // ★ 加强 (原缺失)
             // rotateShooting = false; // v158 无该字段
             lowAltitude = true;
