@@ -115,6 +115,72 @@ public class WorldUnitEntity extends UnitEntity {
     /** 当前正被子世界单位更新的主世界 (供子世界内建筑查询主世界地形, 如海军找水域生成; 无子世界更新时为 null) */
     public static World mainWorld = null;
 
+    /**
+     * Vars.world 交换深度 (0 = 当前就是主世界).
+     * <p>每次 {@link #pushWorld} 进入子世界 +1, {@link #popWorld} 离开 -1。
+     * 只要计数不为 0, 就说明有交换尚未恢复 —— 这是定位"大地乱窜"的关键:
+     * 若某帧交换后因异常/中断未恢复, Vars.world 会永久停在 64x144 的子世界上,
+     * 之后一切依赖全局 Vars.world 的查询 (子世界内建筑的 world.tile/build、
+     * 悬停、边界钳制的 Vars.world.unitWidth/Height 等) 全部错位。</p>
+     */
+    protected static int worldSwapDepth = 0;
+    /** 首次进入子世界时保存的真主世界引用 (供 {@link #popWorld} / {@link #healWorldLeak} 恢复) */
+    protected static World worldSwapSaved = null;
+    /** 记录保存真主世界时所处的游戏状态; 换图/换存档后 Vars.state 改变, 借此判定保存的主世界是否已过期 */
+    protected static mindustry.core.GameState worldSwapState = null;
+    /** healWorldLeak 日志打印次数上限 (防止每帧刷屏) */
+    protected static int leakLogs = 0;
+
+    /**
+     * 切入子世界: 记录真主世界并设置 {@link #mainWorld}, 深度 +1.
+     * <p>无 try/finally 的调用点也能被 {@link #healWorldLeak} 兜底 —— 因为真主世界被存在
+     * 静态字段里, 即使恢复语句被跳过, 下一帧也能取回。</p>
+     */
+    public static void pushWorld(World w) {
+        if (worldSwapDepth == 0) {
+            worldSwapSaved = Vars.world;
+            worldSwapState = Vars.state;
+            mainWorld = worldSwapSaved;
+        }
+        worldSwapDepth++;
+        Vars.world = w;
+    }
+
+    /** 离开子世界: 深度 -1, 归零时恢复真主世界并清空 {@link #mainWorld}. */
+    public static void popWorld() {
+        if (worldSwapDepth > 0) worldSwapDepth--;
+        if (worldSwapDepth == 0) {
+            if (worldSwapSaved != null) Vars.world = worldSwapSaved;
+            mainWorld = null;
+            worldSwapSaved = null;
+            worldSwapState = null;
+        }
+    }
+
+    /**
+     * 自愈: 检测到 Vars.world 仍停留在某次未恢复的交换中时, 纠正回真主世界.
+     * <p>必须在 {@link #update()} 的 super.update() 之前调用 —— 这样本体的移动、
+     * 地形碰撞 (EntityCollisions 使用全局 Vars.world) 与边界钳制永远按主世界计算,
+     * 不会再被子世界语境推出。</p>
+     * <p>若保存的主世界来自另一张地图/存档 (Vars.state 已变), 说明泄漏跨了读档,
+     * 此时不能把 Vars.world 指回旧世界, 只清空计数让其随新地图自然生效。</p>
+     */
+    public static void healWorldLeak() {
+        if (worldSwapDepth != 0) {
+            worldSwapDepth = 0;
+            if (worldSwapSaved != null && worldSwapState == Vars.state) {
+                Vars.world = worldSwapSaved;
+            }
+            mainWorld = null;
+            worldSwapSaved = null;
+            worldSwapState = null;
+            if (leakLogs < 3) {
+                leakLogs++;
+                Log.err("[WorldUnit] 检测到 Vars.world 交换未恢复 (泄漏), 已自动纠正回主世界");
+            }
+        }
+    }
+
     /** 子世界平台宽 (世界像素, 渲染虚线框用) */
     public float platW() {
         return platW;
@@ -150,6 +216,13 @@ public class WorldUnitEntity extends UnitEntity {
 
     @Override
     public void update() {
+        // ★ 自愈兜底: 若上一帧某次 Vars.world 交换因异常/中断未恢复, 这里先纠正回主世界。
+        //   必须在 super.update() 之前执行 —— super.update() 内部的移动积分会调用
+        //   EntityCollisions.move(用全局 Vars.world 逐像素检测地形实心), 末尾还有 bounded
+        //   边界钳制(用 Vars.world.unitWidth/Height); 若此时 Vars.world 仍是 8x18 子世界,
+        //   本体中心周围全是越界 tile → 每帧被推出 → 单向永久乱窜。
+        healWorldLeak();
+
         // ★ 先执行正常的 Unit 更新 (移动/物理/武器等), 对应 PU132 中 @MethodPriority(100) 晚于默认优先级
         super.update();
 
@@ -164,67 +237,67 @@ public class WorldUnitEntity extends UnitEntity {
 
         // ★ TimeReflect: 把 Time.runs 替换为单位自己的队列, 建筑物 Time.run 进入单位队列而非主世界
         TimeReflect.swapRuns(runs);
-        World ow = Vars.world;
-        // 记录主世界引用 (子世界内建筑可通过 WorldUnitEntity.mainWorld 查询主世界地形)
-        mainWorld = ow;
-        Vars.world = unitWorld;
+        // ★ 切入子世界: pushWorld 把真主世界存进静态字段并设置 mainWorld, 并计数 +1
+        pushWorld(unitWorld);
 
-        if (isPlayer()) {
-            for (TurretBuild t : turrets) {
-                t.logicControlTime = 5f;
-                // ★ 建造模式下不再因建造点击开火 (原版语义: isPlacing 时 canShoot()=false,
-                //   玩家的点击全部视为建造意图; 否则平台上每次点击都会触发 player.shooting
-                //   → 炮台"自动攻击")。炮台仍跟随玩家瞄准转动; 非建造模式照常跟随开火
-                t.logicShooting = buildMode ? false : isShooting();
-                t.targetPos.set(aimX(), aimY());
-            }
-        }
-
-        for (int i = 0; i < buildings.size; i++) {
-            Building b = buildings.get(i);
-            positions.add(b.x, b.y);
-
-            if (b instanceof BaseTurretBuild) {
-                BaseTurretBuild t = (BaseTurretBuild) b;
-                t.rotation += r;
+        try {
+            if (isPlayer()) {
+                for (TurretBuild t : turrets) {
+                    t.logicControlTime = 5f;
+                    // ★ 建造模式下不再因建造点击开火 (原版语义: isPlacing 时 canShoot()=false,
+                    //   玩家的点击全部视为建造意图; 否则平台上每次点击都会触发 player.shooting
+                    //   → 炮台"自动攻击")。炮台仍跟随玩家瞄准转动; 非建造模式照常跟随开火
+                    t.logicShooting = buildMode ? false : isShooting();
+                    t.targetPos.set(aimX(), aimY());
+                }
             }
 
-            vec.set(b.x - cx, b.y - cy).rotate(r).add(this);
+            for (int i = 0; i < buildings.size; i++) {
+                Building b = buildings.get(i);
+                positions.add(b.x, b.y);
 
-            b.set(vec);
-            b.update();
-        }
+                if (b instanceof BaseTurretBuild) {
+                    BaseTurretBuild t = (BaseTurretBuild) b;
+                    t.rotation += r;
+                }
 
-        // ★ TimeReflect: 推进单位队列中的延迟任务 (建筑物 Time.run 到期执行)
-        TimeReflect.updateDelays(runs);
+                vec.set(b.x - cx, b.y - cy).rotate(r).add(this);
 
-        for (int i = 0; i < buildings.size; i++) {
-            Building b = buildings.get(i);
-            b.x = positions.get(i * 2);
-            b.y = positions.get(i * 2 + 1);
-
-            if (b instanceof BaseTurretBuild) {
-                BaseTurretBuild t = (BaseTurretBuild) b;
-                t.rotation -= r;
+                b.set(vec);
+                b.update();
             }
+
+            // ★ TimeReflect: 推进单位队列中的延迟任务 (建筑物 Time.run 到期执行)
+            TimeReflect.updateDelays(runs);
+
+            for (int i = 0; i < buildings.size; i++) {
+                Building b = buildings.get(i);
+                b.x = positions.get(i * 2);
+                b.y = positions.get(i * 2 + 1);
+
+                if (b instanceof BaseTurretBuild) {
+                    BaseTurretBuild t = (BaseTurretBuild) b;
+                    t.rotation -= r;
+                }
+            }
+
+            // ★ 子世界建造推进: Terra 自当 builder, 推进 ConstructBlock 脚手架进度并扣主世界核心资源;
+            //   完成的脚手架被 constructFinish 替换为新建筑 → 在此注册进 buildings 列表
+            // (放在 positions 恢复循环之后: 本方法会增删 buildings 列表, 先恢复旧建筑坐标再处理)
+            tickConstructions();
+
+            // ★ 去掉子世界炮台的红温动画 (heat 是 TurretBuild 的开火热度,
+            //   渲染为炮管上的红色 additive 发光; 每帧清零后不再显示,
+            //   射击/索敌/装填等其他行为不受影响)
+            for (int i = 0; i < turrets.size; i++) {
+                turrets.get(i).heat = 0f;
+            }
+        } finally {
+            // ★ 无论子世界内是否抛异常 (如某建筑 update 出错), 都务必退出子世界并恢复 Time.runs,
+            //   否则 Vars.world 会永久遗留为 8x18 子世界 → 下一帧 super.update() 把本体推走 (乱窜)
+            popWorld();
+            TimeReflect.resetRuns();
         }
-
-        // ★ 子世界建造推进: Terra 自当 builder, 推进 ConstructBlock 脚手架进度并扣主世界核心资源;
-        //   完成的脚手架被 constructFinish 替换为新建筑 → 在此注册进 buildings 列表
-        // (放在 positions 恢复循环之后: 本方法会增删 buildings 列表, 先恢复旧建筑坐标再处理)
-        tickConstructions();
-
-        // ★ 去掉子世界炮台的红温动画 (heat 是 TurretBuild 的开火热度,
-        //   渲染为炮管上的红色 additive 发光; 每帧清零后不再显示,
-        //   射击/索敌/装填等其他行为不受影响)
-        for (int i = 0; i < turrets.size; i++) {
-            turrets.get(i).heat = 0f;
-        }
-
-        // ★ TimeReflect: 恢复 Time.runs 为原始主世界队列
-        TimeReflect.resetRuns();
-        Vars.world = ow;
-        mainWorld = null;
     }
 
     // ===== setup / absorb (召唤初始化 + 吸收建筑到子世界) =====
@@ -317,8 +390,8 @@ public class WorldUnitEntity extends UnitEntity {
             }
         }
 
-        World ow = Vars.world;
-        Vars.world = unitWorld;
+        // ★ 切入子世界 (pushWorld 记录真主世界到静态字段, 计数 +1)
+        pushWorld(unitWorld);
 
         for (Runnable r : tmpr) {
             r.run();
@@ -352,7 +425,8 @@ public class WorldUnitEntity extends UnitEntity {
 
         rebuildFromBuildings();
 
-        Vars.world = ow;
+        // ★ 退出子世界 (计数 -1, 归零时恢复真主世界并清空 mainWorld)
+        popWorld();
         tmpr.clear();
         tmp.clear();
         tmpLinks.clear();

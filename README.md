@@ -289,6 +289,11 @@
 - 合并时有烟雾效果和延迟检查
 
 ## 更新日志
+- 修复「大地」(terra) 在子世界内产出单位时漂移/乱窜：
+  - **对齐 PU132 原版定位根因**：PU 的 terra（`UnityUnitTypes.java:2387`）是纯地面单位，仅设 `speed/health/worldWidth/worldHeight`；端口此前把它额外改成了低空飞行 + 整平台碰撞箱 + `physics=false` + 极低阻力（`accel=0.08`、`drag=0.03`），其中极低阻力是漂移的放大器——任何一次微小挤动产生的速度几乎不衰减，terra 便朝一个方向持续滑行。
+  - **修掉漂移放大器**：恢复默认 `accel`/`drag`（不再覆写），位移会迅速衰减；`physics=false`（实测无效）一并移除，恢复默认 `physics=true`。
+  - **保留平台特性**：`hovering`/`lowAltitude`、`hitSize=144` 整平台碰撞箱与悬停建筑信息面板等玩法不变；`WorldUnitType` 的空控制器继续保证未附身时平台不自行移动。
+  - **子世界产出落点**：`ModularConstructor` 产出时先把单位落点推到平台包围盒外（避免与平台重叠），并临时 `popWorld()` 回到主世界再 `spawn()`，使新单位完全以主世界为基准生成。
 - 全系列（End 除外）单位护甲加强：对照原版 v160 护甲曲线，T3 以上单位全部补齐/提升护甲，护甲为 0 的单位一律补上，**无任何削弱**（血量 / 速度 / 武器均未改动）：
   - **T6/T7 扩展单位**：citadel 20→24、empire 22→30、cygnus 10→18、sagittarius 12→26、araneidae 15→20、theraphosidae 17→28、mantle 15→20、aphelion 17→28、sedec 20→24、trigintaduo 22→30、deviation 12→20、anomaly 18→26
   - **直升机 T1-T6**：caelifera 1（不变）、schistocerca 2→4、anthophila 3→6、vespula 4→9、lepidoptera 5→14、mantodea 6→20

@@ -27,6 +27,7 @@ import mindustry.Vars;
 import mindustry.content.Blocks;
 import mindustry.core.World;
 import mindustry.entities.units.BuildPlan;
+import mindustry.entities.units.UnitController;
 import mindustry.game.EventType;
 import mindustry.game.EventType.Trigger;
 import mindustry.gen.Building;
@@ -101,6 +102,41 @@ public class WorldUnitType extends UnityUnitType {
     }
 
     /**
+     * ★ 覆写 createController: 未附身时返回"空控制器", 禁止 AI 自主移动.
+     *
+     * <p>问题背景: 世界单位 (terra) 由 TerraCore 创建时未指派给玩家, 因此引擎会给它
+     * 分配默认 AI 控制器 —— v160 中 {@code UnitType.createController} 直接返回
+     * {@code controller.get(unit)}: 玩家阵营的 terra 会拿到 {@code CommandAI},
+     * 该 AI 在无指令时会自主索敌/寻路, 直接对本体调用 {@code move()},
+     * 表现为"大地朝一个方向快速移动且停不下来".</p>
+     *
+     * <p>平台本应由玩家驱动, 未附身时应完全静止. 这里返回空控制器
+     * (对齐 PU132 {@code unity/ai/EmptyAI} 语义): 不执行任何移动/索敌/寻路.
+     * 附身时引擎会把 controller 换成 {@code Player} (isValidController()=true,
+     * 不会被 resetController 覆盖), 玩家离开后 resetController 重新调用本方法,
+     * 大地重新归于静止.</p>
+     */
+    @Override
+    public UnitController createController(Unit unit) {
+        return new EmptyController();
+    }
+
+    /** 空控制器: 只保存单位引用, 不做任何移动/索敌 (PU132 EmptyAI 移植) */
+    public static class EmptyController implements UnitController {
+        protected Unit unit;
+
+        @Override
+        public void unit(Unit unit) {
+            this.unit = unit;
+        }
+
+        @Override
+        public Unit unit() {
+            return unit;
+        }
+    }
+
+    /**
      * 重写drawBody: 在正常单位渲染后, 绘制子世界中的建筑物
      * <p>渲染 hack 原理 (PU132 UnityUnitType.drawBody):
      * <ol>
@@ -166,8 +202,9 @@ public class WorldUnitType extends UnityUnitType {
 
                 // ★ 电力连接线修复: 建筑的 draw() 内部会用 world.build(links) 查链接目标
                 //   (如 PowerNode 的激光连线), 渲染期间切到子世界, 查询才落在子世界建筑上
-                World ow = Vars.world;
-                Vars.world = world;
+                // ★ 统一经 WorldUnitEntity.pushWorld/popWorld 交换 (带深度计数, 真主世界存静态字段),
+                //   即使某次渲染异常未恢复, 也会被 WorldUnitEntity.update() 开头的 healWorldLeak() 兜底
+                WorldUnitEntity.pushWorld(world);
 
                 // ★ 护盾半透明修复: animateShields 开启时原版护盾走 Renderer 的
                 //   drawRange(Layer.shields) → effectBuffer 离屏缓冲 + Shaders.shield
@@ -321,7 +358,7 @@ public class WorldUnitType extends UnityUnitType {
                 Draw.flush();
                 Draw.sort(false);
 
-                Vars.world = ow;
+                WorldUnitEntity.popWorld();
 
                 // 恢复 camera 和投影
                 cam.set(camX, camY);

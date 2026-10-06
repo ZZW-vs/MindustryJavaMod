@@ -429,7 +429,21 @@ public class ModularConstructor extends Block{
                         }
 
                         if(spawnable){
-                            Unit unit = plan.unit.spawn(team, sx, sy);
+                            // ★ 子世界内产出单位时, 临时切回主世界再 spawn:
+                            //   UnitType.spawn→create/add 期间若 Vars.world 指向 8x18 子世界,
+                            //   新单位会以子世界为基准初始化并"困在平台内", 同时引发本体漂移。
+                            //   这里先 popWorld 回到主世界, spawn 完再 pushWorld 继续子世界更新。
+                            Unit unit;
+                            if(owner != null && owner.unitWorld != null){
+                                WorldUnitEntity.popWorld();
+                                try {
+                                    unit = plan.unit.spawn(team, sx, sy);
+                                } finally {
+                                    WorldUnitEntity.pushWorld(owner.unitWorld);
+                                }
+                            } else {
+                                unit = plan.unit.spawn(team, sx, sy);
+                            }
                             unit.rotation = 90f;
                             // 适配 v155.4: cons.trigger() → consume()
                             consume();

@@ -5407,11 +5407,10 @@ public class Z_Units {
             // 低空飞行单位
             hovering = true;
             lowAltitude = true;
-            // ★ 关闭单位物理碰撞 (MindustryX 160 的 PhysicsProcess):
-            //   terra 是贴地平台, isGrounded()=true → 碰撞层 layerGround, 与陆地单位同层;
-            //   子世界工厂产出的陆地单位正好生成在平台上 → 两个碰撞箱互相挤开导致 terra 乱窜。
-            //   平台本就不该被单位挤动, 关掉物理体后不再参与任何单位碰撞 (空军/海军本就不同层, 无影响)。
-            physics = false;
+            // ★ 物理碰撞: 恢复默认 physics=true (对齐 PU132 原版 terra)。
+            //   此前设 physics=false 试图阻止子世界产出的单位把 terra 挤动, 但实测无效 ——
+            //   真正的漂移放大器是下面的 drag: 只要有外力给出一点速度, 极低阻力会让它
+            //   几乎不衰减, terra 便朝一个方向持续滑行 (乱窜)。恢复默认阻力后位移迅速衰减。
             // ★ 影子偏移修复: 影子偏移量 = shadowTX * clamp(elevation, shadowElevation, 1f),
             //   8f 会导致 clamp 结果为 8 → 影子偏移 -96/-104 像素飞离本体;
             //   低空单位用 0.1f 让影子贴近本体
@@ -5419,8 +5418,10 @@ public class Z_Units {
             groundLayer = Layer.darkness + 1f;  // 地面渲染层级
             drawCell = true;
             rotateSpeed = 1.0f;
-            accel = 0.08f;  // 加快加速度以配合新速度
-            drag = 0.03f;   // 略微减少阻力以保持高速
+            // ★ 恢复默认 accel/drag (对齐 PU132 原版 terra):
+            //   此前 accel=0.08 / drag=0.03 让平台阻力极低, 任何微小位移都停不下来,
+            //   子世界产出单位时的轻微挤动被无限放大 → terra 持续漂移/乱窜。
+            //   这里不再覆写, 沿用引擎默认值; 平台仍由玩家正常驱动 (空控制器保证不自行移动)。
             // 子世界尺寸 (8x18 tile - 删去右侧和下方多余的一行空间)
             worldWidth = 8;
             worldHeight = 18;
