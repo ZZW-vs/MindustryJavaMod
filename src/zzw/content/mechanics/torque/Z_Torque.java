@@ -365,10 +365,15 @@ public class Z_Torque{
 
         // small-radiator: 散热器 (PU160 HeatRadiator L553), 2x2, rotate
         // GraphHeat(capacity 4.0, conductivity 0.15, radiativity 0.4), accept 左右两侧各 2 口
+        // 冷却液机制: 通水(8/秒) 散热更快, 最低降到 5℃; 通冷冻液(8/秒) 更快, 最低降到 -100℃
         smallRadiator = new HeatRadiator("small-radiator"){{
             requirements(Category.power, with(Z_Items.nickel, 30, Items.graphite, 30, Items.copper, 100, Z_Items.cupronickel, 30));
             size = 1;
             health = 1100;
+            waterMinTemp = 278.15f;    // 5℃
+            cryoMinTemp = 173.15f;     // -100℃
+            waterRadiativityMul = 4f;  // 通水时的散热倍率
+            cryoRadiativityMul = 10f;  // 通冷冻液时的散热倍率
             addGraph(new GraphHeat(4f, 0.15f, 0.4f).setAccept(0, 0, 1, 1, 0, 0, 1, 1));
         }};
 

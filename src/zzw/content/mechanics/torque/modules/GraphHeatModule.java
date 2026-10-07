@@ -25,6 +25,18 @@ import zzw.content.mechanics.torque.meta.GraphType;
 public class GraphHeatModule extends GraphModule<GraphHeat, GraphHeatModule, HeatGraph>{
     public float heat, heatBuffer;
 
+    /**
+     * 环境温度 (K), 默认 293.15 (20℃)。
+     * <p>散热器等主动冷却方块会把此值调低, 让所在热网向冷却液对应的"温度池"散热。
+     * 默认值即原有的固定环境温度, 不影响其它热学方块。
+     */
+    public float ambientTemp = 293.15f;
+
+    /**
+     * 热辐射率倍率 (默认 1)。主动冷却方块通入冷却液时提高此值以加快散热速度。
+     */
+    public float radiativityMul = 1f;
+
     @Override
     void applySaveState(HeatGraph graph, int index){}
 
@@ -38,7 +50,7 @@ public class GraphHeatModule extends GraphModule<GraphHeat, GraphHeatModule, Hea
         heatBuffer = 0f;
         float clampedDelta = Mathf.clamp(Time.delta, 0, 1f / cond);
         for(var n : neighbours.keys()) heatBuffer += (n.getTemp() - temp) * cond * clampedDelta;
-        heatBuffer += (293.15f - temp) * this.graph.baseHeatRadiativity * clampedDelta;
+        heatBuffer += (ambientTemp - temp) * this.graph.baseHeatRadiativity * radiativityMul * clampedDelta;
     }
 
     @Override
