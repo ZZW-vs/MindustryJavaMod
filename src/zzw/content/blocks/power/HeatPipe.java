@@ -69,6 +69,19 @@ public class HeatPipe extends GraphBlock{
 
         @Override
         public void onNeighboursChanged(){
+            updateSpriteIndex();
+        }
+
+        /**
+         * 按当前邻居连接位掩码重算贴图变体索引。
+         *
+         * <p>除 {@link #onNeighboursChanged()} 外, {@link #draw()} 每帧也会重算一次。
+         * 原因: 图重建过程中的增量注册 / 提前 return 可能漏发"邻居变化"通知, 只在
+         * onNeighboursChanged 里算一次会残留旧贴图, 表现为"实际已连上但贴图仍显示未连接"。
+         * 每帧按真实邻居重算可彻底避免该残留。</p>
+         */
+        void updateSpriteIndex(){
+            if(heat() == null) return;
             spriteIndex = 0;
             // rotate=true 时端口索引 n 的物理方向 = (n + rotation) % 4,
             // 需换算回物理方向再查 shift 表, 否则贴图切片错乱
@@ -86,6 +99,8 @@ public class HeatPipe extends GraphBlock{
 
         @Override
         public void draw(){
+            // ★ 每帧按真实邻居重算贴图掩码, 修复"连接了但贴图没变"的残留
+            updateSpriteIndex();
             float temp = heat().getTemp();
             Draw.rect(regions[spriteIndex], x, y);
             if(temp < 273f || temp > 498f){

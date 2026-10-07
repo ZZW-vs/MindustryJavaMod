@@ -10,11 +10,17 @@ import zzw.content.mechanics.torque.modules.GraphTorqueModule;
  * 无限扭矩源 (沙盒) —— 在 {@link TorqueGenerator 扭矩发生器} 基础上增加"目标转速"设置。
  * <p>
  * 默认 (未输入 / 输入为空 / 输入非正数) 时, 电机始终输出满力矩 → 转速无限加速。
- * 玩家点击方块打开配置框后, 可输入一个目标转速 (rps, 转/秒); 之后电机只在转速低于目标时
- * 继续加速, 达到目标即停止施力, 从而把转速维持在目标附近。
+ * 玩家点击方块打开配置框后, 可输入一个目标转速 (rps, 转/秒); 之后转速会被限制在目标值:
+ * 低于目标时满力矩加速, 达到目标后停止施力并由 {@link zzw.content.mechanics.torque.graph.TorqueGraph}
+ * 在积分后钳制转速, 从而稳定维持在目标附近。
  * <p>
- * 转速换算: 扭矩系统的 {@code lastVelocity} 与显示的 rps 为 10:1 (见 GraphTorqueGenerate
- * 面板 {@code maxSpeed * 0.1 rps}), 故 目标速度 = 目标 rps × 10。
+ * 调速原理: 无限扭矩源的力矩极大 (maxSpeed=999999 → 每帧转速增量远超目标),
+ * 单纯 bang-bang (到目标就断力) 会在单帧内把速度冲过目标, 之后摩擦 (0.001) 又拉不回来,
+ * 目标形同虚设。因此在 {@link zzw.content.mechanics.torque.graph.TorqueGraph} 里对钳制做了支持:
+ * 本方块把目标写入 {@code setSpeedLimit(...)}, 扭矩图积分后立即钳制, 保证本帧累计转角与显示转速一致。
+ * <p>
+ * 转速换算: 面板显示 rps = {@code lastVelocity / 6} (见 GraphTorqueModule.display 与转角累计),
+ * 故 目标内部速度 = 目标 rps × 6。
  */
 public class InfiTorque extends TorqueGenerator{
     public InfiTorque(String name){
@@ -42,11 +48,14 @@ public class InfiTorque extends TorqueGenerator{
                 return;
             }
 
-            float velocity = tGraph.getNetwork().lastVelocity;
-            // 目标速度 (内部单位); 未设置时为负 → 不做限制
-            float target = targetRps > 0f ? targetRps * 10f : -1f;
-            // 已到达目标转速则停止施力 (由摩擦维持), 否则满力矩加速
-            boolean reached = target >= 0f && velocity >= target;
+            // 面板显示 rps = lastVelocity / 6, 故 目标内部速度 = 目标 rps × 6; 未设置时为负 → 不限制
+            float target = targetRps > 0f ? targetRps * 6f : -1f;
+
+            // 把目标写入扭矩图, 积分后立即钳制 (无限力矩下仅靠断力无法压住转速)
+            tGraph.setSpeedLimit(target);
+
+            // 已到达目标转速则停止施力, 否则满力矩加速; 未设置目标时一直加速
+            boolean reached = target >= 0f && tGraph.getNetwork().lastVelocity >= target;
             tGraph.setMotorForceMult(reached ? 0f : 1f);
         }
 

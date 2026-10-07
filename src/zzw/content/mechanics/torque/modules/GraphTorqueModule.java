@@ -134,4 +134,16 @@ public class GraphTorqueModule<T extends GraphTorque> extends GraphModule<T, Gra
     }
 
     public void setMotorForceMult(float a){}
+
+    /**
+     * 网络转速上限 (内部单位, 与 {@code lastVelocity} 同量纲); {@code < 0} 表示不限制。
+     * <p>由 {@link TorqueGraph#updateDirect()} 汇聚到 {@link TorqueGraph#lastSpeedLimit},
+     * 并在积分后钳制, 从而使"调速"类方块 (如 infi-torque) 能真正把网络转速压在目标值。
+     */
+    public float speedLimit(){
+        return -1f;
+    }
+
+    /** 设置本模块贡献的转速上限; {@code < 0} 表示本模块不限制。 */
+    public void setSpeedLimit(float a){}
 }

@@ -15,8 +15,10 @@ import arc.scene.ui.layout.Table;
  * - baseCapacity → 此源在 1 RPM 下的容量
  */
 public class MechanicalBuilds {
+    // 注: SNAP_INTERVAL / addStatusDisplay 已下移至基类 MechanicalComponentBuild。
+    // 这样下面的嵌套构建类在运行时只依赖自身父类, 不再通过 nestmate 访问本容器类,
+    // 从而避免 "ModClassLoader 无法解析本容器类 → 嵌套类 display/configure 崩溃" 的问题。
     // private static final float STRESS_THRESHOLD = 0.5f;
-    private static final int SNAP_INTERVAL = 32;
     // private static final Color STRESS_COLOR = new Color(1f, 0.7f, 0.4f, 1f);
     // private static final Color OVERLOAD_COLOR = new Color(1f, 0.3f, 0.2f, 1f);
 
@@ -134,20 +136,5 @@ public class MechanicalBuilds {
             super.display(table);
             addStatusDisplay(table, this);
         }
-    }
-
-    // ===================== 辅助: 状态显示 =====================
-    private static void addStatusDisplay(Table table, MechanicalComponentBuild b) {
-        Table info = new Table();
-        info.margin(2);
-
-        info.add("[accent]容量: [white]" + (int) b.capacity + " su").width(160).left().row();
-        info.add("[accent]应力: [white]" + (int) b.stress + " su").width(160).left().row();
-        info.add("[accent]转速: [white]" + (int) b.getSpeed() + " rpm").width(160).left().row();
-        if (b.overStressed) {
-            info.add("[red]⚠ 过载").width(160).left().row();
-        }
-
-        table.add(info).growX().row();
     }
 }

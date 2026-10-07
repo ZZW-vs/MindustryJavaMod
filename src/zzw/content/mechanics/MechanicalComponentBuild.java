@@ -1,6 +1,7 @@
 package zzw.content.mechanics;
 
 import arc.Events;
+import arc.scene.ui.layout.Table;
 import arc.struct.IntMap;
 import arc.struct.IntSet;
 import arc.struct.Seq;
@@ -43,6 +44,8 @@ public class MechanicalComponentBuild extends Building {
     protected static final float SPEED_THRESHOLD = 0.01f;
     protected static final float INFINITY_STRESS = 10000f;
     protected static final int VALIDATION_INTERVAL = 60;
+    // 应力源滑块吸附间隔 (转速取整到该倍数)
+    protected static final int SNAP_INTERVAL = 32;
 
     // 每种方块的基础应力影响 (1 RPM 时). 子类可覆盖
     protected float baseImpact = 1f;
@@ -225,5 +228,25 @@ public class MechanicalComponentBuild extends Building {
             m.capacity = networkCapacity.get(m.networkId, 0f);
             m.overStressed = m.capacity < m.stress;
         }
+    }
+
+    /**
+     * 在方块信息面板中追加通用状态显示 (容量/应力/转速/过载).
+     * <p>放在基类而非 {@code MechanicalBuilds} 容器类, 是为了让子类 (齿轮/传动箱等) 调用它时
+     * 只依赖自身父类, 而不触发对容器类的 nestmate 解析 — 避免容器类一旦无法被模组类加载器解析时
+     * 抛出 NoClassDefFoundError。
+     */
+    protected static void addStatusDisplay(Table table, MechanicalComponentBuild b){
+        Table info = new Table();
+        info.margin(2);
+
+        info.add("[accent]容量: [white]" + (int) b.capacity + " su").width(160).left().row();
+        info.add("[accent]应力: [white]" + (int) b.stress + " su").width(160).left().row();
+        info.add("[accent]转速: [white]" + (int) b.getSpeed() + " rpm").width(160).left().row();
+        if (b.overStressed) {
+            info.add("[red]⚠ 过载").width(160).left().row();
+        }
+
+        table.add(info).growX().row();
     }
 }

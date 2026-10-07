@@ -13,6 +13,8 @@ import static arc.Core.*;
 public class GraphTorqueGenerateModule extends GraphTorqueModule<GraphTorqueGenerate>{
     final WindowedMean smoothedForce = new WindowedMean(40);
     float motorForceMult = 1f, maxMotorForceMult = 1f;
+    /** 网络转速上限 (内部单位); < 0 表示不限制, 由调速方块设置 */
+    public float motorSpeedLimit = -1f;
 
     @Override
     void updateExtension(){
@@ -40,5 +42,15 @@ public class GraphTorqueGenerateModule extends GraphTorqueModule<GraphTorqueGene
     @Override
     public void setMotorForceMult(float a){
         motorForceMult = a;
+    }
+
+    @Override
+    public float speedLimit(){
+        return motorSpeedLimit;
+    }
+
+    @Override
+    public void setSpeedLimit(float a){
+        motorSpeedLimit = a;
     }
 }

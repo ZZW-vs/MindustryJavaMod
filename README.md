@@ -289,6 +289,7 @@
 - 合并时有烟雾效果和延迟检查
 
 ## 更新日志
+- 修复热管 (heat-pipe)「实际已连接但贴图仍显示未连接」：`HeatPipeBuild` 原先只在 `onNeighboursChanged()` 里按邻居位掩码算一次贴图变体，图重建过程中的增量注册/提前 return 可能漏发该通知，导致掩码残留旧值。现在 `draw()` 每帧按当前真实邻居重算掩码，彻底避免残留。
 - 修复「大地」(terra) 在子世界内产出单位时漂移/乱窜：
   - **对齐 PU132 原版定位根因**：PU 的 terra（`UnityUnitTypes.java:2387`）是纯地面单位，仅设 `speed/health/worldWidth/worldHeight`；端口此前把它额外改成了低空飞行 + 整平台碰撞箱 + `physics=false` + 极低阻力（`accel=0.08`、`drag=0.03`），其中极低阻力是漂移的放大器——任何一次微小挤动产生的速度几乎不衰减，terra 便朝一个方向持续滑行。
   - **修掉漂移放大器**：恢复默认 `accel`/`drag`（不再覆写），位移会迅速衰减；`physics=false`（实测无效）一并移除，恢复默认 `physics=true`。

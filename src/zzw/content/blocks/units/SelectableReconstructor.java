@@ -52,79 +52,48 @@ public class SelectableReconstructor extends Reconstructor {
 
     @Override
     public void setStats() {
-        // T6 档位统计
+        // T6(minTier) 档位标题: 先插入, 使其排在后面 super 输出的升级列表之前
         stats.add(Stat.output, table -> {
             table.row();
-            table.add("[accent]T" + minTier + " 档位升级:").left().padTop(10f);
-            table.row();
-            table.add("[lightgray]T5 → T6 升级路径:").left().padBottom(5f);
-            table.row();
-            upgrades.each(upgrade -> {
-                if (upgrade[0].unlockedNow() && upgrade[1].unlockedNow()) {
-                    Table upgradeRow = new Table();
-                    upgradeRow.left();
-                    
-                    // 第一列：原单位
-                    Table firstColumn = new Table();
-                    firstColumn.left();
-                    firstColumn.image(upgrade[0].uiIcon).size(60f).scaling(arc.util.Scaling.fit);
-                    firstColumn.row();
-                    firstColumn.add(upgrade[0].localizedName).color(arc.graphics.Color.white).left().fontScale(1.3f);
-                    table.add(firstColumn).padLeft(15f).padBottom(8f);
-                    
-                    // 第二列：升级箭头
-                    Table arrowColumn = new Table();
-                    arrowColumn.left();
-                    arrowColumn.add("⇨").color(arc.graphics.Color.yellow).size(32f);
-                    table.add(arrowColumn).padBottom(8f);
-                    
-                    // 第三列：升级单位
-                    Table secondColumn = new Table();
-                    secondColumn.left();
-                    secondColumn.image(upgrade[1].uiIcon).size(60f).scaling(arc.util.Scaling.fit);
-                    secondColumn.row();
-                    secondColumn.add(upgrade[1].localizedName).color(arc.graphics.Color.white).left().fontScale(1.3f);
-                    table.add(secondColumn).padBottom(8f);
-                    
-                    table.row();
-                }
-            });
+            table.add("[accent]T" + minTier + " 升级档  [lightgray]T" + (minTier - 1) + " → T" + minTier)
+                .left().padTop(14f).padBottom(4f);
         });
-        
-        // T7 档位统计
+
+        // 原版 Reconstructor 统计: 原版全部属性 + 原版灰色面板样式的 T6 档位升级列表
+        super.setStats();
+
+        // T7(minTier+1) 档位标题 + 升级列表 (样式与原版一致)
         stats.add(Stat.output, table -> {
             table.row();
-            table.add("[accent]T" + (minTier + 1) + " 档位升级:").left().padTop(10f);
-            table.row();
-            table.add("[lightgray]T6 → T7 升级路径:").left().padBottom(5f);
+            table.add("[accent]T" + (minTier + 1) + " 升级档  [lightgray]T" + minTier + " → T" + (minTier + 1))
+                .left().padTop(14f).padBottom(4f);
             table.row();
             otherUpgrades.each(upgrade -> {
-                if (upgrade[0].unlockedNow() && upgrade[1].unlockedNow()) {
-                    Table upgradeRow = new Table();
-                    upgradeRow.left();
-                    
-                    // 第一列：原单位
-                    Table firstColumn = new Table();
-                    firstColumn.left();
-                    firstColumn.image(upgrade[0].uiIcon).size(60f).scaling(arc.util.Scaling.fit);
-                    firstColumn.row();
-                    firstColumn.add(upgrade[0].localizedName).color(arc.graphics.Color.white).left().fontScale(1.3f);
-                    table.add(firstColumn).padLeft(15f).padBottom(8f);
-                    
-                    // 第二列：升级箭头
-                    Table arrowColumn = new Table();
-                    arrowColumn.left();
-                    arrowColumn.add("⇨").color(arc.graphics.Color.yellow).size(32f);
-                    table.add(arrowColumn).padBottom(8f);
-                    
-                    // 第三列：升级单位
-                    Table secondColumn = new Table();
-                    secondColumn.left();
-                    secondColumn.image(upgrade[1].uiIcon).size(60f).scaling(arc.util.Scaling.fit);
-                    secondColumn.row();
-                    secondColumn.add(upgrade[1].localizedName).color(arc.graphics.Color.white).left().fontScale(1.3f);
-                    table.add(secondColumn).padBottom(8f);
-                    
+                if(upgrade[0].unlockedNow() && upgrade[1].unlockedNow()){
+                    table.table(Styles.grayPanel, t -> {
+                        t.left();
+                        t.image(upgrade[0].uiIcon).size(40f).pad(10f).left().scaling(arc.util.Scaling.fit)
+                            .with(i -> mindustry.world.meta.StatValues.withTooltip(i, upgrade[0]));
+                        t.table(info -> {
+                            info.add(upgrade[0].localizedName).left();
+                            info.row();
+                        }).pad(10f).left();
+                    }).fill().padTop(5f).padBottom(5f);
+
+                    table.table(Styles.grayPanel, t -> {
+                        t.image(Icon.right).color(Pal.darkishGray).size(40f).pad(10f);
+                    }).fill().padTop(5f).padBottom(5f);
+
+                    table.table(Styles.grayPanel, t -> {
+                        t.left();
+                        t.image(upgrade[1].uiIcon).size(40f).pad(10f).right().scaling(arc.util.Scaling.fit)
+                            .with(i -> mindustry.world.meta.StatValues.withTooltip(i, upgrade[1]));
+                        t.table(info -> {
+                            info.add(upgrade[1].localizedName).right();
+                            info.row();
+                        }).pad(10f).right();
+                    }).fill().padTop(5f).padBottom(5f);
+
                     table.row();
                 }
             });

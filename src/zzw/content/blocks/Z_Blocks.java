@@ -481,13 +481,14 @@ public class Z_Blocks {
                 new ModularConstructorPlan(UnitTypes.spiroct, 120f, 0,
                     ItemStack.with(Items.copper, 200, Items.lead, 100, Items.silicon, 250, Items.metaglass, 50, Items.graphite, 100)),
 
+                new ModularConstructorPlan(UnitTypes.zenith, 120f, 0,
+                    ItemStack.with(Items.copper, 180, Items.lead, 80, Items.silicon, 240, Items.metaglass, 60, Items.graphite, 80)),
+
+                new ModularConstructorPlan(UnitTypes.mega, 120f, 0,
+                    ItemStack.with(Items.copper, 180, Items.lead, 80, Items.silicon, 240, Items.metaglass, 60, Items.graphite, 80)),
+
+
                 // 2级: 5分钟建造时间 (★ 项目 T3 单位保留在此级; 新增 Scar 系列 T1 hovos)
-                new ModularConstructorPlan(UnitTypes.zenith, 300f, 1,
-                    ItemStack.with(Items.copper, 180, Items.lead, 80, Items.silicon, 240, Items.metaglass, 60, Items.graphite, 50)),
-                
-                new ModularConstructorPlan(UnitTypes.mega, 300f, 1,
-                    ItemStack.with(Items.copper, 180, Items.lead, 80, Items.silicon, 240, Items.metaglass, 60, Items.graphite, 50)),
-                
                 new ModularConstructorPlan(Z_Units.anthophila, 300f, 1,
                     ItemStack.with(Items.copper, 200, Items.lead, 100, Items.silicon, 200, Items.titanium, 50, Items.metaglass, 40, Items.graphite, 80)),
                 
@@ -497,13 +498,14 @@ public class Z_Blocks {
                 new ModularConstructorPlan(Z_MonolithUnits.pilaster, 300f, 1,
                     ItemStack.with(Items.copper, 100, Items.silicon, 280, Items.titanium, 200, Items.metaglass, 80, Items.graphite, 120)),
 
-                // Scar 系列 T1 (hovos): 构造器生产起点, 后续在重构器链上升级
                 new ModularConstructorPlan(Z_ScarUnits.hovos, 300f, 1,
                     ItemStack.with(Items.copper, 100, Items.lead, 80, Items.silicon, 120, Items.graphite, 60, Items.titanium, 40)),
 
+                new ModularConstructorPlan(Z_Units.arcnelidia, 300f, 1,
+                    ItemStack.with(Items.copper, 180, Items.lead, 120, Items.silicon, 100, Items.surgeAlloy, 20, Items.titanium, 40)),
+
                 // 3级: 8分钟建造时间 (★ arcnelidia / toxobyte 移入此级)
-                new ModularConstructorPlan(Z_Units.arcnelidia, 480f, 2,
-                    ItemStack.with(Items.copper, 180, Items.lead, 120, Items.silicon, 100, Items.surgeAlloy, 20)),
+
 
                 new ModularConstructorPlan(Z_Units.toxoswarmer, 480f, 2,
                     ItemStack.with(Items.copper, 350, Items.silicon, 500, Items.metaglass, 110, Z_Items.uranium, 80, Items.plastanium, 80, Items.phaseFabric, 20, Items.thorium, 120)),
@@ -517,9 +519,13 @@ public class Z_Blocks {
                 new ModularConstructorPlan(Z_Units.toxobyte, 300f, 2,
                     ItemStack.with(Items.copper, 300, Items.silicon, 500, Items.metaglass, 100, Z_Items.uranium, 100)),
 
+
                 // 4级: 15分钟建造时间
-                new ModularConstructorPlan(Z_Units.devourer, 900f, 3,
-                    ItemStack.with(Items.copper, 18000, Items.lead, 15000, Items.silicon, 9000, Items.metaglass, 5000, Items.plastanium, 3500, Items.surgeAlloy, 1900, Items.phaseFabric, 2000, Items.graphite, 5200, Items.thorium, 10000)),
+                new ModularConstructorPlan(Z_Units.opticaecus, 900f, 3,
+                    ItemStack.with(Items.copper, 7000, Items.lead, 6400, Items.silicon, 5900, Items.metaglass, 2600, Items.plastanium, 2000, Items.surgeAlloy, 2000, Items.phaseFabric, 2000, Items.graphite, 2800, Items.thorium, 4900)),
+
+                new ModularConstructorPlan(Z_Units.chronos, 900f, 3,
+                    ItemStack.with(Items.copper, 5600, Items.lead, 5000, Items.silicon, 4800, Items.metaglass, 1800, Items.plastanium, 1100, Items.surgeAlloy, 1400, Items.phaseFabric, 1200, Items.graphite, 2100, Items.thorium, 4000)),
                 
                 new ModularConstructorPlan(Z_Units.enigma, 900f, 3,
                     ItemStack.with(Items.copper, 4000, Items.lead, 4500, Items.silicon, 3200, Items.metaglass, 1000, Items.plastanium, 800, Items.surgeAlloy, 500, Items.phaseFabric, 500, Items.graphite, 1000, Items.thorium, 3200))
