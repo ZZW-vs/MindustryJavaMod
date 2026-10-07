@@ -25,7 +25,9 @@ bool empty(vec4 col){
     return col.r == 0.0 && col.g == 0.0 && col.b == 0.0;
 }
 
-bool equal(float a, float b){
+// 注意: 不可命名为 equal() —— GLSL ES 内置了 equal(), 严格驱动 (Mali/Adreno)
+// 会报 "can't redefine/overload built-in functions", 导致移动端着色器编译失败崩溃
+bool id(float a, float b){
     return abs(a - b) < 0.1;
 }
 
@@ -71,7 +73,7 @@ vec4 draw(vec4 color, float j, vec2 blastpos, vec2 pos, vec2 v){
 
     vec4 noise = texture2D(u_noise, trns);
 
-    if(equal(idx, noise.r)){
+    if(id(idx, noise.r)){
         vec4 c = texture2D(u_texture, trnst);
         if(c.a <= 0.0) return color;
 
@@ -84,7 +86,7 @@ vec4 draw(vec4 color, float j, vec2 blastpos, vec2 pos, vec2 v){
             vec4 scanc = texture2D(u_noise, trns + vec2(0.0, -sk) * v);
             vec4 scand = texture2D(u_noise, trns + vec2(-sk, 0.0) * v);
 
-            if(!equal(idx, scana.r) || !equal(idx, scanb.r) || !equal(idx, scanc.r) || !equal(idx, scand.r)){
+            if(!id(idx, scana.r) || !id(idx, scanb.r) || !id(idx, scanc.r) || !id(idx, scand.r)){
                 heat.rgb = heatcolor.rgb;
             }
         }
