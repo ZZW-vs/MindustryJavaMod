@@ -14,7 +14,6 @@ import zzw.content.blocks.modular.PartStat;
 import zzw.content.blocks.modular.PartStatType;
 import zzw.content.blocks.modular.PartType;
 import zzw.content.blocks.power.CombustionHeater;
-import zzw.content.blocks.power.CoolingHeater;
 import zzw.content.blocks.power.HeatPipe;
 import zzw.content.blocks.power.HeatSource;
 import zzw.content.blocks.power.SolarCollector;
@@ -106,8 +105,6 @@ public class Z_Torque{
     public static ThermalHeater thermalHeater;
     /** 燃烧加热器: 焚烧可燃物产热 */
     public static CombustionHeater combustionHeater;
-    /** 制冷机: 消耗冷冻液主动降温 (最低 -200℃) */
-    public static CoolingHeater coolingHeater;
     /** 太阳能集热器: 配合反射镜聚焦产热 */
     public static SolarCollector solarCollector;
     /** 太阳反射镜: 为集热器聚焦光线 */
@@ -395,15 +392,6 @@ public class Z_Torque{
             itemCapacity = 5;
             maxTemp = 1200f;
             mulCoeff = 0.45f;
-            addGraph(new GraphHeat(40f, 0.6f, 0.004f).setAccept(1, 1, 0, 0, 0, 0, 0, 0));
-        }};
-
-        // cooling-heater: 制冷机 (照抄燃烧加热器, 消耗冷冻液把热网降到 -200℃)
-        coolingHeater = new CoolingHeater("cooling-heater"){{
-            requirements(Category.power, with(Items.copper, 100, Z_Items.nickel, 70, Items.graphite, 40, Items.titanium, 80));
-            size = 2;
-            health = 550;
-            liquidCapacity = 30f;
             addGraph(new GraphHeat(40f, 0.6f, 0.004f).setAccept(1, 1, 0, 0, 0, 0, 0, 0));
         }};
 

@@ -61,11 +61,13 @@ public abstract class GraphModule<T extends Graph, M extends GraphModule<T, M, G
     void onCreate(GraphBuildBase build){
         acceptPorts.setSize(graph.accept.length);
         neighbours.shrink(graph.accept.length);
-        //blockSize = graph.accept.length / 4;
+        // ★ 顺序调整: 先重置统计, 再建网。
+        //   原顺序 (initAllNets → initStats) 会把 initAllNets() → updateOnGraphChanged()
+        //   写入的 liquidCap/totalCapacity 随后清零, 导致孤立坩埚容量恒为 0、无法接收物品。
+        initStats();
         initAllNets();
         needsNetworkUpdate = true;
         lastRecalc = -1;
-        initStats();
         initialized = true;
     }
 

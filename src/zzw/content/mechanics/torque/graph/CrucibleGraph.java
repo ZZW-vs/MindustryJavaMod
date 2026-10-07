@@ -169,18 +169,21 @@ public class CrucibleGraph extends BaseGraph<GraphCrucibleModule, CrucibleGraph>
 
         for(var module : connected){
             int bitmask = 0;
-            if(!module.initialized()){
-                module.tilingIndex = 0;
-                return;
-            }
-            for(int i = 0; i < 8; i++){
-                Tile tile = module.parent.build.asBuilding().tile.nearby(Geometry.d8(i));
-                if(tile == null || !(tile.build instanceof GraphBuildBase build)) continue;
+            // ★ 未完成 onCreate 初始化的模块也要计入容量。
+            //   否则孤立坩埚在 onCreate → initAllNets → 本方法时 initialized 仍为 false,
+            //   原实现的 early-return 会让 totalCapacity 恒为 0 → canContainMore 恒 false
+            //   → acceptItem 拒绝所有物品; 只有先连上其它图方块触发一次图变化才能进料。
+            //   容量 (= baseLiquidCapacity) 与初始化无关, 恒应累加; 仅贴图位掩码需要邻居信息。
+            if(module.initialized()){
+                for(int i = 0; i < 8; i++){
+                    Tile tile = module.parent.build.asBuilding().tile.nearby(Geometry.d8(i));
+                    if(tile == null || !(tile.build instanceof GraphBuildBase build)) continue;
 
-                GraphCrucibleModule conModule = build.crucible();
-                if(conModule == null || conModule.dead() || !canConnect(module, conModule)) continue;
+                    GraphCrucibleModule conModule = build.crucible();
+                    if(conModule == null || conModule.dead() || !canConnect(module, conModule)) continue;
 
-                bitmask += 1 << i;
+                    bitmask += 1 << i;
+                }
             }
 
             // PU_V8 模型: 每个方块贡献固定的基础容量 (旧版按直连邻居数打折会令孤立坩埚容量为 0)
