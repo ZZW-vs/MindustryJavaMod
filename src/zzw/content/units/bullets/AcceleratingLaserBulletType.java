@@ -129,18 +129,22 @@ public class AcceleratingLaserBulletType extends BulletType {
         }
     }
 
-    /** 简化版激光碰撞检测 */
+    /** 简化版激光碰撞检测: 只对"贴着激光线段"的目标造成伤害 */
     private void checkLaserCollision(Bullet b, float x1, float y1, float x2, float y2) {
         float fn = 1f; // 简化: 不使用 PU_V8 fn 复杂公式
         float dmg = damage * fn;
 
-        // 检测建筑
+        // 检测建筑: 用"点到线段距离"过滤, 只打激光横扫过的建筑
+        // (原来直接用 indexer 的圆形范围, 会把光束半径内的所有建筑全部误伤, 与视觉完全不符)
         mindustry.Vars.indexer.eachBlock(null, x1, y1, b.fdata + 50f,
                 build -> build.team != b.team,
                 build -> {
+                    float br = build.block.size * Vars.tilesize / 2f;
+                    if (Intersector.distanceSegmentPoint(x1, y1, x2, y2, build.x, build.y) > collisionWidth + br) return;
+
                     if (build.block.absorbLasers) {
                         // 撞到吸收激光的建筑, 截断激光长度
-                        b.fdata = Math.min(b.fdata, b.dst(build) - build.block.size * Vars.tilesize / 2f);
+                        b.fdata = Math.min(b.fdata, b.dst(build) - br);
                     }
                     build.damage(dmg * buildingDamageMultiplier);
                 });

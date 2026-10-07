@@ -120,7 +120,12 @@ public abstract class BaseGraph<M extends GraphModule<? extends Graph, M, G>, G 
                     if(neighbourIndex == neighs.size) return false;
                     target = neighs.get(neighbourIndex);
                 }
-                front.comparator = Comparator.comparingInt(a -> a.hueristic(target.parent.build));
+                // ★ Android 兼容 (修复 NoClassDefFoundError: java.util.Comparator$-CC):
+                //   不能用 Comparator.comparingInt 等组合器——其字节码会引用 javac 生成的
+                //   companion class "java.util.Comparator$-CC", 该类在 Android/ART 上不存在,
+                //   运行到此处即崩溃。改用普通 lambda (invokedynamic, 全平台可用)。
+                front.comparator = (a, b) -> Integer.compare(
+                    a.hueristic(target.parent.build), b.hueristic(target.parent.build));
             }
             visited.add(current);
             current.eachNeighbour(n -> {
