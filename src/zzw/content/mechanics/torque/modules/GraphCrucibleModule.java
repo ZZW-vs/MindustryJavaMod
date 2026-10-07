@@ -85,7 +85,10 @@ public class GraphCrucibleModule extends GraphModule<GraphCrucible, GraphCrucibl
     @Override
     void initStats(){
         tilingIndex = 0;
-        liquidCap = 0f;
+        // ★ 不要在此清零 liquidCap: onCreate 里 initAllNets() 会经由
+        //   CrucibleGraph.updateOnGraphChanged() 先把 liquidCap 设为 baseLiquidCapacity,
+        //   而 initStats() 随后执行。若在此清零, 孤立坩埚的 liquidCap 会一直为 0
+        //   (直到发生一次图变化), 影响熔融液绘制比例与网络拆分分摊。
         propsList.clear();
     }
 

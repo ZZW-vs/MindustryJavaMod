@@ -289,7 +289,8 @@
 - 合并时有烟雾效果和延迟检查
 
 ## 更新日志
-- 修复坩埚 (crucible)「不能往里面输入物品，接上管道/其它可连接方块后才能进料」：`GraphModule.onCreate()` 原先在 `initialized = true` **之前**调用 `initAllNets()`（→ `CrucibleGraph.updateOnGraphChanged()`），而后者遇到未初始化模块会 early-return，导致孤立坩埚的 `totalCapacity` 恒为 0 → `canContainMore` 恒 false → `acceptItem` 拒绝物品；只有发生一次图变化（接上邻居）才会重算容量。现改为：`updateOnGraphChanged` 对未初始化模块也照常累加容量（仅贴图位掩码依赖邻居信息），并把 `initStats()` 移到 `initAllNets()` 之前，避免刚算出的 `liquidCap/totalCapacity` 被清零。
+- 修复坩埚 (crucible)「不能往里面输入物品，接上管道/其它可连接方块后才能进料」：`CrucibleGraph.updateOnGraphChanged()` 原先遇到「未初始化模块」会 early-return，而它是在 `GraphModule.onCreate()` → `initAllNets()` 阶段（此时模块尚未 `initialized`）被调用的，于是孤立坩埚的 `totalCapacity` 恒为 0 → `canContainMore` 恒 false → `acceptItem` 拒绝物品；只有发生一次图变化（接上邻居）才会重算容量。现改为：`updateOnGraphChanged` 对未初始化模块也照常累加容量（容量 = `baseLiquidCapacity`，与是否初始化无关；仅贴图位掩码依赖邻居信息），并移除了 `GraphCrucibleModule.initStats()` 里对 `liquidCap` 的清零（它会在 `initAllNets()` 之后把刚算好的容量抹掉）。
+  - 注：修复过程中曾把 `initStats()` 提前到 `initAllNets()` 之前，会令 `GraphTorqueModule.initStats()` → `setInertia()` 访问尚未建立的 `networks.get(0)` 抛 NPE（放置扭矩方块即崩）。已恢复原顺序（必须先建网再 initStats）。
 - 移除方块 `create-cooling-heater`（制冷机，暂不再使用）及其注册、bundle 文案与 `CoolingHeater` 类。
 - 修复 Android 平台崩溃 `NoClassDefFoundError: java.util.Comparator$-CC`（拆除机械方块/管道时触发）：`BaseGraph.isAtriculationPoint` 使用了 `Comparator.comparingInt(...)`，其字节码会引用 javac 生成的 companion class `java.util.Comparator$-CC`，该类在 Android/ART 上不存在。改用普通 lambda + `Integer.compare`，Desktop / Android 全平台兼容。
 - 修复热管 (heat-pipe)「实际已连接但贴图仍显示未连接」：`HeatPipeBuild` 原先只在 `onNeighboursChanged()` 里按邻居位掩码算一次贴图变体，图重建过程中的增量注册/提前 return 可能漏发该通知，导致掩码残留旧值。现在 `draw()` 每帧按当前真实邻居重算掩码，彻底避免残留。
